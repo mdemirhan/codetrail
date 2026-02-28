@@ -905,27 +905,81 @@ body.platform-macos .titlebar-left {
   padding: 4px 8px;
 }
 
-.toolbar-select {
+.expand-scope-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   height: 28px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.expand-scope-control::after {
+  content: "";
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--text-tertiary);
+  transform: translateY(-30%);
+  pointer-events: none;
+}
+
+.expand-scope-control:hover {
+  border-color: var(--border-active);
+}
+
+.expand-scope-control:focus-within {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px var(--accent-blue-dim);
+}
+
+.expand-scope-action {
+  height: 100%;
+  border: none;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0 10px;
+  min-width: 88px;
+}
+
+.expand-scope-action:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.expand-scope-action:disabled {
+  opacity: 0.55;
+}
+
+.expand-scope-select {
+  height: 100%;
+  border: none;
+  background: transparent;
   color: var(--text-secondary);
   font-size: 11.5px;
   font-weight: 500;
-  padding: 0 8px;
-  min-width: 96px;
-  box-shadow: var(--shadow-sm);
+  padding: 0 24px 0 10px;
+  min-width: 86px;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
-.toolbar-select:hover {
-  border-color: var(--border-active);
+.expand-scope-select:hover {
   color: var(--text-primary);
 }
 
-.toolbar-select:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px var(--accent-blue-dim);
+.expand-scope-select:focus {
+  outline: none;
 }
 
 .toolbar-zoom-group {

@@ -737,7 +737,8 @@ export function App() {
     () => (bulkExpandScope === "all" ? "All" : prettyCategory(bulkExpandScope)),
     [bulkExpandScope],
   );
-  const scopedExpandCollapseLabel = `${areScopedMessagesExpanded ? "Collapse" : "Expand"} ${bulkScopeLabel}`;
+  const scopedActionLabel = areScopedMessagesExpanded ? "Collapse" : "Expand";
+  const scopedExpandCollapseLabel = `${scopedActionLabel} ${bulkScopeLabel}`;
   const workspaceStyle = isHistoryLayout
     ? {
         gridTemplateColumns: `${projectPaneWidth}px 1px ${sessionPaneWidth}px 1px minmax(420px, 1fr)`,
@@ -904,36 +905,40 @@ export function App() {
                     {selectedSession ? deriveSessionTitle(selectedSession) : "Session Detail"}
                   </div>
                   <div className="msg-toolbar">
-                    <button
-                      type="button"
-                      className="toolbar-btn"
-                      onClick={handleToggleScopedMessagesExpanded}
-                      disabled={scopedMessages.length === 0}
-                      aria-label={scopedExpandCollapseLabel}
-                      title={scopedExpandCollapseLabel}
-                    >
-                      <ToolbarIcon name={areScopedMessagesExpanded ? "collapseAll" : "expandAll"} />
-                      {scopedExpandCollapseLabel}
-                    </button>
-                    <select
-                      className="toolbar-select"
-                      value={bulkExpandScope}
-                      onChange={(event) => {
-                        const nextScope = event.target.value;
-                        setBulkExpandScope(
-                          nextScope === "all" ? "all" : (nextScope as MessageCategory),
-                        );
-                      }}
-                      aria-label="Select expand and collapse scope"
-                      title="Choose which message type expand/collapse applies to"
-                    >
-                      <option value="all">All</option>
-                      {CATEGORIES.map((category) => (
-                        <option key={category} value={category}>
-                          {prettyCategory(category)}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="expand-scope-control">
+                      <button
+                        type="button"
+                        className="toolbar-btn expand-scope-action"
+                        onClick={handleToggleScopedMessagesExpanded}
+                        disabled={scopedMessages.length === 0}
+                        aria-label={scopedExpandCollapseLabel}
+                        title={scopedExpandCollapseLabel}
+                      >
+                        <ToolbarIcon
+                          name={areScopedMessagesExpanded ? "collapseAll" : "expandAll"}
+                        />
+                        {scopedActionLabel}
+                      </button>
+                      <select
+                        className="expand-scope-select"
+                        value={bulkExpandScope}
+                        onChange={(event) => {
+                          const nextScope = event.target.value;
+                          setBulkExpandScope(
+                            nextScope === "all" ? "all" : (nextScope as MessageCategory),
+                          );
+                        }}
+                        aria-label="Select expand and collapse scope"
+                        title="Choose which message type expand/collapse applies to"
+                      >
+                        <option value="all">All</option>
+                        {CATEGORIES.map((category) => (
+                          <option key={category} value={category}>
+                            {prettyCategory(category)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="toolbar-zoom-group">
                       <button
                         type="button"
