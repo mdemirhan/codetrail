@@ -14,6 +14,9 @@
     "desktop:build": "bun run --cwd apps/desktop build",
     "desktop:start": "bun run --cwd apps/desktop start",
     "desktop:dev": "bun run --cwd apps/desktop start",
+    "desktop:make:mac": "bun run --cwd apps/desktop make:mac",
+    "desktop:make:mac:x64": "bun run --cwd apps/desktop make:mac:x64",
+    "desktop:make:mac:arm64": "bun run --cwd apps/desktop make:mac:arm64",
     "ci": "bun run lint && bun run typecheck && bun run test"
   },
   "devDependencies": {
