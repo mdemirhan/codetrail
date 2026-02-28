@@ -1,0 +1,29 @@
+{
+  "name": "cch-ts",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "install": "echo \"Dependencies are managed by 'bun install'.\"",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "ELECTRON_RUN_AS_NODE=1 ./apps/desktop/node_modules/.bin/electron ./node_modules/vitest/vitest.mjs run",
+    "test:watch": "ELECTRON_RUN_AS_NODE=1 ./apps/desktop/node_modules/.bin/electron ./node_modules/vitest/vitest.mjs",
+    "test:e2e": "playwright test",
+    "desktop:build": "bun run --cwd apps/desktop build",
+    "desktop:start": "bun run --cwd apps/desktop start",
+    "desktop:dev": "bun run --cwd apps/desktop start",
+    "ci": "bun run lint && bun run typecheck && bun run test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@playwright/test": "1.51.1",
+    "@types/better-sqlite3": "7.6.12",
+    "@types/node": "22.13.10",
+    "@types/react": "19.0.12",
+    "@types/react-dom": "19.0.4",
+    "typescript": "5.8.2",
+    "vitest": "3.0.8"
+  }
+}

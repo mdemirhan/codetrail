@@ -1,0 +1,14 @@
+{
+  "entries": [
+    {
+      "sessionId": "claude-session-redacted-001",
+      "summary": "Refactor parser branches and add tests",
+      "firstPrompt": "Please help refactor parsing logic and add reliable tests.",
+      "messageCount": 4,
+      "created": "2026-02-20T10:00:00Z",
+      "modified": "2026-02-20T10:04:00Z",
+      "gitBranch": "feature/testing",
+      "isSidechain": false
+    }
+  ]
+}

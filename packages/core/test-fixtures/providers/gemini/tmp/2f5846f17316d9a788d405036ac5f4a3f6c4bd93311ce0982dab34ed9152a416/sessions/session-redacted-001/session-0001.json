@@ -1,0 +1,37 @@
+{
+  "sessionId": "gemini-session-redacted-001",
+  "projectHash": "2f5846f17316d9a788d405036ac5f4a3f6c4bd93311ce0982dab34ed9152a416",
+  "startTime": "2026-02-20T12:00:00Z",
+  "lastUpdated": "2026-02-20T12:05:00Z",
+  "messages": [
+    {
+      "id": "g-u-1",
+      "timestamp": "2026-02-20T12:00:10Z",
+      "type": "user",
+      "content": [
+        {
+          "text": "Please summarize these parser refactor changes."
+        }
+      ]
+    },
+    {
+      "id": "g-a-1",
+      "timestamp": "2026-02-20T12:00:30Z",
+      "type": "gemini",
+      "model": "gemini-3.1-pro-preview",
+      "content": "I grouped parser logic by provider and normalized categories.",
+      "thoughts": ["I should keep category mapping deterministic."],
+      "tokens": {
+        "input": 55,
+        "output": 29,
+        "cached": 7
+      }
+    },
+    {
+      "id": "g-i-1",
+      "timestamp": "2026-02-20T12:00:45Z",
+      "type": "info",
+      "content": "Fixture-only info event."
+    }
+  ]
+}

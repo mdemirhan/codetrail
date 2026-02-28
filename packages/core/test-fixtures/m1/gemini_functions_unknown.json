@@ -1,0 +1,111 @@
+{
+  "name": "gemini parts with function call and unknown fallback",
+  "input": {
+    "provider": "gemini",
+    "sessionId": "gemini-session-1",
+    "payload": {
+      "messages": [
+        {
+          "author": "user",
+          "timestamp": "2026-02-27T12:00:00Z",
+          "parts": [
+            {
+              "text": "Refactor this function."
+            }
+          ]
+        },
+        {
+          "author": "model",
+          "created_at": "2026-02-27T12:00:10Z",
+          "usage": {
+            "prompt_tokens": 90,
+            "completion_tokens": 30
+          },
+          "parts": [
+            {
+              "type": "thinking",
+              "text": "Need to inspect call sites first."
+            },
+            {
+              "text": "Here is a safe refactor plan."
+            },
+            {
+              "functionCall": {
+                "name": "edit_file",
+                "args": {
+                  "path": "src/app.ts"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "mystery_event",
+          "createdAt": "2026-02-27T12:00:30Z",
+          "payload": {
+            "foo": "bar"
+          }
+        }
+      ]
+    }
+  },
+  "expected": {
+    "messages": [
+      {
+        "sessionId": "gemini-session-1",
+        "provider": "gemini",
+        "category": "user",
+        "content": "Refactor this function.",
+        "createdAt": "2026-02-27T12:00:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "gemini-session-1",
+        "provider": "gemini",
+        "category": "thinking",
+        "content": "Need to inspect call sites first.",
+        "createdAt": "2026-02-27T12:00:10.000Z",
+        "tokenInput": 90,
+        "tokenOutput": 30
+      },
+      {
+        "sessionId": "gemini-session-1",
+        "provider": "gemini",
+        "category": "assistant",
+        "content": "Here is a safe refactor plan.",
+        "createdAt": "2026-02-27T12:00:10.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "gemini-session-1",
+        "provider": "gemini",
+        "category": "tool_use",
+        "content": "{\"name\":\"edit_file\",\"args\":{\"path\":\"src/app.ts\"}}",
+        "createdAt": "2026-02-27T12:00:10.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "gemini-session-1",
+        "provider": "gemini",
+        "category": "system",
+        "content": "{\"type\":\"mystery_event\",\"createdAt\":\"2026-02-27T12:00:30Z\",\"payload\":{\"foo\":\"bar\"}}",
+        "createdAt": "2026-02-27T12:00:30.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      }
+    ],
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "code": "parser.unknown_event_shape",
+        "provider": "gemini",
+        "sessionId": "gemini-session-1",
+        "eventIndex": 2,
+        "message": "Event shape did not match known patterns; normalized to system message."
+      }
+    ]
+  }
+}

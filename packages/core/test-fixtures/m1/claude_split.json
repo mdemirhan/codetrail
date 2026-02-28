@@ -1,0 +1,106 @@
+{
+  "name": "claude split event with token-first attachment",
+  "input": {
+    "provider": "claude",
+    "sessionId": "claude-session-1",
+    "payload": {
+      "events": [
+        {
+          "role": "user",
+          "createdAt": "2026-02-27T10:00:00Z",
+          "content": [
+            {
+              "type": "text",
+              "text": "Summarize the file changes."
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "createdAt": "2026-02-27T10:00:05Z",
+          "usage": {
+            "input_tokens": 120,
+            "output_tokens": 45
+          },
+          "content": [
+            {
+              "type": "thinking",
+              "text": "Need to inspect the project files first."
+            },
+            {
+              "type": "text",
+              "text": "I will open the relevant files now."
+            },
+            {
+              "type": "tool_use",
+              "name": "read_file",
+              "input": {
+                "path": "src/main.ts"
+              }
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "createdAt": "2026-02-27T10:00:06Z",
+          "content": [
+            {
+              "type": "tool_result",
+              "content": "Read 120 lines from src/main.ts"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expected": {
+    "messages": [
+      {
+        "sessionId": "claude-session-1",
+        "provider": "claude",
+        "category": "user",
+        "content": "Summarize the file changes.",
+        "createdAt": "2026-02-27T10:00:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "claude-session-1",
+        "provider": "claude",
+        "category": "thinking",
+        "content": "Need to inspect the project files first.",
+        "createdAt": "2026-02-27T10:00:05.000Z",
+        "tokenInput": 120,
+        "tokenOutput": 45
+      },
+      {
+        "sessionId": "claude-session-1",
+        "provider": "claude",
+        "category": "assistant",
+        "content": "I will open the relevant files now.",
+        "createdAt": "2026-02-27T10:00:05.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "claude-session-1",
+        "provider": "claude",
+        "category": "tool_use",
+        "content": "{\"type\":\"tool_use\",\"name\":\"read_file\",\"input\":{\"path\":\"src/main.ts\"}}",
+        "createdAt": "2026-02-27T10:00:05.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "claude-session-1",
+        "provider": "claude",
+        "category": "tool_result",
+        "content": "Read 120 lines from src/main.ts",
+        "createdAt": "2026-02-27T10:00:06.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      }
+    ],
+    "diagnostics": []
+  }
+}

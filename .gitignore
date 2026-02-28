@@ -1,0 +1,12 @@
+node_modules
+bun.lock
+.DS_Store
+coverage
+.vitest
+playwright-report
+test-results
+dist
+apps/desktop/dist
+*.db
+*.db-shm
+*.db-wal

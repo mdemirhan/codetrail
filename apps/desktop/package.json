@@ -1,0 +1,27 @@
+{
+  "name": "@cch/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "bun run ./scripts/build.ts",
+    "verify:native": "ELECTRON_RUN_AS_NODE=1 electron -e \"const Database=require('better-sqlite3'); const db=new Database(':memory:'); db.prepare('select 1').get(); db.close(); console.log('better-sqlite3 ABI OK')\"",
+    "rebuild:native": "HOME=./.home npm_config_devdir=./.electron-gyp electron-rebuild -f -w better-sqlite3",
+    "fix:native": "bun run verify:native || bun run rebuild:native",
+    "prestart": "bun run build && bun run fix:native",
+    "predev": "bun run prestart",
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "dependencies": {
+    "@cch/core": "workspace:*",
+    "better-sqlite3": "11.8.1",
+    "electron": "35.0.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.3"
+  }
+}
