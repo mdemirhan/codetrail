@@ -39,10 +39,10 @@ export function ToolbarIcon({
       return "M8 8h11v13H8zM5 3h11v3H8v2H5z";
     }
     if (name === "zoomIn") {
-      return "M11 5v12M5 11h12M18.5 18.5L22 22";
+      return "M12 7v10M7 12h10";
     }
     if (name === "zoomOut") {
-      return "M5 11h12M18.5 18.5L22 22";
+      return "M7 12h10";
     }
     if (name === "zoomReset") {
       return "M12 6v5l3 2M6 5h12v14H6z";
