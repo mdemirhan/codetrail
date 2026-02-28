@@ -9,6 +9,8 @@ playwright-report
 test-results
 dist
 apps/desktop/dist
+apps/desktop/out
+apps/desktop/assets/icons/build
 apps/desktop/.home/
 apps/desktop/.electron-gyp/
 .env
