@@ -92,7 +92,12 @@ export function MessageCard({
           <div className="message-meta">
             <span className="msg-time">{formatDate(message.createdAt)}</span>
             {operationDurationLabel ? (
-              <span className="msg-time">· Took: {operationDurationLabel}</span>
+              <>
+                <span className="msg-separator" aria-hidden="true">
+                  ·
+                </span>
+                <span className="msg-time">Took: {operationDurationLabel}</span>
+              </>
             ) : null}
           </div>
         </div>

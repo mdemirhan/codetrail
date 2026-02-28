@@ -1379,7 +1379,13 @@ body.platform-macos .titlebar-left {
 .message-meta {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+}
+
+.msg-separator {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  margin: 0 6px;
 }
 
 .msg-provider,
