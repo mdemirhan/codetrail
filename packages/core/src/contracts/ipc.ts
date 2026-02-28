@@ -70,6 +70,7 @@ const paneStateSchema = z.object({
   historyCategories: z.array(messageCategorySchema).nullable(),
   searchProviders: z.array(providerSchema).nullable(),
   searchCategories: z.array(messageCategorySchema).nullable(),
+  theme: z.enum(["light", "dark"]).nullable(),
 });
 
 const uiZoomResponseSchema = z.object({
@@ -173,6 +174,7 @@ export const ipcContractSchemas = {
       historyCategories: z.array(messageCategorySchema),
       searchProviders: z.array(providerSchema),
       searchCategories: z.array(messageCategorySchema),
+      theme: z.enum(["light", "dark"]),
     }),
     response: z.object({
       ok: z.literal(true),

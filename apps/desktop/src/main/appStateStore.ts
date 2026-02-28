@@ -3,6 +3,8 @@ import { dirname } from "node:path";
 
 import type { MessageCategory, Provider } from "@codetrail/core";
 
+export type ThemeMode = "light" | "dark";
+
 export type PaneState = {
   projectPaneWidth: number;
   sessionPaneWidth: number;
@@ -10,6 +12,7 @@ export type PaneState = {
   historyCategories?: MessageCategory[];
   searchProviders?: Provider[];
   searchCategories?: MessageCategory[];
+  theme?: ThemeMode;
 };
 
 export type WindowState = {
@@ -39,6 +42,7 @@ const CATEGORY_VALUES: MessageCategory[] = [
   "thinking",
   "system",
 ];
+const THEME_VALUES: ThemeMode[] = ["light", "dark"];
 
 export class AppStateStore {
   private readonly filePath: string;
@@ -154,6 +158,7 @@ function sanitizePaneState(value: unknown): PaneState | null {
   const historyCategories = sanitizeStringArray(record.historyCategories, CATEGORY_VALUES);
   const searchProviders = sanitizeStringArray(record.searchProviders, PROVIDER_VALUES);
   const searchCategories = sanitizeStringArray(record.searchCategories, CATEGORY_VALUES);
+  const theme = sanitizeStringValue(record.theme, THEME_VALUES);
 
   return {
     projectPaneWidth,
@@ -162,6 +167,7 @@ function sanitizePaneState(value: unknown): PaneState | null {
     ...(historyCategories ? { historyCategories } : {}),
     ...(searchProviders ? { searchProviders } : {}),
     ...(searchCategories ? { searchCategories } : {}),
+    ...(theme ? { theme } : {}),
   };
 }
 
@@ -225,4 +231,11 @@ function sanitizeStringArray<T extends string>(value: unknown, universe: readonl
   }
 
   return deduped;
+}
+
+function sanitizeStringValue<T extends string>(value: unknown, universe: readonly T[]): T | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  return universe.includes(value as T) ? (value as T) : null;
 }

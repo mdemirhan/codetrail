@@ -12,12 +12,16 @@ describe("AppStateStore", () => {
     const filePath = join(dir, "ui-state.json");
 
     const store = new AppStateStore(filePath);
-    store.setPaneState({ projectPaneWidth: 312, sessionPaneWidth: 404 });
+    store.setPaneState({ projectPaneWidth: 312, sessionPaneWidth: 404, theme: "dark" });
     store.setWindowState({ width: 1440, height: 920, x: 48, y: 72, isMaximized: false });
     store.flush();
 
     const reloaded = new AppStateStore(filePath);
-    expect(reloaded.getPaneState()).toEqual({ projectPaneWidth: 312, sessionPaneWidth: 404 });
+    expect(reloaded.getPaneState()).toEqual({
+      projectPaneWidth: 312,
+      sessionPaneWidth: 404,
+      theme: "dark",
+    });
     expect(reloaded.getWindowState()).toEqual({
       width: 1440,
       height: 920,

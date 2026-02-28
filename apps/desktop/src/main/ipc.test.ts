@@ -60,6 +60,7 @@ describe("registerIpcHandlers", () => {
           historyCategories: null,
           searchProviders: null,
           searchCategories: null,
+          theme: null,
         }),
         "ui:setState": () => ({
           ok: true,

@@ -58,11 +58,13 @@ const EMPTY_CATEGORY_COUNTS = {
 };
 
 type MainView = "history" | "search";
+type ThemeMode = "light" | "dark";
 
 export function App() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [mainView, setMainView] = useState<MainView>("history");
+  const [theme, setTheme] = useState<ThemeMode>("light");
   const [focusMode, setFocusMode] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
@@ -221,6 +223,9 @@ export function App() {
         if (response.searchCategories !== null) {
           setSearchCategories(response.searchCategories);
         }
+        if (response.theme !== null) {
+          setTheme(response.theme);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -259,6 +264,10 @@ export function App() {
   }, [logError]);
 
   useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
     if (!paneStateHydrated) {
       return;
     }
@@ -272,6 +281,7 @@ export function App() {
           historyCategories,
           searchProviders,
           searchCategories,
+          theme,
         })
         .catch((error: unknown) => {
           logError("Failed saving UI state", error);
@@ -290,6 +300,7 @@ export function App() {
     searchCategories,
     searchProviders,
     sessionPaneWidth,
+    theme,
   ]);
 
   useEffect(() => {
@@ -683,12 +694,14 @@ export function App() {
     <main className="app-shell">
       <TopBar
         mainView={mainView}
+        theme={theme}
         refreshing={refreshing}
         focusMode={focusMode}
         focusDisabled={mainView !== "history"}
         onToggleSearchView={() =>
           setMainView((value) => (value === "history" ? "search" : "history"))
         }
+        onThemeChange={setTheme}
         onIncrementalRefresh={() => void handleIncrementalRefresh()}
         onToggleFocus={() => setFocusMode((value) => !value)}
         onToggleShortcuts={() => setShowShortcuts((value) => !value)}
@@ -920,6 +933,7 @@ export function App() {
                   placeholder="Filter by project text"
                 />
                 <select
+                  className="search-select"
                   value={searchProjectId}
                   onChange={(event) => setSearchProjectId(event.target.value)}
                 >

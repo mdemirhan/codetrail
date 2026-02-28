@@ -2,19 +2,23 @@ import { ToolbarIcon } from "./ToolbarIcon";
 
 export function TopBar({
   mainView,
+  theme,
   refreshing,
   focusMode,
   focusDisabled,
   onToggleSearchView,
+  onThemeChange,
   onIncrementalRefresh,
   onToggleFocus,
   onToggleShortcuts,
 }: {
   mainView: "history" | "search";
+  theme: "light" | "dark";
   refreshing: boolean;
   focusMode: boolean;
   focusDisabled: boolean;
   onToggleSearchView: () => void;
+  onThemeChange: (theme: "light" | "dark") => void;
   onIncrementalRefresh: () => void;
   onToggleFocus: () => void;
   onToggleShortcuts: () => void;
@@ -48,6 +52,16 @@ export function TopBar({
           <ToolbarIcon name={focusMode ? "closeFocus" : "focus"} />
           Focus
         </button>
+        <select
+          className="theme-select"
+          value={theme}
+          onChange={(event) => onThemeChange(event.target.value as "light" | "dark")}
+          aria-label="Theme"
+          title="Theme"
+        >
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
         <button type="button" className="tb-btn primary" onClick={onToggleShortcuts}>
           <ToolbarIcon name="shortcuts" />
           Shortcuts

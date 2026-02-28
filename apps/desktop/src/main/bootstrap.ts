@@ -71,6 +71,7 @@ export async function bootstrapMainProcess(
         historyCategories: paneState?.historyCategories ?? null,
         searchProviders: paneState?.searchProviders ?? null,
         searchCategories: paneState?.searchCategories ?? null,
+        theme: paneState?.theme ?? null,
       };
     },
     "ui:setState": (payload) => {
@@ -81,6 +82,7 @@ export async function bootstrapMainProcess(
         historyCategories: payload.historyCategories,
         searchProviders: payload.searchProviders,
         searchCategories: payload.searchCategories,
+        theme: payload.theme,
       });
       return { ok: true };
     },
