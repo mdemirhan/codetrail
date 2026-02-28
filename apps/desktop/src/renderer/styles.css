@@ -1285,6 +1285,18 @@ body.platform-macos .titlebar-left {
   line-height: 1.5;
 }
 
+.md-list-ordered {
+  list-style: decimal;
+}
+
+.md-quote {
+  margin: 0;
+  border-left: 3px solid var(--border-active);
+  border-radius: 0 6px 6px 0;
+  background: var(--bg-elevated);
+  padding: 6px 10px;
+}
+
 .md-empty {
   min-height: 6px;
 }
@@ -1297,6 +1309,25 @@ body.platform-macos .titlebar-left {
   font-family: var(--font-mono);
   font-size: 0.91em;
   padding: 1px 4px;
+}
+
+.rich-block strong {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.rich-block em {
+  font-style: italic;
+}
+
+.rich-block .md-link {
+  color: var(--accent-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rich-block .md-link:hover {
+  color: var(--text-primary);
 }
 
 .code-block {

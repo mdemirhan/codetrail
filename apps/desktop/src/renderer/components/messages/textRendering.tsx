@@ -35,39 +35,101 @@ export function renderRichText(value: string, query: string, keyPrefix: string):
   return nodes;
 }
 
+export function renderPlainText(value: string, query: string, keyPrefix: string): ReactNode[] {
+  const lines = value.split(/\r?\n/);
+  const items: ReactNode[] = [];
+  for (const [index, line] of lines.entries()) {
+    const key = `${keyPrefix}:${index}:${line.length}`;
+    if (line.trim().length === 0) {
+      items.push(<div key={`${key}:empty`} className="md-empty" />);
+      continue;
+    }
+    items.push(
+      <p key={`${key}:p`} className="md-p">
+        {buildHighlightedTextNodes(line, query, `${key}:txt`)}
+      </p>,
+    );
+  }
+  return items;
+}
+
+export function looksLikeMarkdown(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (trimmed.includes("```")) {
+    return true;
+  }
+  if (/^\s{0,3}(#{1,6}|[-*+]\s+|\d+\.\s+|>\s+)/m.test(value)) {
+    return true;
+  }
+  if (/\[[^\]]+\]\((?:https?:\/\/|mailto:)[^)]+\)/.test(value)) {
+    return true;
+  }
+  return /(^|[^\\])(`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_)/m.test(value);
+}
+
 function renderTextChunk(value: string, query: string, keyPrefix: string): ReactNode {
   const lines = value.split(/\r?\n/);
   const items: ReactNode[] = [];
   let lineCursor = 0;
-  let bulletBuffer: Array<{ key: string; content: string }> = [];
+  let listType: "ul" | "ol" | null = null;
+  let listBuffer: Array<{ key: string; content: string }> = [];
 
-  const flushBullets = () => {
-    if (bulletBuffer.length === 0) {
+  const flushList = () => {
+    if (!listType || listBuffer.length === 0) {
       return;
     }
 
+    const renderedItems = listBuffer.map((listItem) => (
+      <li key={listItem.key}>
+        {renderInlineText(listItem.content, query, `${keyPrefix}:${listItem.key}`)}
+      </li>
+    ));
     items.push(
-      <ul key={`${keyPrefix}:${bulletBuffer[0]?.key ?? "b"}:list`} className="md-list">
-        {bulletBuffer.map((bullet) => (
-          <li key={bullet.key}>
-            {renderInlineText(bullet.content, query, `${keyPrefix}:${bullet.key}`)}
-          </li>
-        ))}
-      </ul>,
+      listType === "ol" ? (
+        <ol
+          key={`${keyPrefix}:${listBuffer[0]?.key ?? "o"}:olist`}
+          className="md-list md-list-ordered"
+        >
+          {renderedItems}
+        </ol>
+      ) : (
+        <ul key={`${keyPrefix}:${listBuffer[0]?.key ?? "u"}:ulist`} className="md-list">
+          {renderedItems}
+        </ul>
+      ),
     );
-    bulletBuffer = [];
+    listBuffer = [];
+    listType = null;
   };
 
   for (const line of lines) {
     const currentKey = `${lineCursor}`;
     lineCursor += line.length + 1;
 
-    if (line.startsWith("- ")) {
-      bulletBuffer.push({ key: currentKey, content: line.slice(2) });
+    const unorderedMatch = /^[-*+]\s+(.*)$/.exec(line);
+    if (unorderedMatch) {
+      if (listType && listType !== "ul") {
+        flushList();
+      }
+      listType = "ul";
+      listBuffer.push({ key: currentKey, content: unorderedMatch[1] ?? "" });
       continue;
     }
 
-    flushBullets();
+    const orderedMatch = /^\d+\.\s+(.*)$/.exec(line);
+    if (orderedMatch) {
+      if (listType && listType !== "ol") {
+        flushList();
+      }
+      listType = "ol";
+      listBuffer.push({ key: currentKey, content: orderedMatch[1] ?? "" });
+      continue;
+    }
+
+    flushList();
 
     if (line.trim().length === 0) {
       items.push(<div key={`${keyPrefix}:${currentKey}:empty`} className="md-empty" />);
@@ -101,6 +163,18 @@ function renderTextChunk(value: string, query: string, keyPrefix: string): React
       continue;
     }
 
+    const quoteMatch = /^>\s?(.*)$/.exec(line);
+    if (quoteMatch) {
+      items.push(
+        <blockquote key={`${keyPrefix}:${currentKey}:q`} className="md-quote">
+          <p className="md-p">
+            {renderInlineText(quoteMatch[1] ?? "", query, `${keyPrefix}:${currentKey}:q`)}
+          </p>
+        </blockquote>,
+      );
+      continue;
+    }
+
     items.push(
       <p key={`${keyPrefix}:${currentKey}:p`} className="md-p">
         {renderInlineText(line, query, `${keyPrefix}:${currentKey}:p`)}
@@ -108,7 +182,7 @@ function renderTextChunk(value: string, query: string, keyPrefix: string): React
     );
   }
 
-  flushBullets();
+  flushList();
 
   return <div key={`${keyPrefix}:chunk`}>{items}</div>;
 }
@@ -122,11 +196,98 @@ function renderInlineText(value: string, query: string, keyPrefix: string): Reac
     if (token.startsWith("`") && token.endsWith("`") && token.length >= 2) {
       nodes.push(<code key={`${key}:code`}>{token.slice(1, -1)}</code>);
     } else {
-      nodes.push(...buildHighlightedTextNodes(token, query, `${key}:txt`));
+      nodes.push(...renderFormattedInlineText(token, query, `${key}:txt`));
     }
     cursor += token.length;
   }
   return nodes;
+}
+
+function renderFormattedInlineText(value: string, query: string, keyPrefix: string): ReactNode[] {
+  const pattern =
+    /(\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_)/g;
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+
+  for (const match of value.matchAll(pattern)) {
+    const token = match[0] ?? "";
+    const index = match.index ?? 0;
+    if (index > cursor) {
+      nodes.push(
+        ...buildHighlightedTextNodes(value.slice(cursor, index), query, `${keyPrefix}:${cursor}:t`),
+      );
+    }
+
+    const linkLabel = match[2];
+    const linkHref = match[3];
+    if (linkLabel && linkHref) {
+      const safeHref = normalizeMarkdownHref(linkHref);
+      if (safeHref) {
+        nodes.push(
+          <a
+            key={`${keyPrefix}:${index}:a`}
+            className="md-link"
+            href={safeHref}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {buildHighlightedTextNodes(linkLabel, query, `${keyPrefix}:${index}:a:txt`)}
+          </a>,
+        );
+      } else {
+        nodes.push(...buildHighlightedTextNodes(token, query, `${keyPrefix}:${index}:unsafe-link`));
+      }
+      cursor = index + token.length;
+      continue;
+    }
+
+    const bold = match[4] ?? match[5];
+    if (bold) {
+      nodes.push(
+        <strong key={`${keyPrefix}:${index}:b`}>
+          {buildHighlightedTextNodes(bold, query, `${keyPrefix}:${index}:b:txt`)}
+        </strong>,
+      );
+      cursor = index + token.length;
+      continue;
+    }
+
+    const italic = match[6] ?? match[7];
+    if (italic) {
+      nodes.push(
+        <em key={`${keyPrefix}:${index}:i`}>
+          {buildHighlightedTextNodes(italic, query, `${keyPrefix}:${index}:i:txt`)}
+        </em>,
+      );
+      cursor = index + token.length;
+      continue;
+    }
+
+    nodes.push(...buildHighlightedTextNodes(token, query, `${keyPrefix}:${index}:raw`));
+    cursor = index + token.length;
+  }
+
+  if (cursor < value.length) {
+    nodes.push(
+      ...buildHighlightedTextNodes(value.slice(cursor), query, `${keyPrefix}:${cursor}:tail`),
+    );
+  }
+  if (nodes.length === 0) {
+    nodes.push(...buildHighlightedTextNodes(value, query, `${keyPrefix}:all`));
+  }
+  return nodes;
+}
+
+function normalizeMarkdownHref(href: string): string | null {
+  const normalized = href.trim();
+  if (
+    normalized.startsWith("https://") ||
+    normalized.startsWith("http://") ||
+    normalized.startsWith("mailto:")
+  ) {
+    return normalized;
+  }
+  return null;
 }
 
 export function CodeBlock({

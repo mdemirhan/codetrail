@@ -7,6 +7,8 @@ import {
   detectLanguageFromContent,
   detectLanguageFromFilePath,
   isLikelyDiff,
+  looksLikeMarkdown,
+  renderPlainText,
   renderRichText,
   tryFormatJson,
 } from "./textRendering";
@@ -45,6 +47,13 @@ export function MessageContent({
 
   if (category === "tool_result") {
     return <ToolResultContent text={text} />;
+  }
+
+  if (category === "assistant") {
+    const content = looksLikeMarkdown(text)
+      ? renderRichText(text, query, "assistant-md")
+      : renderPlainText(text, query, "assistant-txt");
+    return <div className="rich-block">{content}</div>;
   }
 
   return <div className="rich-block">{renderRichText(text, query, "msg")}</div>;
