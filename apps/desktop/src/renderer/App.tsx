@@ -104,7 +104,7 @@ export function App() {
   ]);
   const [messageExpanded, setMessageExpanded] = useState<Record<string, boolean>>({});
   const [zoomPercent, setZoomPercent] = useState(100);
-  const [focusSourceId, setFocusSourceId] = useState("");
+  const [focusMessageId, setFocusMessageId] = useState("");
   const [pendingJumpTarget, setPendingJumpTarget] = useState<{
     sourceId: string;
     messageId: string;
@@ -112,6 +112,7 @@ export function App() {
   const [pendingSearchNavigation, setPendingSearchNavigation] = useState<{
     projectId: string;
     sessionId: string;
+    messageId: string;
     sourceId: string;
   } | null>(null);
 
@@ -474,10 +475,10 @@ export function App() {
     setSessionQueryInput("");
     setHistoryCategories([...CATEGORIES]);
     setSessionPage(0);
-    setFocusSourceId(pendingSearchNavigation.sourceId);
+    setFocusMessageId(pendingSearchNavigation.messageId);
     setPendingJumpTarget({
       sourceId: pendingSearchNavigation.sourceId,
-      messageId: "",
+      messageId: pendingSearchNavigation.messageId,
     });
     setPendingSearchNavigation(null);
     setMainView("history");
@@ -546,12 +547,14 @@ export function App() {
     };
   }, [loadSearch, logError]);
 
-  const focusedMessageId = useMemo(() => {
-    if (!focusSourceId || !sessionDetail?.messages) {
+  const visibleFocusedMessageId = useMemo(() => {
+    if (!focusMessageId || !sessionDetail?.messages) {
       return "";
     }
-    return sessionDetail.messages.find((message) => message.sourceId === focusSourceId)?.id ?? "";
-  }, [focusSourceId, sessionDetail?.messages]);
+    return sessionDetail.messages.some((message) => message.id === focusMessageId)
+      ? focusMessageId
+      : "";
+  }, [focusMessageId, sessionDetail?.messages]);
 
   useEffect(() => {
     if (!messageListRef.current) {
@@ -586,7 +589,7 @@ export function App() {
   }, [selectedSessionId, sessionPage]);
 
   useEffect(() => {
-    if (!focusSourceId || !focusedMessageId || !focusedMessageRef.current) {
+    if (!focusMessageId || !visibleFocusedMessageId || !focusedMessageRef.current) {
       return;
     }
 
@@ -594,7 +597,7 @@ export function App() {
       block: "center",
       behavior: "smooth",
     });
-  }, [focusSourceId, focusedMessageId]);
+  }, [focusMessageId, visibleFocusedMessageId]);
 
   useEffect(() => {
     const onPointerMove = (event: PointerEvent) => {
@@ -859,7 +862,7 @@ export function App() {
   const handleJumpToMessage = useCallback((messageId: string, sourceId: string) => {
     setSessionQueryInput("");
     setSessionPage(0);
-    setFocusSourceId(sourceId);
+    setFocusMessageId(messageId);
     setPendingJumpTarget({ messageId, sourceId });
   }, []);
 
@@ -945,7 +948,7 @@ export function App() {
               onSelectProject={(projectId) => {
                 setPendingSearchNavigation(null);
                 setSelectedProjectId(projectId);
-                setFocusSourceId("");
+                setFocusMessageId("");
                 setPendingJumpTarget(null);
               }}
               onOpenProjectLocation={() => {
@@ -977,7 +980,7 @@ export function App() {
                 setPendingSearchNavigation(null);
                 setSelectedSessionId(sessionId);
                 setSessionPage(0);
-                setFocusSourceId("");
+                setFocusMessageId("");
                 setPendingJumpTarget(null);
                 setMainView("history");
               }}
@@ -1095,7 +1098,7 @@ export function App() {
                       key={message.id}
                       message={message}
                       query={effectiveSessionQuery}
-                      isFocused={!!focusSourceId && message.sourceId === focusSourceId}
+                      isFocused={message.id === focusMessageId}
                       isExpanded={
                         messageExpanded[message.id] ?? isMessageExpandedByDefault(message.category)
                       }
@@ -1108,16 +1111,10 @@ export function App() {
                         }))
                       }
                       onToggleFocused={() =>
-                        setFocusSourceId((value) =>
-                          value === message.sourceId ? "" : message.sourceId,
-                        )
+                        setFocusMessageId((value) => (value === message.id ? "" : message.id))
                       }
                       onJumpToMessage={() => handleJumpToMessage(message.id, message.sourceId)}
-                      cardRef={
-                        focusSourceId && message.sourceId === focusSourceId
-                          ? focusedMessageRef
-                          : null
-                      }
+                      cardRef={focusMessageId === message.id ? focusedMessageRef : null}
                     />
                   ))
                 ) : (
@@ -1227,6 +1224,7 @@ export function App() {
                         setPendingSearchNavigation({
                           projectId: result.projectId,
                           sessionId: result.sessionId,
+                          messageId: result.messageId,
                           sourceId: result.messageSourceId,
                         });
                         setSelectedProjectId(result.projectId);
