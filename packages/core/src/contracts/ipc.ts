@@ -71,6 +71,10 @@ const paneStateSchema = z.object({
   searchProviders: z.array(providerSchema).nullable(),
   searchCategories: z.array(messageCategorySchema).nullable(),
   theme: z.enum(["light", "dark"]).nullable(),
+  selectedProjectId: z.string().nullable(),
+  selectedSessionId: z.string().nullable(),
+  sessionPage: z.number().int().nonnegative().nullable(),
+  sessionScrollTop: z.number().int().nonnegative().nullable(),
 });
 
 const uiZoomResponseSchema = z.object({
@@ -175,6 +179,10 @@ export const ipcContractSchemas = {
       searchProviders: z.array(providerSchema),
       searchCategories: z.array(messageCategorySchema),
       theme: z.enum(["light", "dark"]),
+      selectedProjectId: z.string(),
+      selectedSessionId: z.string(),
+      sessionPage: z.number().int().nonnegative(),
+      sessionScrollTop: z.number().int().nonnegative(),
     }),
     response: z.object({
       ok: z.literal(true),

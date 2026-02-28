@@ -6,9 +6,12 @@ export function TopBar({
   refreshing,
   focusMode,
   focusDisabled,
+  copyDisabled,
   onToggleSearchView,
   onThemeChange,
   onIncrementalRefresh,
+  onForceRefresh,
+  onCopySession,
   onToggleFocus,
   onToggleShortcuts,
 }: {
@@ -17,9 +20,12 @@ export function TopBar({
   refreshing: boolean;
   focusMode: boolean;
   focusDisabled: boolean;
+  copyDisabled: boolean;
   onToggleSearchView: () => void;
   onThemeChange: (theme: "light" | "dark") => void;
   onIncrementalRefresh: () => void;
+  onForceRefresh: () => void;
+  onCopySession: () => void;
   onToggleFocus: () => void;
   onToggleShortcuts: () => void;
 }) {
@@ -35,6 +41,12 @@ export function TopBar({
           type="button"
           className={mainView === "search" ? "tb-btn active" : "tb-btn"}
           onClick={onToggleSearchView}
+          aria-label="Global Search"
+          title={
+            mainView === "search"
+              ? "Return to history view (Cmd/Ctrl+1)"
+              : "Open global search (Cmd/Ctrl+Shift+F)"
+          }
         >
           <ToolbarIcon name="search" />
           Global Search
@@ -44,15 +56,52 @@ export function TopBar({
           className="tb-btn"
           onClick={onIncrementalRefresh}
           disabled={refreshing}
+          aria-label={refreshing ? "Refreshing index" : "Refresh index"}
+          title={refreshing ? "Refreshing index..." : "Refresh index (Cmd/Ctrl+R)"}
         >
           <ToolbarIcon name="refresh" />
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
-        <button type="button" className="tb-btn" onClick={onToggleFocus} disabled={focusDisabled}>
+        <button
+          type="button"
+          className="tb-btn"
+          onClick={onForceRefresh}
+          disabled={refreshing}
+          aria-label="Force reindex"
+          title="Force full reindex (Cmd/Ctrl+Shift+R)"
+        >
+          <ToolbarIcon name="reindex" />
+          Reindex
+        </button>
+        <button
+          type="button"
+          className="tb-btn"
+          onClick={onCopySession}
+          disabled={copyDisabled}
+          aria-label="Copy session details"
+          title="Copy selected session details"
+        >
+          <ToolbarIcon name="copy" />
+          Copy
+        </button>
+        <button
+          type="button"
+          className="tb-btn"
+          onClick={onToggleFocus}
+          disabled={focusDisabled}
+          aria-label={focusMode ? "Exit focus mode" : "Enter focus mode"}
+          title={focusMode ? "Exit focus mode" : "Focus mode"}
+        >
           <ToolbarIcon name={focusMode ? "closeFocus" : "focus"} />
           Focus
         </button>
-        <button type="button" className="tb-btn primary" onClick={onToggleShortcuts}>
+        <button
+          type="button"
+          className="tb-btn primary"
+          onClick={onToggleShortcuts}
+          aria-label="Show keyboard shortcuts"
+          title="Show keyboard shortcuts (?)"
+        >
           <ToolbarIcon name="shortcuts" />
           Shortcuts
         </button>

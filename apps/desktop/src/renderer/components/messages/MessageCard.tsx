@@ -40,10 +40,18 @@ export function MessageCard({
             className={`msg-role category-toggle category-${message.category}`}
             onClick={onToggleExpanded}
             aria-expanded={isExpanded}
+            aria-label={isExpanded ? "Collapse message" : "Expand message"}
+            title={isExpanded ? "Collapse message" : "Expand message"}
           >
             {typeLabel}
           </button>
-          <button type="button" className="message-select-button" onClick={onToggleFocused}>
+          <button
+            type="button"
+            className="message-select-button"
+            onClick={onToggleFocused}
+            aria-label={isFocused ? "Clear message focus" : "Focus this message"}
+            title={isFocused ? "Clear message focus" : "Focus this message"}
+          >
             <span className={`msg-provider provider-label provider-${message.provider}`}>
               {prettyProvider(message.provider)}
             </span>
@@ -52,7 +60,13 @@ export function MessageCard({
         </div>
         {onJumpToMessage ? (
           <div className="message-header-actions">
-            <button type="button" className="message-jump-button" onClick={onJumpToMessage}>
+            <button
+              type="button"
+              className="message-jump-button"
+              onClick={onJumpToMessage}
+              aria-label="Jump to this message in session view"
+              title="Jump to this message"
+            >
               Jump to Message
             </button>
           </div>

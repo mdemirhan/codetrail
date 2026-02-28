@@ -72,6 +72,10 @@ export async function bootstrapMainProcess(
         searchProviders: paneState?.searchProviders ?? null,
         searchCategories: paneState?.searchCategories ?? null,
         theme: paneState?.theme ?? null,
+        selectedProjectId: paneState?.selectedProjectId ?? null,
+        selectedSessionId: paneState?.selectedSessionId ?? null,
+        sessionPage: paneState?.sessionPage ?? null,
+        sessionScrollTop: paneState?.sessionScrollTop ?? null,
       };
     },
     "ui:setState": (payload) => {
@@ -83,6 +87,10 @@ export async function bootstrapMainProcess(
         searchProviders: payload.searchProviders,
         searchCategories: payload.searchCategories,
         theme: payload.theme,
+        selectedProjectId: payload.selectedProjectId,
+        selectedSessionId: payload.selectedSessionId,
+        sessionPage: payload.sessionPage,
+        sessionScrollTop: payload.sessionScrollTop,
       });
       return { ok: true };
     },

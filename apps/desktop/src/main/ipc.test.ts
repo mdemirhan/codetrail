@@ -61,6 +61,10 @@ describe("registerIpcHandlers", () => {
           searchProviders: null,
           searchCategories: null,
           theme: null,
+          selectedProjectId: null,
+          selectedSessionId: null,
+          sessionPage: null,
+          sessionScrollTop: null,
         }),
         "ui:setState": () => ({
           ok: true,

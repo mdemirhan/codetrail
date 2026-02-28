@@ -12,7 +12,15 @@ describe("AppStateStore", () => {
     const filePath = join(dir, "ui-state.json");
 
     const store = new AppStateStore(filePath);
-    store.setPaneState({ projectPaneWidth: 312, sessionPaneWidth: 404, theme: "dark" });
+    store.setPaneState({
+      projectPaneWidth: 312,
+      sessionPaneWidth: 404,
+      theme: "dark",
+      selectedProjectId: "project_alpha",
+      selectedSessionId: "session_beta",
+      sessionPage: 3,
+      sessionScrollTop: 672,
+    });
     store.setWindowState({ width: 1440, height: 920, x: 48, y: 72, isMaximized: false });
     store.flush();
 
@@ -21,6 +29,10 @@ describe("AppStateStore", () => {
       projectPaneWidth: 312,
       sessionPaneWidth: 404,
       theme: "dark",
+      selectedProjectId: "project_alpha",
+      selectedSessionId: "session_beta",
+      sessionPage: 3,
+      sessionScrollTop: 672,
     });
     expect(reloaded.getWindowState()).toEqual({
       width: 1440,

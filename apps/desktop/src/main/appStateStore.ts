@@ -13,6 +13,10 @@ export type PaneState = {
   searchProviders?: Provider[];
   searchCategories?: MessageCategory[];
   theme?: ThemeMode;
+  selectedProjectId?: string;
+  selectedSessionId?: string;
+  sessionPage?: number;
+  sessionScrollTop?: number;
 };
 
 export type WindowState = {
@@ -30,6 +34,10 @@ type AppState = {
 
 const PANE_MIN = 120;
 const PANE_MAX = 2000;
+const PAGE_MIN = 0;
+const PAGE_MAX = 1_000_000;
+const SCROLL_TOP_MIN = 0;
+const SCROLL_TOP_MAX = 10_000_000;
 const WINDOW_MIN = 320;
 const WINDOW_MAX = 6000;
 const PROVIDER_VALUES: Provider[] = ["claude", "codex", "gemini"];
@@ -159,6 +167,14 @@ function sanitizePaneState(value: unknown): PaneState | null {
   const searchProviders = sanitizeStringArray(record.searchProviders, PROVIDER_VALUES);
   const searchCategories = sanitizeStringArray(record.searchCategories, CATEGORY_VALUES);
   const theme = sanitizeStringValue(record.theme, THEME_VALUES);
+  const selectedProjectId = sanitizeOptionalNonEmptyString(record.selectedProjectId);
+  const selectedSessionId = sanitizeOptionalNonEmptyString(record.selectedSessionId);
+  const sessionPage = sanitizeOptionalInt(record.sessionPage, PAGE_MIN, PAGE_MAX);
+  const sessionScrollTop = sanitizeOptionalInt(
+    record.sessionScrollTop,
+    SCROLL_TOP_MIN,
+    SCROLL_TOP_MAX,
+  );
 
   return {
     projectPaneWidth,
@@ -168,6 +184,10 @@ function sanitizePaneState(value: unknown): PaneState | null {
     ...(searchProviders ? { searchProviders } : {}),
     ...(searchCategories ? { searchCategories } : {}),
     ...(theme ? { theme } : {}),
+    ...(selectedProjectId ? { selectedProjectId } : {}),
+    ...(selectedSessionId ? { selectedSessionId } : {}),
+    ...(sessionPage === null ? {} : { sessionPage }),
+    ...(sessionScrollTop === null ? {} : { sessionScrollTop }),
   };
 }
 
@@ -238,4 +258,14 @@ function sanitizeStringValue<T extends string>(value: unknown, universe: readonl
     return null;
   }
   return universe.includes(value as T) ? (value as T) : null;
+}
+
+function sanitizeOptionalNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  if (value.length === 0 || value.length > 4096) {
+    return null;
+  }
+  return value;
 }

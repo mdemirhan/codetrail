@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type { PointerEvent as ReactPointerEvent, UIEvent as ReactUIEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import type { MessageCategory, Provider } from "@codetrail/core";
 import type { IpcResponse } from "@codetrail/core";
@@ -60,6 +61,23 @@ const EMPTY_CATEGORY_COUNTS = {
 type MainView = "history" | "search";
 type ThemeMode = "light" | "dark";
 
+function formatDuration(durationMs: number | null): string {
+  if (durationMs === null || !Number.isFinite(durationMs) || durationMs <= 0) {
+    return "-";
+  }
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
 export function App() {
   const [refreshing, setRefreshing] = useState(false);
 
@@ -71,12 +89,15 @@ export function App() {
   const [projectQueryInput, setProjectQueryInput] = useState("");
   const [projectProviders, setProjectProviders] = useState<Provider[]>([...PROVIDERS]);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState("");
 
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [sessionsLoadedProjectId, setSessionsLoadedProjectId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
   const [sessionPage, setSessionPage] = useState(0);
+  const [sessionScrollTop, setSessionScrollTop] = useState(0);
   const [sessionQueryInput, setSessionQueryInput] = useState("");
   const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>([
     ...DEFAULT_MESSAGE_CATEGORIES,
@@ -129,6 +150,15 @@ export function App() {
 
   const focusedMessageRef = useRef<HTMLDivElement | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
+  const sessionSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const globalSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingRestoredSessionScrollRef = useRef<{
+    sessionId: string;
+    sessionPage: number;
+    scrollTop: number;
+  } | null>(null);
+  const sessionScrollTopRef = useRef(0);
+  const sessionScrollSyncTimerRef = useRef<number | null>(null);
   const sortedProjects = useMemo(() => {
     const next = [...projects];
     next.sort((left, right) => {
@@ -151,24 +181,29 @@ export function App() {
   }, [sessions]);
 
   const loadProjects = useCallback(async () => {
+    setProjectsLoaded(false);
     const response = await window.codetrail.invoke("projects:list", {
       providers: projectProviders,
       query: projectQuery,
     });
     setProjects(response.projects);
+    setProjectsLoaded(true);
   }, [projectProviders, projectQuery]);
 
   const loadSessions = useCallback(async () => {
     if (!selectedProjectId) {
       setSessions([]);
+      setSessionsLoadedProjectId("");
       setSelectedSessionId("");
       return;
     }
 
+    setSessionsLoadedProjectId(null);
     const response = await window.codetrail.invoke("sessions:list", {
       projectId: selectedProjectId,
     });
     setSessions(response.sessions);
+    setSessionsLoadedProjectId(selectedProjectId);
   }, [selectedProjectId]);
 
   const loadSearch = useCallback(async () => {
@@ -226,6 +261,31 @@ export function App() {
         if (response.theme !== null) {
           setTheme(response.theme);
         }
+        if (response.selectedProjectId !== null) {
+          setSelectedProjectId(response.selectedProjectId);
+        }
+        if (response.selectedSessionId !== null) {
+          setSelectedSessionId(response.selectedSessionId);
+        }
+        if (response.sessionPage !== null) {
+          setSessionPage(response.sessionPage);
+        }
+        if (response.sessionScrollTop !== null) {
+          sessionScrollTopRef.current = response.sessionScrollTop;
+          setSessionScrollTop(response.sessionScrollTop);
+        }
+        if (
+          response.selectedSessionId !== null &&
+          response.sessionPage !== null &&
+          response.sessionScrollTop !== null &&
+          response.sessionScrollTop > 0
+        ) {
+          pendingRestoredSessionScrollRef.current = {
+            sessionId: response.selectedSessionId,
+            sessionPage: response.sessionPage,
+            scrollTop: response.sessionScrollTop,
+          };
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -282,6 +342,10 @@ export function App() {
           searchProviders,
           searchCategories,
           theme,
+          selectedProjectId,
+          selectedSessionId,
+          sessionPage,
+          sessionScrollTop,
         })
         .catch((error: unknown) => {
           logError("Failed saving UI state", error);
@@ -299,9 +363,21 @@ export function App() {
     projectProviders,
     searchCategories,
     searchProviders,
+    selectedProjectId,
+    selectedSessionId,
+    sessionPage,
+    sessionScrollTop,
     sessionPaneWidth,
     theme,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (sessionScrollSyncTimerRef.current !== null) {
+        window.clearTimeout(sessionScrollSyncTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -316,6 +392,10 @@ export function App() {
   }, [loadProjects, logError]);
 
   useEffect(() => {
+    if (!projectsLoaded) {
+      return;
+    }
+
     if (sortedProjects.length === 0) {
       if (!pendingSearchNavigation) {
         setSelectedProjectId("");
@@ -334,7 +414,7 @@ export function App() {
     if (searchProjectId && !sortedProjects.some((project) => project.id === searchProjectId)) {
       setSearchProjectId("");
     }
-  }, [pendingSearchNavigation, searchProjectId, selectedProjectId, sortedProjects]);
+  }, [pendingSearchNavigation, projectsLoaded, searchProjectId, selectedProjectId, sortedProjects]);
 
   useEffect(() => {
     let cancelled = false;
@@ -349,6 +429,10 @@ export function App() {
   }, [loadSessions, logError]);
 
   useEffect(() => {
+    if (sessionsLoadedProjectId !== selectedProjectId) {
+      return;
+    }
+
     if (sortedSessions.length === 0) {
       if (!pendingSearchNavigation) {
         setSelectedSessionId("");
@@ -362,8 +446,15 @@ export function App() {
 
     if (!selectedSessionId || !sortedSessions.some((session) => session.id === selectedSessionId)) {
       setSelectedSessionId(sortedSessions[0]?.id ?? "");
+      setSessionPage(0);
     }
-  }, [pendingSearchNavigation, selectedSessionId, sortedSessions]);
+  }, [
+    pendingSearchNavigation,
+    selectedProjectId,
+    selectedSessionId,
+    sessionsLoadedProjectId,
+    sortedSessions,
+  ]);
 
   useEffect(() => {
     if (!pendingSearchNavigation) {
@@ -467,13 +558,35 @@ export function App() {
   }, [focusSourceId, sessionDetail?.messages]);
 
   useEffect(() => {
-    if (!selectedSessionId || sessionPage < 0) {
-      return;
-    }
     if (!messageListRef.current) {
       return;
     }
+    if (!selectedSessionId || sessionPage < 0) {
+      messageListRef.current.scrollTop = 0;
+      sessionScrollTopRef.current = 0;
+      setSessionScrollTop(0);
+      return;
+    }
+
+    const pendingRestore = pendingRestoredSessionScrollRef.current;
+    if (
+      pendingRestore &&
+      pendingRestore.sessionId === selectedSessionId &&
+      pendingRestore.sessionPage === sessionPage
+    ) {
+      messageListRef.current.scrollTop = pendingRestore.scrollTop;
+      sessionScrollTopRef.current = pendingRestore.scrollTop;
+      setSessionScrollTop(pendingRestore.scrollTop);
+      pendingRestoredSessionScrollRef.current = null;
+      return;
+    }
+
+    if (pendingRestore) {
+      pendingRestoredSessionScrollRef.current = null;
+    }
     messageListRef.current.scrollTop = 0;
+    sessionScrollTopRef.current = 0;
+    setSessionScrollTop(0);
   }, [selectedSessionId, sessionPage]);
 
   useEffect(() => {
@@ -539,6 +652,15 @@ export function App() {
     await handleRefresh(true);
   }, [handleRefresh]);
 
+  const selectedProject = useMemo(
+    () => sortedProjects.find((project) => project.id === selectedProjectId) ?? null,
+    [selectedProjectId, sortedProjects],
+  );
+  const selectedSession = useMemo(
+    () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,
+    [selectedSessionId, sortedSessions],
+  );
+
   const applyZoomAction = useCallback(
     async (action: "in" | "out" | "reset") => {
       try {
@@ -551,10 +673,68 @@ export function App() {
     [logError],
   );
 
+  const handleCopySessionDetails = useCallback(async () => {
+    if (!selectedSession) {
+      return;
+    }
+    const messageCount = sessionDetail?.totalCount ?? selectedSession.messageCount;
+    const pageCount = Math.max(1, Math.ceil(messageCount / PAGE_SIZE));
+    const lines = [
+      `Title: ${deriveSessionTitle(selectedSession)}`,
+      `Provider: ${prettyProvider(selectedSession.provider)}`,
+      `Project: ${selectedProject?.name || selectedProject?.path || "(unknown project)"}`,
+      `Session ID: ${selectedSession.id}`,
+      `File: ${selectedSession.filePath}`,
+      `CWD: ${selectedSession.cwd ?? "-"}`,
+      `Branch: ${selectedSession.gitBranch ?? "-"}`,
+      `Models: ${selectedSession.modelNames || "-"}`,
+      `Started: ${selectedSession.startedAt ?? "-"}`,
+      `Ended: ${selectedSession.endedAt ?? "-"}`,
+      `Duration: ${formatDuration(selectedSession.durationMs)}`,
+      `Messages: ${messageCount}`,
+      `Page: ${sessionPage + 1}/${pageCount}`,
+    ];
+    const sessionDetailsText = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(sessionDetailsText);
+      return;
+    } catch {
+      const fallback = document.createElement("textarea");
+      fallback.value = sessionDetailsText;
+      fallback.setAttribute("readonly", "");
+      fallback.style.position = "fixed";
+      fallback.style.left = "-9999px";
+      document.body.appendChild(fallback);
+      fallback.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(fallback);
+      if (!copied) {
+        logError("Failed copying session details", "Clipboard API unavailable");
+      }
+    }
+  }, [logError, selectedProject, selectedSession, sessionDetail?.totalCount, sessionPage]);
+
+  const focusSessionSearch = useCallback(() => {
+    setMainView("history");
+    window.setTimeout(() => {
+      sessionSearchInputRef.current?.focus();
+      sessionSearchInputRef.current?.select();
+    }, 0);
+  }, []);
+
+  const focusGlobalSearch = useCallback(() => {
+    setMainView("search");
+    window.setTimeout(() => {
+      globalSearchInputRef.current?.focus();
+      globalSearchInputRef.current?.select();
+    }, 0);
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const command = event.metaKey || event.ctrlKey;
       const shift = event.shiftKey;
+      const key = event.key.toLowerCase();
       if (event.key === "?") {
         setShowShortcuts(true);
       } else if (event.key === "Escape") {
@@ -565,6 +745,12 @@ export function App() {
           event.preventDefault();
           setMainView("history");
         }
+      } else if (command && shift && key === "f") {
+        event.preventDefault();
+        focusGlobalSearch();
+      } else if (command && key === "f") {
+        event.preventDefault();
+        focusSessionSearch();
       } else if (command && event.key === "1") {
         event.preventDefault();
         setMainView("history");
@@ -580,10 +766,10 @@ export function App() {
       } else if (command && event.key === "0") {
         event.preventDefault();
         void applyZoomAction("reset");
-      } else if (command && shift && event.key.toLowerCase() === "r") {
+      } else if (command && shift && key === "r") {
         event.preventDefault();
         void handleForceRefresh();
-      } else if (command && event.key.toLowerCase() === "r") {
+      } else if (command && key === "r") {
         event.preventDefault();
         void handleIncrementalRefresh();
       }
@@ -593,12 +779,16 @@ export function App() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [applyZoomAction, handleForceRefresh, handleIncrementalRefresh, mainView, showShortcuts]);
+  }, [
+    applyZoomAction,
+    focusGlobalSearch,
+    focusSessionSearch,
+    handleForceRefresh,
+    handleIncrementalRefresh,
+    mainView,
+    showShortcuts,
+  ]);
 
-  const selectedSession = useMemo(
-    () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,
-    [selectedSessionId, sortedSessions],
-  );
   const projectProviderCounts = useMemo(
     () => countProviders(sortedProjects.map((project) => project.provider)),
     [sortedProjects],
@@ -639,8 +829,11 @@ export function App() {
     const global = [
       "Cmd/Ctrl+1: History view",
       "Cmd/Ctrl+2: Search view",
+      "Cmd/Ctrl+F: Focus session search",
+      "Cmd/Ctrl+Shift+F: Open global search",
       "Cmd/Ctrl+R: Refresh index",
       "Cmd/Ctrl+Shift+R: Force reindex",
+      "Toolbar: Reindex and Copy session",
       "?: Shortcut help",
       "Esc: Close shortcuts",
     ];
@@ -669,7 +862,6 @@ export function App() {
 
   const handleJumpToMessage = useCallback((messageId: string, sourceId: string) => {
     setSessionQueryInput("");
-    setHistoryCategories([...CATEGORIES]);
     setSessionPage(0);
     setFocusSourceId(sourceId);
     setPendingJumpTarget({ messageId, sourceId });
@@ -690,6 +882,33 @@ export function App() {
       document.body.classList.add("resizing-panels");
     };
 
+  const handleMessageListScroll = useCallback((event: ReactUIEvent<HTMLDivElement>) => {
+    sessionScrollTopRef.current = Math.max(0, Math.round(event.currentTarget.scrollTop));
+    if (sessionScrollSyncTimerRef.current !== null) {
+      return;
+    }
+    sessionScrollSyncTimerRef.current = window.setTimeout(() => {
+      sessionScrollSyncTimerRef.current = null;
+      setSessionScrollTop((value) =>
+        value === sessionScrollTopRef.current ? value : sessionScrollTopRef.current,
+      );
+    }, 120);
+  }, []);
+
+  const handleSessionSearchKeyDown = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+    event.preventDefault();
+    const focusTarget =
+      messageListRef.current?.querySelector<HTMLButtonElement>(
+        ".message.focused .message-select-button",
+      ) ??
+      messageListRef.current?.querySelector<HTMLButtonElement>(".message .message-select-button") ??
+      messageListRef.current?.querySelector<HTMLButtonElement>(".message .msg-role");
+    focusTarget?.focus();
+  }, []);
+
   return (
     <main className="app-shell">
       <TopBar
@@ -698,11 +917,14 @@ export function App() {
         refreshing={refreshing}
         focusMode={focusMode}
         focusDisabled={mainView !== "history"}
+        copyDisabled={!selectedSession || mainView !== "history"}
         onToggleSearchView={() =>
           setMainView((value) => (value === "history" ? "search" : "history"))
         }
         onThemeChange={setTheme}
         onIncrementalRefresh={() => void handleIncrementalRefresh()}
+        onForceRefresh={() => void handleForceRefresh()}
+        onCopySession={() => void handleCopySessionDetails()}
         onToggleFocus={() => setFocusMode((value) => !value)}
         onToggleShortcuts={() => setShowShortcuts((value) => !value)}
       />
@@ -783,6 +1005,12 @@ export function App() {
                       className="toolbar-btn"
                       onClick={() => handleSetAllMessagesExpanded(!areAllMessagesExpanded)}
                       disabled={sessionMessages.length === 0}
+                      aria-label={
+                        areAllMessagesExpanded ? "Collapse all messages" : "Expand all messages"
+                      }
+                      title={
+                        areAllMessagesExpanded ? "Collapse all messages" : "Expand all messages"
+                      }
                     >
                       <ToolbarIcon name={areAllMessagesExpanded ? "collapseAll" : "expandAll"} />
                       {areAllMessagesExpanded ? "Collapse All" : "Expand All"}
@@ -798,7 +1026,9 @@ export function App() {
                       >
                         <ToolbarIcon name="zoomOut" />
                       </button>
-                      <span className="zoom-level">{zoomPercent}%</span>
+                      <span className="zoom-level" title="Current zoom level">
+                        {zoomPercent}%
+                      </span>
                       <button
                         type="button"
                         className="toolbar-btn zoom-btn"
@@ -845,8 +1075,10 @@ export function App() {
                 <div className="search-box">
                   <ToolbarIcon name="search" />
                   <input
+                    ref={sessionSearchInputRef}
                     className="search-input"
                     value={sessionQueryInput}
+                    onKeyDown={handleSessionSearchKeyDown}
                     onChange={(event) => {
                       setSessionQueryInput(event.target.value);
                       setSessionPage(0);
@@ -856,7 +1088,11 @@ export function App() {
                 </div>
               </div>
 
-              <div className="msg-scroll message-list" ref={messageListRef}>
+              <div
+                className="msg-scroll message-list"
+                ref={messageListRef}
+                onScroll={handleMessageListScroll}
+              >
                 {sessionDetail?.messages.length ? (
                   sessionDetail.messages.map((message) => (
                     <MessageCard
@@ -923,6 +1159,7 @@ export function App() {
               </div>
               <div className="search-controls">
                 <input
+                  ref={globalSearchInputRef}
                   value={searchQueryInput}
                   onChange={(event) => setSearchQueryInput(event.target.value)}
                   placeholder="Search all message text"
