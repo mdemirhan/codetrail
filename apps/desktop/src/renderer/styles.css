@@ -57,6 +57,8 @@
   --session-pane-meta-text: #72788d;
   --session-pane-count-text: #2563eb;
   --message-heading-text: #1a1c24;
+  --message-focus-border: rgba(37, 99, 235, 0.44);
+  --message-focus-ring: rgba(37, 99, 235, 0.2);
   --cat-user-bg: #eaf8f2;
   --cat-user-border: #b7e4cc;
   --cat-user-text: #0b7a4c;
@@ -146,6 +148,8 @@
   --session-pane-meta-text: #a2a9be;
   --session-pane-count-text: #82adff;
   --message-heading-text: #c4ccdf;
+  --message-focus-border: rgba(109, 160, 247, 0.68);
+  --message-focus-ring: rgba(109, 160, 247, 0.28);
   --cat-user-bg: rgba(93, 216, 168, 0.14);
   --cat-user-border: rgba(93, 216, 168, 0.28);
   --cat-user-text: #5dd8a8;
@@ -1010,6 +1014,7 @@ body.platform-macos .titlebar-left {
 
 .message {
   margin-bottom: 20px;
+  border-radius: var(--radius-lg);
   animation: fade-in 0.25s ease;
 }
 
@@ -1102,6 +1107,12 @@ body.platform-macos .titlebar-left {
   padding: 0;
 }
 
+.message-select-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-blue);
+}
+
 .msg-provider,
 .msg-time {
   font-size: 11px;
@@ -1125,7 +1136,7 @@ body.platform-macos .titlebar-left {
   flex-shrink: 0;
 }
 
-.message-jump-button {
+.message-reveal-button {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
@@ -1137,7 +1148,7 @@ body.platform-macos .titlebar-left {
   box-shadow: var(--shadow-sm);
 }
 
-.message-jump-button:hover:not(:disabled) {
+.message-reveal-button:hover:not(:disabled) {
   border-color: var(--border-active);
   color: var(--text-primary);
   box-shadow: var(--shadow-md);
@@ -1154,9 +1165,13 @@ body.platform-macos .titlebar-left {
   box-shadow: var(--shadow-card);
 }
 
+.message.focused {
+  box-shadow: 0 0 0 1px var(--message-focus-border), 0 0 0 4px var(--message-focus-ring);
+}
+
 .message.focused .message-body {
-  border-color: var(--accent-blue-mid);
-  box-shadow: 0 0 0 2px var(--accent-blue-dim), var(--shadow-card);
+  border-color: var(--message-focus-border);
+  box-shadow: var(--shadow-card);
 }
 
 .message-content {

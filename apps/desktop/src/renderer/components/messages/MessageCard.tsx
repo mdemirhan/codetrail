@@ -1,7 +1,7 @@
 import type { MessageCategory } from "@codetrail/core";
 import type { Ref } from "react";
 
-import { formatDate, prettyCategory, prettyProvider } from "../../lib/viewUtils";
+import { formatDate, prettyCategory } from "../../lib/viewUtils";
 
 import { MessageContent } from "./MessageContent";
 import { parseToolInvocationPayload } from "./toolParsing";
@@ -14,7 +14,7 @@ export function MessageCard({
   isExpanded,
   onToggleExpanded,
   onToggleFocused,
-  onJumpToMessage,
+  onRevealInSession,
   cardRef,
 }: {
   message: SessionMessage;
@@ -23,7 +23,7 @@ export function MessageCard({
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onToggleFocused: () => void;
-  onJumpToMessage?: () => void;
+  onRevealInSession?: () => void;
   cardRef?: Ref<HTMLDivElement> | null;
 }) {
   const typeLabel = formatMessageTypeLabel(message.category, message.content);
@@ -50,24 +50,22 @@ export function MessageCard({
             className="message-select-button"
             onClick={onToggleFocused}
             aria-label={isFocused ? "Clear message focus" : "Focus this message"}
-            title={isFocused ? "Clear message focus" : "Focus this message"}
+            title={isFocused ? "Unselect message" : "Select message"}
           >
-            <span className={`msg-provider provider-label provider-${message.provider}`}>
-              {prettyProvider(message.provider)}
-            </span>
+            <span className="message-select-label">{isFocused ? "Unselect" : "Select"}</span>
             <span className="msg-time">{formatDate(message.createdAt)}</span>
           </button>
         </div>
-        {onJumpToMessage ? (
+        {onRevealInSession ? (
           <div className="message-header-actions">
             <button
               type="button"
-              className="message-jump-button"
-              onClick={onJumpToMessage}
-              aria-label="Jump to this message in session view"
-              title="Jump to this message"
+              className="message-reveal-button"
+              onClick={onRevealInSession}
+              aria-label="Reveal this message in session"
+              title="Reveal in session"
             >
-              Jump to Message
+              Reveal in Session
             </button>
           </div>
         ) : null}

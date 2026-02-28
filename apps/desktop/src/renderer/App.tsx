@@ -61,6 +61,14 @@ const EMPTY_CATEGORY_COUNTS = {
 type MainView = "history" | "search";
 type ThemeMode = "light" | "dark";
 
+function areCategorySelectionsEqual(left: MessageCategory[], right: MessageCategory[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const rightSet = new Set(right);
+  return left.every((value) => rightSet.has(value));
+}
+
 function formatDuration(durationMs: number | null): string {
   if (durationMs === null || !Number.isFinite(durationMs) || durationMs <= 0) {
     return "-";
@@ -105,7 +113,7 @@ export function App() {
   const [messageExpanded, setMessageExpanded] = useState<Record<string, boolean>>({});
   const [zoomPercent, setZoomPercent] = useState(100);
   const [focusMessageId, setFocusMessageId] = useState("");
-  const [pendingJumpTarget, setPendingJumpTarget] = useState<{
+  const [pendingRevealTarget, setPendingRevealTarget] = useState<{
     sourceId: string;
     messageId: string;
   } | null>(null);
@@ -382,6 +390,13 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (areCategorySelectionsEqual(historyCategories, searchCategories)) {
+      return;
+    }
+    setSearchCategories([...historyCategories]);
+  }, [historyCategories, searchCategories]);
+
+  useEffect(() => {
     let cancelled = false;
     void loadProjects().catch((error: unknown) => {
       if (!cancelled) {
@@ -477,7 +492,7 @@ export function App() {
     setHistoryCategories([...pendingSearchNavigation.historyCategories]);
     setSessionPage(0);
     setFocusMessageId(pendingSearchNavigation.messageId);
-    setPendingJumpTarget({
+    setPendingRevealTarget({
       sourceId: pendingSearchNavigation.sourceId,
       messageId: pendingSearchNavigation.messageId,
     });
@@ -492,10 +507,10 @@ export function App() {
     }
 
     let cancelled = false;
-    const isJumping = pendingJumpTarget !== null;
+    const isRevealing = pendingRevealTarget !== null;
     const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
     const effectiveCategories = isAllHistoryCategoriesSelected ? undefined : historyCategories;
-    const effectiveQuery = isJumping ? "" : effectiveSessionQuery;
+    const effectiveQuery = isRevealing ? "" : effectiveSessionQuery;
     void window.codetrail
       .invoke("sessions:getDetail", {
         sessionId: selectedSessionId,
@@ -503,16 +518,16 @@ export function App() {
         pageSize: PAGE_SIZE,
         categories: effectiveCategories,
         query: effectiveQuery,
-        focusMessageId: pendingJumpTarget?.messageId || undefined,
-        focusSourceId: pendingJumpTarget?.sourceId || undefined,
+        focusMessageId: pendingRevealTarget?.messageId || undefined,
+        focusSourceId: pendingRevealTarget?.sourceId || undefined,
       })
       .then((response) => {
         if (cancelled) {
           return;
         }
         setSessionDetail(response);
-        if (pendingJumpTarget !== null) {
-          setPendingJumpTarget(null);
+        if (pendingRevealTarget !== null) {
+          setPendingRevealTarget(null);
         }
         if (response.page !== sessionPage) {
           setSessionPage(response.page);
@@ -532,7 +547,7 @@ export function App() {
     sessionPage,
     historyCategories,
     effectiveSessionQuery,
-    pendingJumpTarget,
+    pendingRevealTarget,
     logError,
   ]);
 
@@ -876,11 +891,10 @@ export function App() {
     [sessionMessages],
   );
 
-  const handleJumpToMessage = useCallback((messageId: string, sourceId: string) => {
+  const handleRevealInSession = useCallback((messageId: string, sourceId: string) => {
     setSessionQueryInput("");
-    setSessionPage(0);
     setFocusMessageId(messageId);
-    setPendingJumpTarget({ messageId, sourceId });
+    setPendingRevealTarget({ messageId, sourceId });
   }, []);
 
   const beginResize =
@@ -966,7 +980,7 @@ export function App() {
                 setPendingSearchNavigation(null);
                 setSelectedProjectId(projectId);
                 setFocusMessageId("");
-                setPendingJumpTarget(null);
+                setPendingRevealTarget(null);
               }}
               onOpenProjectLocation={() => {
                 void openInFileManager(sortedProjects, selectedProjectId).then((result) => {
@@ -998,7 +1012,7 @@ export function App() {
                 setSelectedSessionId(sessionId);
                 setSessionPage(0);
                 setFocusMessageId("");
-                setPendingJumpTarget(null);
+                setPendingRevealTarget(null);
                 setMainView("history");
               }}
             />
@@ -1130,7 +1144,7 @@ export function App() {
                       onToggleFocused={() =>
                         setFocusMessageId((value) => (value === message.id ? "" : message.id))
                       }
-                      onJumpToMessage={() => handleJumpToMessage(message.id, message.sourceId)}
+                      onRevealInSession={() => handleRevealInSession(message.id, message.sourceId)}
                       cardRef={focusMessageId === message.id ? focusedMessageRef : null}
                     />
                   ))
@@ -1215,7 +1229,7 @@ export function App() {
                         searchCategories.includes(category) ? " active" : ""
                       }`}
                       onClick={() =>
-                        setSearchCategories((value) =>
+                        setHistoryCategories((value) =>
                           toggleValue<MessageCategory>(value, category),
                         )
                       }
