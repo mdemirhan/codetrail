@@ -9,7 +9,12 @@ export function ToolbarIcon({
     | "focus"
     | "closeFocus"
     | "copy"
-    | "shortcuts";
+    | "shortcuts"
+    | "zoomIn"
+    | "zoomOut"
+    | "zoomReset"
+    | "expandAll"
+    | "collapseAll";
 }) {
   const path = (() => {
     if (name === "history") {
@@ -32,6 +37,21 @@ export function ToolbarIcon({
     }
     if (name === "copy") {
       return "M8 8h11v13H8zM5 3h11v3H8v2H5z";
+    }
+    if (name === "zoomIn") {
+      return "M11 5v12M5 11h12M18.5 18.5L22 22";
+    }
+    if (name === "zoomOut") {
+      return "M5 11h12M18.5 18.5L22 22";
+    }
+    if (name === "zoomReset") {
+      return "M12 6v5l3 2M6 5h12v14H6z";
+    }
+    if (name === "expandAll") {
+      return "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5";
+    }
+    if (name === "collapseAll") {
+      return "M7 7h10v10H7z";
     }
     return "M4 7h16M4 12h16M4 17h10";
   })();

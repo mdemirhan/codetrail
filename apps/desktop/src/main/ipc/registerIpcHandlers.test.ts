@@ -56,9 +56,19 @@ describe("registerIpcHandlers", () => {
         "ui:getState": () => ({
           projectPaneWidth: null,
           sessionPaneWidth: null,
+          projectProviders: null,
+          historyCategories: null,
+          searchProviders: null,
+          searchCategories: null,
         }),
         "ui:setState": () => ({
           ok: true,
+        }),
+        "ui:getZoom": () => ({
+          percent: 100,
+        }),
+        "ui:setZoom": () => ({
+          percent: 100,
         }),
       },
     );

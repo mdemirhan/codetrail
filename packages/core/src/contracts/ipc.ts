@@ -66,6 +66,14 @@ const categoryCountsSchema = z.object({
 const paneStateSchema = z.object({
   projectPaneWidth: z.number().int().positive().nullable(),
   sessionPaneWidth: z.number().int().positive().nullable(),
+  projectProviders: z.array(providerSchema).nullable(),
+  historyCategories: z.array(messageCategorySchema).nullable(),
+  searchProviders: z.array(providerSchema).nullable(),
+  searchCategories: z.array(messageCategorySchema).nullable(),
+});
+
+const uiZoomResponseSchema = z.object({
+  percent: z.number().int().positive(),
 });
 
 export const ipcContractSchemas = {
@@ -160,10 +168,24 @@ export const ipcContractSchemas = {
     request: z.object({
       projectPaneWidth: z.number().int().positive(),
       sessionPaneWidth: z.number().int().positive(),
+      projectProviders: z.array(providerSchema),
+      historyCategories: z.array(messageCategorySchema),
+      searchProviders: z.array(providerSchema),
+      searchCategories: z.array(messageCategorySchema),
     }),
     response: z.object({
       ok: z.literal(true),
     }),
+  },
+  "ui:getZoom": {
+    request: z.object({}),
+    response: uiZoomResponseSchema,
+  },
+  "ui:setZoom": {
+    request: z.object({
+      action: z.enum(["in", "out", "reset"]),
+    }),
+    response: uiZoomResponseSchema,
   },
 } as const;
 

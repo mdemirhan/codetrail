@@ -5,6 +5,7 @@ import type { MessageCategory, Provider } from "@cch/core";
 import type { IpcResponse } from "@cch/core";
 
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
+import { ToolbarIcon } from "./components/ToolbarIcon";
 import { TopBar } from "./components/TopBar";
 import { ProjectPane } from "./components/history/ProjectPane";
 import { SessionPane } from "./components/history/SessionPane";
@@ -26,7 +27,6 @@ import {
   prettyProvider,
   sessionActivityOf,
   toErrorMessage,
-  toggleRequiredValue,
   toggleValue,
 } from "./lib/viewUtils";
 
@@ -41,8 +41,8 @@ const PROVIDERS: Provider[] = ["claude", "codex", "gemini"];
 const CATEGORIES: MessageCategory[] = [
   "user",
   "assistant",
-  "tool_use",
   "tool_edit",
+  "tool_use",
   "tool_result",
   "thinking",
   "system",
@@ -65,7 +65,6 @@ type SessionSortMode = "recent" | "messages" | "model";
 export function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMode, setRefreshMode] = useState<"incremental" | "force">("incremental");
-  const [statusText, setStatusText] = useState("");
 
   const [mainView, setMainView] = useState<MainView>("history");
   const [focusMode, setFocusMode] = useState(false);
@@ -87,7 +86,7 @@ export function App() {
     ...DEFAULT_MESSAGE_CATEGORIES,
   ]);
   const [messageExpanded, setMessageExpanded] = useState<Record<string, boolean>>({});
-  const [zoom, setZoom] = useState(100);
+  const [zoomPercent, setZoomPercent] = useState(100);
   const [focusSourceId, setFocusSourceId] = useState("");
   const [pendingSearchNavigation, setPendingSearchNavigation] = useState<{
     projectId: string;
@@ -123,6 +122,9 @@ export function App() {
   const sessionQuery = useDebouncedValue(sessionQueryInput, 180);
   const searchQuery = useDebouncedValue(searchQueryInput, 220);
   const searchProjectQuery = useDebouncedValue(searchProjectQueryInput, 180);
+  const logError = useCallback((context: string, error: unknown) => {
+    console.error(`[cch] ${context}: ${toErrorMessage(error)}`);
+  }, []);
 
   const focusedMessageRef = useRef<HTMLDivElement | null>(null);
   const sortedProjects = useMemo(() => {
@@ -232,10 +234,22 @@ export function App() {
         if (response.sessionPaneWidth !== null) {
           setSessionPaneWidth(clamp(response.sessionPaneWidth, 250, 620));
         }
+        if (response.projectProviders !== null) {
+          setProjectProviders(response.projectProviders);
+        }
+        if (response.historyCategories !== null) {
+          setHistoryCategories(response.historyCategories);
+        }
+        if (response.searchProviders !== null) {
+          setSearchProviders(response.searchProviders);
+        }
+        if (response.searchCategories !== null) {
+          setSearchCategories(response.searchCategories);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setStatusText(`Failed loading UI layout state: ${toErrorMessage(error)}`);
+          logError("Failed loading UI state", error);
         }
       })
       .finally(() => {
@@ -247,7 +261,27 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [logError]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.cch
+      .invoke("ui:getZoom", {})
+      .then((response) => {
+        if (!cancelled) {
+          setZoomPercent(response.percent);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          logError("Failed loading zoom state", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [logError]);
 
   useEffect(() => {
     if (!paneStateHydrated) {
@@ -259,28 +293,41 @@ export function App() {
         .invoke("ui:setState", {
           projectPaneWidth: Math.round(projectPaneWidth),
           sessionPaneWidth: Math.round(sessionPaneWidth),
+          projectProviders,
+          historyCategories,
+          searchProviders,
+          searchCategories,
         })
         .catch((error: unknown) => {
-          setStatusText(`Failed saving UI layout state: ${toErrorMessage(error)}`);
+          logError("Failed saving UI state", error);
         });
     }, 180);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [paneStateHydrated, projectPaneWidth, sessionPaneWidth]);
+  }, [
+    historyCategories,
+    logError,
+    paneStateHydrated,
+    projectPaneWidth,
+    projectProviders,
+    searchCategories,
+    searchProviders,
+    sessionPaneWidth,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
     void loadProjects().catch((error: unknown) => {
       if (!cancelled) {
-        setStatusText(`Failed loading projects: ${toErrorMessage(error)}`);
+        logError("Failed loading projects", error);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [loadProjects]);
+  }, [loadProjects, logError]);
 
   useEffect(() => {
     if (sortedProjects.length === 0) {
@@ -307,13 +354,13 @@ export function App() {
     let cancelled = false;
     void loadSessions().catch((error: unknown) => {
       if (!cancelled) {
-        setStatusText(`Failed loading sessions: ${toErrorMessage(error)}`);
+        logError("Failed loading sessions", error);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [loadSessions]);
+  }, [loadSessions, logError]);
 
   useEffect(() => {
     if (sortedSessions.length === 0) {
@@ -381,26 +428,26 @@ export function App() {
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setStatusText(`Failed loading session detail: ${toErrorMessage(error)}`);
+          logError("Failed loading session detail", error);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [selectedSessionId, sessionPage, historyCategories, sessionQuery, focusSourceId]);
+  }, [selectedSessionId, sessionPage, historyCategories, sessionQuery, focusSourceId, logError]);
 
   useEffect(() => {
     let cancelled = false;
     void loadSearch().catch((error: unknown) => {
       if (!cancelled) {
-        setStatusText(`Search failed: ${toErrorMessage(error)}`);
+        logError("Search failed", error);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [loadSearch]);
+  }, [loadSearch, logError]);
 
   const focusedMessageId = useMemo(() => {
     if (!focusSourceId || !sessionDetail?.messages) {
@@ -453,17 +500,16 @@ export function App() {
     async (force: boolean) => {
       setRefreshing(true);
       setRefreshMode(force ? "force" : "incremental");
-      setStatusText("");
       try {
         await window.cch.invoke("indexer:refresh", { force });
         await Promise.all([loadProjects(), loadSessions(), loadSearch()]);
       } catch (error) {
-        setStatusText(`Refresh failed: ${toErrorMessage(error)}`);
+        logError("Refresh failed", error);
       } finally {
         setRefreshing(false);
       }
     },
-    [loadProjects, loadSearch, loadSessions],
+    [loadProjects, loadSearch, loadSessions, logError],
   );
 
   const handleIncrementalRefresh = useCallback(async () => {
@@ -473,6 +519,18 @@ export function App() {
   const handleForceRefresh = useCallback(async () => {
     await handleRefresh(true);
   }, [handleRefresh]);
+
+  const applyZoomAction = useCallback(
+    async (action: "in" | "out" | "reset") => {
+      try {
+        const response = await window.cch.invoke("ui:setZoom", { action });
+        setZoomPercent(response.percent);
+      } catch (error) {
+        logError(`Failed applying zoom action '${action}'`, error);
+      }
+    },
+    [logError],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -488,6 +546,15 @@ export function App() {
       } else if (command && event.key === "2") {
         event.preventDefault();
         setMainView("search");
+      } else if (command && (event.key === "+" || event.key === "=")) {
+        event.preventDefault();
+        void applyZoomAction("in");
+      } else if (command && (event.key === "-" || event.key === "_")) {
+        event.preventDefault();
+        void applyZoomAction("out");
+      } else if (command && event.key === "0") {
+        event.preventDefault();
+        void applyZoomAction("reset");
       } else if (command && shift && event.key.toLowerCase() === "r") {
         event.preventDefault();
         void handleForceRefresh();
@@ -501,7 +568,7 @@ export function App() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [handleForceRefresh, handleIncrementalRefresh]);
+  }, [applyZoomAction, handleForceRefresh, handleIncrementalRefresh]);
 
   const selectedSession = useMemo(
     () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,
@@ -528,10 +595,19 @@ export function App() {
     return Math.ceil(totalCount / PAGE_SIZE);
   }, [sessionDetail?.totalCount]);
 
-  const canZoomIn = zoom < 150;
-  const canZoomOut = zoom > 80;
+  const canZoomIn = zoomPercent < 500;
+  const canZoomOut = zoomPercent > 25;
   const historyCategoryCounts = sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS;
   const isHistoryLayout = mainView === "history" && !focusMode;
+  const sessionMessages = sessionDetail?.messages ?? [];
+  const areAllMessagesExpanded = useMemo(
+    () =>
+      sessionMessages.length > 0 &&
+      sessionMessages.every(
+        (message) => messageExpanded[message.id] ?? isMessageExpandedByDefault(message.category),
+      ),
+    [messageExpanded, sessionMessages],
+  );
   const workspaceStyle = isHistoryLayout
     ? {
         gridTemplateColumns: `${projectPaneWidth}px 8px ${sessionPaneWidth}px 8px minmax(420px, 1fr)`,
@@ -579,11 +655,26 @@ export function App() {
     ].join("\n");
     try {
       await navigator.clipboard.writeText(content);
-      setStatusText("Copied session/project info to clipboard.");
     } catch (error) {
-      setStatusText(`Copy failed: ${toErrorMessage(error)}`);
+      logError("Copy info failed", error);
     }
-  }, [selectedProject, selectedSession]);
+  }, [logError, selectedProject, selectedSession]);
+
+  const handleSetAllMessagesExpanded = useCallback(
+    (expanded: boolean) => {
+      if (sessionMessages.length === 0) {
+        return;
+      }
+      setMessageExpanded((value) => {
+        const next = { ...value };
+        for (const message of sessionMessages) {
+          next[message.id] = expanded;
+        }
+        return next;
+      });
+    },
+    [sessionMessages],
+  );
 
   const beginResize =
     (pane: "project" | "session") => (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -617,8 +708,6 @@ export function App() {
         onToggleShortcuts={() => setShowShortcuts((value) => !value)}
       />
 
-      {statusText ? <p className="status-line">{statusText}</p> : null}
-
       <div
         className={`workspace ${isHistoryLayout ? "history-layout" : "single-layout"} ${mainView === "search" ? "search-layout" : ""}`}
         style={workspaceStyle}
@@ -642,9 +731,13 @@ export function App() {
                 setPendingSearchNavigation(null);
                 setSelectedProjectId(projectId);
               }}
-              onOpenProjectLocation={() =>
-                void openInFileManager(sortedProjects, selectedProjectId, setStatusText)
-              }
+              onOpenProjectLocation={() => {
+                void openInFileManager(sortedProjects, selectedProjectId).then((result) => {
+                  if (!result.ok) {
+                    logError("Failed opening project location", result.error ?? "Unknown error");
+                  }
+                });
+              }}
             />
 
             <div className="pane-resizer" onPointerDown={beginResize("project")} />
@@ -665,7 +758,11 @@ export function App() {
                 if (!selectedSession) {
                   return;
                 }
-                void openPath(selectedSession.filePath, setStatusText);
+                void openPath(selectedSession.filePath).then((result) => {
+                  if (!result.ok) {
+                    logError("Failed opening session location", result.error ?? "Unknown error");
+                  }
+                });
               }}
             />
 
@@ -673,7 +770,7 @@ export function App() {
           </>
         ) : null}
 
-        <section className="pane content-pane" style={{ fontSize: `${zoom}%` }}>
+        <section className="pane content-pane">
           {mainView === "history" ? (
             <div className="history-view">
               <div className="content-head">
@@ -692,24 +789,48 @@ export function App() {
                     | {selectedSession?.messageCount ?? 0} messages
                   </p>
                 </div>
-                <div className="zoom-controls">
+                <div className="detail-actions">
                   <button
                     type="button"
-                    onClick={() => setZoom((value) => Math.max(80, value - 5))}
-                    disabled={!canZoomOut}
+                    className="expand-toggle-button"
+                    onClick={() => handleSetAllMessagesExpanded(!areAllMessagesExpanded)}
+                    disabled={sessionMessages.length === 0}
                   >
-                    A-
+                    <ToolbarIcon name={areAllMessagesExpanded ? "collapseAll" : "expandAll"} />
+                    {areAllMessagesExpanded ? "Collapse All" : "Expand All"}
                   </button>
-                  <button type="button" onClick={() => setZoom(100)}>
-                    Reset
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setZoom((value) => Math.min(150, value + 5))}
-                    disabled={!canZoomIn}
-                  >
-                    A+
-                  </button>
+                  <div className="zoom-controls">
+                    <button
+                      type="button"
+                      className="zoom-button"
+                      onClick={() => void applyZoomAction("out")}
+                      disabled={!canZoomOut}
+                      aria-label="Zoom out"
+                      title="Zoom out"
+                    >
+                      <ToolbarIcon name="zoomOut" />
+                    </button>
+                    <button
+                      type="button"
+                      className="zoom-button zoom-reset"
+                      onClick={() => void applyZoomAction("reset")}
+                      aria-label="Reset zoom"
+                      title="Reset zoom"
+                    >
+                      <ToolbarIcon name="zoomReset" />
+                      <span>{zoomPercent}%</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="zoom-button"
+                      onClick={() => void applyZoomAction("in")}
+                      disabled={!canZoomIn}
+                      aria-label="Zoom in"
+                      title="Zoom in"
+                    >
+                      <ToolbarIcon name="zoomIn" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -852,7 +973,7 @@ export function App() {
                       }`}
                       onClick={() =>
                         setSearchCategories((value) =>
-                          toggleRequiredValue<MessageCategory>(value, category, CATEGORIES),
+                          toggleValue<MessageCategory>(value, category),
                         )
                       }
                     >

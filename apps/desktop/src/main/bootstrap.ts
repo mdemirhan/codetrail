@@ -67,14 +67,39 @@ export async function bootstrapMainProcess(
       return {
         projectPaneWidth: paneState?.projectPaneWidth ?? null,
         sessionPaneWidth: paneState?.sessionPaneWidth ?? null,
+        projectProviders: paneState?.projectProviders ?? null,
+        historyCategories: paneState?.historyCategories ?? null,
+        searchProviders: paneState?.searchProviders ?? null,
+        searchCategories: paneState?.searchCategories ?? null,
       };
     },
     "ui:setState": (payload) => {
       options.appStateStore?.setPaneState({
         projectPaneWidth: payload.projectPaneWidth,
         sessionPaneWidth: payload.sessionPaneWidth,
+        projectProviders: payload.projectProviders,
+        historyCategories: payload.historyCategories,
+        searchProviders: payload.searchProviders,
+        searchCategories: payload.searchCategories,
       });
       return { ok: true };
+    },
+    "ui:getZoom": (_payload, event) => ({
+      percent: Math.round(event.sender.getZoomFactor() * 100),
+    }),
+    "ui:setZoom": (payload, event) => {
+      const zoomStep = 0.5;
+      const current = event.sender.getZoomLevel();
+      if (payload.action === "reset") {
+        event.sender.setZoomLevel(0);
+      } else if (payload.action === "in") {
+        event.sender.setZoomLevel(current + zoomStep);
+      } else {
+        event.sender.setZoomLevel(current - zoomStep);
+      }
+      return {
+        percent: Math.round(event.sender.getZoomFactor() * 100),
+      };
     },
   });
 

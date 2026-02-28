@@ -6,21 +6,15 @@ type ProjectPathLike = {
 export async function openInFileManager(
   projects: ProjectPathLike[],
   selectedProjectId: string,
-  setStatusText: (value: string) => void,
-): Promise<void> {
+): Promise<{ ok: boolean; error: string | null }> {
   const selected = projects.find((project) => project.id === selectedProjectId);
   if (!selected) {
-    return;
+    return { ok: false, error: "No selected project." };
   }
-  await openPath(selected.path, setStatusText);
+  return openPath(selected.path);
 }
 
-export async function openPath(
-  path: string,
-  setStatusText: (value: string) => void,
-): Promise<void> {
+export async function openPath(path: string): Promise<{ ok: boolean; error: string | null }> {
   const result = await window.cch.invoke("path:openInFileManager", { path });
-  if (!result.ok) {
-    setStatusText(result.error ?? `Failed to open ${path}`);
-  }
+  return result.ok ? result : { ok: false, error: result.error ?? `Failed to open ${path}` };
 }

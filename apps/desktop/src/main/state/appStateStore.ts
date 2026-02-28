@@ -1,9 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
+import type { MessageCategory, Provider } from "@cch/core";
+
 export type PaneState = {
   projectPaneWidth: number;
   sessionPaneWidth: number;
+  projectProviders?: Provider[];
+  historyCategories?: MessageCategory[];
+  searchProviders?: Provider[];
+  searchCategories?: MessageCategory[];
 };
 
 export type WindowState = {
@@ -23,6 +29,16 @@ const PANE_MIN = 120;
 const PANE_MAX = 2000;
 const WINDOW_MIN = 320;
 const WINDOW_MAX = 6000;
+const PROVIDER_VALUES: Provider[] = ["claude", "codex", "gemini"];
+const CATEGORY_VALUES: MessageCategory[] = [
+  "user",
+  "assistant",
+  "tool_edit",
+  "tool_use",
+  "tool_result",
+  "thinking",
+  "system",
+];
 
 export class AppStateStore {
   private readonly filePath: string;
@@ -134,10 +150,18 @@ function sanitizePaneState(value: unknown): PaneState | null {
   if (projectPaneWidth === null || sessionPaneWidth === null) {
     return null;
   }
+  const projectProviders = sanitizeStringArray(record.projectProviders, PROVIDER_VALUES);
+  const historyCategories = sanitizeStringArray(record.historyCategories, CATEGORY_VALUES);
+  const searchProviders = sanitizeStringArray(record.searchProviders, PROVIDER_VALUES);
+  const searchCategories = sanitizeStringArray(record.searchCategories, CATEGORY_VALUES);
 
   return {
     projectPaneWidth,
     sessionPaneWidth,
+    ...(projectProviders ? { projectProviders } : {}),
+    ...(historyCategories ? { historyCategories } : {}),
+    ...(searchProviders ? { searchProviders } : {}),
+    ...(searchCategories ? { searchCategories } : {}),
   };
 }
 
@@ -182,4 +206,23 @@ function sanitizeOptionalInt(value: unknown, min: number, max: number): number |
     return null;
   }
   return sanitizeInt(value, min, max);
+}
+
+function sanitizeStringArray<T extends string>(value: unknown, universe: readonly T[]): T[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const deduped: T[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") {
+      return null;
+    }
+    if (!universe.includes(item as T) || deduped.includes(item as T)) {
+      return null;
+    }
+    deduped.push(item as T);
+  }
+
+  return deduped;
 }

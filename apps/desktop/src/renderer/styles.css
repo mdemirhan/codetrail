@@ -152,17 +152,6 @@ select:focus-visible {
   color: #083d9e;
 }
 
-.status-line {
-  margin: 0;
-  border: 1px solid #d6dfec;
-  background: #f7fbff;
-  color: #355170;
-  border-radius: var(--radius-sm);
-  padding: 7px 9px;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
 .workspace {
   min-height: 0;
   overflow: hidden;
@@ -264,28 +253,14 @@ select {
 }
 
 .chip {
-  position: relative;
   font-size: 12px;
   line-height: 1;
-  padding: 6px 8px 6px 22px;
+  padding: 6px 10px;
   background: var(--bg-muted);
   border-color: #cfd8e6;
   color: var(--text-2);
   opacity: 0.72;
   filter: saturate(0.72);
-}
-
-.chip::before {
-  content: "";
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  margin-top: -4px;
-  border-radius: 999px;
-  border: 1.4px solid currentColor;
-  background: transparent;
 }
 
 .chip.active {
@@ -296,11 +271,6 @@ select {
   filter: saturate(1);
   font-weight: 650;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 25%, transparent);
-}
-
-.chip.active::before {
-  background: currentColor;
-  border-color: currentColor;
 }
 
 .provider-chip.provider-claude {
@@ -491,7 +461,7 @@ select {
 .session-title {
   font-size: 13px;
   line-height: 1.3;
-  font-weight: 500;
+  font-weight: 400;
   overflow-wrap: anywhere;
   word-break: break-word;
   display: -webkit-box;
@@ -551,13 +521,50 @@ select {
   gap: 7px;
 }
 
-.zoom-controls {
+.detail-actions {
   display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.expand-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+  padding: 5px 7px;
+}
+
+.expand-toggle-button .toolbar-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.zoom-controls {
+  display: inline-flex;
   gap: 5px;
 }
 
-.zoom-controls button {
-  min-width: 42px;
+.zoom-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+.zoom-button .toolbar-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.zoom-button.zoom-reset {
+  min-width: 56px;
 }
 
 .message-card {
@@ -684,12 +691,6 @@ select {
 
 .category-toggle:hover:not(:disabled) {
   border-color: transparent;
-}
-
-.collapse-button {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 8px;
 }
 
 .message-card header {

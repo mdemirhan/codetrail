@@ -1,6 +1,6 @@
 import type { MessageCategory } from "@cch/core";
 import type { IpcResponse } from "@cch/core";
-import type { MouseEvent as ReactMouseEvent, ReactNode, Ref } from "react";
+import type { ReactNode, Ref } from "react";
 
 import { formatDate, prettyCategory, prettyProvider } from "../../lib/viewUtils";
 
@@ -24,10 +24,6 @@ export function MessageCard({
   cardRef?: Ref<HTMLDivElement> | null;
 }) {
   const typeLabel = formatMessageTypeLabel(message.category, message.content);
-  const handleToggleExpanded = (event: ReactMouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    onToggleExpanded();
-  };
 
   return (
     <article
@@ -39,7 +35,7 @@ export function MessageCard({
           <button
             type="button"
             className={`category-badge category-toggle category-${message.category}`}
-            onClick={handleToggleExpanded}
+            onClick={onToggleExpanded}
             aria-expanded={isExpanded}
           >
             {typeLabel}
@@ -53,14 +49,6 @@ export function MessageCard({
             </small>
           </button>
         </div>
-        <button
-          type="button"
-          className="collapse-button"
-          aria-expanded={isExpanded}
-          onClick={handleToggleExpanded}
-        >
-          {isExpanded ? "Collapse" : "Expand"}
-        </button>
       </header>
       {isExpanded ? (
         <>
