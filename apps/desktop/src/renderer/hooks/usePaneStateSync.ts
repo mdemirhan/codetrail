@@ -21,7 +21,6 @@ export function usePaneStateSync(args: {
   historyCategories: MessageCategory[];
   expandedByDefaultCategories: MessageCategory[];
   searchProviders: Provider[];
-  searchCategories: MessageCategory[];
   theme: ThemeMode;
   selectedProjectId: string;
   selectedSessionId: string;
@@ -33,7 +32,6 @@ export function usePaneStateSync(args: {
   setHistoryCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setExpandedByDefaultCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setSearchProviders: Dispatch<SetStateAction<Provider[]>>;
-  setSearchCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setTheme: Dispatch<SetStateAction<ThemeMode>>;
   setSelectedProjectId: Dispatch<SetStateAction<string>>;
   setSelectedSessionId: Dispatch<SetStateAction<string>>;
@@ -50,7 +48,6 @@ export function usePaneStateSync(args: {
     historyCategories,
     expandedByDefaultCategories,
     searchProviders,
-    searchCategories,
     theme,
     selectedProjectId,
     selectedSessionId,
@@ -62,7 +59,6 @@ export function usePaneStateSync(args: {
     setHistoryCategories,
     setExpandedByDefaultCategories,
     setSearchProviders,
-    setSearchCategories,
     setTheme,
     setSelectedProjectId,
     setSelectedSessionId,
@@ -99,9 +95,6 @@ export function usePaneStateSync(args: {
         }
         if (response.searchProviders !== null) {
           setSearchProviders(response.searchProviders);
-        }
-        if (response.searchCategories !== null) {
-          setSearchCategories(response.searchCategories);
         }
         if (response.theme !== null) {
           setTheme(response.theme);
@@ -154,7 +147,6 @@ export function usePaneStateSync(args: {
     setProjectPaneWidth,
     setProjectProviders,
     setExpandedByDefaultCategories,
-    setSearchCategories,
     setSearchProviders,
     setSelectedProjectId,
     setSelectedSessionId,
@@ -178,7 +170,6 @@ export function usePaneStateSync(args: {
           historyCategories,
           expandedByDefaultCategories,
           searchProviders,
-          searchCategories,
           theme,
           selectedProjectId,
           selectedSessionId,
@@ -200,7 +191,6 @@ export function usePaneStateSync(args: {
     projectPaneWidth,
     projectProviders,
     expandedByDefaultCategories,
-    searchCategories,
     searchProviders,
     selectedProjectId,
     selectedSessionId,

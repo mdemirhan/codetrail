@@ -63,14 +63,6 @@ type MainView = "history" | "search" | "settings";
 type ThemeMode = "light" | "dark";
 type BulkExpandScope = "all" | MessageCategory;
 
-function areCategorySelectionsEqual(left: MessageCategory[], right: MessageCategory[]): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-  const rightSet = new Set(right);
-  return left.every((value) => rightSet.has(value));
-}
-
 function formatDuration(durationMs: number | null): string {
   if (durationMs === null || !Number.isFinite(durationMs) || durationMs <= 0) {
     return "-";
@@ -137,9 +129,6 @@ export function App() {
   const [searchQueryInput, setSearchQueryInput] = useState("");
   const [searchProjectQueryInput, setSearchProjectQueryInput] = useState("");
   const [searchProviders, setSearchProviders] = useState<Provider[]>([]);
-  const [searchCategories, setSearchCategories] = useState<MessageCategory[]>([
-    ...DEFAULT_MESSAGE_CATEGORIES,
-  ]);
   const [searchProjectId, setSearchProjectId] = useState("");
   const [searchResponse, setSearchResponse] = useState<SearchQueryResponse>({
     query: "",
@@ -233,7 +222,7 @@ export function App() {
 
   const loadSearch = useCallback(async () => {
     const trimmed = searchQuery.trim();
-    const isAllSearchCategoriesSelected = searchCategories.length === CATEGORIES.length;
+    const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
     if (trimmed.length === 0) {
       setSearchResponse({
         query: searchQuery,
@@ -246,7 +235,7 @@ export function App() {
 
     const response = await window.codetrail.invoke("search:query", {
       query: searchQuery,
-      categories: isAllSearchCategoriesSelected ? undefined : searchCategories,
+      categories: isAllHistoryCategoriesSelected ? undefined : historyCategories,
       providers: searchProviders.length > 0 ? searchProviders : undefined,
       projectIds: searchProjectId ? [searchProjectId] : undefined,
       projectQuery: searchProjectQuery,
@@ -254,7 +243,7 @@ export function App() {
       offset: 0,
     });
     setSearchResponse(response);
-  }, [searchCategories, searchProjectId, searchProjectQuery, searchProviders, searchQuery]);
+  }, [historyCategories, searchProjectId, searchProjectQuery, searchProviders, searchQuery]);
 
   const loadSettingsInfo = useCallback(async () => {
     setSettingsLoading(true);
@@ -277,7 +266,6 @@ export function App() {
     historyCategories,
     expandedByDefaultCategories,
     searchProviders,
-    searchCategories,
     theme,
     selectedProjectId,
     selectedSessionId,
@@ -289,7 +277,6 @@ export function App() {
     setHistoryCategories,
     setExpandedByDefaultCategories,
     setSearchProviders,
-    setSearchCategories,
     setTheme,
     setSelectedProjectId,
     setSelectedSessionId,
@@ -330,13 +317,6 @@ export function App() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (areCategorySelectionsEqual(historyCategories, searchCategories)) {
-      return;
-    }
-    setSearchCategories([...historyCategories]);
-  }, [historyCategories, searchCategories]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1133,7 +1113,7 @@ export function App() {
                       key={category}
                       type="button"
                       className={`chip category-chip category-${category}${
-                        searchCategories.includes(category) ? " active" : ""
+                        historyCategories.includes(category) ? " active" : ""
                       }`}
                       onClick={() =>
                         setHistoryCategories((value) =>
@@ -1164,7 +1144,7 @@ export function App() {
                           sessionId: result.sessionId,
                           messageId: result.messageId,
                           sourceId: result.messageSourceId,
-                          historyCategories: [...searchCategories],
+                          historyCategories: [...historyCategories],
                         });
                         setSelectedProjectId(result.projectId);
                         setMainView("history");
