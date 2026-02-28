@@ -42,7 +42,16 @@
   --diff-meta-bg: rgba(148, 163, 184, 0.2);
   --diff-meta-text: #475569;
   --diff-context-text: #1f2937;
+  --diff-word-add-bg: rgba(16, 185, 129, 0.28);
+  --diff-word-remove-bg: rgba(220, 38, 38, 0.26);
   --mark-bg: #fde68a;
+  --path-pill-bg: #fff4ea;
+  --path-pill-border: rgba(217, 119, 6, 0.28);
+  --path-pill-text: #c2410c;
+  --syntax-keyword: #7c3aed;
+  --syntax-string: #be123c;
+  --syntax-number: #0f766e;
+  --syntax-comment: #64748b;
   --cat-user-bg: #eaf8f2;
   --cat-user-border: #b7e4cc;
   --cat-user-text: #0b7a4c;
@@ -117,7 +126,16 @@
   --diff-meta-bg: rgba(109, 160, 247, 0.16);
   --diff-meta-text: #a9c6ff;
   --diff-context-text: #d0d3dd;
+  --diff-word-add-bg: rgba(166, 209, 137, 0.3);
+  --diff-word-remove-bg: rgba(231, 130, 132, 0.3);
   --mark-bg: rgba(240, 176, 80, 0.35);
+  --path-pill-bg: #303446;
+  --path-pill-border: #51576d;
+  --path-pill-text: #c6d0f5;
+  --syntax-keyword: #ca9ee6;
+  --syntax-string: #a6d189;
+  --syntax-number: #ef9f76;
+  --syntax-comment: #737994;
   --cat-user-bg: rgba(93, 216, 168, 0.14);
   --cat-user-border: rgba(93, 216, 168, 0.28);
   --cat-user-text: #5dd8a8;
@@ -1176,10 +1194,10 @@ body.platform-macos .titlebar-left {
 .tool-edit-path {
   display: inline-flex;
   max-width: 100%;
-  border: 1px solid rgba(217, 119, 6, 0.28);
+  border: 1px solid var(--path-pill-border);
   border-radius: 999px;
-  background: #fff4ea;
-  color: #c2410c;
+  background: var(--path-pill-bg);
+  color: var(--path-pill-text);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.3;
@@ -1266,20 +1284,20 @@ body.platform-macos .titlebar-left {
 }
 
 .tok-keyword {
-  color: #7c3aed;
+  color: var(--syntax-keyword);
   font-weight: 650;
 }
 
 .tok-string {
-  color: #be123c;
+  color: var(--syntax-string);
 }
 
 .tok-number {
-  color: #0f766e;
+  color: var(--syntax-number);
 }
 
 .tok-comment {
-  color: #64748b;
+  color: var(--syntax-comment);
   font-style: italic;
 }
 
@@ -1315,12 +1333,12 @@ body.platform-macos .titlebar-left {
 }
 
 .diff-word-add {
-  background: rgba(16, 185, 129, 0.28);
+  background: var(--diff-word-add-bg);
   border-radius: 2px;
 }
 
 .diff-word-remove {
-  background: rgba(220, 38, 38, 0.26);
+  background: var(--diff-word-remove-bg);
   border-radius: 2px;
 }
 
