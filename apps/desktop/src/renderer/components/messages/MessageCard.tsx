@@ -1,5 +1,5 @@
 import type { MessageCategory } from "@codetrail/core";
-import type { Ref } from "react";
+import type { KeyboardEvent, MouseEvent, Ref } from "react";
 
 import { formatDate, prettyCategory } from "../../lib/viewUtils";
 
@@ -32,50 +32,92 @@ export function MessageCard({
     message.operationDurationConfidence,
   );
 
+  const handleToggleButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onToggleExpanded();
+  };
+
+  const handleHeaderKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    event.preventDefault();
+    onToggleExpanded();
+  };
+
+  const handleSelectButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onToggleFocused();
+  };
+
+  const handleRevealButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onRevealInSession?.();
+  };
+
   return (
     <article
-      className={`message category-${message.category}${isFocused ? " focused" : ""}`}
+      className={`message category-${message.category}${isFocused ? " focused" : ""}${
+        isExpanded ? " expanded" : " collapsed"
+      }`}
       ref={cardRef ?? null}
     >
-      <header className="message-header">
+      <header
+        className="message-header"
+        onClick={onToggleExpanded}
+        onKeyDown={handleHeaderKeyDown}
+        tabIndex={0}
+      >
         <div className="message-header-left">
           <button
             type="button"
-            className={`msg-role category-toggle category-${message.category}`}
-            onClick={onToggleExpanded}
+            className="message-toggle-button"
+            onClick={handleToggleButtonClick}
             aria-expanded={isExpanded}
             aria-label={isExpanded ? "Collapse message" : "Expand message"}
             title={isExpanded ? "Collapse message" : "Expand message"}
           >
-            {typeLabel}
+            <svg className="msg-chevron" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
+            </svg>
+            <span className={`msg-role category-toggle category-${message.category}`}>
+              {typeLabel}
+            </span>
           </button>
+          <div className="message-meta">
+            <span className="msg-time">{formatDate(message.createdAt)}</span>
+            {operationDurationLabel ? (
+              <span className="msg-time">· Took: {operationDurationLabel}</span>
+            ) : null}
+          </div>
+        </div>
+        <div className="message-header-actions">
           <button
             type="button"
-            className="message-select-button"
-            onClick={onToggleFocused}
+            className={`message-action-button message-select-button${isFocused ? " is-active" : ""}`}
+            onClick={handleSelectButtonClick}
             aria-label={isFocused ? "Clear message focus" : "Focus this message"}
             title={isFocused ? "Unselect message" : "Select message"}
           >
             <span className="message-select-label">{isFocused ? "Unselect" : "Select"}</span>
-            <span className="msg-time">{formatDate(message.createdAt)}</span>
-            {operationDurationLabel ? (
-              <span className="msg-time">Took: {operationDurationLabel}</span>
-            ) : null}
           </button>
-        </div>
-        {onRevealInSession ? (
-          <div className="message-header-actions">
+          {onRevealInSession ? (
             <button
               type="button"
-              className="message-reveal-button"
-              onClick={onRevealInSession}
+              className="message-action-button message-reveal-button"
+              onClick={handleRevealButtonClick}
               aria-label="Reveal this message in session"
               title="Reveal in session"
             >
               Reveal in Session
             </button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </header>
       {isExpanded ? (
         <div className="message-body">

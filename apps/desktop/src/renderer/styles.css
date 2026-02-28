@@ -1224,8 +1224,14 @@ body.platform-macos .titlebar-left {
 }
 
 .message {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   animation: fade-in 0.25s ease;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 @keyframes fade-in {
@@ -1245,10 +1251,15 @@ body.platform-macos .titlebar-left {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  padding: 6px 10px;
-  margin-bottom: 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.message.collapsed .message-header {
+  border-bottom-color: transparent;
 }
 
 .message-header-left {
@@ -1256,6 +1267,31 @@ body.platform-macos .titlebar-left {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.message-toggle-button {
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+}
+
+.msg-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.message-toggle-button:hover .msg-chevron {
+  color: var(--text-primary);
+}
+
+.message.collapsed .msg-chevron {
+  transform: rotate(-90deg);
 }
 
 .msg-role {
@@ -1311,19 +1347,39 @@ body.platform-macos .titlebar-left {
   border-color: var(--cat-system-border);
 }
 
-.message-select-button {
-  border: 0;
-  background: transparent;
+.message-action-button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0;
+  padding: 4px 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.message-action-button:hover:not(:disabled) {
+  border-color: var(--border-active);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.message-select-button.is-active {
+  border-color: var(--message-focus-border);
+  box-shadow: 0 0 0 2px var(--message-focus-ring);
 }
 
 .message-select-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent-blue);
+  color: inherit;
+}
+
+.message-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .msg-provider,
@@ -1346,44 +1402,28 @@ body.platform-macos .titlebar-left {
 }
 
 .message-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .message-reveal-button {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
-  color: var(--text-tertiary);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 4px 10px;
-  box-shadow: var(--shadow-sm);
-}
-
-.message-reveal-button:hover:not(:disabled) {
-  border-color: var(--border-active);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-md);
+  white-space: nowrap;
 }
 
 .message-body {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface);
   padding: 16px 18px;
   color: var(--text-secondary);
   font-size: 13.5px;
   line-height: 1.7;
-  box-shadow: var(--shadow-card);
 }
 
-.message.focused .message-header {
-  border-color: var(--message-focus-border);
-  box-shadow: 0 0 0 3px var(--message-focus-ring);
+.message.collapsed .message-body {
+  display: none;
 }
 
-.message.focused .message-body {
+.message.focused {
   border-color: var(--message-focus-border);
   box-shadow: 0 0 0 3px var(--message-focus-ring), var(--shadow-card);
 }
