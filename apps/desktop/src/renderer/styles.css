@@ -1014,7 +1014,6 @@ body.platform-macos .titlebar-left {
 
 .message {
   margin-bottom: 20px;
-  border-radius: var(--radius-lg);
   animation: fade-in 0.25s ease;
 }
 
@@ -1035,6 +1034,9 @@ body.platform-macos .titlebar-left {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  padding: 6px 10px;
   margin-bottom: 10px;
 }
 
@@ -1165,8 +1167,9 @@ body.platform-macos .titlebar-left {
   box-shadow: var(--shadow-card);
 }
 
-.message.focused {
-  box-shadow: 0 0 0 1px var(--message-focus-border), 0 0 0 4px var(--message-focus-ring);
+.message.focused .message-header {
+  border-color: var(--message-focus-border);
+  box-shadow: 0 0 0 3px var(--message-focus-ring);
 }
 
 .message.focused .message-body {
