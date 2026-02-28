@@ -74,71 +74,38 @@ function renderTextChunk(value: string, query: string, keyPrefix: string): React
   const lines = value.split(/\r?\n/);
   const items: ReactNode[] = [];
   let lineCursor = 0;
-  let listType: "ul" | "ol" | null = null;
-  let listBuffer: Array<{ key: string; content: string }> = [];
+  let listRoots: MarkdownList[] = [];
+  const listStack: MarkdownListFrame[] = [];
 
-  const flushList = () => {
-    if (!listType || listBuffer.length === 0) {
+  const flushLists = () => {
+    if (listRoots.length === 0) {
       return;
     }
 
-    const renderedItems = listBuffer.map((listItem) => (
-      <li key={listItem.key}>
-        {renderInlineText(listItem.content, query, `${keyPrefix}:${listItem.key}`)}
-      </li>
-    ));
-    items.push(
-      listType === "ol" ? (
-        <ol
-          key={`${keyPrefix}:${listBuffer[0]?.key ?? "o"}:olist`}
-          className="md-list md-list-ordered"
-        >
-          {renderedItems}
-        </ol>
-      ) : (
-        <ul key={`${keyPrefix}:${listBuffer[0]?.key ?? "u"}:ulist`} className="md-list">
-          {renderedItems}
-        </ul>
-      ),
-    );
-    listBuffer = [];
-    listType = null;
+    for (const list of listRoots) {
+      items.push(renderMarkdownList(list, query, keyPrefix));
+    }
+    listRoots = [];
+    listStack.length = 0;
   };
 
   for (const line of lines) {
     const currentKey = `${lineCursor}`;
     lineCursor += line.length + 1;
-
-    const unorderedMatch = /^[-*+]\s+(.*)$/.exec(line);
-    const tolerantUnorderedMatch = /^\s{0,3}[-*+•]\s+(.*)$/.exec(line);
-    if (unorderedMatch || tolerantUnorderedMatch) {
-      if (listType && listType !== "ul") {
-        flushList();
-      }
-      listType = "ul";
-      listBuffer.push({
-        key: currentKey,
-        content: (unorderedMatch?.[1] ?? tolerantUnorderedMatch?.[1] ?? "").trim(),
-      });
+    const listToken = parseMarkdownListToken(line, currentKey, listStack.length > 0);
+    if (listToken) {
+      appendMarkdownListToken(listToken, listRoots, listStack);
       continue;
     }
-
-    const orderedMatch = /^\s{0,3}\d+\.\s+(.*)$/.exec(line);
-    if (orderedMatch) {
-      if (listType && listType !== "ol") {
-        flushList();
-      }
-      listType = "ol";
-      listBuffer.push({ key: currentKey, content: orderedMatch[1] ?? "" });
-      continue;
-    }
-
-    flushList();
 
     if (line.trim().length === 0) {
+      if (listStack.length > 0) {
+        continue;
+      }
       items.push(<div key={`${keyPrefix}:${currentKey}:empty`} className="md-empty" />);
       continue;
     }
+    flushLists();
 
     const headingMatch = /^\s{0,3}(#{1,6})\s+(.*)$/.exec(line);
     if (headingMatch) {
@@ -186,9 +153,159 @@ function renderTextChunk(value: string, query: string, keyPrefix: string): React
     );
   }
 
-  flushList();
+  flushLists();
 
   return <div key={`${keyPrefix}:chunk`}>{items}</div>;
+}
+
+type MarkdownListKind = "ul" | "ol";
+
+type MarkdownListToken = {
+  key: string;
+  kind: MarkdownListKind;
+  indent: number;
+  content: string;
+};
+
+type MarkdownListItem = {
+  key: string;
+  content: string;
+  children: MarkdownList[];
+};
+
+type MarkdownList = {
+  key: string;
+  kind: MarkdownListKind;
+  indent: number;
+  items: MarkdownListItem[];
+};
+
+type MarkdownListFrame = {
+  list: MarkdownList;
+  parentItem: MarkdownListItem | null;
+};
+
+function parseMarkdownListToken(
+  line: string,
+  key: string,
+  hasActiveList: boolean,
+): MarkdownListToken | null {
+  const normalized = line.replace(/\t/g, "  ");
+
+  const unorderedMatch = /^(\s*)[-*+•]\s+(.*)$/.exec(normalized);
+  if (unorderedMatch) {
+    const indent = (unorderedMatch[1] ?? "").length;
+    if (indent <= 3 || hasActiveList) {
+      return {
+        key,
+        kind: "ul",
+        indent,
+        content: unorderedMatch[2] ?? "",
+      };
+    }
+  }
+
+  const orderedMatch = /^(\s*)\d+\.\s+(.*)$/.exec(normalized);
+  if (orderedMatch) {
+    const indent = (orderedMatch[1] ?? "").length;
+    if (indent <= 3 || hasActiveList) {
+      return {
+        key,
+        kind: "ol",
+        indent,
+        content: orderedMatch[2] ?? "",
+      };
+    }
+  }
+
+  return null;
+}
+
+function appendMarkdownListToken(
+  token: MarkdownListToken,
+  roots: MarkdownList[],
+  stack: MarkdownListFrame[],
+): void {
+  let current = token;
+
+  while (stack.length > 0 && current.indent < (stack[stack.length - 1]?.list.indent ?? 0)) {
+    stack.pop();
+  }
+
+  let frame = stack[stack.length - 1];
+
+  if (!frame) {
+    frame = pushMarkdownListFrame(current, null, roots, stack);
+  } else if (current.indent > frame.list.indent) {
+    const parentItem = frame.list.items[frame.list.items.length - 1] ?? null;
+    if (parentItem) {
+      frame = pushMarkdownListFrame(current, parentItem, roots, stack);
+    } else {
+      current = { ...current, indent: frame.list.indent };
+      if (current.kind !== frame.list.kind) {
+        stack.pop();
+        frame = pushMarkdownListFrame(current, frame.parentItem, roots, stack);
+      }
+    }
+  } else if (current.indent === frame.list.indent && current.kind !== frame.list.kind) {
+    stack.pop();
+    frame = pushMarkdownListFrame(current, frame.parentItem, roots, stack);
+  }
+
+  const item: MarkdownListItem = {
+    key: current.key,
+    content: current.content.trim(),
+    children: [],
+  };
+  frame.list.items.push(item);
+}
+
+function pushMarkdownListFrame(
+  token: MarkdownListToken,
+  parentItem: MarkdownListItem | null,
+  roots: MarkdownList[],
+  stack: MarkdownListFrame[],
+): MarkdownListFrame {
+  const list: MarkdownList = {
+    key: `${token.key}:${token.kind}:${token.indent}`,
+    kind: token.kind,
+    indent: token.indent,
+    items: [],
+  };
+  if (parentItem) {
+    parentItem.children.push(list);
+  } else {
+    roots.push(list);
+  }
+
+  const frame: MarkdownListFrame = { list, parentItem };
+  stack.push(frame);
+  return frame;
+}
+
+function renderMarkdownList(list: MarkdownList, query: string, keyPrefix: string): ReactNode {
+  const renderedItems = list.items.map((item) => (
+    <li key={item.key}>
+      {renderInlineText(item.content, query, `${keyPrefix}:${item.key}`)}
+      {item.children.map((child, index) =>
+        renderMarkdownList(child, query, `${keyPrefix}:${item.key}:child:${index}`),
+      )}
+    </li>
+  ));
+
+  if (list.kind === "ol") {
+    return (
+      <ol key={`${keyPrefix}:${list.key}:olist`} className="md-list md-list-ordered">
+        {renderedItems}
+      </ol>
+    );
+  }
+
+  return (
+    <ul key={`${keyPrefix}:${list.key}:ulist`} className="md-list">
+      {renderedItems}
+    </ul>
+  );
 }
 
 function renderInlineText(value: string, query: string, keyPrefix: string): ReactNode[] {
