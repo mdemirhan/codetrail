@@ -7,7 +7,7 @@ import {
   IpcValidationError,
   ipcChannels,
   ipcContractSchemas,
-} from "@cch/core";
+} from "@codetrail/core";
 
 type IpcHandlerMap = {
   [K in IpcChannel]: (

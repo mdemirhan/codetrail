@@ -52,8 +52,9 @@ echo "[4/5] Building macOS icon assets..."
 ./scripts/build-app-icon.sh
 
 echo "[5/5] Packaging macOS app for ${ARCH}..."
-OUT_DIR="${APP_DIR}/out/CCH-darwin-${ARCH}"
-APP_NAME="CCH"
+APP_NAME="Code Trail"
+APP_SLUG="CodeTrail"
+OUT_DIR="${APP_DIR}/out/${APP_SLUG}-darwin-${ARCH}"
 APP_BUNDLE="${OUT_DIR}/${APP_NAME}.app"
 ELECTRON_APP="${APP_DIR}/node_modules/electron/dist/Electron.app"
 RESOURCES_APP="${APP_BUNDLE}/Contents/Resources/app"
@@ -73,14 +74,14 @@ PLIST="${APP_BUNDLE}/Contents/Info.plist"
 if [[ -f "${PLIST}" ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleName ${APP_NAME}" "${PLIST}" >/dev/null 2>&1 || true
   /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${APP_NAME}" "${PLIST}" >/dev/null 2>&1 || true
-  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.cch.desktop" "${PLIST}" >/dev/null 2>&1 || true
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.codetrail.desktop" "${PLIST}" >/dev/null 2>&1 || true
 fi
 
 if [[ -f "${ICON_ICNS}" ]]; then
-  cp "${ICON_ICNS}" "${APP_BUNDLE}/Contents/Resources/${APP_NAME}.icns"
+  cp "${ICON_ICNS}" "${APP_BUNDLE}/Contents/Resources/${APP_SLUG}.icns"
   if [[ -f "${PLIST}" ]]; then
-    /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile ${APP_NAME}.icns" "${PLIST}" >/dev/null 2>&1 || \
-      /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string ${APP_NAME}.icns" "${PLIST}" >/dev/null 2>&1 || true
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile ${APP_SLUG}.icns" "${PLIST}" >/dev/null 2>&1 || \
+      /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string ${APP_SLUG}.icns" "${PLIST}" >/dev/null 2>&1 || true
   fi
 fi
 
@@ -95,7 +96,7 @@ for dep in better-sqlite3 react react-dom; do
   fi
 done
 
-ZIP_PATH="${OUT_DIR}/${APP_NAME}-${ARCH}.zip"
+ZIP_PATH="${OUT_DIR}/${APP_SLUG}-${ARCH}.zip"
 ditto -c -k --sequesterRsrc --keepParent "${APP_BUNDLE}" "${ZIP_PATH}"
 
 echo "Done. Open artifacts in:"

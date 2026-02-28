@@ -1,36 +1,48 @@
-# CCH TS Desktop
+# Code Trail
 
-TypeScript desktop clone of CCH for local AI coding chat history across Claude, Codex, and Gemini.
+Code Trail is a local desktop app for indexing and exploring AI coding session history across Claude, Codex, and Gemini.
 
-## Scope
+It helps you search, filter, and revisit prior coding conversations, tool calls, and edits from one interface.
 
-- Discovery from default local provider directories.
-- Provider-specific parsing into one canonical message schema.
-- SQLite indexing with FTS search and incremental updates.
-- Desktop UI for project/session browsing and search-driven deep linking.
+## What Code Trail Can Do
 
-## Commands
+- Discover session files from local provider directories.
+- Parse provider-specific formats into one canonical message model.
+- Index sessions/messages into SQLite with incremental updates.
+- Run full-text search with facets (provider/category/project filters).
+- Browse projects and sessions with deep links to exact messages.
+- Open original file/session locations directly from the UI.
+- Persist UI state (pane widths, filters, zoom) between runs.
 
-- Install: `bun install`
-- Quality gate: `bun run ci`
-- Core test suite: `bun run test`
-- Desktop build: `bun run desktop:build`
-- Desktop run: `bun run desktop:start`
-- Desktop build + run: `bun run desktop:dev`
+## Screenshot
 
-## Discovery defaults
+![Code Trail Screenshot Placeholder](docs/images/screenshot-placeholder.svg)
 
-- Claude: `~/.claude/projects`
-- Codex: `~/.codex/sessions`
-- Gemini: `~/.gemini/tmp`
+_(Replace with a real screenshot once available.)_
 
-## Desktop notes
+## Tech Stack
 
-- `apps/desktop/src/main/main.ts` uses `CCH_RENDERER_URL` when set.
-- Without `CCH_RENDERER_URL`, it loads `dist/renderer/index.html`.
-- Search result clicks open session detail focused on the target message source id.
+- Electron + React + TypeScript
+- SQLite (`better-sqlite3`) + FTS
+- Bun workspaces
+- Vitest + Biome + TypeScript strict mode
 
-## Reference logs
+## Development
 
-- Decision log: `docs/DECISION_LOG.md`
-- Architecture log: `docs/ARCHITECTURE_LOG.md`
+- Install dependencies: `bun install`
+- Lint/typecheck/test: `bun run ci`
+- Build desktop app: `bun run desktop:build`
+- Run desktop app: `bun run desktop:start`
+- Build macOS app bundle: `bun run desktop:make:mac`
+
+## Data Locations (macOS)
+
+Code Trail uses Electron `userData` for state and database files.
+Typical location:
+
+- `<userData>/ui-state.json`
+- `<userData>/codetrail.sqlite`
+
+## Built With Codex
+
+This project is fully written in Codex.

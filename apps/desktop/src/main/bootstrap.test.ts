@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DATABASE_SCHEMA_VERSION } from "@cch/core";
+import { DATABASE_SCHEMA_VERSION } from "@codetrail/core";
 import { describe, expect, it, vi } from "vitest";
 
 const { mockHandle } = vi.hoisted(() => ({
@@ -23,7 +23,7 @@ import { bootstrapMainProcess } from "./bootstrap";
 
 describe("bootstrapMainProcess", () => {
   it("boots services and registers ipc handlers", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "cch-ts-main-"));
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-main-"));
     const dbPath = join(dir, "app.db");
 
     const result = await bootstrapMainProcess({ dbPath, runStartupIndexing: false });

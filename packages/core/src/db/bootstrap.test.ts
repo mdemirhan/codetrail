@@ -9,7 +9,7 @@ import { DATABASE_SCHEMA_VERSION } from "./constants";
 
 describe("initializeDatabase", () => {
   it("creates schema tables for an empty db", () => {
-    const dir = mkdtempSync(join(tmpdir(), "cch-ts-db-"));
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-db-"));
     const dbPath = join(dir, "test.db");
 
     const result = initializeDatabase(dbPath);
@@ -32,7 +32,7 @@ describe("initializeDatabase", () => {
   });
 
   it("rebuilds schema when stored version mismatches", () => {
-    const dir = mkdtempSync(join(tmpdir(), "cch-ts-db-"));
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-db-"));
     const dbPath = join(dir, "test-mismatch.db");
 
     initializeDatabase(dbPath);

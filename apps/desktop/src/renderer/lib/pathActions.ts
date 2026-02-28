@@ -15,6 +15,6 @@ export async function openInFileManager(
 }
 
 export async function openPath(path: string): Promise<{ ok: boolean; error: string | null }> {
-  const result = await window.cch.invoke("path:openInFileManager", { path });
+  const result = await window.codetrail.invoke("path:openInFileManager", { path });
   return result.ok ? result : { ok: false, error: result.error ?? `Failed to open ${path}` };
 }

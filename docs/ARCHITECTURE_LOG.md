@@ -45,5 +45,5 @@ The repository is split into:
 ## Build/runtime notes
 
 - Desktop build script bundles main, preload, and renderer into `apps/desktop/dist`.
-- Main process loads renderer URL from `CCH_RENDERER_URL` when provided.
+- Main process loads renderer URL from `CODETRAIL_RENDERER_URL` when provided.
 - Otherwise it loads local `dist/renderer/index.html`.

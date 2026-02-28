@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
-import type { MessageCategory, Provider } from "@cch/core";
-import type { IpcResponse } from "@cch/core";
+import type { MessageCategory, Provider } from "@codetrail/core";
+import type { IpcResponse } from "@codetrail/core";
 
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { ToolbarIcon } from "./components/ToolbarIcon";
@@ -128,7 +128,7 @@ export function App() {
   const searchProjectQuery = useDebouncedValue(searchProjectQueryInput, 180);
   const effectiveSessionQuery = sessionQueryInput.trim().length === 0 ? "" : sessionQuery;
   const logError = useCallback((context: string, error: unknown) => {
-    console.error(`[cch] ${context}: ${toErrorMessage(error)}`);
+    console.error(`[codetrail] ${context}: ${toErrorMessage(error)}`);
   }, []);
 
   const focusedMessageRef = useRef<HTMLDivElement | null>(null);
@@ -176,7 +176,7 @@ export function App() {
   }, [sessions, sessionSortMode]);
 
   const loadProjects = useCallback(async () => {
-    const response = await window.cch.invoke("projects:list", {
+    const response = await window.codetrail.invoke("projects:list", {
       providers: projectProviders,
       query: projectQuery,
     });
@@ -190,7 +190,9 @@ export function App() {
       return;
     }
 
-    const response = await window.cch.invoke("sessions:list", { projectId: selectedProjectId });
+    const response = await window.codetrail.invoke("sessions:list", {
+      projectId: selectedProjectId,
+    });
     setSessions(response.sessions);
   }, [selectedProjectId]);
 
@@ -207,7 +209,7 @@ export function App() {
       return;
     }
 
-    const response = await window.cch.invoke("search:query", {
+    const response = await window.codetrail.invoke("search:query", {
       query: searchQuery,
       categories: isAllSearchCategoriesSelected ? undefined : searchCategories,
       providers: searchProviders.length > 0 ? searchProviders : undefined,
@@ -221,7 +223,7 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    void window.cch
+    void window.codetrail
       .invoke("ui:getState", {})
       .then((response) => {
         if (cancelled) {
@@ -265,7 +267,7 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    void window.cch
+    void window.codetrail
       .invoke("ui:getZoom", {})
       .then((response) => {
         if (!cancelled) {
@@ -289,7 +291,7 @@ export function App() {
     }
 
     const timer = window.setTimeout(() => {
-      void window.cch
+      void window.codetrail
         .invoke("ui:setState", {
           projectPaneWidth: Math.round(projectPaneWidth),
           sessionPaneWidth: Math.round(sessionPaneWidth),
@@ -421,7 +423,7 @@ export function App() {
         ? undefined
         : historyCategories;
     const effectiveQuery = isJumping ? "" : effectiveSessionQuery;
-    void window.cch
+    void window.codetrail
       .invoke("sessions:getDetail", {
         sessionId: selectedSessionId,
         page: sessionPage,
@@ -535,7 +537,7 @@ export function App() {
       setRefreshing(true);
       setRefreshMode(force ? "force" : "incremental");
       try {
-        await window.cch.invoke("indexer:refresh", { force });
+        await window.codetrail.invoke("indexer:refresh", { force });
         await Promise.all([loadProjects(), loadSessions(), loadSearch()]);
       } catch (error) {
         logError("Refresh failed", error);
@@ -557,7 +559,7 @@ export function App() {
   const applyZoomAction = useCallback(
     async (action: "in" | "out" | "reset") => {
       try {
-        const response = await window.cch.invoke("ui:setZoom", { action });
+        const response = await window.codetrail.invoke("ui:setZoom", { action });
         setZoomPercent(response.percent);
       } catch (error) {
         logError(`Failed applying zoom action '${action}'`, error);

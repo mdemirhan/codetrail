@@ -1,4 +1,4 @@
-import type { IpcResponse, Provider } from "@cch/core";
+import type { IpcResponse, Provider } from "@codetrail/core";
 
 import { compactPath, formatDate, prettyProvider } from "../../lib/viewUtils";
 

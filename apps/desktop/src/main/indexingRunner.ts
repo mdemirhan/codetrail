@@ -1,4 +1,4 @@
-import { runIncrementalIndexing } from "@cch/core";
+import { runIncrementalIndexing } from "@codetrail/core";
 
 export type RefreshJobRequest = {
   force: boolean;

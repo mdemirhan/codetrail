@@ -27,29 +27,29 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
 
   const mainWindow = new BrowserWindow(windowOptions);
 
-  const debugRenderer = process.env.CCH_DEBUG_RENDERER === "1";
+  const debugRenderer = process.env.CODETRAIL_DEBUG_RENDERER === "1";
   if (debugRenderer) {
     mainWindow.webContents.on("did-finish-load", () => {
-      console.log("[cch] renderer loaded", mainWindow.webContents.getURL());
+      console.log("[codetrail] renderer loaded", mainWindow.webContents.getURL());
     });
 
     mainWindow.webContents.on(
       "did-fail-load",
       (_event, errorCode, errorDescription, validatedURL) => {
-        console.error("[cch] did-fail-load", { errorCode, errorDescription, validatedURL });
+        console.error("[codetrail] did-fail-load", { errorCode, errorDescription, validatedURL });
       },
     );
 
     mainWindow.webContents.on("render-process-gone", (_event, details) => {
-      console.error("[cch] render-process-gone", details);
+      console.error("[codetrail] render-process-gone", details);
     });
 
     mainWindow.webContents.on("preload-error", (_event, preloadScriptPath, error) => {
-      console.error("[cch] preload-error", preloadScriptPath, error);
+      console.error("[codetrail] preload-error", preloadScriptPath, error);
     });
   }
 
-  const rendererUrl = process.env.CCH_RENDERER_URL;
+  const rendererUrl = process.env.CODETRAIL_RENDERER_URL;
   if (rendererUrl && rendererUrl.length > 0) {
     void mainWindow.loadURL(rendererUrl);
   } else {
@@ -59,13 +59,13 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
     } else {
       void mainWindow.loadURL(
         `data:text/html;charset=utf-8,${encodeURIComponent(
-          "<!doctype html><html><body style='font-family:sans-serif;padding:24px'><h1>CCH TS</h1><p>Renderer bundle not found.</p></body></html>",
+          "<!doctype html><html><body style='font-family:sans-serif;padding:24px'><h1>Code Trail</h1><p>Renderer bundle not found.</p></body></html>",
         )}`,
       );
     }
   }
 
-  if (process.env.CCH_OPEN_DEVTOOLS === "1") {
+  if (process.env.CODETRAIL_OPEN_DEVTOOLS === "1") {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
@@ -99,7 +99,7 @@ app.whenReady().then(async () => {
     await bootstrapMainProcess({ appStateStore });
     createWindow(appStateStore);
   } catch (error) {
-    console.error("[cch] bootstrap failure", error);
+    console.error("[codetrail] bootstrap failure", error);
     app.exit(1);
     return;
   }

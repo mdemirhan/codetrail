@@ -9,7 +9,7 @@ import { runIncrementalIndexing } from "../indexing";
 import { searchMessages } from "./searchMessages";
 
 function setupIndexedDb(): { dbPath: string; cleanup: () => void } {
-  const dir = mkdtempSync(join(tmpdir(), "cch-ts-search-"));
+  const dir = mkdtempSync(join(tmpdir(), "codetrail-search-"));
   const dbPath = join(dir, "index.db");
 
   const claudeRoot = join(dir, ".claude", "projects");

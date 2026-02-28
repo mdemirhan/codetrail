@@ -21,8 +21,8 @@
     "baseUrl": ".",
     "types": ["node", "react", "react-dom", "vitest/globals"],
     "paths": {
-      "@cch/core": ["packages/core/src/index.ts"],
-      "@cch/core/*": ["packages/core/src/*"]
+      "@codetrail/core": ["packages/core/src/index.ts"],
+      "@codetrail/core/*": ["packages/core/src/*"]
     }
   },
   "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx"]

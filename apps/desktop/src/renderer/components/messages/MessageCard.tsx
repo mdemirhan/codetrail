@@ -1,4 +1,4 @@
-import type { MessageCategory } from "@cch/core";
+import type { MessageCategory } from "@codetrail/core";
 import type { Ref } from "react";
 
 import { formatDate, prettyCategory, prettyProvider } from "../../lib/viewUtils";

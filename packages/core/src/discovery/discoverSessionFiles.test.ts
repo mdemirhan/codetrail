@@ -8,7 +8,7 @@ import { discoverSessionFiles } from "./discoverSessionFiles";
 
 describe("discoverSessionFiles", () => {
   it("discovers provider session files with configured parity rules", () => {
-    const dir = mkdtempSync(join(tmpdir(), "cch-ts-discovery-"));
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-discovery-"));
 
     const claudeRoot = join(dir, ".claude", "projects");
     const claudeProject = join(claudeRoot, "project-a");

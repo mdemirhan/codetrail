@@ -1,8 +1,8 @@
-import type { IpcChannel, IpcRequest, IpcResponse } from "@cch/core";
+import type { IpcChannel, IpcRequest, IpcResponse } from "@codetrail/core";
 
 declare global {
   interface Window {
-    cch: {
+    codetrail: {
       invoke<C extends IpcChannel>(channel: C, payload: IpcRequest<C>): Promise<IpcResponse<C>>;
     };
   }

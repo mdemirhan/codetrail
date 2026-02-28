@@ -8,7 +8,7 @@ import { AppStateStore } from "./appStateStore";
 
 describe("AppStateStore", () => {
   it("persists and restores pane/window state", () => {
-    const dir = mkdtempSync(join(tmpdir(), "cch-ts-app-state-"));
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-app-state-"));
     const filePath = join(dir, "ui-state.json");
 
     const store = new AppStateStore(filePath);
@@ -34,7 +34,7 @@ describe("AppStateStore", () => {
   });
 
   it("ignores invalid persisted payloads", () => {
-    const dir = mkdtempSync(join(tmpdir(), "cch-ts-app-state-invalid-"));
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-app-state-invalid-"));
     const filePath = join(dir, "ui-state.json");
     const store = new AppStateStore(filePath);
     store.setPaneState({ projectPaneWidth: 300, sessionPaneWidth: 350 });

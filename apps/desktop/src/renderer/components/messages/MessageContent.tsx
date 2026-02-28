@@ -1,4 +1,4 @@
-import type { MessageCategory } from "@cch/core";
+import type { MessageCategory } from "@codetrail/core";
 
 import {
   CodeBlock,

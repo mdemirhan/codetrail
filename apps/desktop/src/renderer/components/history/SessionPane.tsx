@@ -1,4 +1,4 @@
-import type { IpcResponse } from "@cch/core";
+import type { IpcResponse } from "@codetrail/core";
 
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
 

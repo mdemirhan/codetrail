@@ -1,4 +1,4 @@
-import { type IpcRequest, type IpcResponse, openDatabase, searchMessages } from "@cch/core";
+import { type IpcRequest, type IpcResponse, openDatabase, searchMessages } from "@codetrail/core";
 
 type SessionSummaryRow = {
   id: string;

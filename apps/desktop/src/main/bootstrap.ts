@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { app, ipcMain, shell } from "electron";
 
-import { DATABASE_SCHEMA_VERSION, initializeDatabase } from "@cch/core";
+import { DATABASE_SCHEMA_VERSION, initializeDatabase } from "@codetrail/core";
 
 import type { AppStateStore } from "./appStateStore";
 import { getSessionDetail, listProjects, listSessions, runSearchQuery } from "./data/queryService";
@@ -24,7 +24,7 @@ export type BootstrapResult = {
 export async function bootstrapMainProcess(
   options: BootstrapOptions = {},
 ): Promise<BootstrapResult> {
-  const dbPath = options.dbPath ?? join(app.getPath("userData"), "cch-ts.sqlite");
+  const dbPath = options.dbPath ?? join(app.getPath("userData"), "codetrail.sqlite");
 
   const dbBootstrap = initializeDatabase(dbPath);
   const indexingRunner = new WorkerIndexingRunner(dbPath);
@@ -105,7 +105,7 @@ export async function bootstrapMainProcess(
 
   if (options.runStartupIndexing ?? true) {
     void indexingRunner.enqueue({ force: false }).catch((error: unknown) => {
-      console.error("[cch] startup incremental indexing failed", error);
+      console.error("[codetrail] startup incremental indexing failed", error);
     });
   }
 

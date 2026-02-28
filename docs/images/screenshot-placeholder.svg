@@ -1,0 +1,16 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="720" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#1E293B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <rect x="80" y="80" width="1120" height="560" rx="28" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+  <text x="640" y="330" text-anchor="middle" fill="#E2E8F0" font-size="56" font-family="Arial, sans-serif" font-weight="700">
+    Code Trail
+  </text>
+  <text x="640" y="392" text-anchor="middle" fill="#94A3B8" font-size="28" font-family="Arial, sans-serif">
+    Screenshot Placeholder
+  </text>
+</svg>

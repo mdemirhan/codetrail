@@ -10,7 +10,7 @@ import { runIncrementalIndexing } from "./indexSessions";
 
 describe("runIncrementalIndexing", () => {
   it("indexes incrementally, supports force rebuild, and rebuilds on schema-version mismatch", () => {
-    const dir = mkdtempSync(join(tmpdir(), "cch-ts-index-"));
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-index-"));
     const dbPath = join(dir, "index.db");
 
     const claudeRoot = join(dir, ".claude", "projects");
@@ -271,7 +271,7 @@ describe("runIncrementalIndexing", () => {
   });
 
   it("keeps copied codex sessions with identical source ids as distinct sessions", () => {
-    const dir = mkdtempSync(join(tmpdir(), "cch-ts-index-codex-dupe-"));
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-index-codex-dupe-"));
     const dbPath = join(dir, "index.db");
     const codexRoot = join(dir, ".codex", "sessions");
     const fileA = join(codexRoot, "2026", "02", "27", "one", "same-id.jsonl");

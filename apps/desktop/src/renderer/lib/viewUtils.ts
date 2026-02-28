@@ -1,4 +1,4 @@
-import type { MessageCategory, Provider } from "@cch/core";
+import type { MessageCategory, Provider } from "@codetrail/core";
 
 export const PROVIDER_LABELS: Record<Provider, string> = {
   claude: "Claude",

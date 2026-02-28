@@ -17,8 +17,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@cch/core": coreIndexPath,
-      "@cch/core/": coreDirPath,
+      "@codetrail/core": coreIndexPath,
+      "@codetrail/core/": coreDirPath,
     },
   },
 });

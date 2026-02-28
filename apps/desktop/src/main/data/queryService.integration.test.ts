@@ -2,13 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { openDatabase, runIncrementalIndexing } from "@cch/core";
+import { openDatabase, runIncrementalIndexing } from "@codetrail/core";
 import { describe, expect, it } from "vitest";
 
 import { getSessionDetail, listProjects, listSessions, runSearchQuery } from "./queryService";
 
 function setupIndexedDb(): { dbPath: string; cleanup: () => void } {
-  const dir = mkdtempSync(join(tmpdir(), "cch-ts-query-service-"));
+  const dir = mkdtempSync(join(tmpdir(), "codetrail-query-service-"));
   const dbPath = join(dir, "index.db");
 
   const claudeRoot = join(dir, ".claude", "projects");

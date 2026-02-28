@@ -5,8 +5,8 @@ import { AutoUnpackNativesPlugin } from "@electron-forge/plugin-auto-unpack-nati
 const forgeConfig = {
   packagerConfig: {
     asar: true,
-    name: "CCH",
-    appBundleId: "com.cch.desktop",
+    name: "Code Trail",
+    appBundleId: "com.codetrail.desktop",
   },
   rebuildConfig: {},
   plugins: [new AutoUnpackNativesPlugin({})],

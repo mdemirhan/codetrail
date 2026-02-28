@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-import type { MessageCategory, Provider } from "@cch/core";
+import type { MessageCategory, Provider } from "@codetrail/core";
 
 export type PaneState = {
   projectPaneWidth: number;
@@ -135,7 +135,7 @@ function persistState(filePath: string, state: AppState): void {
     mkdirSync(dirname(filePath), { recursive: true });
     writeFileSync(filePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
   } catch (error) {
-    console.error("[cch] failed persisting app state", error);
+    console.error("[codetrail] failed persisting app state", error);
   }
 }
 

@@ -2,14 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { runIncrementalIndexing } from "@cch/core";
+import { runIncrementalIndexing } from "@codetrail/core";
 import { describe, expect, it } from "vitest";
 
 import { getSessionDetail, listProjects, listSessions, runSearchQuery } from "./queryService";
 
 describe("desktop smoke flow", () => {
   it("supports discovery to index to search to open session detail at focus message", () => {
-    const dir = mkdtempSync(join(tmpdir(), "cch-ts-smoke-flow-"));
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-smoke-flow-"));
     const dbPath = join(dir, "index.db");
 
     const claudeRoot = join(dir, ".claude", "projects");

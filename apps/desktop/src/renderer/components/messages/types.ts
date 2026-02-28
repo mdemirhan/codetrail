@@ -1,3 +1,3 @@
-import type { IpcResponse } from "@cch/core";
+import type { IpcResponse } from "@codetrail/core";
 
 export type SessionMessage = IpcResponse<"sessions:getDetail">["messages"][number];
