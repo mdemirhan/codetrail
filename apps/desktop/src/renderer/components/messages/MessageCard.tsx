@@ -30,26 +30,24 @@ export function MessageCard({
 
   return (
     <article
-      className={`message-card category-${message.category}${isFocused ? " focused" : ""}`}
+      className={`message category-${message.category}${isFocused ? " focused" : ""}`}
       ref={cardRef ?? null}
     >
       <header className="message-header">
-        <div className="message-header-meta">
+        <div className="message-header-left">
           <button
             type="button"
-            className={`category-badge category-toggle category-${message.category}`}
+            className={`msg-role category-toggle category-${message.category}`}
             onClick={onToggleExpanded}
             aria-expanded={isExpanded}
           >
             {typeLabel}
           </button>
           <button type="button" className="message-select-button" onClick={onToggleFocused}>
-            <small>
-              <span className={`provider-label provider-${message.provider}`}>
-                {prettyProvider(message.provider)}
-              </span>{" "}
-              | {formatDate(message.createdAt)}
-            </small>
+            <span className={`msg-provider provider-label provider-${message.provider}`}>
+              {prettyProvider(message.provider)}
+            </span>
+            <span className="msg-time">{formatDate(message.createdAt)}</span>
           </button>
         </div>
         {onJumpToMessage ? (
@@ -61,11 +59,11 @@ export function MessageCard({
         ) : null}
       </header>
       {isExpanded ? (
-        <>
+        <div className="message-body">
           <div className="message-content">
             <MessageContent text={message.content} category={message.category} query={query} />
           </div>
-        </>
+        </div>
       ) : null}
     </article>
   );

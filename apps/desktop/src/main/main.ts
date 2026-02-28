@@ -10,12 +10,20 @@ import { bootstrapMainProcess } from "./bootstrap";
 function createWindow(appStateStore: AppStateStore): BrowserWindow {
   const preloadPath = resolvePreloadPath();
   const persistedWindowState = appStateStore.getWindowState();
+  const isMac = process.platform === "darwin";
 
   const windowOptions = {
     width: persistedWindowState?.width ?? 1400,
     height: persistedWindowState?.height ?? 900,
     minWidth: 1120,
     minHeight: 680,
+    title: "Code Trail",
+    ...(isMac
+      ? {
+          titleBarStyle: "hiddenInset" as const,
+          trafficLightPosition: { x: 14, y: 16 },
+        }
+      : {}),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

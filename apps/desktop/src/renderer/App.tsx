@@ -22,7 +22,6 @@ import {
   countProviders,
   deriveSessionTitle,
   formatDate,
-  parentPath,
   prettyCategory,
   prettyProvider,
   sessionActivityOf,
@@ -59,12 +58,9 @@ const EMPTY_CATEGORY_COUNTS = {
 };
 
 type MainView = "history" | "search";
-type ProjectSortMode = "recent" | "name" | "provider";
-type SessionSortMode = "recent" | "messages";
 
 export function App() {
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshMode, setRefreshMode] = useState<"incremental" | "force">("incremental");
 
   const [mainView, setMainView] = useState<MainView>("history");
   const [focusMode, setFocusMode] = useState(false);
@@ -72,12 +68,10 @@ export function App() {
 
   const [projectQueryInput, setProjectQueryInput] = useState("");
   const [projectProviders, setProjectProviders] = useState<Provider[]>([...PROVIDERS]);
-  const [projectSortMode, setProjectSortMode] = useState<ProjectSortMode>("recent");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
 
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [sessionSortMode, setSessionSortMode] = useState<SessionSortMode>("recent");
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
   const [sessionPage, setSessionPage] = useState(0);
@@ -136,44 +130,23 @@ export function App() {
   const sortedProjects = useMemo(() => {
     const next = [...projects];
     next.sort((left, right) => {
-      if (projectSortMode === "recent") {
-        return (
-          compareRecent(right.lastActivity, left.lastActivity) ||
-          left.name.localeCompare(right.name)
-        );
-      }
-      if (projectSortMode === "provider") {
-        return (
-          left.provider.localeCompare(right.provider) ||
-          left.name.localeCompare(right.name) ||
-          compareRecent(right.lastActivity, left.lastActivity)
-        );
-      }
       return (
-        left.name.localeCompare(right.name) ||
-        left.provider.localeCompare(right.provider) ||
-        compareRecent(right.lastActivity, left.lastActivity)
+        compareRecent(right.lastActivity, left.lastActivity) || left.name.localeCompare(right.name)
       );
     });
     return next;
-  }, [projects, projectSortMode]);
+  }, [projects]);
 
   const sortedSessions = useMemo(() => {
     const next = [...sessions];
     next.sort((left, right) => {
-      if (sessionSortMode === "messages") {
-        return (
-          right.messageCount - left.messageCount ||
-          compareRecent(sessionActivityOf(right), sessionActivityOf(left))
-        );
-      }
       return (
         compareRecent(sessionActivityOf(right), sessionActivityOf(left)) ||
         right.messageCount - left.messageCount
       );
     });
     return next;
-  }, [sessions, sessionSortMode]);
+  }, [sessions]);
 
   const loadProjects = useCallback(async () => {
     const response = await window.codetrail.invoke("projects:list", {
@@ -535,7 +508,6 @@ export function App() {
   const handleRefresh = useCallback(
     async (force: boolean) => {
       setRefreshing(true);
-      setRefreshMode(force ? "force" : "incremental");
       try {
         await window.codetrail.invoke("indexer:refresh", { force });
         await Promise.all([loadProjects(), loadSessions(), loadSearch()]);
@@ -610,10 +582,6 @@ export function App() {
     () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,
     [selectedSessionId, sortedSessions],
   );
-  const selectedProject = useMemo(
-    () => sortedProjects.find((project) => project.id === selectedProjectId) ?? null,
-    [selectedProjectId, sortedProjects],
-  );
   const projectProviderCounts = useMemo(
     () => countProviders(sortedProjects.map((project) => project.provider)),
     [sortedProjects],
@@ -646,7 +614,7 @@ export function App() {
   );
   const workspaceStyle = isHistoryLayout
     ? {
-        gridTemplateColumns: `${projectPaneWidth}px 8px ${sessionPaneWidth}px 8px minmax(420px, 1fr)`,
+        gridTemplateColumns: `${projectPaneWidth}px 1px ${sessionPaneWidth}px 1px minmax(420px, 1fr)`,
       }
     : undefined;
 
@@ -665,36 +633,6 @@ export function App() {
         : ["Current view: Search", `Results: ${searchResponse.totalCount}`];
     return [...contextual, ...global];
   }, [mainView, searchResponse.totalCount, selectedSession]);
-
-  const handleCopyInfo = useCallback(async () => {
-    const sessionTitle = selectedSession ? deriveSessionTitle(selectedSession) : "(none)";
-    const sessionId = selectedSession?.id ?? "(none)";
-    const projectName = selectedProject?.name || selectedProject?.path || "(none)";
-    const projectId = selectedProject?.id ?? "(none)";
-    const historyFile = selectedSession?.filePath ?? "(none)";
-    const historyDir = historyFile === "(none)" ? "(none)" : parentPath(historyFile);
-    const projectPath = selectedProject?.path || selectedSession?.cwd || "(none)";
-    const provider = selectedSession?.provider ?? selectedProject?.provider ?? "(none)";
-    const providerLabel =
-      provider === "claude" || provider === "codex" || provider === "gemini"
-        ? prettyProvider(provider)
-        : provider;
-    const content = [
-      `Provider: ${providerLabel}`,
-      `Project Name: ${projectName}`,
-      `Project ID: ${projectId}`,
-      `Project Path: ${projectPath}`,
-      `Session Title: ${sessionTitle}`,
-      `Session ID: ${sessionId}`,
-      `History Directory: ${historyDir}`,
-      `History File: ${historyFile}`,
-    ].join("\n");
-    try {
-      await navigator.clipboard.writeText(content);
-    } catch (error) {
-      logError("Copy info failed", error);
-    }
-  }, [logError, selectedProject, selectedSession]);
 
   const handleSetAllMessagesExpanded = useCallback(
     (expanded: boolean) => {
@@ -740,15 +678,13 @@ export function App() {
       <TopBar
         mainView={mainView}
         refreshing={refreshing}
-        refreshMode={refreshMode}
         focusMode={focusMode}
         focusDisabled={mainView !== "history"}
-        onSelectHistory={() => setMainView("history")}
-        onSelectSearch={() => setMainView("search")}
+        onToggleSearchView={() =>
+          setMainView((value) => (value === "history" ? "search" : "history"))
+        }
         onIncrementalRefresh={() => void handleIncrementalRefresh()}
-        onForceRefresh={() => void handleForceRefresh()}
         onToggleFocus={() => setFocusMode((value) => !value)}
-        onCopyInfo={() => void handleCopyInfo()}
         onToggleShortcuts={() => setShowShortcuts((value) => !value)}
       />
 
@@ -761,12 +697,10 @@ export function App() {
             <ProjectPane
               sortedProjects={sortedProjects}
               selectedProjectId={selectedProjectId}
-              projectSortMode={projectSortMode}
               projectQueryInput={projectQueryInput}
               projectProviders={projectProviders}
               providers={PROVIDERS}
               projectProviderCounts={projectProviderCounts}
-              onProjectSortChange={setProjectSortMode}
               onProjectQueryChange={setProjectQueryInput}
               onToggleProvider={(provider) =>
                 setProjectProviders((value) => toggleValue(value, provider))
@@ -784,23 +718,7 @@ export function App() {
                   }
                 });
               }}
-            />
-
-            <div className="pane-resizer" onPointerDown={beginResize("project")} />
-
-            <SessionPane
-              sortedSessions={sortedSessions}
-              selectedSessionId={selectedSessionId}
-              sessionSortMode={sessionSortMode}
-              onSessionSortChange={setSessionSortMode}
-              onSelectSession={(sessionId) => {
-                setPendingSearchNavigation(null);
-                setSelectedSessionId(sessionId);
-                setSessionPage(0);
-                setFocusSourceId("");
-                setPendingJumpTarget(null);
-                setMainView("history");
-              }}
+              canOpenSessionLocation={!!selectedSession}
               onOpenSessionLocation={() => {
                 if (!selectedSession) {
                   return;
@@ -813,6 +731,21 @@ export function App() {
               }}
             />
 
+            <div className="pane-resizer" onPointerDown={beginResize("project")} />
+
+            <SessionPane
+              sortedSessions={sortedSessions}
+              selectedSessionId={selectedSessionId}
+              onSelectSession={(sessionId) => {
+                setPendingSearchNavigation(null);
+                setSelectedSessionId(sessionId);
+                setSessionPage(0);
+                setFocusSourceId("");
+                setPendingJumpTarget(null);
+                setMainView("history");
+              }}
+            />
+
             <div className="pane-resizer" onPointerDown={beginResize("session")} />
           </>
         ) : null}
@@ -820,98 +753,91 @@ export function App() {
         <section className="pane content-pane">
           {mainView === "history" ? (
             <div className="history-view">
-              <div className="content-head">
-                <div>
-                  <h2>
+              <div className="msg-header">
+                <div className="msg-header-top">
+                  <div className="msg-header-title">
                     {selectedSession ? deriveSessionTitle(selectedSession) : "Session Detail"}
-                  </h2>
-                  <p>
-                    {selectedSession ? (
-                      <span className={`provider-label provider-${selectedSession.provider}`}>
-                        {prettyProvider(selectedSession.provider)}
-                      </span>
-                    ) : (
-                      "-"
-                    )}{" "}
-                    | {selectedSession?.messageCount ?? 0} messages
-                  </p>
-                </div>
-                <div className="detail-actions">
-                  <button
-                    type="button"
-                    className="expand-toggle-button"
-                    onClick={() => handleSetAllMessagesExpanded(!areAllMessagesExpanded)}
-                    disabled={sessionMessages.length === 0}
-                  >
-                    <ToolbarIcon name={areAllMessagesExpanded ? "collapseAll" : "expandAll"} />
-                    {areAllMessagesExpanded ? "Collapse All" : "Expand All"}
-                  </button>
-                  <div className="zoom-controls">
+                  </div>
+                  <div className="msg-toolbar">
                     <button
                       type="button"
-                      className="zoom-button"
-                      onClick={() => void applyZoomAction("out")}
-                      disabled={!canZoomOut}
-                      aria-label="Zoom out"
-                      title="Zoom out"
+                      className="toolbar-btn"
+                      onClick={() => handleSetAllMessagesExpanded(!areAllMessagesExpanded)}
+                      disabled={sessionMessages.length === 0}
                     >
-                      <ToolbarIcon name="zoomOut" />
+                      <ToolbarIcon name={areAllMessagesExpanded ? "collapseAll" : "expandAll"} />
+                      {areAllMessagesExpanded ? "Collapse All" : "Expand All"}
                     </button>
-                    <button
-                      type="button"
-                      className="zoom-button zoom-reset"
-                      onClick={() => void applyZoomAction("reset")}
-                      aria-label="Reset zoom"
-                      title="Reset zoom"
-                    >
-                      <ToolbarIcon name="zoomReset" />
-                      <span>{zoomPercent}%</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="zoom-button"
-                      onClick={() => void applyZoomAction("in")}
-                      disabled={!canZoomIn}
-                      aria-label="Zoom in"
-                      title="Zoom in"
-                    >
-                      <ToolbarIcon name="zoomIn" />
-                    </button>
+                    <div className="toolbar-zoom-group">
+                      <button
+                        type="button"
+                        className="toolbar-btn zoom-btn"
+                        onClick={() => void applyZoomAction("out")}
+                        disabled={!canZoomOut}
+                        aria-label="Zoom out"
+                        title="Zoom out"
+                      >
+                        <ToolbarIcon name="zoomOut" />
+                      </button>
+                      <span className="zoom-level">{zoomPercent}%</span>
+                      <button
+                        type="button"
+                        className="toolbar-btn zoom-btn"
+                        onClick={() => void applyZoomAction("in")}
+                        disabled={!canZoomIn}
+                        aria-label="Zoom in"
+                        title="Zoom in"
+                      >
+                        <ToolbarIcon name="zoomIn" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="filter-row">
-                <input
-                  value={sessionQueryInput}
-                  onChange={(event) => {
-                    setSessionQueryInput(event.target.value);
-                    setSessionPage(0);
-                  }}
-                  placeholder="Search in session"
-                />
-                <div className="chip-row">
-                  {CATEGORIES.map((category) => (
-                    <button
-                      key={category}
-                      type="button"
-                      className={`chip category-chip category-${category}${
-                        historyCategories.includes(category) ? " active" : ""
-                      }`}
-                      onClick={() => {
-                        setHistoryCategories((value) =>
-                          toggleValue<MessageCategory>(value, category),
-                        );
-                        setSessionPage(0);
-                      }}
-                    >
-                      {prettyCategory(category)} ({historyCategoryCounts[category]})
-                    </button>
-                  ))}
+                <div className="msg-header-info">
+                  <span className="provider">
+                    {selectedSession ? prettyProvider(selectedSession.provider) : "-"}
+                  </span>
+                  <span>{selectedSession?.messageCount ?? 0} messages</span>
                 </div>
               </div>
 
-              <div className="message-list" ref={messageListRef}>
+              <div className="msg-filters">
+                {CATEGORIES.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    className={`msg-filter ${category}-filter${
+                      historyCategories.includes(category) ? " active" : ""
+                    }`}
+                    onClick={() => {
+                      setHistoryCategories((value) =>
+                        toggleValue<MessageCategory>(value, category),
+                      );
+                      setSessionPage(0);
+                    }}
+                  >
+                    {prettyCategory(category)}
+                    <span className="filter-count">{historyCategoryCounts[category]}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="msg-search">
+                <div className="search-box">
+                  <ToolbarIcon name="search" />
+                  <input
+                    className="search-input"
+                    value={sessionQueryInput}
+                    onChange={(event) => {
+                      setSessionQueryInput(event.target.value);
+                      setSessionPage(0);
+                    }}
+                    placeholder="Search in session..."
+                  />
+                </div>
+              </div>
+
+              <div className="msg-scroll message-list" ref={messageListRef}>
                 {sessionDetail?.messages.length ? (
                   sessionDetail.messages.map((message) => (
                     <MessageCard
@@ -948,19 +874,21 @@ export function App() {
                 )}
               </div>
 
-              <div className="pagination-row">
+              <div className="msg-pagination pagination-row">
                 <button
                   type="button"
+                  className="page-btn"
                   onClick={() => setSessionPage((value) => Math.max(0, value - 1))}
                   disabled={sessionPage <= 0}
                 >
                   Previous
                 </button>
-                <span>
+                <span className="page-info">
                   Page {sessionPage + 1} / {totalPages} ({sessionDetail?.totalCount ?? 0} messages)
                 </span>
                 <button
                   type="button"
+                  className="page-btn"
                   onClick={() => setSessionPage((value) => Math.min(totalPages - 1, value + 1))}
                   disabled={sessionPage + 1 >= totalPages}
                 >

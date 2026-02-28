@@ -9,6 +9,10 @@ if (!rootElement) {
   throw new Error("Missing root element");
 }
 
+if (navigator.userAgent.includes("Mac")) {
+  document.body.classList.add("platform-macos");
+}
+
 createRoot(rootElement).render(
   <StrictMode>
     <App />
