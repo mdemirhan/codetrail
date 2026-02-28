@@ -73,6 +73,7 @@ describe("registerIpcHandlers", () => {
           sessionPaneWidth: null,
           projectProviders: null,
           historyCategories: null,
+          expandedByDefaultCategories: null,
           searchProviders: null,
           searchCategories: null,
           theme: null,

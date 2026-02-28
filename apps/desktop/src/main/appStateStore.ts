@@ -10,6 +10,7 @@ export type PaneState = {
   sessionPaneWidth: number;
   projectProviders?: Provider[];
   historyCategories?: MessageCategory[];
+  expandedByDefaultCategories?: MessageCategory[];
   searchProviders?: Provider[];
   searchCategories?: MessageCategory[];
   theme?: ThemeMode;
@@ -168,6 +169,10 @@ function sanitizePaneState(value: unknown): PaneState | null {
   }
   const projectProviders = sanitizeStringArray(record.projectProviders, PROVIDER_VALUES);
   const historyCategories = sanitizeStringArray(record.historyCategories, CATEGORY_VALUES);
+  const expandedByDefaultCategories = sanitizeStringArray(
+    record.expandedByDefaultCategories,
+    CATEGORY_VALUES,
+  );
   const searchProviders = sanitizeStringArray(record.searchProviders, PROVIDER_VALUES);
   const searchCategories = sanitizeStringArray(record.searchCategories, CATEGORY_VALUES);
   const theme = sanitizeStringValue(record.theme, THEME_VALUES);
@@ -185,6 +190,7 @@ function sanitizePaneState(value: unknown): PaneState | null {
     sessionPaneWidth,
     ...(projectProviders ? { projectProviders } : {}),
     ...(historyCategories ? { historyCategories } : {}),
+    ...(expandedByDefaultCategories ? { expandedByDefaultCategories } : {}),
     ...(searchProviders ? { searchProviders } : {}),
     ...(searchCategories ? { searchCategories } : {}),
     ...(theme ? { theme } : {}),

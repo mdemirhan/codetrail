@@ -36,7 +36,7 @@ export function useKeyboardShortcuts(args: {
         if (showShortcuts) {
           event.preventDefault();
           setShowShortcuts(false);
-        } else if (mainView === "search") {
+        } else if (mainView === "search" || mainView === "settings") {
           event.preventDefault();
           setMainView("history");
         }

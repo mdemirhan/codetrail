@@ -11,11 +11,7 @@ import { ToolbarIcon } from "./components/ToolbarIcon";
 import { TopBar } from "./components/TopBar";
 import { ProjectPane } from "./components/history/ProjectPane";
 import { SessionPane } from "./components/history/SessionPane";
-import {
-  HighlightedText,
-  MessageCard,
-  isMessageExpandedByDefault,
-} from "./components/messages/MessagePresentation";
+import { HighlightedText, MessageCard } from "./components/messages/MessagePresentation";
 import { useDebouncedValue } from "./hooks/useDebouncedValue";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { usePaneStateSync } from "./hooks/usePaneStateSync";
@@ -115,6 +111,9 @@ export function App() {
   const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>([
     ...DEFAULT_MESSAGE_CATEGORIES,
   ]);
+  const [expandedByDefaultCategories, setExpandedByDefaultCategories] = useState<MessageCategory[]>(
+    [...DEFAULT_MESSAGE_CATEGORIES],
+  );
   const [messageExpanded, setMessageExpanded] = useState<Record<string, boolean>>({});
   const [zoomPercent, setZoomPercent] = useState(100);
   const [focusMessageId, setFocusMessageId] = useState("");
@@ -271,6 +270,7 @@ export function App() {
     sessionPaneWidth,
     projectProviders,
     historyCategories,
+    expandedByDefaultCategories,
     searchProviders,
     searchCategories,
     theme,
@@ -282,6 +282,7 @@ export function App() {
     setSessionPaneWidth,
     setProjectProviders,
     setHistoryCategories,
+    setExpandedByDefaultCategories,
     setSearchProviders,
     setSearchCategories,
     setTheme,
@@ -711,13 +712,17 @@ export function App() {
   const canZoomOut = zoomPercent > 25;
   const historyCategoryCounts = sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS;
   const sessionMessages = sessionDetail?.messages ?? [];
+  const isExpandedByDefault = useCallback(
+    (category: MessageCategory) => expandedByDefaultCategories.includes(category),
+    [expandedByDefaultCategories],
+  );
   const areAllMessagesExpanded = useMemo(
     () =>
       sessionMessages.length > 0 &&
       sessionMessages.every(
-        (message) => messageExpanded[message.id] ?? isMessageExpandedByDefault(message.category),
+        (message) => messageExpanded[message.id] ?? isExpandedByDefault(message.category),
       ),
-    [messageExpanded, sessionMessages],
+    [isExpandedByDefault, messageExpanded, sessionMessages],
   );
   const workspaceStyle = isHistoryLayout
     ? {
@@ -988,13 +993,13 @@ export function App() {
                       query={effectiveSessionQuery}
                       isFocused={message.id === focusMessageId}
                       isExpanded={
-                        messageExpanded[message.id] ?? isMessageExpandedByDefault(message.category)
+                        messageExpanded[message.id] ?? isExpandedByDefault(message.category)
                       }
                       onToggleExpanded={() =>
                         setMessageExpanded((value) => ({
                           ...value,
                           [message.id]: !(
-                            value[message.id] ?? isMessageExpandedByDefault(message.category)
+                            value[message.id] ?? isExpandedByDefault(message.category)
                           ),
                         }))
                       }
@@ -1145,7 +1150,17 @@ export function App() {
               </div>
             </div>
           ) : (
-            <SettingsView info={settingsInfo} loading={settingsLoading} error={settingsError} />
+            <SettingsView
+              info={settingsInfo}
+              loading={settingsLoading}
+              error={settingsError}
+              expandedByDefaultCategories={expandedByDefaultCategories}
+              onToggleExpandedByDefault={(category) =>
+                setExpandedByDefaultCategories((value) =>
+                  toggleValue<MessageCategory>(value, category),
+                )
+              }
+            />
           )}
         </section>
       </div>

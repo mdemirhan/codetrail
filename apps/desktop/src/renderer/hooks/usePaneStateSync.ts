@@ -19,6 +19,7 @@ export function usePaneStateSync(args: {
   sessionPaneWidth: number;
   projectProviders: Provider[];
   historyCategories: MessageCategory[];
+  expandedByDefaultCategories: MessageCategory[];
   searchProviders: Provider[];
   searchCategories: MessageCategory[];
   theme: ThemeMode;
@@ -30,6 +31,7 @@ export function usePaneStateSync(args: {
   setSessionPaneWidth: Dispatch<SetStateAction<number>>;
   setProjectProviders: Dispatch<SetStateAction<Provider[]>>;
   setHistoryCategories: Dispatch<SetStateAction<MessageCategory[]>>;
+  setExpandedByDefaultCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setSearchProviders: Dispatch<SetStateAction<Provider[]>>;
   setSearchCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setTheme: Dispatch<SetStateAction<ThemeMode>>;
@@ -46,6 +48,7 @@ export function usePaneStateSync(args: {
     sessionPaneWidth,
     projectProviders,
     historyCategories,
+    expandedByDefaultCategories,
     searchProviders,
     searchCategories,
     theme,
@@ -57,6 +60,7 @@ export function usePaneStateSync(args: {
     setSessionPaneWidth,
     setProjectProviders,
     setHistoryCategories,
+    setExpandedByDefaultCategories,
     setSearchProviders,
     setSearchCategories,
     setTheme,
@@ -89,6 +93,9 @@ export function usePaneStateSync(args: {
         }
         if (response.historyCategories !== null) {
           setHistoryCategories(response.historyCategories);
+        }
+        if (response.expandedByDefaultCategories !== null) {
+          setExpandedByDefaultCategories(response.expandedByDefaultCategories);
         }
         if (response.searchProviders !== null) {
           setSearchProviders(response.searchProviders);
@@ -146,6 +153,7 @@ export function usePaneStateSync(args: {
     setHistoryCategories,
     setProjectPaneWidth,
     setProjectProviders,
+    setExpandedByDefaultCategories,
     setSearchCategories,
     setSearchProviders,
     setSelectedProjectId,
@@ -168,6 +176,7 @@ export function usePaneStateSync(args: {
           sessionPaneWidth: Math.round(sessionPaneWidth),
           projectProviders,
           historyCategories,
+          expandedByDefaultCategories,
           searchProviders,
           searchCategories,
           theme,
@@ -190,6 +199,7 @@ export function usePaneStateSync(args: {
     paneStateHydrated,
     projectPaneWidth,
     projectProviders,
+    expandedByDefaultCategories,
     searchCategories,
     searchProviders,
     selectedProjectId,
