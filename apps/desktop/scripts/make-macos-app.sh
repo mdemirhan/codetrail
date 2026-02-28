@@ -39,13 +39,16 @@ if [[ ! -x "./node_modules/.bin/electron-forge" ]]; then
   exit 1
 fi
 
-echo "[1/3] Building app bundles..."
+echo "[1/4] Building app bundles..."
 bun run build
 
-echo "[2/3] Verifying native dependency ABI..."
+echo "[2/4] Verifying native dependency ABI..."
 bun run fix:native
 
-echo "[3/3] Packaging macOS app for ${ARCH}..."
+echo "[3/4] Materializing Node-style dependency links for Forge..."
+node ./scripts/materialize-forge-deps.mjs
+
+echo "[4/4] Packaging macOS app for ${ARCH}..."
 ./node_modules/.bin/electron-forge make --platform=darwin --arch="${ARCH}" --skip-rebuild
 
 echo "Done. Open artifacts in:"
