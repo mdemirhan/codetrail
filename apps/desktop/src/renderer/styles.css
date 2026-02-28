@@ -1523,6 +1523,14 @@ body.platform-macos .titlebar-left {
   text-underline-offset: 2px;
 }
 
+.rich-block .md-link-local {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .rich-block .md-link:hover {
   color: var(--text-primary);
 }

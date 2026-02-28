@@ -110,16 +110,20 @@ function renderTextChunk(value: string, query: string, keyPrefix: string): React
     lineCursor += line.length + 1;
 
     const unorderedMatch = /^[-*+]\s+(.*)$/.exec(line);
-    if (unorderedMatch) {
+    const tolerantUnorderedMatch = /^\s{0,3}[-*+•]\s+(.*)$/.exec(line);
+    if (unorderedMatch || tolerantUnorderedMatch) {
       if (listType && listType !== "ul") {
         flushList();
       }
       listType = "ul";
-      listBuffer.push({ key: currentKey, content: unorderedMatch[1] ?? "" });
+      listBuffer.push({
+        key: currentKey,
+        content: (unorderedMatch?.[1] ?? tolerantUnorderedMatch?.[1] ?? "").trim(),
+      });
       continue;
     }
 
-    const orderedMatch = /^\d+\.\s+(.*)$/.exec(line);
+    const orderedMatch = /^\s{0,3}\d+\.\s+(.*)$/.exec(line);
     if (orderedMatch) {
       if (listType && listType !== "ol") {
         flushList();
@@ -136,7 +140,7 @@ function renderTextChunk(value: string, query: string, keyPrefix: string): React
       continue;
     }
 
-    const headingMatch = /^(#{1,3})\s+(.*)$/.exec(line);
+    const headingMatch = /^\s{0,3}(#{1,6})\s+(.*)$/.exec(line);
     if (headingMatch) {
       const marks = headingMatch[1] ?? "";
       const level = marks.length;
@@ -163,7 +167,7 @@ function renderTextChunk(value: string, query: string, keyPrefix: string): React
       continue;
     }
 
-    const quoteMatch = /^>\s?(.*)$/.exec(line);
+    const quoteMatch = /^\s{0,3}>\s?(.*)$/.exec(line);
     if (quoteMatch) {
       items.push(
         <blockquote key={`${keyPrefix}:${currentKey}:q`} className="md-quote">
@@ -221,18 +225,31 @@ function renderFormattedInlineText(value: string, query: string, keyPrefix: stri
     const linkLabel = match[2];
     const linkHref = match[3];
     if (linkLabel && linkHref) {
-      const safeHref = normalizeMarkdownHref(linkHref);
-      if (safeHref) {
+      const parsedHref = parseMarkdownHref(linkHref);
+      if (parsedHref.kind === "external") {
         nodes.push(
           <a
             key={`${keyPrefix}:${index}:a`}
             className="md-link"
-            href={safeHref}
+            href={parsedHref.href}
             target="_blank"
             rel="noreferrer"
           >
             {buildHighlightedTextNodes(linkLabel, query, `${keyPrefix}:${index}:a:txt`)}
           </a>,
+        );
+      } else if (parsedHref.kind === "local") {
+        nodes.push(
+          <button
+            key={`${keyPrefix}:${index}:local`}
+            type="button"
+            className="md-link md-link-local"
+            onClick={() => {
+              void openLocalPath(parsedHref.path);
+            }}
+          >
+            {buildHighlightedTextNodes(linkLabel, query, `${keyPrefix}:${index}:local:txt`)}
+          </button>,
         );
       } else {
         nodes.push(...buildHighlightedTextNodes(token, query, `${keyPrefix}:${index}:unsafe-link`));
@@ -278,16 +295,76 @@ function renderFormattedInlineText(value: string, query: string, keyPrefix: stri
   return nodes;
 }
 
-function normalizeMarkdownHref(href: string): string | null {
+function parseMarkdownHref(
+  href: string,
+): { kind: "external"; href: string } | { kind: "local"; path: string } | { kind: "invalid" } {
   const normalized = href.trim();
+  if (normalized.length === 0) {
+    return { kind: "invalid" };
+  }
+
   if (
     normalized.startsWith("https://") ||
     normalized.startsWith("http://") ||
     normalized.startsWith("mailto:")
   ) {
-    return normalized;
+    return { kind: "external", href: normalized };
   }
-  return null;
+
+  const localPath = toLocalPath(normalized);
+  if (localPath) {
+    return { kind: "local", path: localPath };
+  }
+  return { kind: "invalid" };
+}
+
+function toLocalPath(href: string): string | null {
+  let value = href.trim();
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    // Keep undecoded input.
+  }
+
+  if (value.startsWith("file://")) {
+    value = value.slice("file://".length);
+    if (value.startsWith("localhost/")) {
+      value = value.slice("localhost".length);
+    }
+  }
+
+  const hashIndex = value.indexOf("#");
+  if (hashIndex >= 0) {
+    value = value.slice(0, hashIndex);
+  }
+  value = value.trim();
+  if (value.length === 0) {
+    return null;
+  }
+
+  const isUnixAbsolute = value.startsWith("/");
+  const isWindowsAbsolute = /^[A-Za-z]:[\\/]/.test(value);
+  if (!isUnixAbsolute && !isWindowsAbsolute) {
+    return null;
+  }
+
+  return stripLineColumnSuffix(value);
+}
+
+function stripLineColumnSuffix(pathValue: string): string {
+  const suffixMatch = /^(.*\.[A-Za-z0-9_-]+)(?::\d+(?::\d+)?)$/.exec(pathValue);
+  if (!suffixMatch) {
+    return pathValue;
+  }
+  return suffixMatch[1] ?? pathValue;
+}
+
+async function openLocalPath(path: string): Promise<void> {
+  try {
+    await window.codetrail.invoke("path:openInFileManager", { path });
+  } catch (error) {
+    console.error("[codetrail] failed opening local markdown link", path, error);
+  }
 }
 
 export function CodeBlock({
