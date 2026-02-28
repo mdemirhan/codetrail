@@ -492,11 +492,7 @@ export function App() {
     let cancelled = false;
     const isJumping = pendingJumpTarget !== null;
     const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
-    const effectiveCategories = isJumping
-      ? undefined
-      : isAllHistoryCategoriesSelected
-        ? undefined
-        : historyCategories;
+    const effectiveCategories = isAllHistoryCategoriesSelected ? undefined : historyCategories;
     const effectiveQuery = isJumping ? "" : effectiveSessionQuery;
     void window.codetrail
       .invoke("sessions:getDetail", {
