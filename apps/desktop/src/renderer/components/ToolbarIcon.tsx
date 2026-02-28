@@ -15,7 +15,8 @@ export function ToolbarIcon({
     | "zoomOut"
     | "zoomReset"
     | "expandAll"
-    | "collapseAll";
+    | "collapseAll"
+    | "chevronLeft";
 }) {
   const path = (() => {
     if (name === "history") {
@@ -56,6 +57,9 @@ export function ToolbarIcon({
     }
     if (name === "collapseAll") {
       return "M7 7h10v10H7z";
+    }
+    if (name === "chevronLeft") {
+      return "M15 5l-6 7 6 7";
     }
     return "M4 7h16M4 12h16M4 17h10";
   })();

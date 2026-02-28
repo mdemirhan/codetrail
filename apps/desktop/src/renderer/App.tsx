@@ -36,6 +36,7 @@ type SearchQueryResponse = IpcResponse<"search:query">;
 type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
 
 const PAGE_SIZE = 100;
+const COLLAPSED_PANE_WIDTH = 48;
 
 const PROVIDERS: Provider[] = ["claude", "codex", "gemini"];
 const CATEGORIES: MessageCategory[] = [
@@ -93,6 +94,8 @@ export function App() {
   const [mainView, setMainView] = useState<MainView>("history");
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [focusMode, setFocusMode] = useState(false);
+  const [projectPaneCollapsed, setProjectPaneCollapsed] = useState(false);
+  const [sessionPaneCollapsed, setSessionPaneCollapsed] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const isHistoryLayout = mainView === "history" && !focusMode;
 
@@ -741,7 +744,9 @@ export function App() {
   const scopedExpandCollapseLabel = `${scopedActionLabel} ${bulkScopeLabel}`;
   const workspaceStyle = isHistoryLayout
     ? {
-        gridTemplateColumns: `${projectPaneWidth}px 1px ${sessionPaneWidth}px 1px minmax(420px, 1fr)`,
+        gridTemplateColumns: `${
+          projectPaneCollapsed ? COLLAPSED_PANE_WIDTH : projectPaneWidth
+        }px 1px ${sessionPaneCollapsed ? COLLAPSED_PANE_WIDTH : sessionPaneWidth}px 1px minmax(420px, 1fr)`,
       }
     : undefined;
 
@@ -835,7 +840,11 @@ export function App() {
       />
 
       <div
-        className={`workspace ${isHistoryLayout ? "history-layout" : "single-layout"} ${mainView === "search" ? "search-layout" : ""}`}
+        className={`workspace ${isHistoryLayout ? "history-layout" : "single-layout"} ${
+          mainView === "search" ? "search-layout" : ""
+        }${projectPaneCollapsed ? " projects-collapsed" : ""}${
+          sessionPaneCollapsed ? " sessions-collapsed" : ""
+        }`}
         style={workspaceStyle}
       >
         {isHistoryLayout ? (
@@ -843,10 +852,12 @@ export function App() {
             <ProjectPane
               sortedProjects={sortedProjects}
               selectedProjectId={selectedProjectId}
+              collapsed={projectPaneCollapsed}
               projectQueryInput={projectQueryInput}
               projectProviders={projectProviders}
               providers={PROVIDERS}
               projectProviderCounts={projectProviderCounts}
+              onToggleCollapsed={() => setProjectPaneCollapsed((value) => !value)}
               onProjectQueryChange={setProjectQueryInput}
               onToggleProvider={(provider) =>
                 setProjectProviders((value) => toggleValue(value, provider))
@@ -882,6 +893,8 @@ export function App() {
             <SessionPane
               sortedSessions={sortedSessions}
               selectedSessionId={selectedSessionId}
+              collapsed={sessionPaneCollapsed}
+              onToggleCollapsed={() => setSessionPaneCollapsed((value) => !value)}
               onSelectSession={(sessionId) => {
                 setPendingSearchNavigation(null);
                 setSelectedSessionId(sessionId);

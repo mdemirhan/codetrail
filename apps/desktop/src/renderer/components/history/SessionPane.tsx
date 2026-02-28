@@ -2,16 +2,21 @@ import type { IpcResponse } from "@codetrail/core";
 import { useEffect, useRef } from "react";
 
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
+import { ToolbarIcon } from "../ToolbarIcon";
 
 type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
 
 export function SessionPane({
   sortedSessions,
   selectedSessionId,
+  collapsed,
+  onToggleCollapsed,
   onSelectSession,
 }: {
   sortedSessions: SessionSummary[];
   selectedSessionId: string;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   onSelectSession: (sessionId: string) => void;
 }) {
   const selectedSessionRef = useRef<HTMLButtonElement | null>(null);
@@ -24,10 +29,21 @@ export function SessionPane({
   }, [selectedSessionId]);
 
   return (
-    <aside className="panel session-pane">
+    <aside className={`panel session-pane${collapsed ? " collapsed" : ""}`}>
       <div className="panel-header">
-        <span className="panel-title">Sessions</span>
-        <span className="panel-count">{sortedSessions.length}</span>
+        <div className="panel-header-left">
+          <span className="panel-title">Sessions</span>
+          <span className="panel-count">{sortedSessions.length}</span>
+        </div>
+        <button
+          type="button"
+          className="collapse-btn"
+          onClick={onToggleCollapsed}
+          aria-label={collapsed ? "Expand Sessions pane" : "Collapse Sessions pane"}
+          title={collapsed ? "Expand Sessions" : "Collapse Sessions"}
+        >
+          <ToolbarIcon name="chevronLeft" />
+        </button>
       </div>
       <div className="list-scroll session-list">
         {sortedSessions.map((session) => (

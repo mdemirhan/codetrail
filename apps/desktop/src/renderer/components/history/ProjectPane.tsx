@@ -9,10 +9,12 @@ type ProjectSummary = IpcResponse<"projects:list">["projects"][number];
 export function ProjectPane({
   sortedProjects,
   selectedProjectId,
+  collapsed,
   projectQueryInput,
   projectProviders,
   providers,
   projectProviderCounts,
+  onToggleCollapsed,
   onProjectQueryChange,
   onToggleProvider,
   onSelectProject,
@@ -22,10 +24,12 @@ export function ProjectPane({
 }: {
   sortedProjects: ProjectSummary[];
   selectedProjectId: string;
+  collapsed: boolean;
   projectQueryInput: string;
   projectProviders: Provider[];
   providers: Provider[];
   projectProviderCounts: Record<Provider, number>;
+  onToggleCollapsed: () => void;
   onProjectQueryChange: (value: string) => void;
   onToggleProvider: (provider: Provider) => void;
   onSelectProject: (projectId: string) => void;
@@ -43,12 +47,21 @@ export function ProjectPane({
   }, [selectedProjectId]);
 
   return (
-    <aside className="panel project-pane">
+    <aside className={`panel project-pane${collapsed ? " collapsed" : ""}`}>
       <div className="panel-header">
-        <span className="panel-title">Projects</span>
-        <div className="pane-head-controls">
+        <div className="panel-header-left">
+          <span className="panel-title">Projects</span>
           <span className="panel-count">{sortedProjects.length}</span>
         </div>
+        <button
+          type="button"
+          className="collapse-btn"
+          onClick={onToggleCollapsed}
+          aria-label={collapsed ? "Expand Projects pane" : "Collapse Projects pane"}
+          title={collapsed ? "Expand Projects" : "Collapse Projects"}
+        >
+          <ToolbarIcon name="chevronLeft" />
+        </button>
       </div>
       <div className="search-wrapper">
         <div className="search-box">

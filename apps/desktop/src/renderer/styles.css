@@ -440,6 +440,7 @@ body.platform-macos .titlebar-left {
 
 .history-layout {
   grid-template-columns: 260px 1px 300px 1px minmax(420px, 1fr);
+  transition: grid-template-columns 0.3s ease;
 }
 
 .single-layout,
@@ -483,6 +484,12 @@ body.platform-macos .titlebar-left {
   flex-shrink: 0;
 }
 
+.panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .panel-title {
   font-size: 11px;
   font-weight: 600;
@@ -495,6 +502,36 @@ body.platform-macos .titlebar-left {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.collapse-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.collapse-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-active);
+}
+
+.collapse-btn .toolbar-icon {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.25s ease;
+}
+
+.panel.collapsed .collapse-btn .toolbar-icon {
+  transform: rotate(180deg);
 }
 
 .panel-count {
@@ -822,6 +859,38 @@ body.platform-macos .titlebar-left {
   background: var(--accent-green);
   box-shadow: 0 0 5px rgba(5, 150, 105, 0.4);
   flex-shrink: 0;
+}
+
+.panel.collapsed .panel-header {
+  padding: 14px 12px;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel.collapsed .panel-header-left {
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.panel.collapsed .panel-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+}
+
+.panel.collapsed .panel-count {
+  font-size: 10px;
+  padding: 1px 6px;
+}
+
+.panel.collapsed .search-wrapper,
+.panel.collapsed .tag-row,
+.panel.collapsed .list-scroll,
+.panel.collapsed .panel-footer {
+  display: none;
 }
 
 .history-view,
