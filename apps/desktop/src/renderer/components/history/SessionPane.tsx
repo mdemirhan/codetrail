@@ -2,7 +2,7 @@ import type { IpcResponse } from "@cch/core";
 
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
 
-type SessionSortMode = "recent" | "messages" | "model";
+type SessionSortMode = "recent" | "messages";
 type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
 
 export function SessionPane({
@@ -34,7 +34,6 @@ export function SessionPane({
           >
             <option value="recent">Recent</option>
             <option value="messages">Messages</option>
-            <option value="model">Model</option>
           </select>
         </div>
       </div>

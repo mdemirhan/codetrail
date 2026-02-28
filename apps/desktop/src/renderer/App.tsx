@@ -60,7 +60,7 @@ const EMPTY_CATEGORY_COUNTS = {
 
 type MainView = "history" | "search";
 type ProjectSortMode = "recent" | "name" | "provider";
-type SessionSortMode = "recent" | "messages" | "model";
+type SessionSortMode = "recent" | "messages";
 
 export function App() {
   const [refreshing, setRefreshing] = useState(false);
@@ -164,12 +164,6 @@ export function App() {
       if (sessionSortMode === "messages") {
         return (
           right.messageCount - left.messageCount ||
-          compareRecent(sessionActivityOf(right), sessionActivityOf(left))
-        );
-      }
-      if (sessionSortMode === "model") {
-        return (
-          left.modelNames.localeCompare(right.modelNames) ||
           compareRecent(sessionActivityOf(right), sessionActivityOf(left))
         );
       }
