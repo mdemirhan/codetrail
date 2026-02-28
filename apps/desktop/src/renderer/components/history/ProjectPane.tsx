@@ -1,4 +1,5 @@
 import type { IpcResponse, Provider } from "@codetrail/core";
+import { useEffect, useRef } from "react";
 
 import { compactPath, formatDate, prettyProvider } from "../../lib/viewUtils";
 import { ToolbarIcon } from "../ToolbarIcon";
@@ -32,6 +33,15 @@ export function ProjectPane({
   canOpenSessionLocation: boolean;
   onOpenSessionLocation: () => void;
 }) {
+  const selectedProjectRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      return;
+    }
+    selectedProjectRef.current?.scrollIntoView({ block: "nearest" });
+  }, [selectedProjectId, sortedProjects]);
+
   return (
     <aside className="panel project-pane">
       <div className="panel-header">
@@ -69,6 +79,7 @@ export function ProjectPane({
           <button
             key={project.id}
             type="button"
+            ref={project.id === selectedProjectId ? selectedProjectRef : null}
             className={
               project.id === selectedProjectId
                 ? "list-item project-item active"

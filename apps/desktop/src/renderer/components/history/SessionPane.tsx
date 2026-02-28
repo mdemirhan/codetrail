@@ -1,4 +1,5 @@
 import type { IpcResponse } from "@codetrail/core";
+import { useEffect, useRef } from "react";
 
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
 
@@ -13,6 +14,15 @@ export function SessionPane({
   selectedSessionId: string;
   onSelectSession: (sessionId: string) => void;
 }) {
+  const selectedSessionRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!selectedSessionId) {
+      return;
+    }
+    selectedSessionRef.current?.scrollIntoView({ block: "nearest" });
+  }, [selectedSessionId, sortedSessions]);
+
   return (
     <aside className="panel session-pane">
       <div className="panel-header">
@@ -24,6 +34,7 @@ export function SessionPane({
           <button
             key={session.id}
             type="button"
+            ref={session.id === selectedSessionId ? selectedSessionRef : null}
             className={session.id === selectedSessionId ? "session-item active" : "session-item"}
             onClick={() => onSelectSession(session.id)}
           >
