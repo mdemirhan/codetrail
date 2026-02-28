@@ -114,6 +114,7 @@ export function App() {
     sessionId: string;
     messageId: string;
     sourceId: string;
+    historyCategories: MessageCategory[];
   } | null>(null);
 
   const [searchQueryInput, setSearchQueryInput] = useState("");
@@ -473,7 +474,7 @@ export function App() {
 
     setSelectedSessionId(pendingSearchNavigation.sessionId);
     setSessionQueryInput("");
-    setHistoryCategories([...CATEGORIES]);
+    setHistoryCategories([...pendingSearchNavigation.historyCategories]);
     setSessionPage(0);
     setFocusMessageId(pendingSearchNavigation.messageId);
     setPendingJumpTarget({
@@ -555,6 +556,12 @@ export function App() {
       ? focusMessageId
       : "";
   }, [focusMessageId, sessionDetail?.messages]);
+  const focusedMessagePosition = useMemo(() => {
+    if (!focusMessageId || !sessionDetail?.messages) {
+      return -1;
+    }
+    return sessionDetail.messages.findIndex((message) => message.id === focusMessageId);
+  }, [focusMessageId, sessionDetail?.messages]);
 
   useEffect(() => {
     if (!messageListRef.current) {
@@ -589,15 +596,25 @@ export function App() {
   }, [selectedSessionId, sessionPage]);
 
   useEffect(() => {
-    if (!focusMessageId || !visibleFocusedMessageId || !focusedMessageRef.current) {
+    if (
+      !focusMessageId ||
+      !visibleFocusedMessageId ||
+      focusedMessagePosition < 0 ||
+      !focusedMessageRef.current
+    ) {
       return;
     }
 
-    focusedMessageRef.current.scrollIntoView({
-      block: "center",
-      behavior: "smooth",
+    const rafId = window.requestAnimationFrame(() => {
+      focusedMessageRef.current?.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
     });
-  }, [focusMessageId, visibleFocusedMessageId]);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [focusMessageId, focusedMessagePosition, visibleFocusedMessageId]);
 
   useEffect(() => {
     const onPointerMove = (event: PointerEvent) => {
@@ -1226,6 +1243,7 @@ export function App() {
                           sessionId: result.sessionId,
                           messageId: result.messageId,
                           sourceId: result.messageSourceId,
+                          historyCategories: [...searchCategories],
                         });
                         setSelectedProjectId(result.projectId);
                         setMainView("history");

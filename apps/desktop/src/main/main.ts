@@ -2,13 +2,14 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { BrowserWindow, type BrowserWindowConstructorOptions, app } from "electron";
+import { BrowserWindow, type BrowserWindowConstructorOptions, app, nativeImage } from "electron";
 
 import { type AppStateStore, createAppStateStore } from "./appStateStore";
 import { bootstrapMainProcess } from "./bootstrap";
 
 function createWindow(appStateStore: AppStateStore): BrowserWindow {
   const preloadPath = resolvePreloadPath();
+  const iconPath = resolveAppIconPath();
   const persistedWindowState = appStateStore.getWindowState();
   const isMac = process.platform === "darwin";
 
@@ -29,6 +30,7 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    ...(iconPath ? { icon: iconPath } : {}),
     ...(persistedWindowState?.x !== undefined ? { x: persistedWindowState.x } : {}),
     ...(persistedWindowState?.y !== undefined ? { y: persistedWindowState.y } : {}),
   } satisfies BrowserWindowConstructorOptions;
@@ -103,6 +105,13 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
 
 app.whenReady().then(async () => {
   const appStateStore = createAppStateStore(join(app.getPath("userData"), "ui-state.json"));
+  const iconPath = resolveAppIconPath();
+  if (iconPath && process.platform === "darwin") {
+    const icon = nativeImage.createFromPath(iconPath);
+    if (!icon.isEmpty()) {
+      app.dock.setIcon(icon);
+    }
+  }
   try {
     await bootstrapMainProcess({ appStateStore });
     createWindow(appStateStore);
@@ -161,4 +170,20 @@ function resolvePreloadPath(): string {
   }
 
   throw new Error(`Preload script not found. Tried: ${candidates.join(", ")}`);
+}
+
+function resolveAppIconPath(): string | null {
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    join(moduleDir, "..", "..", "assets", "icons", "build", "codetrail-1024.png"),
+    join(process.cwd(), "assets", "icons", "build", "codetrail-1024.png"),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
