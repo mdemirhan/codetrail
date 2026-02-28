@@ -547,7 +547,13 @@ export function App() {
       if (event.key === "?") {
         setShowShortcuts(true);
       } else if (event.key === "Escape") {
-        setShowShortcuts(false);
+        if (showShortcuts) {
+          event.preventDefault();
+          setShowShortcuts(false);
+        } else if (mainView === "search") {
+          event.preventDefault();
+          setMainView("history");
+        }
       } else if (command && event.key === "1") {
         event.preventDefault();
         setMainView("history");
@@ -576,7 +582,7 @@ export function App() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [applyZoomAction, handleForceRefresh, handleIncrementalRefresh]);
+  }, [applyZoomAction, handleForceRefresh, handleIncrementalRefresh, mainView, showShortcuts]);
 
   const selectedSession = useMemo(
     () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,

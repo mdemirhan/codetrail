@@ -22,6 +22,27 @@
   --accent-purple-dim: rgba(124, 58, 237, 0.08);
   --accent-red: #dc2626;
   --accent-red-dim: rgba(220, 38, 38, 0.08);
+  --cat-user-bg: #eaf8f2;
+  --cat-user-border: #b7e4cc;
+  --cat-user-text: #0b7a4c;
+  --cat-assistant-bg: #eaf1ff;
+  --cat-assistant-border: #b5ccff;
+  --cat-assistant-text: #1d4ed8;
+  --cat-write-bg: #fff1e8;
+  --cat-write-border: #ffcbaf;
+  --cat-write-text: #c2410c;
+  --cat-tool-use-bg: #e6f7fb;
+  --cat-tool-use-border: #9edcf0;
+  --cat-tool-use-text: #0e7490;
+  --cat-tool-result-bg: #f2ecff;
+  --cat-tool-result-border: #cfb8ff;
+  --cat-tool-result-text: #6d28d9;
+  --cat-thinking-bg: #fff7e6;
+  --cat-thinking-border: #f8d487;
+  --cat-thinking-text: #b45309;
+  --cat-system-bg: #f3f4f6;
+  --cat-system-border: #d1d5db;
+  --cat-system-text: #4b5563;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -741,36 +762,51 @@ select {
 
 .msg-filter.user-filter.active,
 .category-badge.category-user {
-  background: var(--accent-green-dim);
-  color: var(--accent-green);
-  border-color: rgba(5, 150, 105, 0.2);
+  background: var(--cat-user-bg);
+  color: var(--cat-user-text);
+  border-color: var(--cat-user-border);
 }
 
 .msg-filter.assistant-filter.active,
 .category-badge.category-assistant {
-  background: var(--accent-blue-dim);
-  color: var(--accent-blue);
-  border-color: rgba(37, 99, 235, 0.2);
+  background: var(--cat-assistant-bg);
+  color: var(--cat-assistant-text);
+  border-color: var(--cat-assistant-border);
 }
 
 .msg-filter.tool_edit-filter.active,
+.category-badge.category-tool_edit {
+  background: var(--cat-write-bg);
+  color: var(--cat-write-text);
+  border-color: var(--cat-write-border);
+}
+
 .msg-filter.tool_use-filter.active,
+.category-badge.category-tool_use {
+  background: var(--cat-tool-use-bg);
+  color: var(--cat-tool-use-text);
+  border-color: var(--cat-tool-use-border);
+}
+
 .msg-filter.tool_result-filter.active,
-.category-badge.category-tool_edit,
-.category-badge.category-tool_use,
 .category-badge.category-tool_result {
-  background: var(--accent-purple-dim);
-  color: var(--accent-purple);
-  border-color: rgba(124, 58, 237, 0.2);
+  background: var(--cat-tool-result-bg);
+  color: var(--cat-tool-result-text);
+  border-color: var(--cat-tool-result-border);
 }
 
 .msg-filter.thinking-filter.active,
-.category-badge.category-thinking,
+.category-badge.category-thinking {
+  background: var(--cat-thinking-bg);
+  color: var(--cat-thinking-text);
+  border-color: var(--cat-thinking-border);
+}
+
 .msg-filter.system-filter.active,
 .category-badge.category-system {
-  background: rgba(100, 116, 139, 0.08);
-  color: #64748b;
-  border-color: rgba(100, 116, 139, 0.18);
+  background: var(--cat-system-bg);
+  color: var(--cat-system-text);
+  border-color: var(--cat-system-border);
 }
 
 .msg-search {
@@ -818,7 +854,7 @@ select {
 }
 
 .msg-role {
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 5px;
   padding: 3px 10px;
   text-transform: uppercase;
@@ -829,26 +865,45 @@ select {
 }
 
 .msg-role.category-user {
-  background: var(--accent-green-dim);
-  color: var(--accent-green);
+  background: var(--cat-user-bg);
+  color: var(--cat-user-text);
+  border-color: var(--cat-user-border);
 }
 
 .msg-role.category-assistant {
-  background: var(--accent-blue-dim);
-  color: var(--accent-blue);
+  background: var(--cat-assistant-bg);
+  color: var(--cat-assistant-text);
+  border-color: var(--cat-assistant-border);
 }
 
-.msg-role.category-tool_edit,
-.msg-role.category-tool_use,
+.msg-role.category-tool_edit {
+  background: var(--cat-write-bg);
+  color: var(--cat-write-text);
+  border-color: var(--cat-write-border);
+}
+
+.msg-role.category-tool_use {
+  background: var(--cat-tool-use-bg);
+  color: var(--cat-tool-use-text);
+  border-color: var(--cat-tool-use-border);
+}
+
 .msg-role.category-tool_result {
-  background: var(--accent-purple-dim);
-  color: var(--accent-purple);
+  background: var(--cat-tool-result-bg);
+  color: var(--cat-tool-result-text);
+  border-color: var(--cat-tool-result-border);
 }
 
-.msg-role.category-thinking,
+.msg-role.category-thinking {
+  background: var(--cat-thinking-bg);
+  color: var(--cat-thinking-text);
+  border-color: var(--cat-thinking-border);
+}
+
 .msg-role.category-system {
-  background: rgba(100, 116, 139, 0.08);
-  color: #64748b;
+  background: var(--cat-system-bg);
+  color: var(--cat-system-text);
+  border-color: var(--cat-system-border);
 }
 
 .message-select-button {
@@ -1239,30 +1294,45 @@ mark {
 }
 
 .category-chip.active.category-user {
-  background: var(--accent-green-dim);
-  color: var(--accent-green);
-  border-color: rgba(5, 150, 105, 0.2);
+  background: var(--cat-user-bg);
+  color: var(--cat-user-text);
+  border-color: var(--cat-user-border);
 }
 
 .category-chip.active.category-assistant {
-  background: var(--accent-blue-dim);
-  color: var(--accent-blue);
-  border-color: rgba(37, 99, 235, 0.2);
+  background: var(--cat-assistant-bg);
+  color: var(--cat-assistant-text);
+  border-color: var(--cat-assistant-border);
 }
 
-.category-chip.active.category-tool_edit,
-.category-chip.active.category-tool_use,
+.category-chip.active.category-tool_edit {
+  background: var(--cat-write-bg);
+  color: var(--cat-write-text);
+  border-color: var(--cat-write-border);
+}
+
+.category-chip.active.category-tool_use {
+  background: var(--cat-tool-use-bg);
+  color: var(--cat-tool-use-text);
+  border-color: var(--cat-tool-use-border);
+}
+
 .category-chip.active.category-tool_result {
-  background: var(--accent-purple-dim);
-  color: var(--accent-purple);
-  border-color: rgba(124, 58, 237, 0.2);
+  background: var(--cat-tool-result-bg);
+  color: var(--cat-tool-result-text);
+  border-color: var(--cat-tool-result-border);
 }
 
-.category-chip.active.category-thinking,
+.category-chip.active.category-thinking {
+  background: var(--cat-thinking-bg);
+  color: var(--cat-thinking-text);
+  border-color: var(--cat-thinking-border);
+}
+
 .category-chip.active.category-system {
-  background: rgba(100, 116, 139, 0.08);
-  color: #64748b;
-  border-color: rgba(100, 116, 139, 0.18);
+  background: var(--cat-system-bg);
+  color: var(--cat-system-text);
+  border-color: var(--cat-system-border);
 }
 
 .search-result {
