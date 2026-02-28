@@ -3,7 +3,11 @@ import { join } from "node:path";
 
 import { app, ipcMain, shell } from "electron";
 
-import { DATABASE_SCHEMA_VERSION, initializeDatabase } from "@codetrail/core";
+import {
+  DATABASE_SCHEMA_VERSION,
+  DEFAULT_DISCOVERY_CONFIG,
+  initializeDatabase,
+} from "@codetrail/core";
 
 import type { AppStateStore } from "./appStateStore";
 import { type QueryService, createQueryService } from "./data/queryService";
@@ -40,6 +44,26 @@ export async function bootstrapMainProcess(
     "app:getHealth": () => ({
       status: "ok",
       version: app.getVersion(),
+    }),
+    "app:getSettingsInfo": () => ({
+      storage: {
+        settingsFile:
+          options.appStateStore?.getFilePath() ?? join(app.getPath("userData"), "ui-state.json"),
+        cacheDir: app.getPath("sessionData"),
+        databaseFile: dbPath,
+        userDataDir: app.getPath("userData"),
+      },
+      discovery: {
+        claudeRoot: DEFAULT_DISCOVERY_CONFIG.claudeRoot,
+        codexRoot: DEFAULT_DISCOVERY_CONFIG.codexRoot,
+        geminiRoot: DEFAULT_DISCOVERY_CONFIG.geminiRoot,
+        geminiHistoryRoot:
+          DEFAULT_DISCOVERY_CONFIG.geminiHistoryRoot ??
+          join(app.getPath("home"), ".gemini", "history"),
+        geminiProjectsPath:
+          DEFAULT_DISCOVERY_CONFIG.geminiProjectsPath ??
+          join(app.getPath("home"), ".gemini", "projects.json"),
+      },
     }),
     "db:getSchemaVersion": () => ({
       schemaVersion: dbBootstrap.schemaVersion,

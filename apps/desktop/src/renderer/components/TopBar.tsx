@@ -14,8 +14,9 @@ export function TopBar({
   onCopySession,
   onToggleFocus,
   onToggleShortcuts,
+  onToggleSettings,
 }: {
-  mainView: "history" | "search";
+  mainView: "history" | "search" | "settings";
   theme: "light" | "dark";
   refreshing: boolean;
   focusMode: boolean;
@@ -28,6 +29,7 @@ export function TopBar({
   onCopySession: () => void;
   onToggleFocus: () => void;
   onToggleShortcuts: () => void;
+  onToggleSettings: () => void;
 }) {
   return (
     <header className="titlebar">
@@ -139,6 +141,15 @@ export function TopBar({
             <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
           </svg>
         </div>
+        <button
+          type="button"
+          className={mainView === "settings" ? "tb-btn tb-btn-icon active" : "tb-btn tb-btn-icon"}
+          onClick={onToggleSettings}
+          aria-label={mainView === "settings" ? "Return to history view" : "Open settings"}
+          title={mainView === "settings" ? "Return to history view" : "Open settings"}
+        >
+          <ToolbarIcon name="settings" />
+        </button>
       </div>
     </header>
   );

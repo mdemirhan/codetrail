@@ -81,6 +81,22 @@ const uiZoomResponseSchema = z.object({
   percent: z.number().int().positive(),
 });
 
+const settingsInfoResponseSchema = z.object({
+  storage: z.object({
+    settingsFile: z.string().min(1),
+    cacheDir: z.string().min(1),
+    databaseFile: z.string().min(1),
+    userDataDir: z.string().min(1),
+  }),
+  discovery: z.object({
+    claudeRoot: z.string().min(1),
+    codexRoot: z.string().min(1),
+    geminiRoot: z.string().min(1),
+    geminiHistoryRoot: z.string().min(1),
+    geminiProjectsPath: z.string().min(1),
+  }),
+});
+
 export const ipcContractSchemas = {
   "app:getHealth": {
     request: z.object({}),
@@ -88,6 +104,10 @@ export const ipcContractSchemas = {
       status: z.literal("ok"),
       version: z.string().min(1),
     }),
+  },
+  "app:getSettingsInfo": {
+    request: z.object({}),
+    response: settingsInfoResponseSchema,
   },
   "db:getSchemaVersion": {
     request: z.object({}),

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-type MainView = "history" | "search";
+type MainView = "history" | "search" | "settings";
 
 export function useKeyboardShortcuts(args: {
   mainView: MainView;

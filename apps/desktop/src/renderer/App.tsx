@@ -5,6 +5,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { MessageCategory, Provider } from "@codetrail/core";
 import type { IpcResponse } from "@codetrail/core";
 
+import { SettingsView } from "./components/SettingsView";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { ToolbarIcon } from "./components/ToolbarIcon";
 import { TopBar } from "./components/TopBar";
@@ -36,6 +37,7 @@ type ProjectSummary = IpcResponse<"projects:list">["projects"][number];
 type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
 type SessionDetail = IpcResponse<"sessions:getDetail">;
 type SearchQueryResponse = IpcResponse<"search:query">;
+type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
 
 const PAGE_SIZE = 100;
 
@@ -60,7 +62,7 @@ const EMPTY_CATEGORY_COUNTS = {
   system: 0,
 };
 
-type MainView = "history" | "search";
+type MainView = "history" | "search" | "settings";
 type ThemeMode = "light" | "dark";
 
 function areCategorySelectionsEqual(left: MessageCategory[], right: MessageCategory[]): boolean {
@@ -141,6 +143,9 @@ export function App() {
     categoryCounts: EMPTY_CATEGORY_COUNTS,
     results: [],
   });
+  const [settingsInfo, setSettingsInfo] = useState<SettingsInfoResponse | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const projectQuery = useDebouncedValue(projectQueryInput, 180);
   const sessionQuery = useDebouncedValue(sessionQueryInput, 180);
@@ -246,6 +251,19 @@ export function App() {
     });
     setSearchResponse(response);
   }, [searchCategories, searchProjectId, searchProjectQuery, searchProviders, searchQuery]);
+
+  const loadSettingsInfo = useCallback(async () => {
+    setSettingsLoading(true);
+    setSettingsError(null);
+    try {
+      const response = await window.codetrail.invoke("app:getSettingsInfo", {});
+      setSettingsInfo(response);
+    } catch (error) {
+      setSettingsError(toErrorMessage(error));
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, []);
 
   usePaneStateSync({
     logError,
@@ -481,6 +499,16 @@ export function App() {
     };
   }, [loadSearch, logError]);
 
+  useEffect(() => {
+    if (mainView !== "settings") {
+      return;
+    }
+    if (settingsInfo || settingsLoading) {
+      return;
+    }
+    void loadSettingsInfo();
+  }, [loadSettingsInfo, mainView, settingsInfo, settingsLoading]);
+
   const visibleFocusedMessageId = useMemo(() => {
     if (!focusMessageId || !sessionDetail?.messages) {
       return "";
@@ -705,7 +733,7 @@ export function App() {
       "Cmd/Ctrl+Shift+F: Open global search",
       "Cmd/Ctrl+R: Refresh index",
       "Cmd/Ctrl+Shift+R: Force reindex",
-      "Toolbar: Reindex and Copy session",
+      "Toolbar: Reindex, Copy session, Settings",
       "?: Shortcut help",
       "Esc: Close shortcuts",
     ];
@@ -775,7 +803,7 @@ export function App() {
         focusDisabled={mainView !== "history"}
         copyDisabled={!selectedSession || mainView !== "history"}
         onToggleSearchView={() =>
-          setMainView((value) => (value === "history" ? "search" : "history"))
+          setMainView((value) => (value === "search" ? "history" : "search"))
         }
         onThemeChange={setTheme}
         onIncrementalRefresh={() => void handleIncrementalRefresh()}
@@ -783,6 +811,9 @@ export function App() {
         onCopySession={() => void handleCopySessionDetails()}
         onToggleFocus={() => setFocusMode((value) => !value)}
         onToggleShortcuts={() => setShowShortcuts((value) => !value)}
+        onToggleSettings={() =>
+          setMainView((value) => (value === "settings" ? "history" : "settings"))
+        }
       />
 
       <div
@@ -1001,7 +1032,7 @@ export function App() {
                 </button>
               </div>
             </div>
-          ) : (
+          ) : mainView === "search" ? (
             <div className="search-view">
               <div className="content-head">
                 <h2>Global Search</h2>
@@ -1113,6 +1144,8 @@ export function App() {
                 )}
               </div>
             </div>
+          ) : (
+            <SettingsView info={settingsInfo} loading={settingsLoading} error={settingsError} />
           )}
         </section>
       </div>

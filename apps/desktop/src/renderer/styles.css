@@ -330,6 +330,12 @@ body.platform-macos .titlebar-left {
   box-shadow: var(--tb-primary-hover-shadow);
 }
 
+.tb-btn.tb-btn-icon {
+  min-width: 30px;
+  justify-content: center;
+  padding: 5px 8px;
+}
+
 .theme-toggle {
   display: flex;
   align-items: center;
@@ -1174,7 +1180,7 @@ body.platform-macos .titlebar-left {
 
 .message.focused .message-body {
   border-color: var(--message-focus-border);
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 0 0 3px var(--message-focus-ring), var(--shadow-card);
 }
 
 .message-content {
@@ -1432,6 +1438,74 @@ mark {
 
 .search-view {
   background: var(--bg-base);
+}
+
+.settings-view {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.settings-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: grid;
+  gap: 14px;
+}
+
+.settings-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.settings-section h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.settings-section p {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.settings-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-row {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  padding: 8px 10px;
+}
+
+.settings-key {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.settings-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  user-select: text;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .content-head {

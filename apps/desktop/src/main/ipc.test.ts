@@ -14,6 +14,21 @@ describe("registerIpcHandlers", () => {
       },
       {
         "app:getHealth": () => ({ status: "ok", version: "0.1.0" }),
+        "app:getSettingsInfo": () => ({
+          storage: {
+            settingsFile: "/tmp/codetrail/ui-state.json",
+            cacheDir: "/tmp/codetrail/cache",
+            databaseFile: "/tmp/codetrail/codetrail.sqlite",
+            userDataDir: "/tmp/codetrail",
+          },
+          discovery: {
+            claudeRoot: "/Users/test/.claude/projects",
+            codexRoot: "/Users/test/.codex/sessions",
+            geminiRoot: "/Users/test/.gemini/tmp",
+            geminiHistoryRoot: "/Users/test/.gemini/history",
+            geminiProjectsPath: "/Users/test/.gemini/projects.json",
+          },
+        }),
         "db:getSchemaVersion": () => ({ schemaVersion: 1 }),
         "indexer:refresh": (payload) => ({ jobId: payload.force ? "force-1" : "normal-1" }),
         "projects:list": () => ({ projects: [] }),

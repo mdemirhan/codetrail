@@ -62,6 +62,10 @@ export class AppStateStore {
     this.state = readState(filePath);
   }
 
+  getFilePath(): string {
+    return this.filePath;
+  }
+
   getPaneState(): PaneState | null {
     return this.state.pane ?? null;
   }
