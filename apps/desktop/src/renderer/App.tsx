@@ -60,6 +60,7 @@ const EMPTY_CATEGORY_COUNTS = {
 
 type MainView = "history" | "search" | "settings";
 type ThemeMode = "light" | "dark";
+type BulkExpandScope = "all" | MessageCategory;
 
 function areCategorySelectionsEqual(left: MessageCategory[], right: MessageCategory[]): boolean {
   if (left.length !== right.length) {
@@ -114,6 +115,7 @@ export function App() {
   const [expandedByDefaultCategories, setExpandedByDefaultCategories] = useState<MessageCategory[]>(
     [...DEFAULT_MESSAGE_CATEGORIES],
   );
+  const [bulkExpandScope, setBulkExpandScope] = useState<BulkExpandScope>("all");
   const [messageExpanded, setMessageExpanded] = useState<Record<string, boolean>>({});
   const [zoomPercent, setZoomPercent] = useState(100);
   const [focusMessageId, setFocusMessageId] = useState("");
@@ -716,14 +718,26 @@ export function App() {
     (category: MessageCategory) => expandedByDefaultCategories.includes(category),
     [expandedByDefaultCategories],
   );
-  const areAllMessagesExpanded = useMemo(
+  const scopedMessages = useMemo(
     () =>
-      sessionMessages.length > 0 &&
-      sessionMessages.every(
+      bulkExpandScope === "all"
+        ? sessionMessages
+        : sessionMessages.filter((message) => message.category === bulkExpandScope),
+    [bulkExpandScope, sessionMessages],
+  );
+  const areScopedMessagesExpanded = useMemo(
+    () =>
+      scopedMessages.length > 0 &&
+      scopedMessages.every(
         (message) => messageExpanded[message.id] ?? isExpandedByDefault(message.category),
       ),
-    [isExpandedByDefault, messageExpanded, sessionMessages],
+    [isExpandedByDefault, messageExpanded, scopedMessages],
   );
+  const bulkScopeLabel = useMemo(
+    () => (bulkExpandScope === "all" ? "All" : prettyCategory(bulkExpandScope)),
+    [bulkExpandScope],
+  );
+  const scopedExpandCollapseLabel = `${areScopedMessagesExpanded ? "Collapse" : "Expand"} ${bulkScopeLabel}`;
   const workspaceStyle = isHistoryLayout
     ? {
         gridTemplateColumns: `${projectPaneWidth}px 1px ${sessionPaneWidth}px 1px minmax(420px, 1fr)`,
@@ -749,21 +763,19 @@ export function App() {
     return [...contextual, ...global];
   }, [mainView, searchResponse.totalCount, selectedSession]);
 
-  const handleSetAllMessagesExpanded = useCallback(
-    (expanded: boolean) => {
-      if (sessionMessages.length === 0) {
-        return;
+  const handleToggleScopedMessagesExpanded = useCallback(() => {
+    if (scopedMessages.length === 0) {
+      return;
+    }
+    const expanded = !areScopedMessagesExpanded;
+    setMessageExpanded((value) => {
+      const next = { ...value };
+      for (const message of scopedMessages) {
+        next[message.id] = expanded;
       }
-      setMessageExpanded((value) => {
-        const next = { ...value };
-        for (const message of sessionMessages) {
-          next[message.id] = expanded;
-        }
-        return next;
-      });
-    },
-    [sessionMessages],
-  );
+      return next;
+    });
+  }, [areScopedMessagesExpanded, scopedMessages]);
 
   const handleRevealInSession = useCallback((messageId: string, sourceId: string) => {
     setSessionQueryInput("");
@@ -895,18 +907,33 @@ export function App() {
                     <button
                       type="button"
                       className="toolbar-btn"
-                      onClick={() => handleSetAllMessagesExpanded(!areAllMessagesExpanded)}
-                      disabled={sessionMessages.length === 0}
-                      aria-label={
-                        areAllMessagesExpanded ? "Collapse all messages" : "Expand all messages"
-                      }
-                      title={
-                        areAllMessagesExpanded ? "Collapse all messages" : "Expand all messages"
-                      }
+                      onClick={handleToggleScopedMessagesExpanded}
+                      disabled={scopedMessages.length === 0}
+                      aria-label={scopedExpandCollapseLabel}
+                      title={scopedExpandCollapseLabel}
                     >
-                      <ToolbarIcon name={areAllMessagesExpanded ? "collapseAll" : "expandAll"} />
-                      {areAllMessagesExpanded ? "Collapse All" : "Expand All"}
+                      <ToolbarIcon name={areScopedMessagesExpanded ? "collapseAll" : "expandAll"} />
+                      {scopedExpandCollapseLabel}
                     </button>
+                    <select
+                      className="toolbar-select"
+                      value={bulkExpandScope}
+                      onChange={(event) => {
+                        const nextScope = event.target.value;
+                        setBulkExpandScope(
+                          nextScope === "all" ? "all" : (nextScope as MessageCategory),
+                        );
+                      }}
+                      aria-label="Select expand and collapse scope"
+                      title="Choose which message type expand/collapse applies to"
+                    >
+                      <option value="all">All</option>
+                      {CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {prettyCategory(category)}
+                        </option>
+                      ))}
+                    </select>
                     <div className="toolbar-zoom-group">
                       <button
                         type="button"
