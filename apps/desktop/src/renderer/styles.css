@@ -52,6 +52,11 @@
   --syntax-string: #be123c;
   --syntax-number: #0f766e;
   --syntax-comment: #64748b;
+  --session-pane-heading-text: #5c5f72;
+  --session-pane-preview-text: #4f5468;
+  --session-pane-meta-text: #72788d;
+  --session-pane-count-text: #2563eb;
+  --message-heading-text: #1a1c24;
   --cat-user-bg: #eaf8f2;
   --cat-user-border: #b7e4cc;
   --cat-user-text: #0b7a4c;
@@ -136,6 +141,11 @@
   --syntax-string: #a6d189;
   --syntax-number: #ef9f76;
   --syntax-comment: #737994;
+  --session-pane-heading-text: #b4bcd2;
+  --session-pane-preview-text: #c5cce0;
+  --session-pane-meta-text: #a2a9be;
+  --session-pane-count-text: #82adff;
+  --message-heading-text: #c4ccdf;
   --cat-user-bg: rgba(93, 216, 168, 0.14);
   --cat-user-border: rgba(93, 216, 168, 0.28);
   --cat-user-text: #5dd8a8;
@@ -698,12 +708,18 @@ body.platform-macos .titlebar-left {
   padding: 14px;
 }
 
+.session-pane .panel-title,
+.session-pane .panel-count {
+  color: var(--session-pane-heading-text);
+}
+
 .session-preview {
   margin-bottom: 10px;
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-secondary);
+  color: var(--session-pane-preview-text);
+  font-weight: 500;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -720,12 +736,12 @@ body.platform-macos .titlebar-left {
 .msg-count {
   font-size: 11px;
   font-weight: 600;
-  color: var(--accent-blue);
+  color: var(--session-pane-count-text);
 }
 
 .session-time {
   font-size: 11px;
-  color: var(--text-tertiary);
+  color: var(--session-pane-meta-text);
 }
 
 .panel-footer {
@@ -1215,7 +1231,7 @@ body.platform-macos .titlebar-left {
 .md-h2,
 .md-h3 {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--message-heading-text);
 }
 
 .md-h1 {
