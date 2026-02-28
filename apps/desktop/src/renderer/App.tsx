@@ -594,6 +594,12 @@ export function App() {
     () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,
     [selectedSessionId, sortedSessions],
   );
+  const messagePathRoots = useMemo(() => {
+    if (!selectedProject?.path) {
+      return [];
+    }
+    return [selectedProject.path];
+  }, [selectedProject?.path]);
 
   const applyZoomAction = useCallback(
     async (action: "in" | "out" | "reset") => {
@@ -1016,6 +1022,7 @@ export function App() {
                       key={message.id}
                       message={message}
                       query={effectiveSessionQuery}
+                      pathRoots={messagePathRoots}
                       isFocused={message.id === focusMessageId}
                       isExpanded={
                         messageExpanded[message.id] ?? isExpandedByDefault(message.category)

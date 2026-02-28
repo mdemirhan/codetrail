@@ -1570,15 +1570,32 @@ body.platform-macos .titlebar-left {
 }
 
 .rich-block .md-link-local {
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--accent-blue);
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 0.94em;
+  line-height: 1.35;
   cursor: pointer;
 }
 
 .rich-block .md-link:hover {
   color: var(--text-primary);
+}
+
+.rich-block .md-link-local:hover {
+  border-color: var(--border-active);
+  color: var(--text-primary);
+}
+
+.rich-block .md-link-local code {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
 }
 
 .code-block {

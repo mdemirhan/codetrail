@@ -1,41 +1,34 @@
-import type { ReactNode } from "react";
+import { Children, cloneElement, isValidElement, type ReactNode } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { tryParseJsonRecord } from "./toolParsing";
 
-export function renderRichText(value: string, query: string, keyPrefix: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  const codeFence = /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g;
-  let cursor = 0;
-  let match = codeFence.exec(value);
-
-  while (match) {
-    const blockStart = match.index;
-    if (blockStart > cursor) {
-      const textChunk = value.slice(cursor, blockStart);
-      nodes.push(renderTextChunk(textChunk, query, `${keyPrefix}:${cursor}:t`));
-    }
-
-    const language = match[1] ?? "";
-    const codeValue = match[2] ?? "";
-    nodes.push(
-      <CodeBlock key={`${keyPrefix}:${blockStart}:c`} language={language} codeValue={codeValue} />,
-    );
-
-    cursor = blockStart + match[0].length;
-    match = codeFence.exec(value);
-  }
-
-  if (cursor < value.length) {
-    nodes.push(renderTextChunk(value.slice(cursor), query, `${keyPrefix}:${cursor}:tail`));
-  }
-
-  if (nodes.length === 0) {
-    nodes.push(renderTextChunk(value, query, `${keyPrefix}:only`));
-  }
-  return nodes;
+export function renderRichText(
+  value: string,
+  query: string,
+  keyPrefix: string,
+  pathRoots: string[] = [],
+): ReactNode[] {
+  const normalized = normalizeMarkdownInput(value);
+  return [
+    <ReactMarkdown
+      key={`${keyPrefix}:md`}
+      remarkPlugins={[remarkGfm]}
+      skipHtml
+      components={buildMarkdownComponents(pathRoots, query)}
+    >
+      {normalized}
+    </ReactMarkdown>,
+  ];
 }
 
-export function renderPlainText(value: string, query: string, keyPrefix: string): ReactNode[] {
+export function renderPlainText(
+  value: string,
+  query: string,
+  keyPrefix: string,
+  pathRoots: string[] = [],
+): ReactNode[] {
   const lines = value.split(/\r?\n/);
   const items: ReactNode[] = [];
   for (const [index, line] of lines.entries()) {
@@ -46,7 +39,7 @@ export function renderPlainText(value: string, query: string, keyPrefix: string)
     }
     items.push(
       <p key={`${key}:p`} className="md-p">
-        {buildHighlightedTextNodes(line, query, `${key}:txt`)}
+        {renderTextWithLocalPathLinks(line, query, `${key}:txt`, pathRoots)}
       </p>,
     );
   }
@@ -64,352 +57,346 @@ export function looksLikeMarkdown(value: string): boolean {
   if (/^\s{0,3}(#{1,6}|[-*+]\s+|\d+\.\s+|>\s+)/m.test(value)) {
     return true;
   }
-  if (/\[[^\]]+\]\((?:https?:\/\/|mailto:)[^)]+\)/.test(value)) {
+  if (/\[[^\]]+\]\s*\([^)]+\)/.test(value)) {
     return true;
   }
   return /(^|[^\\])(`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_)/m.test(value);
 }
 
-function renderTextChunk(value: string, query: string, keyPrefix: string): ReactNode {
-  const lines = value.split(/\r?\n/);
-  const items: ReactNode[] = [];
-  let lineCursor = 0;
-  let listRoots: MarkdownList[] = [];
-  const listStack: MarkdownListFrame[] = [];
+const TEXT_PATH_PATTERN = /(file:\/\/[^\s)\],;!?"'`]+|[A-Za-z]:[\\/][^\s)\],;!?"'`]+|\/[^\s)\],;!?"'`]+)/g;
 
-  const flushLists = () => {
-    if (listRoots.length === 0) {
-      return;
-    }
+function buildMarkdownComponents(pathRoots: string[], query: string): Components {
+  return {
+    h1({ children }) {
+      return <h3 className="md-h1">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h1")}</h3>;
+    },
+    h2({ children }) {
+      return <h4 className="md-h2">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h2")}</h4>;
+    },
+    h3({ children }) {
+      return <h5 className="md-h3">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h3")}</h5>;
+    },
+    h4({ children }) {
+      return <h5 className="md-h3">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h4")}</h5>;
+    },
+    h5({ children }) {
+      return <h5 className="md-h3">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h5")}</h5>;
+    },
+    h6({ children }) {
+      return <h5 className="md-h3">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h6")}</h5>;
+    },
+    p({ children }) {
+      return <p className="md-p">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "p")}</p>;
+    },
+    li({ children }) {
+      return <li>{renderChildrenWithLocalPathLinks(children, query, pathRoots, "li")}</li>;
+    },
+    ul({ children }) {
+      return <ul className="md-list">{children}</ul>;
+    },
+    ol({ children }) {
+      return <ol className="md-list md-list-ordered">{children}</ol>;
+    },
+    blockquote({ children }) {
+      return <blockquote className="md-quote">{children}</blockquote>;
+    },
+    pre({ children }) {
+      return <>{children}</>;
+    },
+    code({ className, children, node }) {
+      const languageMatch = /language-([a-zA-Z0-9_-]+)/.exec(className ?? "");
+      const language = languageMatch?.[1] ?? "";
+      const rawValue = String(children ?? "");
+      const codeValue = rawValue.replace(/\n$/, "");
+      const position = (node as { position?: { start?: { line?: number }; end?: { line?: number } } })
+        ?.position;
+      const spansMultipleLines =
+        typeof position?.start?.line === "number" &&
+        typeof position?.end?.line === "number" &&
+        position.start.line !== position.end.line;
+      const isInlineCode = !languageMatch && !spansMultipleLines && !rawValue.includes("\n");
 
-    for (const list of listRoots) {
-      items.push(renderMarkdownList(list, query, keyPrefix));
-    }
-    listRoots = [];
-    listStack.length = 0;
-  };
-
-  for (const line of lines) {
-    const currentKey = `${lineCursor}`;
-    lineCursor += line.length + 1;
-    const listToken = parseMarkdownListToken(line, currentKey, listStack.length > 0);
-    if (listToken) {
-      appendMarkdownListToken(listToken, listRoots, listStack);
-      continue;
-    }
-
-    if (line.trim().length === 0) {
-      if (listStack.length > 0) {
-        continue;
+      if (isInlineCode) {
+        const resolved = resolvePathToken(codeValue.trim(), pathRoots);
+        if (resolved) {
+          return (
+            <button
+              type="button"
+              className="md-link-local"
+              onClick={() => {
+                void openLocalPath(resolved.absolutePath);
+              }}
+            >
+              {resolved.displayLabel}
+            </button>
+          );
+        }
+        return <code>{children}</code>;
       }
-      items.push(<div key={`${keyPrefix}:${currentKey}:empty`} className="md-empty" />);
-      continue;
-    }
-    flushLists();
-
-    const headingMatch = /^\s{0,3}(#{1,6})\s+(.*)$/.exec(line);
-    if (headingMatch) {
-      const marks = headingMatch[1] ?? "";
-      const level = marks.length;
-      const text = headingMatch[2] ?? "";
-      if (level === 1) {
-        items.push(
-          <h3 key={`${keyPrefix}:${currentKey}:h1`} className="md-h1">
-            {renderInlineText(text, query, `${keyPrefix}:${currentKey}:h1`)}
-          </h3>,
-        );
-      } else if (level === 2) {
-        items.push(
-          <h4 key={`${keyPrefix}:${currentKey}:h2`} className="md-h2">
-            {renderInlineText(text, query, `${keyPrefix}:${currentKey}:h2`)}
-          </h4>,
-        );
-      } else {
-        items.push(
-          <h5 key={`${keyPrefix}:${currentKey}:h3`} className="md-h3">
-            {renderInlineText(text, query, `${keyPrefix}:${currentKey}:h3`)}
-          </h5>,
-        );
-      }
-      continue;
-    }
-
-    const quoteMatch = /^\s{0,3}>\s?(.*)$/.exec(line);
-    if (quoteMatch) {
-      items.push(
-        <blockquote key={`${keyPrefix}:${currentKey}:q`} className="md-quote">
-          <p className="md-p">
-            {renderInlineText(quoteMatch[1] ?? "", query, `${keyPrefix}:${currentKey}:q`)}
-          </p>
-        </blockquote>,
-      );
-      continue;
-    }
-
-    items.push(
-      <p key={`${keyPrefix}:${currentKey}:p`} className="md-p">
-        {renderInlineText(line, query, `${keyPrefix}:${currentKey}:p`)}
-      </p>,
-    );
-  }
-
-  flushLists();
-
-  return <div key={`${keyPrefix}:chunk`}>{items}</div>;
-}
-
-type MarkdownListKind = "ul" | "ol";
-
-type MarkdownListToken = {
-  key: string;
-  kind: MarkdownListKind;
-  indent: number;
-  content: string;
-};
-
-type MarkdownListItem = {
-  key: string;
-  content: string;
-  children: MarkdownList[];
-};
-
-type MarkdownList = {
-  key: string;
-  kind: MarkdownListKind;
-  indent: number;
-  items: MarkdownListItem[];
-};
-
-type MarkdownListFrame = {
-  list: MarkdownList;
-  parentItem: MarkdownListItem | null;
-};
-
-function parseMarkdownListToken(
-  line: string,
-  key: string,
-  hasActiveList: boolean,
-): MarkdownListToken | null {
-  const normalized = line.replace(/\t/g, "  ");
-
-  const unorderedMatch = /^(\s*)[-*+•]\s+(.*)$/.exec(normalized);
-  if (unorderedMatch) {
-    const indent = (unorderedMatch[1] ?? "").length;
-    if (indent <= 3 || hasActiveList) {
-      return {
-        key,
-        kind: "ul",
-        indent,
-        content: unorderedMatch[2] ?? "",
-      };
-    }
-  }
-
-  const orderedMatch = /^(\s*)\d+\.\s+(.*)$/.exec(normalized);
-  if (orderedMatch) {
-    const indent = (orderedMatch[1] ?? "").length;
-    if (indent <= 3 || hasActiveList) {
-      return {
-        key,
-        kind: "ol",
-        indent,
-        content: orderedMatch[2] ?? "",
-      };
-    }
-  }
-
-  return null;
-}
-
-function appendMarkdownListToken(
-  token: MarkdownListToken,
-  roots: MarkdownList[],
-  stack: MarkdownListFrame[],
-): void {
-  let current = token;
-
-  while (stack.length > 0 && current.indent < (stack[stack.length - 1]?.list.indent ?? 0)) {
-    stack.pop();
-  }
-
-  let frame = stack[stack.length - 1];
-
-  if (!frame) {
-    frame = pushMarkdownListFrame(current, null, roots, stack);
-  } else if (current.indent > frame.list.indent) {
-    const parentItem = frame.list.items[frame.list.items.length - 1] ?? null;
-    if (parentItem) {
-      frame = pushMarkdownListFrame(current, parentItem, roots, stack);
-    } else {
-      current = { ...current, indent: frame.list.indent };
-      if (current.kind !== frame.list.kind) {
-        stack.pop();
-        frame = pushMarkdownListFrame(current, frame.parentItem, roots, stack);
-      }
-    }
-  } else if (current.indent === frame.list.indent && current.kind !== frame.list.kind) {
-    stack.pop();
-    frame = pushMarkdownListFrame(current, frame.parentItem, roots, stack);
-  }
-
-  const item: MarkdownListItem = {
-    key: current.key,
-    content: current.content.trim(),
-    children: [],
-  };
-  frame.list.items.push(item);
-}
-
-function pushMarkdownListFrame(
-  token: MarkdownListToken,
-  parentItem: MarkdownListItem | null,
-  roots: MarkdownList[],
-  stack: MarkdownListFrame[],
-): MarkdownListFrame {
-  const list: MarkdownList = {
-    key: `${token.key}:${token.kind}:${token.indent}`,
-    kind: token.kind,
-    indent: token.indent,
-    items: [],
-  };
-  if (parentItem) {
-    parentItem.children.push(list);
-  } else {
-    roots.push(list);
-  }
-
-  const frame: MarkdownListFrame = { list, parentItem };
-  stack.push(frame);
-  return frame;
-}
-
-function renderMarkdownList(list: MarkdownList, query: string, keyPrefix: string): ReactNode {
-  const renderedItems = list.items.map((item) => (
-    <li key={item.key}>
-      {renderInlineText(item.content, query, `${keyPrefix}:${item.key}`)}
-      {item.children.map((child, index) =>
-        renderMarkdownList(child, query, `${keyPrefix}:${item.key}:child:${index}`),
-      )}
-    </li>
-  ));
-
-  if (list.kind === "ol") {
-    return (
-      <ol key={`${keyPrefix}:${list.key}:olist`} className="md-list md-list-ordered">
-        {renderedItems}
-      </ol>
-    );
-  }
-
-  return (
-    <ul key={`${keyPrefix}:${list.key}:ulist`} className="md-list">
-      {renderedItems}
-    </ul>
-  );
-}
-
-function renderInlineText(value: string, query: string, keyPrefix: string): ReactNode[] {
-  const tokens = value.split(/(`[^`]+`)/g);
-  const nodes: ReactNode[] = [];
-  let cursor = 0;
-  for (const token of tokens) {
-    const key = `${keyPrefix}:${cursor}`;
-    if (token.startsWith("`") && token.endsWith("`") && token.length >= 2) {
-      nodes.push(<code key={`${key}:code`}>{token.slice(1, -1)}</code>);
-    } else {
-      nodes.push(...renderFormattedInlineText(token, query, `${key}:txt`));
-    }
-    cursor += token.length;
-  }
-  return nodes;
-}
-
-function renderFormattedInlineText(value: string, query: string, keyPrefix: string): ReactNode[] {
-  const pattern =
-    /(\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_)/g;
-  const nodes: ReactNode[] = [];
-  let cursor = 0;
-
-  for (const match of value.matchAll(pattern)) {
-    const token = match[0] ?? "";
-    const index = match.index ?? 0;
-    if (index > cursor) {
-      nodes.push(
-        ...buildHighlightedTextNodes(value.slice(cursor, index), query, `${keyPrefix}:${cursor}:t`),
-      );
-    }
-
-    const linkLabel = match[2];
-    const linkHref = match[3];
-    if (linkLabel && linkHref) {
-      const parsedHref = parseMarkdownHref(linkHref);
+      return <CodeBlock language={language} codeValue={codeValue} />;
+    },
+    a({ href, children }) {
+      const parsedHref = parseMarkdownHref(href ?? "");
       if (parsedHref.kind === "external") {
-        nodes.push(
-          <a
-            key={`${keyPrefix}:${index}:a`}
-            className="md-link"
-            href={parsedHref.href}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {buildHighlightedTextNodes(linkLabel, query, `${keyPrefix}:${index}:a:txt`)}
-          </a>,
+        return (
+          <a className="md-link" href={parsedHref.href} target="_blank" rel="noreferrer">
+            {children}
+          </a>
         );
-      } else if (parsedHref.kind === "local") {
-        nodes.push(
+      }
+      if (parsedHref.kind === "local") {
+        return (
           <button
-            key={`${keyPrefix}:${index}:local`}
             type="button"
-            className="md-link md-link-local"
+            className="md-link-local"
             onClick={() => {
               void openLocalPath(parsedHref.path);
             }}
           >
-            {buildHighlightedTextNodes(linkLabel, query, `${keyPrefix}:${index}:local:txt`)}
-          </button>,
+            {formatLocalLinkLabel(children, parsedHref.path, pathRoots)}
+          </button>
         );
-      } else {
-        nodes.push(...buildHighlightedTextNodes(token, query, `${keyPrefix}:${index}:unsafe-link`));
       }
-      cursor = index + token.length;
+      return <span>{renderChildrenWithLocalPathLinks(children, query, pathRoots, "unsafe-link")}</span>;
+    },
+  };
+}
+
+function normalizeMarkdownInput(value: string): string {
+  const normalizedLinks = value.replace(/\]\s+\(/g, "](");
+  const normalizedBracketedPathCode = normalizedLinks.replace(
+    /\[\s*`((?:\/|[A-Za-z]:[\\/]|file:\/\/)[^`]+)`\s*\]/g,
+    "`$1`",
+  );
+  return normalizedBracketedPathCode.replace(/<\/?[A-Za-z_][A-Za-z0-9_.:-]*>/g, (tag) =>
+    tag.replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+  );
+}
+
+function formatLocalLinkLabel(children: ReactNode, localPath: string, pathRoots: string[]): ReactNode {
+  const text = flattenText(children).trim();
+  const parsedLabelPath = toLocalPath(text);
+  if (parsedLabelPath) {
+    return formatLocalPathLabel(parsedLabelPath, pathRoots);
+  }
+  if (text.length === 0) {
+    return formatLocalPathLabel(localPath, pathRoots);
+  }
+  if (looksLikePathLabel(text)) {
+    return formatLocalPathLabel(localPath, pathRoots);
+  }
+  return text;
+}
+
+function flattenText(node: ReactNode): string {
+  let result = "";
+  for (const child of Children.toArray(node)) {
+    if (typeof child === "string" || typeof child === "number") {
+      result += String(child);
+      continue;
+    }
+    if (child && typeof child === "object" && "props" in child) {
+      result += flattenText((child as { props?: { children?: ReactNode } }).props?.children ?? "");
+    }
+  }
+  return result;
+}
+
+function formatLocalPathLabel(path: string, pathRoots: string[] = []): string {
+  const normalized = path.replace(/\\/g, "/");
+  for (const root of pathRoots) {
+    const normalizedRoot = root.replace(/\\/g, "/").replace(/\/+$/, "");
+    if (!normalizedRoot) {
+      continue;
+    }
+    if (normalized === normalizedRoot) {
+      return normalized.split("/").pop() ?? normalized;
+    }
+    if (normalized.startsWith(`${normalizedRoot}/`)) {
+      return normalized.slice(normalizedRoot.length + 1);
+    }
+  }
+  return normalized;
+}
+
+function renderChildrenWithLocalPathLinks(
+  children: ReactNode,
+  query: string,
+  pathRoots: string[],
+  keyPrefix: string,
+): ReactNode {
+  const mapped: ReactNode[] = [];
+
+  for (const [index, child] of Children.toArray(children).entries()) {
+    const childKey = `${keyPrefix}:${index}`;
+    if (typeof child === "string" || typeof child === "number") {
+      mapped.push(...renderTextWithLocalPathLinks(String(child), query, `${childKey}:text`, pathRoots));
       continue;
     }
 
-    const bold = match[4] ?? match[5];
-    if (bold) {
+    if (!isValidElement(child)) {
+      mapped.push(child);
+      continue;
+    }
+
+    if (typeof child.type !== "string") {
+      mapped.push(child);
+      continue;
+    }
+
+    const elementType = child.type;
+    if (elementType === "code" || elementType === "a" || elementType === "button" || elementType === "pre") {
+      mapped.push(child);
+      continue;
+    }
+
+    const props = child.props as { children?: ReactNode };
+    if (props.children === undefined) {
+      mapped.push(child);
+      continue;
+    }
+
+    mapped.push(
+      cloneElement(
+        child,
+        undefined,
+        renderChildrenWithLocalPathLinks(props.children, query, pathRoots, `${childKey}:child`),
+      ),
+    );
+  }
+
+  return mapped;
+}
+
+function renderTextWithLocalPathLinks(
+  value: string,
+  query: string,
+  keyPrefix: string,
+  pathRoots: string[],
+): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+
+  for (const match of value.matchAll(TEXT_PATH_PATTERN)) {
+    const rawToken = match[0] ?? "";
+    const index = match.index ?? 0;
+    const tokenEnd = index + rawToken.length;
+    const resolved = resolvePathToken(rawToken, pathRoots);
+    const bracketWrapped =
+      !!resolved &&
+      index > cursor &&
+      value[index - 1] === "[" &&
+      tokenEnd < value.length &&
+      value[tokenEnd] === "]";
+    const plainEnd = bracketWrapped ? index - 1 : index;
+    if (plainEnd > cursor) {
       nodes.push(
-        <strong key={`${keyPrefix}:${index}:b`}>
-          {buildHighlightedTextNodes(bold, query, `${keyPrefix}:${index}:b:txt`)}
-        </strong>,
+        ...buildHighlightedTextNodes(
+          value.slice(cursor, plainEnd),
+          query,
+          `${keyPrefix}:${cursor}:plain`,
+        ),
       );
-      cursor = index + token.length;
-      continue;
     }
 
-    const italic = match[6] ?? match[7];
-    if (italic) {
+    if (resolved) {
       nodes.push(
-        <em key={`${keyPrefix}:${index}:i`}>
-          {buildHighlightedTextNodes(italic, query, `${keyPrefix}:${index}:i:txt`)}
-        </em>,
+        <button
+          key={`${keyPrefix}:${index}:path`}
+          type="button"
+          className="md-link-local"
+          onClick={() => {
+            void openLocalPath(resolved.absolutePath);
+          }}
+        >
+          {buildHighlightedTextNodes(resolved.displayLabel, query, `${keyPrefix}:${index}:label`)}
+        </button>,
       );
-      cursor = index + token.length;
-      continue;
+      cursor = tokenEnd + (bracketWrapped ? 1 : 0);
+    } else {
+      nodes.push(...buildHighlightedTextNodes(rawToken, query, `${keyPrefix}:${index}:raw`));
+      cursor = tokenEnd;
     }
-
-    nodes.push(...buildHighlightedTextNodes(token, query, `${keyPrefix}:${index}:raw`));
-    cursor = index + token.length;
   }
 
   if (cursor < value.length) {
-    nodes.push(
-      ...buildHighlightedTextNodes(value.slice(cursor), query, `${keyPrefix}:${cursor}:tail`),
-    );
+    nodes.push(...buildHighlightedTextNodes(value.slice(cursor), query, `${keyPrefix}:${cursor}:tail`));
   }
+
   if (nodes.length === 0) {
     nodes.push(...buildHighlightedTextNodes(value, query, `${keyPrefix}:all`));
   }
+
   return nodes;
+}
+
+function resolvePathToken(
+  token: string,
+  pathRoots: string[],
+): { absolutePath: string; displayLabel: string } | null {
+  const candidate = stripWrappingPunctuation(token.trim());
+  if (!candidate) {
+    return null;
+  }
+  if (candidate.startsWith("/") && candidate.indexOf("/", 1) < 0) {
+    return null;
+  }
+
+  const absolutePath = toLocalPath(candidate);
+  if (!absolutePath) {
+    return null;
+  }
+  if (!isPathUnderProjectRoots(absolutePath, pathRoots)) {
+    return null;
+  }
+  return {
+    absolutePath,
+    displayLabel: formatLocalPathLabel(absolutePath, pathRoots),
+  };
+}
+
+function isPathUnderProjectRoots(path: string, pathRoots: string[]): boolean {
+  if (pathRoots.length === 0) {
+    return false;
+  }
+  const normalizedPath = path.replace(/\\/g, "/");
+  for (const root of pathRoots) {
+    const normalizedRoot = root.replace(/\\/g, "/").replace(/\/+$/, "");
+    if (!normalizedRoot) {
+      continue;
+    }
+    if (normalizedPath === normalizedRoot || normalizedPath.startsWith(`${normalizedRoot}/`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function stripWrappingPunctuation(value: string): string {
+  let trimmed = value;
+  while (
+    trimmed.length > 0 &&
+    (trimmed.endsWith(".") ||
+      trimmed.endsWith(",") ||
+      trimmed.endsWith(";") ||
+      trimmed.endsWith("!") ||
+      trimmed.endsWith("?") ||
+      trimmed.endsWith(")") ||
+      trimmed.endsWith("]"))
+  ) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  while (trimmed.startsWith("(") || trimmed.startsWith("[") || trimmed.startsWith("'") || trimmed.startsWith('"')) {
+    trimmed = trimmed.slice(1);
+  }
+  return trimmed;
+}
+
+function looksLikePathLabel(value: string): boolean {
+  if (value.startsWith("./") || value.startsWith("../") || value.startsWith("/")) {
+    return true;
+  }
+  return value.includes("/") || value.includes("\\");
 }
 
 function parseMarkdownHref(
@@ -417,6 +404,9 @@ function parseMarkdownHref(
 ): { kind: "external"; href: string } | { kind: "local"; path: string } | { kind: "invalid" } {
   const normalized = href.trim();
   if (normalized.length === 0) {
+    return { kind: "invalid" };
+  }
+  if (/[\u0000-\u001f\u007f]/.test(normalized)) {
     return { kind: "invalid" };
   }
 
@@ -456,6 +446,12 @@ function toLocalPath(href: string): string | null {
   }
   value = value.trim();
   if (value.length === 0) {
+    return null;
+  }
+  if (/[\u0000-\u001f\u007f]/.test(value)) {
+    return null;
+  }
+  if (value.startsWith("//")) {
     return null;
   }
 

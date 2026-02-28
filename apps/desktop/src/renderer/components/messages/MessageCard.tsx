@@ -4,12 +4,21 @@ import type { KeyboardEvent, MouseEvent, Ref } from "react";
 import { formatDate, prettyCategory } from "../../lib/viewUtils";
 
 import { MessageContent } from "./MessageContent";
-import { parseToolInvocationPayload } from "./toolParsing";
+import {
+  asNonEmptyString,
+  asObject,
+  asString,
+  buildUnifiedDiffFromTextPair,
+  parseToolEditPayload,
+  parseToolInvocationPayload,
+  tryParseJsonRecord,
+} from "./toolParsing";
 import type { SessionMessage } from "./types";
 
 export function MessageCard({
   message,
   query,
+  pathRoots,
   isFocused,
   isExpanded,
   onToggleExpanded,
@@ -19,6 +28,7 @@ export function MessageCard({
 }: {
   message: SessionMessage;
   query: string;
+  pathRoots: string[];
   isFocused: boolean;
   isExpanded: boolean;
   onToggleExpanded: () => void;
@@ -53,6 +63,16 @@ export function MessageCard({
   const handleSelectButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onToggleFocused();
+  };
+
+  const handleCopyRawButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    void copyTextToClipboard(JSON.stringify(message, null, 2));
+  };
+
+  const handleCopyBodyButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    void copyTextToClipboard(formatMessageBodyForClipboard(message));
   };
 
   const handleRevealButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -104,6 +124,24 @@ export function MessageCard({
         <div className="message-header-actions">
           <button
             type="button"
+            className="message-action-button"
+            onClick={handleCopyRawButtonClick}
+            aria-label="Copy raw message data"
+            title="Copy raw message data"
+          >
+            Copy Raw
+          </button>
+          <button
+            type="button"
+            className="message-action-button"
+            onClick={handleCopyBodyButtonClick}
+            aria-label="Copy formatted message body"
+            title="Copy formatted message body"
+          >
+            Copy
+          </button>
+          <button
+            type="button"
             className={`message-action-button message-select-button${isFocused ? " is-active" : ""}`}
             onClick={handleSelectButtonClick}
             aria-label={isFocused ? "Clear message focus" : "Focus this message"}
@@ -127,7 +165,12 @@ export function MessageCard({
       {isExpanded ? (
         <div className="message-body">
           <div className="message-content">
-            <MessageContent text={message.content} category={message.category} query={query} />
+            <MessageContent
+              text={message.content}
+              category={message.category}
+              query={query}
+              pathRoots={pathRoots}
+            />
           </div>
         </div>
       ) : null}
@@ -185,4 +228,123 @@ function formatOperationDurationLabel(
 
   const days = Math.max(1, Math.round(hours / 24));
   return `~${days}d`;
+}
+
+function formatMessageBodyForClipboard(message: SessionMessage): string {
+  if (message.category === "tool_use") {
+    return formatToolUseBodyForClipboard(message.content);
+  }
+  if (message.category === "tool_edit") {
+    return formatToolEditBodyForClipboard(message.content);
+  }
+  if (message.category === "tool_result") {
+    return formatToolResultBodyForClipboard(message.content);
+  }
+  return message.content;
+}
+
+function formatToolUseBodyForClipboard(content: string): string {
+  const parsed = parseToolInvocationPayload(content);
+  if (!parsed) {
+    return formatJsonIfParsable(content);
+  }
+
+  const sections: string[] = [];
+  if (parsed.prettyName) {
+    sections.push(`Tool: ${parsed.prettyName}`);
+  }
+
+  const targetPath = asNonEmptyString(
+    parsed.inputRecord?.file_path ?? parsed.inputRecord?.path ?? parsed.inputRecord?.file,
+  );
+  if (targetPath) {
+    sections.push(`Path: ${targetPath}`);
+  }
+
+  const command = asNonEmptyString(parsed.inputRecord?.cmd ?? parsed.inputRecord?.command);
+  if (command) {
+    sections.push(`Command:\n${command}`);
+  }
+
+  if (parsed.inputRecord) {
+    sections.push(`Arguments:\n${JSON.stringify(parsed.inputRecord, null, 2)}`);
+  } else {
+    sections.push(`Payload:\n${JSON.stringify(parsed.record, null, 2)}`);
+  }
+
+  return sections.join("\n\n");
+}
+
+function formatToolEditBodyForClipboard(content: string): string {
+  const parsed = parseToolEditPayload(content);
+  if (!parsed) {
+    return formatJsonIfParsable(content);
+  }
+
+  if (parsed.diff) {
+    return parsed.diff;
+  }
+
+  if (parsed.oldText !== null && parsed.newText !== null) {
+    return buildUnifiedDiffFromTextPair({
+      oldText: parsed.oldText,
+      newText: parsed.newText,
+      filePath: parsed.filePath,
+    });
+  }
+
+  if (parsed.newText !== null) {
+    return parsed.newText;
+  }
+
+  return formatJsonIfParsable(content);
+}
+
+function formatToolResultBodyForClipboard(content: string): string {
+  const parsed = tryParseJsonRecord(content);
+  if (!parsed) {
+    return formatJsonIfParsable(content);
+  }
+
+  const metadata = asObject(parsed.metadata);
+  const output = asString(parsed.output);
+  const sections: string[] = [];
+
+  if (metadata) {
+    sections.push(`Metadata:\n${JSON.stringify(metadata, null, 2)}`);
+  }
+
+  if (output) {
+    const outputJson = tryParseJsonRecord(output);
+    sections.push(outputJson ? `Output:\n${JSON.stringify(outputJson, null, 2)}` : `Output:\n${output}`);
+  } else {
+    sections.push(JSON.stringify(parsed, null, 2));
+  }
+
+  return sections.join("\n\n");
+}
+
+function formatJsonIfParsable(value: string): string {
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+async function copyTextToClipboard(value: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(value);
+    return;
+  } catch {
+    const fallback = document.createElement("textarea");
+    fallback.value = value;
+    fallback.setAttribute("readonly", "");
+    fallback.style.position = "fixed";
+    fallback.style.left = "-9999px";
+    document.body.appendChild(fallback);
+    fallback.select();
+    document.execCommand("copy");
+    document.body.removeChild(fallback);
+  }
 }

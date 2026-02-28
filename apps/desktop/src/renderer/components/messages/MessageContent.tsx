@@ -26,10 +26,12 @@ export function MessageContent({
   text,
   category,
   query,
+  pathRoots = [],
 }: {
   text: string;
   category: MessageCategory;
   query: string;
+  pathRoots?: string[];
 }) {
   if (category === "thinking") {
     return (
@@ -51,12 +53,12 @@ export function MessageContent({
 
   if (category === "assistant") {
     const content = looksLikeMarkdown(text)
-      ? renderRichText(text, query, "assistant-md")
-      : renderPlainText(text, query, "assistant-txt");
+      ? renderRichText(text, query, "assistant-md", pathRoots)
+      : renderPlainText(text, query, "assistant-txt", pathRoots);
     return <div className="rich-block">{content}</div>;
   }
 
-  return <div className="rich-block">{renderRichText(text, query, "msg")}</div>;
+  return <div className="rich-block">{renderRichText(text, query, "msg", pathRoots)}</div>;
 }
 
 function ToolUseContent({ text, query }: { text: string; query: string }) {
