@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { messageCategorySchema, providerSchema } from "./canonical";
+import {
+  messageCategorySchema,
+  operationDurationConfidenceSchema,
+  operationDurationSourceSchema,
+  providerSchema,
+} from "./canonical";
 
 const projectSummarySchema = z.object({
   id: z.string().min(1),
@@ -38,6 +43,9 @@ const sessionMessageSchema = z.object({
   createdAt: z.string(),
   tokenInput: z.number().int().nonnegative().nullable(),
   tokenOutput: z.number().int().nonnegative().nullable(),
+  operationDurationMs: z.number().int().nonnegative().nullable(),
+  operationDurationSource: operationDurationSourceSchema.nullable(),
+  operationDurationConfidence: operationDurationConfidenceSchema.nullable(),
 });
 
 const searchResultSchema = z.object({

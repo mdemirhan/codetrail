@@ -27,6 +27,10 @@ export function MessageCard({
   cardRef?: Ref<HTMLDivElement> | null;
 }) {
   const typeLabel = formatMessageTypeLabel(message.category, message.content);
+  const operationDurationLabel = formatOperationDurationLabel(
+    message.operationDurationMs,
+    message.operationDurationConfidence,
+  );
 
   return (
     <article
@@ -54,6 +58,9 @@ export function MessageCard({
           >
             <span className="message-select-label">{isFocused ? "Unselect" : "Select"}</span>
             <span className="msg-time">{formatDate(message.createdAt)}</span>
+            {operationDurationLabel ? (
+              <span className="msg-time">Took: {operationDurationLabel}</span>
+            ) : null}
           </button>
         </div>
         {onRevealInSession ? (
@@ -95,4 +102,40 @@ function formatMessageTypeLabel(category: MessageCategory, content: string): str
 
 export function isMessageExpandedByDefault(category: MessageCategory): boolean {
   return category === "user" || category === "assistant";
+}
+
+function formatOperationDurationLabel(
+  durationMs: number | null,
+  confidence: "high" | "low" | null,
+): string | null {
+  if (
+    confidence !== "high" ||
+    durationMs === null ||
+    !Number.isFinite(durationMs) ||
+    durationMs < 0
+  ) {
+    return null;
+  }
+
+  if (durationMs < 1000) {
+    return "~<1s";
+  }
+
+  const seconds = Math.max(1, Math.round(durationMs / 1000));
+  if (seconds < 60) {
+    return `~${seconds}s`;
+  }
+
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes < 60) {
+    return `~${minutes}m`;
+  }
+
+  const hours = Math.max(1, Math.round(minutes / 60));
+  if (hours < 24) {
+    return `~${hours}h`;
+  }
+
+  const days = Math.max(1, Math.round(hours / 24));
+  return `~${days}d`;
 }

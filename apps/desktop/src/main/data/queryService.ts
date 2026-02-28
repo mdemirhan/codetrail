@@ -322,7 +322,10 @@ function getSessionDetailWithDatabase(
          m.content,
          m.created_at,
          m.token_input,
-         m.token_output
+         m.token_output,
+         m.operation_duration_ms,
+         m.operation_duration_source,
+         m.operation_duration_confidence
        FROM messages m
        WHERE ${whereClause}
        ORDER BY m.created_at, m.id
@@ -338,6 +341,9 @@ function getSessionDetailWithDatabase(
     created_at: string;
     token_input: number | null;
     token_output: number | null;
+    operation_duration_ms: number | null;
+    operation_duration_source: "native" | "derived" | null;
+    operation_duration_confidence: "high" | "low" | null;
   }>;
 
   return {
@@ -357,6 +363,9 @@ function getSessionDetailWithDatabase(
       createdAt: row.created_at,
       tokenInput: row.token_input,
       tokenOutput: row.token_output,
+      operationDurationMs: row.operation_duration_ms,
+      operationDurationSource: row.operation_duration_source,
+      operationDurationConfidence: row.operation_duration_confidence,
     })),
   };
 }

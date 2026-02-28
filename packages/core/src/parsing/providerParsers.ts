@@ -1,4 +1,9 @@
-import type { MessageCategory, Provider } from "../contracts/canonical";
+import type {
+  MessageCategory,
+  OperationDurationConfidence,
+  OperationDurationSource,
+  Provider,
+} from "../contracts/canonical";
 
 import type { ParserDiagnostic } from "./contracts";
 import {
@@ -18,6 +23,9 @@ import {
 type EventSegment = {
   category: MessageCategory;
   content: string;
+  operationDurationMs?: number | null;
+  operationDurationSource?: OperationDurationSource | null;
+  operationDurationConfidence?: OperationDurationConfidence | null;
 };
 
 export type ParsedProviderMessage = {
@@ -27,6 +35,9 @@ export type ParsedProviderMessage = {
   content: string;
   tokenInput: number | null;
   tokenOutput: number | null;
+  operationDurationMs: number | null;
+  operationDurationSource: OperationDurationSource | null;
+  operationDurationConfidence: OperationDurationConfidence | null;
 };
 
 export function parseProviderPayload(args: {
@@ -417,13 +428,35 @@ function parseCodexSegments(
   }
 
   if (payloadType === "function_call_output") {
+    const operationDurationMs = extractCodexNativeDurationMs(payloadRecord.output);
     const output = extractCodexFunctionOutput(payloadRecord.output);
-    return output.length > 0 ? [{ category: "tool_result", content: output }] : [];
+    return output.length > 0
+      ? [
+          {
+            category: "tool_result",
+            content: output,
+            operationDurationMs,
+            operationDurationSource: operationDurationMs === null ? null : "native",
+            operationDurationConfidence: operationDurationMs === null ? null : "high",
+          },
+        ]
+      : [];
   }
 
   if (payloadType === "custom_tool_call_output") {
+    const operationDurationMs = extractCodexNativeDurationMs(payloadRecord.output);
     const output = extractCodexFunctionOutput(payloadRecord.output);
-    return output.length > 0 ? [{ category: "tool_result", content: output }] : [];
+    return output.length > 0
+      ? [
+          {
+            category: "tool_result",
+            content: output,
+            operationDurationMs,
+            operationDurationSource: operationDurationMs === null ? null : "native",
+            operationDurationConfidence: operationDurationMs === null ? null : "high",
+          },
+        ]
+      : [];
   }
 
   if (payloadType === "reasoning") {
@@ -733,6 +766,9 @@ function pushSplitMessages(args: {
       content: segment.content,
       tokenInput: index === 0 ? tokenUsage.input : null,
       tokenOutput: index === 0 ? tokenUsage.output : null,
+      operationDurationMs: segment.operationDurationMs ?? null,
+      operationDurationSource: segment.operationDurationSource ?? null,
+      operationDurationConfidence: segment.operationDurationConfidence ?? null,
     });
     nextSequence += 1;
   }
@@ -840,6 +876,95 @@ function parseMaybeJson(value: string): unknown {
   } catch {
     return value;
   }
+}
+
+function extractCodexNativeDurationMs(value: unknown): number | null {
+  const seconds = extractDurationSeconds(value);
+  if (seconds === null) {
+    return null;
+  }
+
+  return Math.trunc(seconds * 1000);
+}
+
+function extractDurationSeconds(value: unknown): number | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+
+    const numeric = parseNonNegativeNumber(trimmed);
+    if (numeric !== null) {
+      return numeric;
+    }
+
+    try {
+      return extractDurationSeconds(JSON.parse(trimmed));
+    } catch {
+      return null;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const seconds = extractDurationSeconds(item);
+      if (seconds !== null) {
+        return seconds;
+      }
+    }
+    return null;
+  }
+
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  const metadata = asRecord(record.metadata);
+  const direct = [
+    record.duration_seconds,
+    record.durationSeconds,
+    record.elapsed_seconds,
+    record.elapsedSeconds,
+    record.elapsed_time_seconds,
+    metadata?.duration_seconds,
+    metadata?.durationSeconds,
+    metadata?.elapsed_seconds,
+    metadata?.elapsedSeconds,
+    metadata?.elapsed_time_seconds,
+  ];
+
+  for (const candidate of direct) {
+    const parsed = parseNonNegativeNumber(candidate);
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+
+  if ("output" in record) {
+    const nested = extractDurationSeconds(record.output);
+    if (nested !== null) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+function parseNonNegativeNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+
+  return null;
 }
 
 function inferToolUseCategory(content: string): MessageCategory {

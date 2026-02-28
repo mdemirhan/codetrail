@@ -13,6 +13,11 @@ describe("initializeDatabase", () => {
     const dbPath = join(dir, "test.db");
 
     const result = initializeDatabase(dbPath);
+    const db = openDatabase(dbPath);
+    const messageColumns = (
+      db.prepare("PRAGMA table_info(messages)").all() as Array<{ name: string }>
+    ).map((column) => column.name);
+    db.close();
 
     expect(result.schemaVersion).toBe(DATABASE_SCHEMA_VERSION);
     expect(result.schemaRebuilt).toBe(false);
@@ -25,6 +30,13 @@ describe("initializeDatabase", () => {
         "projects",
         "sessions",
         "tool_calls",
+      ]),
+    );
+    expect(messageColumns).toEqual(
+      expect.arrayContaining([
+        "operation_duration_ms",
+        "operation_duration_source",
+        "operation_duration_confidence",
       ]),
     );
 

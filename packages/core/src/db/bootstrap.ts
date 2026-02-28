@@ -49,6 +49,9 @@ const tableStatements = [
     created_at TEXT NOT NULL,
     token_input INTEGER,
     token_output INTEGER,
+    operation_duration_ms INTEGER,
+    operation_duration_source TEXT,
+    operation_duration_confidence TEXT,
     FOREIGN KEY(session_id) REFERENCES sessions(id)
   )`,
   `CREATE TABLE IF NOT EXISTS tool_calls (

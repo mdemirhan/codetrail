@@ -90,6 +90,12 @@ describe("parseSession python fixtures", () => {
           message.category === "tool_result",
       ),
     ).toBe(true);
+    const nativeDurationMessage = parsed.messages.find(
+      (message) => message.id === "codex-custom-tool-1:custom_tool_call_output",
+    );
+    expect(nativeDurationMessage?.operationDurationSource).toBe("native");
+    expect(nativeDurationMessage?.operationDurationConfidence).toBe("high");
+    expect(nativeDurationMessage?.operationDurationMs).toBe(0);
   });
 
   it("parses gemini fixture thoughts split with first-message token usage", () => {

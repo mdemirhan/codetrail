@@ -172,6 +172,11 @@ describe("queryService", () => {
     expect(page.categoryCounts.user).toBeGreaterThanOrEqual(1);
     expect(page.categoryCounts.assistant).toBeGreaterThanOrEqual(1);
     expect(page.messages.length).toBe(2);
+    const timedMessage = page.messages.find(
+      (message) =>
+        message.operationDurationConfidence === "high" && message.operationDurationMs !== null,
+    );
+    expect(timedMessage?.operationDurationMs).toBeGreaterThan(0);
 
     const filtered = getSessionDetail(dbPath, {
       sessionId: claudeSessionIdRow.id,

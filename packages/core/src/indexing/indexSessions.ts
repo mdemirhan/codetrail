@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import type { Provider } from "../contracts/canonical";
+import type { MessageCategory, Provider } from "../contracts/canonical";
 import {
   type SqliteDatabase,
   clearIndexedData,
@@ -43,6 +43,10 @@ type SessionFileRow = {
   id: string;
   file_path: string;
 };
+
+type IndexedMessage = ReturnType<typeof parseSession>["messages"][number];
+
+const MAX_DERIVED_DURATION_MS = 15 * 60 * 1000;
 
 export function runIncrementalIndexing(config: IndexingConfig): IndexingResult {
   const discoveryConfig = resolveDiscoveryConfig(config.discoveryConfig);
@@ -132,8 +136,11 @@ export function runIncrementalIndexing(config: IndexingConfig): IndexingResult {
         content,
         created_at,
         token_input,
-        token_output
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     const insertMessageFts = db.prepare(
@@ -218,8 +225,9 @@ export function runIncrementalIndexing(config: IndexingConfig): IndexingResult {
 
       const projectId = makeProjectId(discovered.provider, discovered.projectPath);
       const sourceMeta = extractSourceMetadata(discovered.provider, source.rawPayload);
+      const messagesWithDuration = deriveOperationDurations(parsed.messages);
       const aggregate = buildSessionAggregate(
-        parsed.messages.map((message) => ({
+        messagesWithDuration.map((message) => ({
           ...message,
           id: makeMessageId(sessionDbId, message.id),
         })),
@@ -254,7 +262,7 @@ export function runIncrementalIndexing(config: IndexingConfig): IndexingResult {
           aggregate.tokenOutputTotal,
         );
 
-        for (const message of parsed.messages) {
+        for (const message of messagesWithDuration) {
           const messageId = makeMessageId(sessionDbId, message.id);
 
           insertMessage.run(
@@ -267,6 +275,9 @@ export function runIncrementalIndexing(config: IndexingConfig): IndexingResult {
             message.createdAt,
             message.tokenInput,
             message.tokenOutput,
+            message.operationDurationMs,
+            message.operationDurationSource,
+            message.operationDurationConfidence,
           );
 
           insertMessageFts.run(
@@ -468,6 +479,98 @@ function extractSourceMetadata(
     gitBranch,
     cwd,
   };
+}
+
+function deriveOperationDurations(messages: IndexedMessage[]): IndexedMessage[] {
+  return messages.map((message, index) => {
+    if (message.operationDurationMs !== null) {
+      return message;
+    }
+
+    const previous = selectDerivedBaseline(messages, index, message.category);
+    if (!previous) {
+      return message;
+    }
+
+    if (!isHighConfidenceDerivedPair(previous.category, message.category)) {
+      return message;
+    }
+
+    const currentMs = Date.parse(message.createdAt);
+    const previousMs = Date.parse(previous.createdAt);
+    if (!Number.isFinite(currentMs) || !Number.isFinite(previousMs)) {
+      return message;
+    }
+
+    const durationMs = currentMs - previousMs;
+    if (durationMs <= 0 || durationMs > MAX_DERIVED_DURATION_MS) {
+      return message;
+    }
+
+    return {
+      ...message,
+      operationDurationMs: durationMs,
+      operationDurationSource: "derived",
+      operationDurationConfidence: "high",
+    };
+  });
+}
+
+function isHighConfidenceDerivedPair(
+  previousCategory: MessageCategory,
+  currentCategory: MessageCategory,
+): boolean {
+  if (
+    (currentCategory === "assistant" || currentCategory === "thinking") &&
+    previousCategory === "user"
+  ) {
+    return true;
+  }
+
+  if (currentCategory === "tool_result") {
+    return previousCategory === "tool_use" || previousCategory === "tool_edit";
+  }
+
+  return false;
+}
+
+function selectDerivedBaseline(
+  messages: IndexedMessage[],
+  currentIndex: number,
+  currentCategory: MessageCategory,
+): IndexedMessage | null {
+  if (currentIndex <= 0) {
+    return null;
+  }
+
+  if (currentCategory === "assistant" || currentCategory === "thinking") {
+    const currentRoot = splitMessageRoot(messages[currentIndex]?.id ?? "");
+    let pointer = currentIndex - 1;
+    while (pointer >= 0) {
+      const candidate = messages[pointer];
+      if (!candidate) {
+        return null;
+      }
+
+      const candidateRoot = splitMessageRoot(candidate.id);
+      const isSameLogicalMessage =
+        candidateRoot === currentRoot &&
+        (candidate.category === "assistant" || candidate.category === "thinking");
+      if (!isSameLogicalMessage) {
+        return candidate;
+      }
+
+      pointer -= 1;
+    }
+
+    return null;
+  }
+
+  return messages[currentIndex - 1] ?? null;
+}
+
+function splitMessageRoot(id: string): string {
+  return id.replace(/#\d+$/, "");
 }
 
 function buildSessionAggregate(

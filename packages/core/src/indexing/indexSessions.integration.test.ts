@@ -170,6 +170,17 @@ describe("runIncrementalIndexing", () => {
       git_branch: string;
       cwd: string;
     };
+    const derivedDurationCount = (
+      dbAfterFirst
+        .prepare(
+          `SELECT COUNT(*) as c
+           FROM messages
+           WHERE operation_duration_source = 'derived'
+             AND operation_duration_confidence = 'high'
+             AND operation_duration_ms IS NOT NULL`,
+        )
+        .get() as { c: number }
+    ).c;
     dbAfterFirst.close();
 
     expect(countsAfterFirst.projects).toBe(3);
@@ -182,6 +193,7 @@ describe("runIncrementalIndexing", () => {
     expect(claudeAggregate.model_names).toContain("claude-opus-4-6");
     expect(claudeAggregate.git_branch).toBe("main");
     expect(claudeAggregate.cwd).toBe("/workspace/claude");
+    expect(derivedDurationCount).toBeGreaterThan(0);
 
     const second = runIncrementalIndexing({
       dbPath,

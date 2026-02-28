@@ -27,6 +27,9 @@ export function parseSession(input: ParseSessionInput): ParseSessionResult {
       createdAt: message.createdAt,
       tokenInput: message.tokenInput,
       tokenOutput: message.tokenOutput,
+      operationDurationMs: message.operationDurationMs ?? null,
+      operationDurationSource: message.operationDurationSource ?? null,
+      operationDurationConfidence: message.operationDurationConfidence ?? null,
     };
 
     const parsedMessage = canonicalMessageSchema.safeParse(candidate);

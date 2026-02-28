@@ -9,7 +9,15 @@ import { canonicalMessageSchema } from "../contracts/canonical";
 import { parseSessionInputSchema, parserDiagnosticSchema } from "./contracts";
 import { parseSession } from "./parseSession";
 
-const fixtureMessageSchema = canonicalMessageSchema.omit({ id: true });
+const fixtureMessageSchema = canonicalMessageSchema.pick({
+  sessionId: true,
+  provider: true,
+  category: true,
+  content: true,
+  createdAt: true,
+  tokenInput: true,
+  tokenOutput: true,
+});
 
 const fixtureSchema = z.object({
   name: z.string().min(1),
