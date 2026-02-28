@@ -21,7 +21,7 @@ export function SessionPane({
       return;
     }
     selectedSessionRef.current?.scrollIntoView({ block: "nearest" });
-  }, [selectedSessionId, sortedSessions]);
+  }, [selectedSessionId]);
 
   return (
     <aside className="panel session-pane">

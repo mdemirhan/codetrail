@@ -31,21 +31,6 @@ export function toggleValue<T>(values: T[], value: T): T[] {
   return [...values, value];
 }
 
-export function toggleRequiredValue<T>(values: T[], value: T, universe: readonly T[]): T[] {
-  if (values.includes(value)) {
-    if (values.length <= 1) {
-      return values;
-    }
-    return values.filter((item) => item !== value);
-  }
-
-  const next = [...values, value];
-  if (next.length >= universe.length) {
-    return [...universe];
-  }
-  return next;
-}
-
 export function sessionActivityOf(session: SessionSummaryLike): string | null {
   return session.endedAt ?? session.startedAt;
 }
@@ -129,18 +114,6 @@ export function compactPath(path: string): string {
     return `~${path.slice(windowsHome[0].length)}`;
   }
   return path;
-}
-
-export function parentPath(path: string): string {
-  if (!path) {
-    return "";
-  }
-  const separator = path.includes("\\") ? "\\" : "/";
-  const index = path.lastIndexOf(separator);
-  if (index <= 0) {
-    return path;
-  }
-  return path.slice(0, index);
 }
 
 export function toErrorMessage(value: unknown): string {

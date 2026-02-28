@@ -9,6 +9,7 @@ import {
 } from "../db/bootstrap";
 import { DEFAULT_DISCOVERY_CONFIG, type DiscoveryConfig, discoverSessionFiles } from "../discovery";
 import { parseSession } from "../parsing";
+import { asArray, asRecord, readString } from "../parsing/helpers";
 
 import { makeMessageId, makeProjectId, makeSessionId, makeToolCallId } from "./ids";
 
@@ -392,20 +393,6 @@ function readProviderSource(
       })
       .filter((entry) => entry !== null) as unknown[];
 
-    if (provider === "claude") {
-      return {
-        rawPayload: parsedLines,
-        parsePayload: parsedLines,
-      };
-    }
-
-    if (provider === "codex") {
-      return {
-        rawPayload: parsedLines,
-        parsePayload: parsedLines,
-      };
-    }
-
     return {
       rawPayload: parsedLines,
       parsePayload: parsedLines,
@@ -517,8 +504,20 @@ function buildSessionAggregate(
     };
   }
 
-  const started = Math.min(...timestamps);
-  const ended = Math.max(...timestamps);
+  let started = timestamps[0] ?? 0;
+  let ended = started;
+  for (let index = 1; index < timestamps.length; index += 1) {
+    const value = timestamps[index];
+    if (value === undefined) {
+      continue;
+    }
+    if (value < started) {
+      started = value;
+    }
+    if (value > ended) {
+      ended = value;
+    }
+  }
 
   return {
     messageCount,
@@ -554,20 +553,4 @@ function parseToolCallContent(content: string): {
       resultJson: null,
     };
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function readString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
 }

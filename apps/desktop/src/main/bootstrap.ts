@@ -6,7 +6,7 @@ import { app, ipcMain, shell } from "electron";
 import { DATABASE_SCHEMA_VERSION, initializeDatabase } from "@codetrail/core";
 
 import type { AppStateStore } from "./appStateStore";
-import { getSessionDetail, listProjects, listSessions, runSearchQuery } from "./data/queryService";
+import { type QueryService, createQueryService } from "./data/queryService";
 import { WorkerIndexingRunner } from "./indexingRunner";
 import { registerIpcHandlers } from "./ipc";
 
@@ -21,6 +21,8 @@ export type BootstrapResult = {
   tableCount: number;
 };
 
+let activeQueryService: QueryService | null = null;
+
 export async function bootstrapMainProcess(
   options: BootstrapOptions = {},
 ): Promise<BootstrapResult> {
@@ -28,6 +30,11 @@ export async function bootstrapMainProcess(
 
   const dbBootstrap = initializeDatabase(dbPath);
   const indexingRunner = new WorkerIndexingRunner(dbPath);
+  if (activeQueryService) {
+    activeQueryService.close();
+  }
+  const queryService = createQueryService(dbPath);
+  activeQueryService = queryService;
 
   registerIpcHandlers(ipcMain, {
     "app:getHealth": () => ({
@@ -41,10 +48,10 @@ export async function bootstrapMainProcess(
       const job = await indexingRunner.enqueue({ force: payload.force });
       return { jobId: job.jobId };
     },
-    "projects:list": (payload) => listProjects(dbPath, payload),
-    "sessions:list": (payload) => listSessions(dbPath, payload),
-    "sessions:getDetail": (payload) => getSessionDetail(dbPath, payload),
-    "search:query": (payload) => runSearchQuery(dbPath, payload),
+    "projects:list": (payload) => queryService.listProjects(payload),
+    "sessions:list": (payload) => queryService.listSessions(payload),
+    "sessions:getDetail": (payload) => queryService.getSessionDetail(payload),
+    "search:query": (payload) => queryService.runSearchQuery(payload),
     "path:openInFileManager": async (payload) => {
       try {
         const fileStat = await stat(payload.path);
@@ -123,4 +130,12 @@ export async function bootstrapMainProcess(
     schemaVersion: dbBootstrap.schemaVersion ?? DATABASE_SCHEMA_VERSION,
     tableCount: dbBootstrap.tables.length,
   };
+}
+
+export function shutdownMainProcess(): void {
+  if (!activeQueryService) {
+    return;
+  }
+  activeQueryService.close();
+  activeQueryService = null;
 }

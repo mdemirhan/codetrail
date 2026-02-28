@@ -1,20 +1,10 @@
 import type { MessageCategory, Provider } from "../contracts/canonical";
+import {
+  makeEmptyCategoryCounts,
+  normalizeMessageCategories,
+  normalizeMessageCategory,
+} from "../contracts/categories";
 import type { SqliteDatabase } from "../db/bootstrap";
-
-const CATEGORY_KEYS = [
-  "user",
-  "assistant",
-  "tool_use",
-  "tool_edit",
-  "tool_result",
-  "thinking",
-  "system",
-] as const satisfies ReadonlyArray<MessageCategory>;
-
-const CATEGORY_ALIASES: Record<string, MessageCategory> = {
-  tool_call: "tool_use",
-  "tool-edit": "tool_edit",
-};
 
 export type SearchMessagesInput = {
   query: string;
@@ -95,7 +85,7 @@ export function searchMessages(
     .all(ftsQuery, ...facetFilters.params) as Array<{ category: string; cnt: number }>;
 
   for (const row of facetRows) {
-    const category = normalizeCategory(row.category);
+    const category = normalizeMessageCategory(row.category);
     categoryCounts[category] += Number(row.cnt ?? 0);
   }
 
@@ -139,7 +129,7 @@ export function searchMessages(
     sessionId: row.session_id,
     projectId: row.project_id,
     provider: normalizeProvider(row.provider),
-    category: normalizeCategory(row.category),
+    category: normalizeMessageCategory(row.category),
     createdAt: row.created_at,
     snippet: row.snippet ?? "",
     projectName: row.project_name ?? "",
@@ -162,7 +152,7 @@ function buildFilters(
   const params: Array<string | number> = [];
 
   if (includeCategories && input.categories && input.categories.length > 0) {
-    const categories = normalizeCategories(input.categories);
+    const categories = normalizeMessageCategories(input.categories);
     if (categories.length > 0) {
       conditions.push(`m.category IN (${categories.map(() => "?").join(",")})`);
       params.push(...categories);
@@ -216,58 +206,6 @@ function normalizeProvider(value: string): Provider {
     return "gemini";
   }
   return "claude";
-}
-
-function normalizeCategories(values: string[]): MessageCategory[] {
-  const selected = new Set<MessageCategory>();
-  for (const value of values) {
-    const normalized = normalizeCategory(value);
-    if (CATEGORY_KEYS.includes(normalized)) {
-      selected.add(normalized);
-    }
-  }
-
-  return CATEGORY_KEYS.filter((value) => selected.has(value));
-}
-
-function normalizeCategory(value: string): MessageCategory {
-  const normalized = value.trim().toLowerCase();
-  const aliased = CATEGORY_ALIASES[normalized];
-  if (aliased) {
-    return aliased;
-  }
-
-  if (normalized === "user") {
-    return "user";
-  }
-  if (normalized === "assistant") {
-    return "assistant";
-  }
-  if (normalized === "tool_use") {
-    return "tool_use";
-  }
-  if (normalized === "tool_edit") {
-    return "tool_edit";
-  }
-  if (normalized === "tool_result") {
-    return "tool_result";
-  }
-  if (normalized === "thinking") {
-    return "thinking";
-  }
-  return "system";
-}
-
-function makeEmptyCategoryCounts(): Record<MessageCategory, number> {
-  return {
-    user: 0,
-    assistant: 0,
-    tool_use: 0,
-    tool_edit: 0,
-    tool_result: 0,
-    thinking: 0,
-    system: 0,
-  };
 }
 
 function sqlFilterClause(conditions: string[]): string {

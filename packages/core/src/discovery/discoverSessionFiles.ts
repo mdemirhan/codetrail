@@ -1,7 +1,18 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  readSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import { homedir } from "node:os";
-import { basename, extname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
+
+import { asRecord, readString } from "../parsing/helpers";
 
 import type { DiscoveredSessionFile, DiscoveryConfig, GeminiProjectResolution } from "./types";
 
@@ -321,15 +332,7 @@ function readCodexJsonlMeta(filePath: string): {
   cwd: string | null;
   gitBranch: string | null;
 } {
-  if (!existsSync(filePath)) {
-    return { sessionId: null, cwd: null, gitBranch: null };
-  }
-
-  const lines = readFileSync(filePath, "utf8")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .slice(0, 120);
+  const lines = readLeadingNonEmptyLines(filePath, 120, 256 * 1024);
 
   let sessionId: string | null = null;
   let cwd: string | null = null;
@@ -367,12 +370,7 @@ function readCodexJsonlMeta(filePath: string): {
 }
 
 function readFirstJsonlObject(filePath: string): Record<string, unknown> | null {
-  if (!existsSync(filePath)) {
-    return null;
-  }
-
-  const content = readFileSync(filePath, "utf8");
-  const firstLine = content.split(/\r?\n/, 1)[0]?.trim();
+  const firstLine = readLeadingNonEmptyLines(filePath, 1, 16 * 1024)[0];
   if (!firstLine) {
     return null;
   }
@@ -381,6 +379,60 @@ function readFirstJsonlObject(filePath: string): Record<string, unknown> | null 
     return asRecord(JSON.parse(firstLine));
   } catch {
     return null;
+  }
+}
+
+function readLeadingNonEmptyLines(filePath: string, maxLines: number, maxBytes: number): string[] {
+  if (maxLines <= 0 || maxBytes <= 0) {
+    return [];
+  }
+
+  let fd: number | null = null;
+  try {
+    fd = openSync(filePath, "r");
+    const lines: string[] = [];
+    let bytesReadTotal = 0;
+    let remainder = "";
+    const chunkSize = 4096;
+
+    while (lines.length < maxLines && bytesReadTotal < maxBytes) {
+      const bytesToRead = Math.min(chunkSize, maxBytes - bytesReadTotal);
+      if (bytesToRead <= 0) {
+        break;
+      }
+      const buffer = Buffer.allocUnsafe(bytesToRead);
+      const bytesRead = readSync(fd, buffer, 0, bytesToRead, null);
+      if (bytesRead <= 0) {
+        break;
+      }
+      bytesReadTotal += bytesRead;
+      remainder += buffer.toString("utf8", 0, bytesRead);
+
+      let newlineIndex = remainder.indexOf("\n");
+      while (newlineIndex >= 0 && lines.length < maxLines) {
+        const line = remainder.slice(0, newlineIndex).trim();
+        if (line.length > 0) {
+          lines.push(line);
+        }
+        remainder = remainder.slice(newlineIndex + 1);
+        newlineIndex = remainder.indexOf("\n");
+      }
+    }
+
+    if (lines.length < maxLines) {
+      const tail = remainder.trim();
+      if (tail.length > 0) {
+        lines.push(tail);
+      }
+    }
+
+    return lines.slice(0, maxLines);
+  } catch {
+    return [];
+  } finally {
+    if (fd !== null) {
+      closeSync(fd);
+    }
   }
 }
 
@@ -422,22 +474,8 @@ function walkFiles(root: string): string[] {
   return files;
 }
 
-function readString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
-}
-
-function dirnameOf(filePath: string): string {
-  const parts = filePath.split("/");
-  parts.pop();
-  return parts.join("/") || "/";
-}
-
-function parentDir(filePath: string): string {
-  return dirnameOf(filePath);
 }
 
 function geminiContainerDir(filePath: string): string {
@@ -452,7 +490,7 @@ function geminiContainerDir(filePath: string): string {
     return parts.slice(0, chatsIndex).join("/") || "/";
   }
 
-  return parentDir(parentDir(parentDir(filePath)));
+  return dirname(dirname(dirname(filePath)));
 }
 
 function decodeClaudeProjectId(projectId: string): string {
@@ -460,7 +498,7 @@ function decodeClaudeProjectId(projectId: string): string {
     return "";
   }
 
-  return projectId.replace("-", "/").replaceAll("-", "/");
+  return projectId.replaceAll("-", "/");
 }
 
 function projectNameFromPath(projectPath: string): string {
@@ -470,14 +508,6 @@ function projectNameFromPath(projectPath: string): string {
 
   const name = basename(projectPath);
   return name.length > 0 ? name : "Unknown";
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
 }
 
 function providerSessionIdentity(

@@ -5,7 +5,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { BrowserWindow, type BrowserWindowConstructorOptions, app, nativeImage } from "electron";
 
 import { type AppStateStore, createAppStateStore } from "./appStateStore";
-import { bootstrapMainProcess } from "./bootstrap";
+import { bootstrapMainProcess, shutdownMainProcess } from "./bootstrap";
+
+let mainWindowRef: BrowserWindow | null = null;
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
 
 function createWindow(appStateStore: AppStateStore): BrowserWindow {
   const preloadPath = resolvePreloadPath();
@@ -90,11 +96,31 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
     });
   };
 
-  mainWindow.on("resize", persistWindowState);
-  mainWindow.on("move", persistWindowState);
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+  const schedulePersistWindowState = () => {
+    if (persistTimer !== null) {
+      clearTimeout(persistTimer);
+    }
+    persistTimer = setTimeout(() => {
+      persistTimer = null;
+      persistWindowState();
+    }, 120);
+  };
+
+  mainWindow.on("resize", schedulePersistWindowState);
+  mainWindow.on("move", schedulePersistWindowState);
   mainWindow.on("maximize", persistWindowState);
   mainWindow.on("unmaximize", persistWindowState);
   mainWindow.on("close", persistWindowState);
+  mainWindow.on("closed", () => {
+    if (persistTimer !== null) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
+    }
+    if (mainWindowRef === mainWindow) {
+      mainWindowRef = null;
+    }
+  });
 
   if (persistedWindowState?.isMaximized) {
     mainWindow.maximize();
@@ -103,40 +129,54 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
   return mainWindow;
 }
 
-app.whenReady().then(async () => {
-  const appStateStore = createAppStateStore(join(app.getPath("userData"), "ui-state.json"));
-  const iconPath = resolveAppIconPath();
-  if (iconPath && process.platform === "darwin") {
-    const icon = nativeImage.createFromPath(iconPath);
-    if (!icon.isEmpty()) {
-      app.dock.setIcon(icon);
+if (hasSingleInstanceLock) {
+  app.whenReady().then(async () => {
+    const appStateStore = createAppStateStore(join(app.getPath("userData"), "ui-state.json"));
+    const iconPath = resolveAppIconPath();
+    if (iconPath && process.platform === "darwin") {
+      const icon = nativeImage.createFromPath(iconPath);
+      if (!icon.isEmpty()) {
+        app.dock.setIcon(icon);
+      }
     }
-  }
-  try {
-    await bootstrapMainProcess({ appStateStore });
-    createWindow(appStateStore);
-  } catch (error) {
-    console.error("[codetrail] bootstrap failure", error);
-    app.exit(1);
-    return;
-  }
+    try {
+      await bootstrapMainProcess({ appStateStore });
+      mainWindowRef = createWindow(appStateStore);
+    } catch (error) {
+      console.error("[codetrail] bootstrap failure", error);
+      app.exit(1);
+      return;
+    }
 
-  app.on("before-quit", () => {
-    appStateStore.flush();
+    app.on("before-quit", () => {
+      shutdownMainProcess();
+      appStateStore.flush();
+    });
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        mainWindowRef = createWindow(appStateStore);
+      }
+    });
   });
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow(appStateStore);
+  app.on("second-instance", () => {
+    const window = mainWindowRef ?? BrowserWindow.getAllWindows()[0] ?? null;
+    if (!window) {
+      return;
+    }
+    if (window.isMinimized()) {
+      window.restore();
+    }
+    window.focus();
+  });
+
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
     }
   });
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+}
 
 function resolveLocalRendererHtmlPath(): string | null {
   const moduleDir = dirname(fileURLToPath(import.meta.url));

@@ -40,7 +40,7 @@ export function ProjectPane({
       return;
     }
     selectedProjectRef.current?.scrollIntoView({ block: "nearest" });
-  }, [selectedProjectId, sortedProjects]);
+  }, [selectedProjectId]);
 
   return (
     <aside className="panel project-pane">

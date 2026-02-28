@@ -1,4 +1,14 @@
-import { type IpcRequest, type IpcResponse, openDatabase, searchMessages } from "@codetrail/core";
+import {
+  type IpcRequest,
+  type IpcResponse,
+  makeEmptyCategoryCounts,
+  normalizeMessageCategories,
+  normalizeMessageCategory,
+  openDatabase,
+  searchMessages,
+} from "@codetrail/core";
+
+type DatabaseHandle = ReturnType<typeof openDatabase>;
 
 type SessionSummaryRow = {
   id: string;
@@ -17,360 +27,370 @@ type SessionSummaryRow = {
   token_output_total: number;
 };
 
-const CATEGORY_ALIASES: Record<string, string> = {
-  tool_call: "tool_use",
-  "tool-edit": "tool_edit",
+const SESSION_TITLE_JOIN_SQL = `
+  LEFT JOIN (
+    SELECT ranked.session_id, ranked.content
+    FROM (
+      SELECT
+        m.session_id,
+        m.content,
+        ROW_NUMBER() OVER (PARTITION BY m.session_id ORDER BY m.created_at, m.id) AS row_num
+      FROM messages m
+      WHERE m.category = 'user'
+    ) ranked
+    WHERE ranked.row_num = 1
+  ) first_user ON first_user.session_id = s.id
+`;
+
+export type QueryService = {
+  listProjects: (request: IpcRequest<"projects:list">) => IpcResponse<"projects:list">;
+  listSessions: (request: IpcRequest<"sessions:list">) => IpcResponse<"sessions:list">;
+  getSessionDetail: (
+    request: IpcRequest<"sessions:getDetail">,
+  ) => IpcResponse<"sessions:getDetail">;
+  runSearchQuery: (request: IpcRequest<"search:query">) => IpcResponse<"search:query">;
+  close: () => void;
 };
+
+export function createQueryService(dbPath: string): QueryService {
+  const db = openDatabase(dbPath);
+
+  return {
+    listProjects: (request) => listProjectsWithDatabase(db, request),
+    listSessions: (request) => listSessionsWithDatabase(db, request),
+    getSessionDetail: (request) => getSessionDetailWithDatabase(db, request),
+    runSearchQuery: (request) => runSearchQueryWithDatabase(db, request),
+    close: () => {
+      db.close();
+    },
+  };
+}
 
 export function listProjects(
   dbPath: string,
   request: IpcRequest<"projects:list">,
 ): IpcResponse<"projects:list"> {
-  return withDatabase(dbPath, (db) => {
-    if (request.providers && request.providers.length === 0) {
-      return { projects: [] };
-    }
-
-    const conditions: string[] = [];
-    const params: Array<string> = [];
-
-    if (request.providers && request.providers.length > 0) {
-      conditions.push(`p.provider IN (${request.providers.map(() => "?").join(",")})`);
-      params.push(...request.providers);
-    }
-
-    const query = request.query.trim().toLowerCase();
-    if (query.length > 0) {
-      conditions.push("(LOWER(p.name) LIKE ? OR LOWER(p.path) LIKE ?)");
-      const like = `%${query}%`;
-      params.push(like, like);
-    }
-
-    const rows = db
-      .prepare(
-        `SELECT
-           p.id,
-           p.provider,
-           p.name,
-           p.path,
-           COUNT(s.id) as session_count,
-           MAX(COALESCE(s.ended_at, s.started_at)) as last_activity
-         FROM projects p
-         LEFT JOIN sessions s ON s.project_id = p.id
-         ${conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""}
-         GROUP BY p.id
-         ORDER BY p.provider, LOWER(p.name), p.id`,
-      )
-      .all(...params) as Array<{
-      id: string;
-      provider: "claude" | "codex" | "gemini";
-      name: string;
-      path: string;
-      session_count: number;
-      last_activity: string | null;
-    }>;
-
-    return {
-      projects: rows.map((row) => ({
-        id: row.id,
-        provider: row.provider,
-        name: row.name,
-        path: row.path,
-        sessionCount: row.session_count,
-        lastActivity: row.last_activity,
-      })),
-    };
-  });
+  return withDatabase(dbPath, (db) => listProjectsWithDatabase(db, request));
 }
 
 export function listSessions(
   dbPath: string,
   request: IpcRequest<"sessions:list">,
 ): IpcResponse<"sessions:list"> {
-  return withDatabase(dbPath, (db) => {
-    const rows = request.projectId
-      ? (db
-          .prepare(
-            `SELECT
-               id,
-               project_id,
-               provider,
-               file_path,
-               COALESCE(
-                 (
-                   SELECT m.content
-                   FROM messages m
-                   WHERE m.session_id = sessions.id
-                   AND m.category = 'user'
-                   ORDER BY m.created_at, m.id
-                   LIMIT 1
-                 ),
-                 ''
-               ) as title,
-               model_names,
-               started_at,
-               ended_at,
-               duration_ms,
-               git_branch,
-               cwd,
-               message_count,
-               token_input_total,
-               token_output_total
-             FROM sessions
-             WHERE project_id = ?
-             ORDER BY COALESCE(ended_at, started_at) DESC, id DESC`,
-          )
-          .all(request.projectId) as SessionSummaryRow[])
-      : (db
-          .prepare(
-            `SELECT
-               id,
-               project_id,
-               provider,
-               file_path,
-               COALESCE(
-                 (
-                   SELECT m.content
-                   FROM messages m
-                   WHERE m.session_id = sessions.id
-                   AND m.category = 'user'
-                   ORDER BY m.created_at, m.id
-                   LIMIT 1
-                 ),
-                 ''
-               ) as title,
-               model_names,
-               started_at,
-               ended_at,
-               duration_ms,
-               git_branch,
-               cwd,
-               message_count,
-               token_input_total,
-               token_output_total
-             FROM sessions
-             ORDER BY COALESCE(ended_at, started_at) DESC, id DESC`,
-          )
-          .all() as SessionSummaryRow[]);
-
-    return { sessions: rows.map(mapSessionSummaryRow) };
-  });
+  return withDatabase(dbPath, (db) => listSessionsWithDatabase(db, request));
 }
 
 export function getSessionDetail(
   dbPath: string,
   request: IpcRequest<"sessions:getDetail">,
 ): IpcResponse<"sessions:getDetail"> {
-  return withDatabase(dbPath, (db) => {
-    const sessionRow = db
-      .prepare(
-        `SELECT
-           id,
-           project_id,
-           provider,
-           file_path,
-           COALESCE(
-             (
-               SELECT m.content
-               FROM messages m
-               WHERE m.session_id = sessions.id
-               AND m.category = 'user'
-               ORDER BY m.created_at, m.id
-               LIMIT 1
-             ),
-             ''
-           ) as title,
-           model_names,
-           started_at,
-           ended_at,
-           duration_ms,
-           git_branch,
-           cwd,
-           message_count,
-           token_input_total,
-           token_output_total
-         FROM sessions
-         WHERE id = ?`,
-      )
-      .get(request.sessionId) as SessionSummaryRow | undefined;
-
-    if (!sessionRow) {
-      return {
-        session: null,
-        totalCount: 0,
-        categoryCounts: emptyCategoryCounts(),
-        page: 0,
-        pageSize: request.pageSize,
-        focusIndex: null,
-        messages: [],
-      };
-    }
-
-    const pageSize = request.pageSize;
-    let page = request.page;
-    const messageFilters: {
-      sessionId: string;
-      categories?: string[];
-      query: string;
-    } = {
-      sessionId: request.sessionId,
-      query: request.query,
-    };
-    if (request.categories !== undefined) {
-      messageFilters.categories = request.categories;
-    }
-
-    const { whereClause, params } = buildMessageFilters(messageFilters);
-
-    const totalRow = db
-      .prepare(`SELECT COUNT(*) as cnt FROM messages m WHERE ${whereClause}`)
-      .get(...params) as { cnt: number } | undefined;
-    const totalCount = Number(totalRow?.cnt ?? 0);
-    const categoryCounts = emptyCategoryCounts();
-
-    const queryOnlyFilter = buildMessageFilters({
-      sessionId: request.sessionId,
-      query: request.query,
-    });
-    const categoryRows = db
-      .prepare(
-        `SELECT m.category as category, COUNT(*) as cnt
-         FROM messages m
-         WHERE ${queryOnlyFilter.whereClause}
-         GROUP BY m.category`,
-      )
-      .all(...queryOnlyFilter.params) as Array<{ category: string; cnt: number }>;
-
-    for (const row of categoryRows) {
-      categoryCounts[normalizeCategory(row.category)] += Number(row.cnt ?? 0);
-    }
-
-    let focusIndex: number | null = null;
-    if (request.focusMessageId || request.focusSourceId) {
-      const focusTarget = request.focusMessageId
-        ? ((db
-            .prepare("SELECT id, created_at FROM messages WHERE session_id = ? AND id = ?")
-            .get(request.sessionId, request.focusMessageId) as
-            | {
-                id: string;
-                created_at: string;
-              }
-            | undefined) ?? undefined)
-        : ((db
-            .prepare("SELECT id, created_at FROM messages WHERE session_id = ? AND source_id = ?")
-            .get(request.sessionId, request.focusSourceId) as
-            | {
-                id: string;
-                created_at: string;
-              }
-            | undefined) ?? undefined);
-
-      if (focusTarget) {
-        const focusRow = db
-          .prepare(
-            `SELECT COUNT(*) as cnt
-             FROM messages m
-             WHERE ${whereClause}
-             AND (m.created_at < ? OR (m.created_at = ? AND m.id <= ?))`,
-          )
-          .get(...params, focusTarget.created_at, focusTarget.created_at, focusTarget.id) as
-          | { cnt: number }
-          | undefined;
-        const countBefore = Number(focusRow?.cnt ?? 0);
-        if (countBefore > 0) {
-          focusIndex = countBefore - 1;
-          page = Math.floor(focusIndex / pageSize);
-        }
-      }
-    }
-
-    if (totalCount > 0 && page * pageSize >= totalCount) {
-      page = Math.floor((totalCount - 1) / pageSize);
-    }
-
-    const rows = db
-      .prepare(
-        `SELECT
-           m.id,
-           m.source_id,
-           m.session_id,
-           m.provider,
-           m.category,
-           m.content,
-           m.created_at,
-           m.token_input,
-           m.token_output
-         FROM messages m
-         WHERE ${whereClause}
-         ORDER BY m.created_at, m.id
-         LIMIT ? OFFSET ?`,
-      )
-      .all(...params, pageSize, page * pageSize) as Array<{
-      id: string;
-      source_id: string;
-      session_id: string;
-      provider: "claude" | "codex" | "gemini";
-      category: string;
-      content: string;
-      created_at: string;
-      token_input: number | null;
-      token_output: number | null;
-    }>;
-
-    return {
-      session: mapSessionSummaryRow(sessionRow),
-      totalCount,
-      categoryCounts,
-      page,
-      pageSize,
-      focusIndex,
-      messages: rows.map((row) => ({
-        id: row.id,
-        sourceId: row.source_id,
-        sessionId: row.session_id,
-        provider: row.provider,
-        category: normalizeCategory(row.category),
-        content: row.content,
-        createdAt: row.created_at,
-        tokenInput: row.token_input,
-        tokenOutput: row.token_output,
-      })),
-    };
-  });
+  return withDatabase(dbPath, (db) => getSessionDetailWithDatabase(db, request));
 }
 
 export function runSearchQuery(
   dbPath: string,
   request: IpcRequest<"search:query">,
 ): IpcResponse<"search:query"> {
-  return withDatabase(dbPath, (db) => {
-    const searchInput: {
-      query: string;
-      categories?: string[];
-      providers?: string[];
-      projectIds?: string[];
-      projectQuery: string;
-      limit: number;
-      offset: number;
-    } = {
-      query: request.query,
-      projectQuery: request.projectQuery,
-      limit: request.limit,
-      offset: request.offset,
+  return withDatabase(dbPath, (db) => runSearchQueryWithDatabase(db, request));
+}
+
+function listProjectsWithDatabase(
+  db: DatabaseHandle,
+  request: IpcRequest<"projects:list">,
+): IpcResponse<"projects:list"> {
+  if (request.providers && request.providers.length === 0) {
+    return { projects: [] };
+  }
+
+  const conditions: string[] = [];
+  const params: Array<string> = [];
+
+  if (request.providers && request.providers.length > 0) {
+    conditions.push(`p.provider IN (${request.providers.map(() => "?").join(",")})`);
+    params.push(...request.providers);
+  }
+
+  const query = request.query.trim().toLowerCase();
+  if (query.length > 0) {
+    conditions.push("(LOWER(p.name) LIKE ? OR LOWER(p.path) LIKE ?)");
+    const like = `%${query}%`;
+    params.push(like, like);
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT
+         p.id,
+         p.provider,
+         p.name,
+         p.path,
+         COUNT(s.id) as session_count,
+         MAX(COALESCE(s.ended_at, s.started_at)) as last_activity
+       FROM projects p
+       LEFT JOIN sessions s ON s.project_id = p.id
+       ${conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""}
+       GROUP BY p.id
+       ORDER BY p.provider, LOWER(p.name), p.id`,
+    )
+    .all(...params) as Array<{
+    id: string;
+    provider: "claude" | "codex" | "gemini";
+    name: string;
+    path: string;
+    session_count: number;
+    last_activity: string | null;
+  }>;
+
+  return {
+    projects: rows.map((row) => ({
+      id: row.id,
+      provider: row.provider,
+      name: row.name,
+      path: row.path,
+      sessionCount: row.session_count,
+      lastActivity: row.last_activity,
+    })),
+  };
+}
+
+function listSessionsWithDatabase(
+  db: DatabaseHandle,
+  request: IpcRequest<"sessions:list">,
+): IpcResponse<"sessions:list"> {
+  const params: string[] = [];
+  const whereClause = request.projectId ? "WHERE s.project_id = ?" : "";
+  if (request.projectId) {
+    params.push(request.projectId);
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT
+         s.id,
+         s.project_id,
+         s.provider,
+         s.file_path,
+         COALESCE(first_user.content, '') as title,
+         s.model_names,
+         s.started_at,
+         s.ended_at,
+         s.duration_ms,
+         s.git_branch,
+         s.cwd,
+         s.message_count,
+         s.token_input_total,
+         s.token_output_total
+       FROM sessions s
+       ${SESSION_TITLE_JOIN_SQL}
+       ${whereClause}
+       ORDER BY COALESCE(s.ended_at, s.started_at) DESC, s.id DESC`,
+    )
+    .all(...params) as SessionSummaryRow[];
+
+  return { sessions: rows.map(mapSessionSummaryRow) };
+}
+
+function getSessionDetailWithDatabase(
+  db: DatabaseHandle,
+  request: IpcRequest<"sessions:getDetail">,
+): IpcResponse<"sessions:getDetail"> {
+  const sessionRow = db
+    .prepare(
+      `SELECT
+         s.id,
+         s.project_id,
+         s.provider,
+         s.file_path,
+         COALESCE(first_user.content, '') as title,
+         s.model_names,
+         s.started_at,
+         s.ended_at,
+         s.duration_ms,
+         s.git_branch,
+         s.cwd,
+         s.message_count,
+         s.token_input_total,
+         s.token_output_total
+       FROM sessions s
+       ${SESSION_TITLE_JOIN_SQL}
+       WHERE s.id = ?`,
+    )
+    .get(request.sessionId) as SessionSummaryRow | undefined;
+
+  if (!sessionRow) {
+    return {
+      session: null,
+      totalCount: 0,
+      categoryCounts: makeEmptyCategoryCounts(),
+      page: 0,
+      pageSize: request.pageSize,
+      focusIndex: null,
+      messages: [],
     };
+  }
 
-    if (request.categories && request.categories.length > 0) {
-      searchInput.categories = request.categories;
-    }
-    if (request.providers && request.providers.length > 0) {
-      searchInput.providers = request.providers;
-    }
-    if (request.projectIds && request.projectIds.length > 0) {
-      searchInput.projectIds = request.projectIds;
-    }
+  const pageSize = request.pageSize;
+  let page = request.page;
+  const messageFilters: {
+    sessionId: string;
+    categories?: string[];
+    query: string;
+  } = {
+    sessionId: request.sessionId,
+    query: request.query,
+  };
+  if (request.categories !== undefined) {
+    messageFilters.categories = request.categories;
+  }
 
-    return searchMessages(db, searchInput);
+  const { whereClause, params } = buildMessageFilters(messageFilters);
+
+  const totalRow = db
+    .prepare(`SELECT COUNT(*) as cnt FROM messages m WHERE ${whereClause}`)
+    .get(...params) as { cnt: number } | undefined;
+  const totalCount = Number(totalRow?.cnt ?? 0);
+  const categoryCounts = makeEmptyCategoryCounts();
+
+  const queryOnlyFilter = buildMessageFilters({
+    sessionId: request.sessionId,
+    query: request.query,
   });
+  const categoryRows = db
+    .prepare(
+      `SELECT m.category as category, COUNT(*) as cnt
+       FROM messages m
+       WHERE ${queryOnlyFilter.whereClause}
+       GROUP BY m.category`,
+    )
+    .all(...queryOnlyFilter.params) as Array<{ category: string; cnt: number }>;
+
+  for (const row of categoryRows) {
+    categoryCounts[normalizeMessageCategory(row.category)] += Number(row.cnt ?? 0);
+  }
+
+  let focusIndex: number | null = null;
+  if (request.focusMessageId || request.focusSourceId) {
+    const focusTarget = request.focusMessageId
+      ? ((db
+          .prepare("SELECT id, created_at FROM messages WHERE session_id = ? AND id = ?")
+          .get(request.sessionId, request.focusMessageId) as
+          | {
+              id: string;
+              created_at: string;
+            }
+          | undefined) ?? undefined)
+      : ((db
+          .prepare("SELECT id, created_at FROM messages WHERE session_id = ? AND source_id = ?")
+          .get(request.sessionId, request.focusSourceId) as
+          | {
+              id: string;
+              created_at: string;
+            }
+          | undefined) ?? undefined);
+
+    if (focusTarget) {
+      const focusRow = db
+        .prepare(
+          `SELECT COUNT(*) as cnt
+           FROM messages m
+           WHERE ${whereClause}
+           AND (m.created_at < ? OR (m.created_at = ? AND m.id <= ?))`,
+        )
+        .get(...params, focusTarget.created_at, focusTarget.created_at, focusTarget.id) as
+        | { cnt: number }
+        | undefined;
+      const countBefore = Number(focusRow?.cnt ?? 0);
+      if (countBefore > 0) {
+        focusIndex = countBefore - 1;
+        page = Math.floor(focusIndex / pageSize);
+      }
+    }
+  }
+
+  if (totalCount > 0 && page * pageSize >= totalCount) {
+    page = Math.floor((totalCount - 1) / pageSize);
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT
+         m.id,
+         m.source_id,
+         m.session_id,
+         m.provider,
+         m.category,
+         m.content,
+         m.created_at,
+         m.token_input,
+         m.token_output
+       FROM messages m
+       WHERE ${whereClause}
+       ORDER BY m.created_at, m.id
+       LIMIT ? OFFSET ?`,
+    )
+    .all(...params, pageSize, page * pageSize) as Array<{
+    id: string;
+    source_id: string;
+    session_id: string;
+    provider: "claude" | "codex" | "gemini";
+    category: string;
+    content: string;
+    created_at: string;
+    token_input: number | null;
+    token_output: number | null;
+  }>;
+
+  return {
+    session: mapSessionSummaryRow(sessionRow),
+    totalCount,
+    categoryCounts,
+    page,
+    pageSize,
+    focusIndex,
+    messages: rows.map((row) => ({
+      id: row.id,
+      sourceId: row.source_id,
+      sessionId: row.session_id,
+      provider: row.provider,
+      category: normalizeMessageCategory(row.category),
+      content: row.content,
+      createdAt: row.created_at,
+      tokenInput: row.token_input,
+      tokenOutput: row.token_output,
+    })),
+  };
+}
+
+function runSearchQueryWithDatabase(
+  db: DatabaseHandle,
+  request: IpcRequest<"search:query">,
+): IpcResponse<"search:query"> {
+  const searchInput: {
+    query: string;
+    categories?: string[];
+    providers?: string[];
+    projectIds?: string[];
+    projectQuery: string;
+    limit: number;
+    offset: number;
+  } = {
+    query: request.query,
+    projectQuery: request.projectQuery,
+    limit: request.limit,
+    offset: request.offset,
+  };
+
+  if (request.categories && request.categories.length > 0) {
+    searchInput.categories = request.categories;
+  }
+  if (request.providers && request.providers.length > 0) {
+    searchInput.providers = request.providers;
+  }
+  if (request.projectIds && request.projectIds.length > 0) {
+    searchInput.projectIds = request.projectIds;
+  }
+
+  return searchMessages(db, searchInput);
 }
 
 function buildMessageFilters(args: {
@@ -382,7 +402,7 @@ function buildMessageFilters(args: {
   const params = [args.sessionId];
 
   if (args.categories !== undefined) {
-    const categories = normalizeCategories(args.categories);
+    const categories = normalizeMessageCategories(args.categories);
     if (categories.length > 0) {
       conditions.push(`m.category IN (${categories.map(() => "?").join(",")})`);
       params.push(...categories);
@@ -398,58 +418,6 @@ function buildMessageFilters(args: {
   }
 
   return { whereClause: conditions.join(" AND "), params };
-}
-
-function normalizeCategories(values: string[]): string[] {
-  const selected = new Set<string>();
-  for (const value of values) {
-    const normalized = normalizeCategory(value);
-    selected.add(normalized);
-  }
-
-  return [...selected];
-}
-
-function normalizeCategory(
-  value: string,
-): "user" | "assistant" | "tool_use" | "tool_edit" | "tool_result" | "thinking" | "system" {
-  const normalized = value.trim().toLowerCase();
-  const alias = CATEGORY_ALIASES[normalized];
-  if (alias) {
-    return normalizeCategory(alias);
-  }
-
-  if (normalized === "user") {
-    return "user";
-  }
-  if (normalized === "assistant") {
-    return "assistant";
-  }
-  if (normalized === "tool_use") {
-    return "tool_use";
-  }
-  if (normalized === "tool_edit") {
-    return "tool_edit";
-  }
-  if (normalized === "tool_result") {
-    return "tool_result";
-  }
-  if (normalized === "thinking") {
-    return "thinking";
-  }
-  return "system";
-}
-
-function emptyCategoryCounts(): IpcResponse<"search:query">["categoryCounts"] {
-  return {
-    user: 0,
-    assistant: 0,
-    tool_use: 0,
-    tool_edit: 0,
-    tool_result: 0,
-    thinking: 0,
-    system: 0,
-  };
 }
 
 function mapSessionSummaryRow(
@@ -473,7 +441,7 @@ function mapSessionSummaryRow(
   };
 }
 
-function withDatabase<T>(dbPath: string, callback: (db: ReturnType<typeof openDatabase>) => T): T {
+function withDatabase<T>(dbPath: string, callback: (db: DatabaseHandle) => T): T {
   const db = openDatabase(dbPath);
   try {
     return callback(db);

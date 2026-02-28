@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, UIEvent as ReactUIEvent } from "react";
+import type { UIEvent as ReactUIEvent } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import type { MessageCategory, Provider } from "@codetrail/core";
@@ -16,9 +16,11 @@ import {
   isMessageExpandedByDefault,
 } from "./components/messages/MessagePresentation";
 import { useDebouncedValue } from "./hooks/useDebouncedValue";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { usePaneStateSync } from "./hooks/usePaneStateSync";
+import { useResizablePanes } from "./hooks/useResizablePanes";
 import { openInFileManager, openPath } from "./lib/pathActions";
 import {
-  clamp,
   compareRecent,
   countProviders,
   deriveSessionTitle,
@@ -93,6 +95,7 @@ export function App() {
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [focusMode, setFocusMode] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const isHistoryLayout = mainView === "history" && !focusMode;
 
   const [projectQueryInput, setProjectQueryInput] = useState("");
   const [projectProviders, setProjectProviders] = useState<Provider[]>([...PROVIDERS]);
@@ -139,16 +142,6 @@ export function App() {
     results: [],
   });
 
-  const [projectPaneWidth, setProjectPaneWidth] = useState(300);
-  const [sessionPaneWidth, setSessionPaneWidth] = useState(320);
-  const [paneStateHydrated, setPaneStateHydrated] = useState(false);
-  const resizeState = useRef<{
-    pane: "project" | "session";
-    startX: number;
-    projectPaneWidth: number;
-    sessionPaneWidth: number;
-  } | null>(null);
-
   const projectQuery = useDebouncedValue(projectQueryInput, 180);
   const sessionQuery = useDebouncedValue(sessionQueryInput, 180);
   const searchQuery = useDebouncedValue(searchQueryInput, 220);
@@ -169,6 +162,19 @@ export function App() {
   } | null>(null);
   const sessionScrollTopRef = useRef(0);
   const sessionScrollSyncTimerRef = useRef<number | null>(null);
+  const {
+    projectPaneWidth,
+    setProjectPaneWidth,
+    sessionPaneWidth,
+    setSessionPaneWidth,
+    beginResize,
+  } = useResizablePanes({
+    isHistoryLayout,
+    projectMin: 230,
+    projectMax: 520,
+    sessionMin: 250,
+    sessionMax: 620,
+  });
   const sortedProjects = useMemo(() => {
     const next = [...projects];
     next.sort((left, right) => {
@@ -241,77 +247,33 @@ export function App() {
     setSearchResponse(response);
   }, [searchCategories, searchProjectId, searchProjectQuery, searchProviders, searchQuery]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void window.codetrail
-      .invoke("ui:getState", {})
-      .then((response) => {
-        if (cancelled) {
-          return;
-        }
-
-        if (response.projectPaneWidth !== null) {
-          setProjectPaneWidth(clamp(response.projectPaneWidth, 230, 520));
-        }
-        if (response.sessionPaneWidth !== null) {
-          setSessionPaneWidth(clamp(response.sessionPaneWidth, 250, 620));
-        }
-        if (response.projectProviders !== null) {
-          setProjectProviders(response.projectProviders);
-        }
-        if (response.historyCategories !== null) {
-          setHistoryCategories(response.historyCategories);
-        }
-        if (response.searchProviders !== null) {
-          setSearchProviders(response.searchProviders);
-        }
-        if (response.searchCategories !== null) {
-          setSearchCategories(response.searchCategories);
-        }
-        if (response.theme !== null) {
-          setTheme(response.theme);
-        }
-        if (response.selectedProjectId !== null) {
-          setSelectedProjectId(response.selectedProjectId);
-        }
-        if (response.selectedSessionId !== null) {
-          setSelectedSessionId(response.selectedSessionId);
-        }
-        if (response.sessionPage !== null) {
-          setSessionPage(response.sessionPage);
-        }
-        if (response.sessionScrollTop !== null) {
-          sessionScrollTopRef.current = response.sessionScrollTop;
-          setSessionScrollTop(response.sessionScrollTop);
-        }
-        if (
-          response.selectedSessionId !== null &&
-          response.sessionPage !== null &&
-          response.sessionScrollTop !== null &&
-          response.sessionScrollTop > 0
-        ) {
-          pendingRestoredSessionScrollRef.current = {
-            sessionId: response.selectedSessionId,
-            sessionPage: response.sessionPage,
-            scrollTop: response.sessionScrollTop,
-          };
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          logError("Failed loading UI state", error);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setPaneStateHydrated(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [logError]);
+  usePaneStateSync({
+    logError,
+    projectPaneWidth,
+    sessionPaneWidth,
+    projectProviders,
+    historyCategories,
+    searchProviders,
+    searchCategories,
+    theme,
+    selectedProjectId,
+    selectedSessionId,
+    sessionPage,
+    sessionScrollTop,
+    setProjectPaneWidth,
+    setSessionPaneWidth,
+    setProjectProviders,
+    setHistoryCategories,
+    setSearchProviders,
+    setSearchCategories,
+    setTheme,
+    setSelectedProjectId,
+    setSelectedSessionId,
+    setSessionPage,
+    setSessionScrollTop,
+    sessionScrollTopRef,
+    pendingRestoredSessionScrollRef,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -336,50 +298,6 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
-
-  useEffect(() => {
-    if (!paneStateHydrated) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      void window.codetrail
-        .invoke("ui:setState", {
-          projectPaneWidth: Math.round(projectPaneWidth),
-          sessionPaneWidth: Math.round(sessionPaneWidth),
-          projectProviders,
-          historyCategories,
-          searchProviders,
-          searchCategories,
-          theme,
-          selectedProjectId,
-          selectedSessionId,
-          sessionPage,
-          sessionScrollTop,
-        })
-        .catch((error: unknown) => {
-          logError("Failed saving UI state", error);
-        });
-    }, 180);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [
-    historyCategories,
-    logError,
-    paneStateHydrated,
-    projectPaneWidth,
-    projectProviders,
-    searchCategories,
-    searchProviders,
-    selectedProjectId,
-    selectedSessionId,
-    sessionPage,
-    sessionScrollTop,
-    sessionPaneWidth,
-    theme,
-  ]);
 
   useEffect(() => {
     return () => {
@@ -631,35 +549,6 @@ export function App() {
     };
   }, [focusMessageId, focusedMessagePosition, visibleFocusedMessageId]);
 
-  useEffect(() => {
-    const onPointerMove = (event: PointerEvent) => {
-      const active = resizeState.current;
-      if (!active) {
-        return;
-      }
-
-      const delta = event.clientX - active.startX;
-      if (active.pane === "project") {
-        setProjectPaneWidth(clamp(active.projectPaneWidth + delta, 230, 520));
-        return;
-      }
-
-      setSessionPaneWidth(clamp(active.sessionPaneWidth + delta, 250, 620));
-    };
-
-    const onPointerUp = () => {
-      resizeState.current = null;
-      document.body.classList.remove("resizing-panels");
-    };
-
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-    };
-  }, []);
-
   const handleRefresh = useCallback(
     async (force: boolean) => {
       setRefreshing(true);
@@ -761,64 +650,17 @@ export function App() {
     }, 0);
   }, []);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const command = event.metaKey || event.ctrlKey;
-      const shift = event.shiftKey;
-      const key = event.key.toLowerCase();
-      if (event.key === "?") {
-        setShowShortcuts(true);
-      } else if (event.key === "Escape") {
-        if (showShortcuts) {
-          event.preventDefault();
-          setShowShortcuts(false);
-        } else if (mainView === "search") {
-          event.preventDefault();
-          setMainView("history");
-        }
-      } else if (command && shift && key === "f") {
-        event.preventDefault();
-        focusGlobalSearch();
-      } else if (command && key === "f") {
-        event.preventDefault();
-        focusSessionSearch();
-      } else if (command && event.key === "1") {
-        event.preventDefault();
-        setMainView("history");
-      } else if (command && event.key === "2") {
-        event.preventDefault();
-        setMainView("search");
-      } else if (command && (event.key === "+" || event.key === "=")) {
-        event.preventDefault();
-        void applyZoomAction("in");
-      } else if (command && (event.key === "-" || event.key === "_")) {
-        event.preventDefault();
-        void applyZoomAction("out");
-      } else if (command && event.key === "0") {
-        event.preventDefault();
-        void applyZoomAction("reset");
-      } else if (command && shift && key === "r") {
-        event.preventDefault();
-        void handleForceRefresh();
-      } else if (command && key === "r") {
-        event.preventDefault();
-        void handleIncrementalRefresh();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [
-    applyZoomAction,
-    focusGlobalSearch,
-    focusSessionSearch,
-    handleForceRefresh,
-    handleIncrementalRefresh,
+  useKeyboardShortcuts({
     mainView,
     showShortcuts,
-  ]);
+    setMainView,
+    setShowShortcuts,
+    focusGlobalSearch,
+    focusSessionSearch,
+    applyZoomAction,
+    handleForceRefresh,
+    handleIncrementalRefresh,
+  });
 
   const projectProviderCounts = useMemo(
     () => countProviders(sortedProjects.map((project) => project.provider)),
@@ -840,7 +682,6 @@ export function App() {
   const canZoomIn = zoomPercent < 500;
   const canZoomOut = zoomPercent > 25;
   const historyCategoryCounts = sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS;
-  const isHistoryLayout = mainView === "history" && !focusMode;
   const sessionMessages = sessionDetail?.messages ?? [];
   const areAllMessagesExpanded = useMemo(
     () =>
@@ -896,21 +737,6 @@ export function App() {
     setFocusMessageId(messageId);
     setPendingRevealTarget({ messageId, sourceId });
   }, []);
-
-  const beginResize =
-    (pane: "project" | "session") => (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!isHistoryLayout) {
-        return;
-      }
-      event.preventDefault();
-      resizeState.current = {
-        pane,
-        startX: event.clientX,
-        projectPaneWidth,
-        sessionPaneWidth,
-      };
-      document.body.classList.add("resizing-panels");
-    };
 
   const handleMessageListScroll = useCallback((event: ReactUIEvent<HTMLDivElement>) => {
     sessionScrollTopRef.current = Math.max(0, Math.round(event.currentTarget.scrollTop));

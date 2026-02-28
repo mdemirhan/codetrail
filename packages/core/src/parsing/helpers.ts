@@ -1,11 +1,11 @@
-import { createHash } from "node:crypto";
-
 export type UnknownRecord = Record<string, unknown>;
 
 export type TokenUsage = {
   input: number | null;
   output: number | null;
 };
+
+export const EPOCH_ISO = new Date(0).toISOString();
 
 export function asRecord(value: unknown): UnknownRecord | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -25,6 +25,10 @@ export function lowerString(value: unknown): string | null {
   }
 
   return value.trim().toLowerCase();
+}
+
+export function readString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 export function extractEvents(payload: unknown): unknown[] {
@@ -138,7 +142,7 @@ export function extractEventTimestamp(event: UnknownRecord): string {
     }
   }
 
-  return new Date(0).toISOString();
+  return EPOCH_ISO;
 }
 
 export function extractText(value: unknown): string[] {
@@ -186,16 +190,6 @@ export function serializeUnknown(value: unknown): string {
   } catch {
     return String(value);
   }
-}
-
-export function stableMessageId(parts: string[]): string {
-  const hash = createHash("sha1").update(parts.join("|"), "utf8").digest("hex").slice(0, 32);
-  const chars = hash.split("");
-  chars[12] = "5";
-  chars[16] = "a";
-  const canonical = chars.join("");
-
-  return `${canonical.slice(0, 8)}-${canonical.slice(8, 12)}-${canonical.slice(12, 16)}-${canonical.slice(16, 20)}-${canonical.slice(20, 32)}`;
 }
 
 function firstTextField(record: UnknownRecord): string | null {

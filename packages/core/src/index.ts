@@ -1,4 +1,5 @@
 export * from "./contracts/canonical";
+export * from "./contracts/categories";
 export * from "./contracts/ipc";
 export * from "./discovery";
 export * from "./db/bootstrap";

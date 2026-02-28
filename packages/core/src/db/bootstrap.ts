@@ -79,6 +79,14 @@ const tableStatements = [
   )`,
 ] as const;
 
+const indexStatements = [
+  "CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id)",
+  "CREATE INDEX IF NOT EXISTS idx_sessions_activity ON sessions(ended_at, started_at, id)",
+  "CREATE INDEX IF NOT EXISTS idx_messages_session_created ON messages(session_id, created_at, id)",
+  "CREATE INDEX IF NOT EXISTS idx_messages_session_category_created ON messages(session_id, category, created_at, id)",
+  "CREATE INDEX IF NOT EXISTS idx_messages_session_source_id ON messages(session_id, source_id)",
+] as const;
+
 const dataTables = ["tool_calls", "messages", "sessions", "projects", "indexed_files"] as const;
 
 export function openDatabase(databasePath: string): SqliteDatabase {
@@ -99,6 +107,9 @@ export function ensureDatabaseSchema(db: SqliteDatabase): DatabaseBootstrapResul
     schemaRebuilt = true;
   } else {
     for (const statement of tableStatements) {
+      db.exec(statement);
+    }
+    for (const statement of indexStatements) {
       db.exec(statement);
     }
   }
@@ -131,6 +142,9 @@ export function initializeDatabase(databasePath: string): DatabaseBootstrapResul
 
 function recreateSchema(db: SqliteDatabase): void {
   for (const statement of tableStatements) {
+    db.exec(statement);
+  }
+  for (const statement of indexStatements) {
     db.exec(statement);
   }
 }

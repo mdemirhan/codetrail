@@ -10,14 +10,6 @@ export function makeSessionId(provider: Provider, sessionIdentity: string): stri
   return `session_${hash([provider, sessionIdentity])}`;
 }
 
-export function makeFileKey(
-  provider: Provider,
-  projectPath: string,
-  sessionIdentity: string,
-): string {
-  return `file_${hash([provider, projectPath, sessionIdentity])}`;
-}
-
 export function makeMessageId(sessionId: string, sourceMessageId: string): string {
   return `msg_${hash([sessionId, sourceMessageId])}`;
 }

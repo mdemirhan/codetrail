@@ -2,13 +2,16 @@ import type { MessageCategory, Provider } from "../contracts/canonical";
 
 import type { ParserDiagnostic } from "./contracts";
 import {
+  EPOCH_ISO,
   type TokenUsage,
   asArray,
   asRecord,
   extractEventTimestamp,
+  extractEvents,
   extractText,
   extractTokenUsage,
   lowerString,
+  readString,
   serializeUnknown,
 } from "./helpers";
 
@@ -52,23 +55,22 @@ function parseClaudePayload(args: {
   diagnostics: ParserDiagnostic[];
 }): ParsedProviderMessage[] {
   const { provider, sessionId, payload, diagnostics } = args;
-  const events = extractProviderEvents(payload);
+  const events = extractEvents(payload);
   const output: ParsedProviderMessage[] = [];
   let sequence = 0;
 
   for (const [eventIndex, event] of events.entries()) {
     const eventRecord = asRecord(event);
     if (!eventRecord) {
-      pushNonObjectEvent({
+      sequence = pushNonObjectEvent({
         output,
         provider,
         sessionId,
         eventIndex,
         event,
         diagnostics,
-        sequenceRef: { value: sequence },
+        sequence,
       });
-      sequence += 1;
       continue;
     }
 
@@ -97,7 +99,6 @@ function parseClaudePayload(args: {
       readString(normalized.id) ??
       null;
     const segments = dedupeSegments(parseClaudeSegments(sourceType, normalized));
-    const sequenceRef = { value: sequence };
     if (segments.length === 0) {
       diagnostics.push({
         severity: "warning",
@@ -109,17 +110,16 @@ function parseClaudePayload(args: {
       });
     }
 
-    pushSplitMessages({
+    sequence = pushSplitMessages({
       output,
       sessionId,
-      sequenceRef,
+      sequence,
       baseId,
       createdAt,
       tokenUsage: usage,
       segments,
       fallbackRaw: event,
     });
-    sequence = sequenceRef.value;
   }
 
   return output;
@@ -132,23 +132,22 @@ function parseCodexPayload(args: {
   diagnostics: ParserDiagnostic[];
 }): ParsedProviderMessage[] {
   const { provider, sessionId, payload, diagnostics } = args;
-  const events = extractProviderEvents(payload);
+  const events = extractEvents(payload);
   const output: ParsedProviderMessage[] = [];
   let sequence = 0;
 
   for (const [eventIndex, event] of events.entries()) {
     const eventRecord = asRecord(event);
     if (!eventRecord) {
-      pushNonObjectEvent({
+      sequence = pushNonObjectEvent({
         output,
         provider,
         sessionId,
         eventIndex,
         event,
         diagnostics,
-        sequenceRef: { value: sequence },
+        sequence,
       });
-      sequence += 1;
       continue;
     }
 
@@ -160,18 +159,16 @@ function parseCodexPayload(args: {
         continue;
       }
 
-      const sequenceRef = { value: sequence };
-      pushSplitMessages({
+      sequence = pushSplitMessages({
         output,
         sessionId,
-        sequenceRef,
+        sequence,
         baseId: readString(eventRecord.id),
         createdAt: extractEventTimestamp(eventRecord),
         tokenUsage: extractTokenUsage(eventRecord),
         segments: dedupeSegments(segments),
         fallbackRaw: event,
       });
-      sequence = sequenceRef.value;
       continue;
     }
 
@@ -195,22 +192,20 @@ function parseCodexPayload(args: {
     const baseId =
       readString(payloadRecord.id) ?? (callId && payloadType ? `${callId}:${payloadType}` : callId);
     const segments = parseCodexSegments(payloadType, payloadRecord, sessionId, sequence);
-    const sequenceRef = { value: sequence };
     if (segments.length === 0) {
       continue;
     }
 
-    pushSplitMessages({
+    sequence = pushSplitMessages({
       output,
       sessionId,
-      sequenceRef,
+      sequence,
       baseId,
       createdAt,
       tokenUsage,
       segments: dedupeSegments(segments),
       fallbackRaw: event,
     });
-    sequence = sequenceRef.value;
   }
 
   return output;
@@ -230,16 +225,15 @@ function parseGeminiPayload(args: {
   for (const [eventIndex, event] of events.entries()) {
     const eventRecord = asRecord(event);
     if (!eventRecord) {
-      pushNonObjectEvent({
+      sequence = pushNonObjectEvent({
         output,
         provider,
         sessionId,
         eventIndex,
         event,
         diagnostics,
-        sequenceRef: { value: sequence },
+        sequence,
       });
-      sequence += 1;
       continue;
     }
 
@@ -267,7 +261,6 @@ function parseGeminiPayload(args: {
     }
 
     const normalizedSegments = dedupeSegments(segments);
-    const sequenceRef = { value: sequence };
     if (normalizedSegments.length === 0) {
       diagnostics.push({
         severity: "warning",
@@ -279,17 +272,16 @@ function parseGeminiPayload(args: {
       });
     }
 
-    pushSplitMessages({
+    sequence = pushSplitMessages({
       output,
       sessionId,
-      sequenceRef,
+      sequence,
       baseId,
       createdAt,
       tokenUsage: usage,
       segments: normalizedSegments,
       fallbackRaw: event,
     });
-    sequence = sequenceRef.value;
   }
 
   return output;
@@ -715,19 +707,20 @@ function extractGeminiThoughts(thoughts: unknown): string[] {
 function pushSplitMessages(args: {
   output: ParsedProviderMessage[];
   sessionId: string;
-  sequenceRef: { value: number };
+  sequence: number;
   baseId: string | null;
   createdAt: string;
   tokenUsage: TokenUsage;
   segments: EventSegment[];
   fallbackRaw: unknown;
-}): void {
-  const { output, sessionId, sequenceRef, baseId, createdAt, tokenUsage, fallbackRaw } = args;
+}): number {
+  const { output, sessionId, sequence, baseId, createdAt, tokenUsage, fallbackRaw } = args;
   const segments: EventSegment[] =
     args.segments.length > 0
       ? args.segments
       : [{ category: "system", content: serializeUnknown(fallbackRaw) }];
-  const canonicalBase = baseId ?? `${sessionId}:msg:${sequenceRef.value}`;
+  const canonicalBase = baseId ?? `${sessionId}:msg:${sequence}`;
+  let nextSequence = sequence;
 
   for (const [index, segment] of segments.entries()) {
     const id = index === 0 ? canonicalBase : `${canonicalBase}#${index + 1}`;
@@ -741,8 +734,9 @@ function pushSplitMessages(args: {
       tokenInput: index === 0 ? tokenUsage.input : null,
       tokenOutput: index === 0 ? tokenUsage.output : null,
     });
-    sequenceRef.value += 1;
+    nextSequence += 1;
   }
+  return nextSequence;
 }
 
 function pushNonObjectEvent(args: {
@@ -752,9 +746,9 @@ function pushNonObjectEvent(args: {
   eventIndex: number;
   event: unknown;
   diagnostics: ParserDiagnostic[];
-  sequenceRef: { value: number };
-}): void {
-  const { output, provider, sessionId, eventIndex, event, diagnostics, sequenceRef } = args;
+  sequence: number;
+}): number {
+  const { output, provider, sessionId, eventIndex, event, diagnostics, sequence } = args;
   diagnostics.push({
     severity: "warning",
     code: "parser.non_object_event",
@@ -764,36 +758,16 @@ function pushNonObjectEvent(args: {
     message: "Encountered non-object event; normalized to system message.",
   });
 
-  pushSplitMessages({
+  return pushSplitMessages({
     output,
     sessionId,
-    sequenceRef,
+    sequence,
     baseId: null,
-    createdAt: new Date(0).toISOString(),
+    createdAt: EPOCH_ISO,
     tokenUsage: { input: null, output: null },
     segments: [{ category: "system", content: serializeUnknown(event) }],
     fallbackRaw: event,
   });
-}
-
-function extractProviderEvents(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-
-  const record = asRecord(payload);
-  if (!record) {
-    return [];
-  }
-
-  for (const key of ["events", "messages", "conversation", "items"]) {
-    const value = record[key];
-    if (Array.isArray(value)) {
-      return value;
-    }
-  }
-
-  return [];
 }
 
 function extractGeminiEvents(payload: unknown): unknown[] {
@@ -803,7 +777,7 @@ function extractGeminiEvents(payload: unknown): unknown[] {
     return messages;
   }
 
-  return extractProviderEvents(payload);
+  return extractEvents(payload);
 }
 
 function dedupeSegments(segments: EventSegment[]): EventSegment[] {
@@ -836,15 +810,11 @@ function firstKnownTimestamp(
   fallback: Record<string, unknown>,
 ): string {
   const first = extractEventTimestamp(primary);
-  if (first !== new Date(0).toISOString()) {
+  if (first !== EPOCH_ISO) {
     return first;
   }
 
   return extractEventTimestamp(fallback);
-}
-
-function readString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 function safeJsonString(value: unknown): string {
