@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { registerIpcHandlers } from "./registerIpcHandlers";
+import { registerIpcHandlers } from "./ipc";
 
 describe("registerIpcHandlers", () => {
   it("validates request payloads before invoking handlers", async () => {

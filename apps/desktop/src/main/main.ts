@@ -4,8 +4,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { BrowserWindow, type BrowserWindowConstructorOptions, app } from "electron";
 
+import { type AppStateStore, createAppStateStore } from "./appStateStore";
 import { bootstrapMainProcess } from "./bootstrap";
-import { type AppStateStore, createAppStateStore } from "./state/appStateStore";
 
 function createWindow(appStateStore: AppStateStore): BrowserWindow {
   const preloadPath = resolvePreloadPath();

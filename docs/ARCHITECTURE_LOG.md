@@ -27,7 +27,7 @@ The repository is split into:
 
 - Main bootstrap and IPC registration: `apps/desktop/src/main/bootstrap.ts`
 - Query service: `apps/desktop/src/main/data/queryService.ts`
-- Index refresh runner: `apps/desktop/src/main/worker/indexingRunner.ts`
+- Index refresh runner: `apps/desktop/src/main/indexingRunner.ts`
 - Preload bridge: `apps/desktop/src/preload/index.ts`
 - Renderer app: `apps/desktop/src/renderer/App.tsx`
 

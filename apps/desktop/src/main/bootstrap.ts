@@ -5,10 +5,10 @@ import { app, ipcMain, shell } from "electron";
 
 import { DATABASE_SCHEMA_VERSION, initializeDatabase } from "@cch/core";
 
+import type { AppStateStore } from "./appStateStore";
 import { getSessionDetail, listProjects, listSessions, runSearchQuery } from "./data/queryService";
-import { registerIpcHandlers } from "./ipc/registerIpcHandlers";
-import type { AppStateStore } from "./state/appStateStore";
-import { WorkerIndexingRunner } from "./worker/indexingRunner";
+import { WorkerIndexingRunner } from "./indexingRunner";
+import { registerIpcHandlers } from "./ipc";
 
 export type BootstrapOptions = {
   dbPath?: string;
