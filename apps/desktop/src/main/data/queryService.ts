@@ -351,13 +351,26 @@ function getProjectCombinedDetailWithDatabase(
   db: DatabaseHandle,
   request: IpcRequest<"projects:getCombinedDetail">,
 ): IpcResponse<"projects:getCombinedDetail"> {
+  const createdAtOrderExpr = "COALESCE(unixepoch(m.created_at), -9223372036854775808)";
   const isAscending = request.sortDirection === "asc";
   const messageOrder = isAscending
-    ? "m.created_at ASC, m.id ASC"
-    : "m.created_at DESC, m.id DESC";
+    ? `${createdAtOrderExpr} ASC, m.created_at ASC, m.id ASC`
+    : `${createdAtOrderExpr} DESC, m.created_at DESC, m.id DESC`;
   const focusComparison = isAscending
-    ? "(m.created_at < ? OR (m.created_at = ? AND m.id <= ?))"
-    : "(m.created_at > ? OR (m.created_at = ? AND m.id >= ?))";
+    ? `(
+         ${createdAtOrderExpr} < COALESCE(unixepoch(?), -9223372036854775808)
+         OR (
+           ${createdAtOrderExpr} = COALESCE(unixepoch(?), -9223372036854775808)
+           AND (m.created_at < ? OR (m.created_at = ? AND m.id <= ?))
+         )
+       )`
+    : `(
+         ${createdAtOrderExpr} > COALESCE(unixepoch(?), -9223372036854775808)
+         OR (
+           ${createdAtOrderExpr} = COALESCE(unixepoch(?), -9223372036854775808)
+           AND (m.created_at > ? OR (m.created_at = ? AND m.id >= ?))
+         )
+       )`;
   const pageSize = request.pageSize;
   let page = request.page;
   const messageFilters: {
@@ -436,7 +449,14 @@ function getProjectCombinedDetailWithDatabase(
            WHERE ${whereClause}
            AND ${focusComparison}`,
         )
-        .get(...params, focusTarget.created_at, focusTarget.created_at, focusTarget.id) as
+        .get(
+          ...params,
+          focusTarget.created_at,
+          focusTarget.created_at,
+          focusTarget.created_at,
+          focusTarget.created_at,
+          focusTarget.id,
+        ) as
         | { cnt: number }
         | undefined;
       const countBefore = Number(focusRow?.cnt ?? 0);
@@ -495,13 +515,26 @@ function getSessionDetailWithDatabase(
   db: DatabaseHandle,
   request: IpcRequest<"sessions:getDetail">,
 ): IpcResponse<"sessions:getDetail"> {
+  const createdAtOrderExpr = "COALESCE(unixepoch(m.created_at), -9223372036854775808)";
   const isAscending = request.sortDirection === "asc";
   const messageOrder = isAscending
-    ? "m.created_at ASC, m.id ASC"
-    : "m.created_at DESC, m.id DESC";
+    ? `${createdAtOrderExpr} ASC, m.created_at ASC, m.id ASC`
+    : `${createdAtOrderExpr} DESC, m.created_at DESC, m.id DESC`;
   const focusComparison = isAscending
-    ? "(m.created_at < ? OR (m.created_at = ? AND m.id <= ?))"
-    : "(m.created_at > ? OR (m.created_at = ? AND m.id >= ?))";
+    ? `(
+         ${createdAtOrderExpr} < COALESCE(unixepoch(?), -9223372036854775808)
+         OR (
+           ${createdAtOrderExpr} = COALESCE(unixepoch(?), -9223372036854775808)
+           AND (m.created_at < ? OR (m.created_at = ? AND m.id <= ?))
+         )
+       )`
+    : `(
+         ${createdAtOrderExpr} > COALESCE(unixepoch(?), -9223372036854775808)
+         OR (
+           ${createdAtOrderExpr} = COALESCE(unixepoch(?), -9223372036854775808)
+           AND (m.created_at > ? OR (m.created_at = ? AND m.id >= ?))
+         )
+       )`;
   const sessionRow = db
     .prepare(
       `SELECT
@@ -604,7 +637,14 @@ function getSessionDetailWithDatabase(
            WHERE ${whereClause}
            AND ${focusComparison}`,
         )
-        .get(...params, focusTarget.created_at, focusTarget.created_at, focusTarget.id) as
+        .get(
+          ...params,
+          focusTarget.created_at,
+          focusTarget.created_at,
+          focusTarget.created_at,
+          focusTarget.created_at,
+          focusTarget.id,
+        ) as
         | { cnt: number }
         | undefined;
       const countBefore = Number(focusRow?.cnt ?? 0);

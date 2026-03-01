@@ -624,7 +624,7 @@ export function App() {
         pageSize: PAGE_SIZE,
         categories: effectiveCategories,
         query: effectiveQuery,
-        sortDirection: projectAllSortDirection,
+        sortDirection: messageSortDirection,
         focusMessageId: pendingRevealTarget?.messageId || undefined,
         focusSourceId: pendingRevealTarget?.sourceId || undefined,
       })
@@ -679,7 +679,7 @@ export function App() {
         pageSize: PAGE_SIZE,
         categories: effectiveCategories,
         query: effectiveQuery,
-        sortDirection: messageSortDirection,
+        sortDirection: projectAllSortDirection,
         focusMessageId: pendingRevealTarget?.messageId || undefined,
         focusSourceId: pendingRevealTarget?.sourceId || undefined,
       })
@@ -784,14 +784,6 @@ export function App() {
     return sessionDetail?.messages ?? [];
   }, [bookmarkMessages, historyMode, projectCombinedDetail?.messages, sessionDetail?.messages]);
 
-  const sortedHistoryMessages = useMemo(() => {
-    const next = [...activeHistoryMessages];
-    next.sort((left, right) => {
-      const byTime = compareRecent(left.createdAt, right.createdAt) || left.id.localeCompare(right.id);
-      return activeMessageSortDirection === "asc" ? byTime : -byTime;
-    });
-    return next;
-  }, [activeHistoryMessages, activeMessageSortDirection]);
 
   const visibleFocusedMessageId = useMemo(() => {
     if (!focusMessageId) {
@@ -1008,7 +1000,7 @@ export function App() {
       : historyMode === "project_all"
         ? (projectCombinedDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS)
         : (sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS);
-  const sessionMessages = sortedHistoryMessages;
+  const sessionMessages = activeHistoryMessages;
   const isExpandedByDefault = useCallback(
     (category: MessageCategory) => expandedByDefaultCategories.includes(category),
     [expandedByDefaultCategories],

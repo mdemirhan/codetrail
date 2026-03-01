@@ -443,6 +443,113 @@ describe("queryService in-memory", () => {
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("sorts project combined messages by actual timestamp across pages", () => {
+    const db = createInMemoryDatabase();
+    const now = "2026-03-01T10:00:00.000Z";
+
+    db.prepare(
+      `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run("project_1", "codex", "Project One", "/workspace/project-one", now, now);
+
+    db.prepare(
+      `INSERT INTO sessions (
+        id, project_id, provider, file_path, model_names, started_at, ended_at,
+        duration_ms, git_branch, cwd, message_count, token_input_total, token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "session_1",
+      "project_1",
+      "codex",
+      "/workspace/project-one/session-1.jsonl",
+      "gpt-5",
+      now,
+      now,
+      1,
+      "main",
+      "/workspace/project-one",
+      2,
+      0,
+      0,
+    );
+
+    const insertMessage = db.prepare(
+      `INSERT INTO messages (
+        id, source_id, session_id, provider, category, content, created_at,
+        token_input, token_output, operation_duration_ms, operation_duration_source, operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    // Older absolute time (08:00Z) but lexicographically larger due +02:00 offset.
+    insertMessage.run(
+      "message_offset",
+      "source_offset",
+      "session_1",
+      "codex",
+      "assistant",
+      "offset time",
+      "2026-03-01T10:00:00+02:00",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    // Newer absolute time (08:30Z).
+    insertMessage.run(
+      "message_utc",
+      "source_utc",
+      "session_1",
+      "codex",
+      "assistant",
+      "utc time",
+      "2026-03-01T08:30:00Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+
+    const service = createQueryServiceFromDb(db);
+
+    const descPage0 = service.getProjectCombinedDetail({
+      projectId: "project_1",
+      page: 0,
+      pageSize: 1,
+      sortDirection: "desc",
+      categories: undefined,
+      query: "",
+      focusMessageId: undefined,
+      focusSourceId: undefined,
+    });
+    const descPage1 = service.getProjectCombinedDetail({
+      projectId: "project_1",
+      page: 1,
+      pageSize: 1,
+      sortDirection: "desc",
+      categories: undefined,
+      query: "",
+      focusMessageId: undefined,
+      focusSourceId: undefined,
+    });
+
+    expect(descPage0.messages[0]?.id).toBe("message_utc");
+    expect(descPage1.messages[0]?.id).toBe("message_offset");
+
+    const ascPage0 = service.getProjectCombinedDetail({
+      projectId: "project_1",
+      page: 0,
+      pageSize: 1,
+      sortDirection: "asc",
+      categories: undefined,
+      query: "",
+      focusMessageId: undefined,
+      focusSourceId: undefined,
+    });
+    expect(ascPage0.messages[0]?.id).toBe("message_offset");
+  });
+
   it("selects session titles from user first, assistant second, then first message", () => {
     const db = createInMemoryDatabase();
     const now = "2026-03-01T10:00:00.000Z";
