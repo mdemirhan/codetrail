@@ -371,6 +371,31 @@ body.platform-macos .titlebar-left {
   padding: 5px 8px;
 }
 
+.sort-btn,
+.toolbar-btn.sort-btn,
+.collapse-btn.sort-btn {
+  background: var(--tb-primary-bg);
+  color: var(--tb-primary-fg);
+  box-shadow: var(--tb-primary-shadow);
+  border-color: transparent;
+}
+
+.sort-btn:hover:not(:disabled),
+.sort-btn.active,
+.toolbar-btn.sort-btn:hover:not(:disabled),
+.collapse-btn.sort-btn:hover:not(:disabled),
+.toolbar-btn.sort-btn.active,
+.collapse-btn.sort-btn.active {
+  background: var(--tb-primary-hover-bg);
+  box-shadow: var(--tb-primary-hover-shadow);
+  color: var(--tb-primary-fg);
+  border-color: transparent;
+}
+
+.msg-sort-btn {
+  margin-right: 8px;
+}
+
 .theme-toggle {
   display: flex;
   align-items: center;
@@ -539,7 +564,7 @@ body.platform-macos .titlebar-left {
   transition: transform 0.25s ease;
 }
 
-.panel.collapsed .collapse-btn .toolbar-icon {
+.panel.collapsed .pane-collapse-btn .toolbar-icon {
   transform: rotate(180deg);
 }
 
@@ -909,6 +934,12 @@ body.platform-macos .titlebar-left {
 .panel.collapsed .panel-count {
   font-size: 10px;
   padding: 1px 6px;
+}
+
+.panel.collapsed .pane-head-controls {
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
 .panel.collapsed .search-wrapper,

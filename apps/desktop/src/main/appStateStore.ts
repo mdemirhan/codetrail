@@ -34,6 +34,11 @@ export type PaneState = {
   selectedProjectId?: string;
   selectedSessionId?: string;
   historyMode?: "session" | "bookmarks" | "project_all";
+  projectSortDirection?: "asc" | "desc";
+  sessionSortDirection?: "asc" | "desc";
+  messageSortDirection?: "asc" | "desc";
+  bookmarkSortDirection?: "asc" | "desc";
+  projectAllSortDirection?: "asc" | "desc";
   sessionPage?: number;
   sessionScrollTop?: number;
   systemMessageRegexRules?: Record<Provider, string[]>;
@@ -88,6 +93,7 @@ const REGULAR_FONT_VALUES: RegularFontFamily[] = [...UI_REGULAR_FONT_VALUES];
 const MONO_FONT_SIZE_VALUES: MonoFontSize[] = [...UI_MONO_FONT_SIZE_VALUES];
 const REGULAR_FONT_SIZE_VALUES: RegularFontSize[] = [...UI_REGULAR_FONT_SIZE_VALUES];
 const HISTORY_MODE_VALUES = ["session", "bookmarks", "project_all"] as const;
+const SORT_DIRECTION_VALUES = ["asc", "desc"] as const;
 const DEFAULT_FILE_SYSTEM: AppStateStoreFileSystem = {
   existsSync: (path) => existsSync(path),
   mkdirSync: (path, options) => mkdirSync(path, options),
@@ -247,6 +253,17 @@ function sanitizePaneState(value: unknown): PaneState | null {
   const selectedProjectId = sanitizeOptionalNonEmptyString(record.selectedProjectId);
   const selectedSessionId = sanitizeOptionalNonEmptyString(record.selectedSessionId);
   const historyMode = sanitizeStringValue(record.historyMode, HISTORY_MODE_VALUES);
+  const projectSortDirection = sanitizeStringValue(record.projectSortDirection, SORT_DIRECTION_VALUES);
+  const sessionSortDirection = sanitizeStringValue(record.sessionSortDirection, SORT_DIRECTION_VALUES);
+  const messageSortDirection = sanitizeStringValue(record.messageSortDirection, SORT_DIRECTION_VALUES);
+  const bookmarkSortDirection = sanitizeStringValue(
+    record.bookmarkSortDirection,
+    SORT_DIRECTION_VALUES,
+  );
+  const projectAllSortDirection = sanitizeStringValue(
+    record.projectAllSortDirection,
+    SORT_DIRECTION_VALUES,
+  );
   const sessionPage = sanitizeOptionalInt(record.sessionPage, PAGE_MIN, PAGE_MAX);
   const sessionScrollTop = sanitizeOptionalInt(
     record.sessionScrollTop,
@@ -271,6 +288,11 @@ function sanitizePaneState(value: unknown): PaneState | null {
     ...(selectedProjectId ? { selectedProjectId } : {}),
     ...(selectedSessionId ? { selectedSessionId } : {}),
     ...(historyMode ? { historyMode } : {}),
+    ...(projectSortDirection ? { projectSortDirection } : {}),
+    ...(sessionSortDirection ? { sessionSortDirection } : {}),
+    ...(messageSortDirection ? { messageSortDirection } : {}),
+    ...(bookmarkSortDirection ? { bookmarkSortDirection } : {}),
+    ...(projectAllSortDirection ? { projectAllSortDirection } : {}),
     ...(sessionPage === null ? {} : { sessionPage }),
     ...(sessionScrollTop === null ? {} : { sessionScrollTop }),
     ...(systemMessageRegexRules ? { systemMessageRegexRules } : {}),

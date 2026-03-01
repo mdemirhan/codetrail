@@ -34,6 +34,7 @@ describe("ProjectPane", () => {
 
     const user = userEvent.setup();
     const onToggleCollapsed = vi.fn();
+    const onToggleSortDirection = vi.fn();
     const onProjectQueryChange = vi.fn();
     const onToggleProvider = vi.fn();
     const onSelectProject = vi.fn();
@@ -44,6 +45,7 @@ describe("ProjectPane", () => {
       <ProjectPane
         sortedProjects={projects}
         selectedProjectId="project_1"
+        sortDirection="desc"
         collapsed={false}
         projectQueryInput=""
         projectProviders={["claude", "codex"]}
@@ -52,6 +54,7 @@ describe("ProjectPane", () => {
         onToggleCollapsed={onToggleCollapsed}
         onProjectQueryChange={onProjectQueryChange}
         onToggleProvider={onToggleProvider}
+        onToggleSortDirection={onToggleSortDirection}
         onSelectProject={onSelectProject}
         onOpenProjectLocation={onOpenProjectLocation}
         canOpenSessionLocation={true}
@@ -63,6 +66,7 @@ describe("ProjectPane", () => {
     expect(screen.getByText("Project Two")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
+    await user.click(screen.getByRole("button", { name: "Sort projects ascending" }));
     await user.type(screen.getByPlaceholderText("Filter projects..."), "abc");
     await user.click(screen.getByRole("button", { name: /Gemini/i }));
     await user.click(screen.getByRole("button", { name: /Project Two/i }));
@@ -70,6 +74,7 @@ describe("ProjectPane", () => {
     await user.click(screen.getByRole("button", { name: "Open Session Location" }));
 
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+    expect(onToggleSortDirection).toHaveBeenCalledTimes(1);
     expect(onProjectQueryChange).toHaveBeenCalled();
     expect(onToggleProvider).toHaveBeenCalledWith("gemini");
     expect(onSelectProject).toHaveBeenCalledWith("project_2");
@@ -82,6 +87,7 @@ describe("ProjectPane", () => {
       <ProjectPane
         sortedProjects={projects}
         selectedProjectId=""
+        sortDirection="asc"
         collapsed={true}
         projectQueryInput=""
         projectProviders={["claude"]}
@@ -90,6 +96,7 @@ describe("ProjectPane", () => {
         onToggleCollapsed={vi.fn()}
         onProjectQueryChange={vi.fn()}
         onToggleProvider={vi.fn()}
+        onToggleSortDirection={vi.fn()}
         onSelectProject={vi.fn()}
         onOpenProjectLocation={vi.fn()}
         canOpenSessionLocation={false}

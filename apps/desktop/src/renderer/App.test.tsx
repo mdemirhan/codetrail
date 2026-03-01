@@ -31,6 +31,11 @@ function createAppClient() {
         selectedProjectId: null,
         selectedSessionId: null,
         historyMode: null,
+        projectSortDirection: null,
+        sessionSortDirection: null,
+        messageSortDirection: null,
+        bookmarkSortDirection: null,
+        projectAllSortDirection: null,
         sessionPage: null,
         sessionScrollTop: null,
         systemMessageRegexRules: null,
@@ -340,6 +345,11 @@ function createBookmarksSearchClient() {
         selectedProjectId: null,
         selectedSessionId: null,
         historyMode: null,
+        projectSortDirection: null,
+        sessionSortDirection: null,
+        messageSortDirection: null,
+        bookmarkSortDirection: null,
+        projectAllSortDirection: null,
         sessionPage: null,
         sessionScrollTop: null,
         systemMessageRegexRules: null,
@@ -620,6 +630,32 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Open settings" }));
     await waitFor(() => {
       expect(screen.getByText("Discovery Roots")).toBeInTheDocument();
+    });
+  });
+
+  it("passes per-mode message sort direction to detail requests and toggles on click", async () => {
+    const user = userEvent.setup();
+    const client = createAppClient();
+
+    renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Sort All Sessions messages ascending" }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Sort All Sessions messages ascending" }));
+
+    await waitFor(() => {
+      const calls = client.invoke.mock.calls.filter(
+        ([channel]) => channel === "projects:getCombinedDetail",
+      );
+      expect(
+        calls.some(
+          ([, payload]) => (payload as { sortDirection?: string }).sortDirection === "asc",
+        ),
+      ).toBe(true);
     });
   });
 

@@ -10,24 +10,28 @@ type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
 export function SessionPane({
   sortedSessions,
   selectedSessionId,
+  sortDirection,
   allSessionsCount,
   allSessionsSelected,
   bookmarksCount,
   bookmarksSelected,
   collapsed,
   onToggleCollapsed,
+  onToggleSortDirection,
   onSelectAllSessions,
   onSelectBookmarks,
   onSelectSession,
 }: {
   sortedSessions: SessionSummary[];
   selectedSessionId: string;
+  sortDirection: "asc" | "desc";
   allSessionsCount: number;
   allSessionsSelected: boolean;
   bookmarksCount: number;
   bookmarksSelected: boolean;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  onToggleSortDirection: () => void;
   onSelectAllSessions: () => void;
   onSelectBookmarks: () => void;
   onSelectSession: (sessionId: string) => void;
@@ -35,6 +39,10 @@ export function SessionPane({
   const [selectedSessionElement, setSelectedSessionElement] = useState<HTMLButtonElement | null>(
     null,
   );
+  const sortTooltip =
+    sortDirection === "asc"
+      ? "Sessions: oldest activity first. Click to show newest activity first."
+      : "Sessions: newest activity first. Click to show oldest activity first.";
   const selectedSessionRef = useCallback((node: HTMLButtonElement | null) => {
     setSelectedSessionElement(node);
   }, []);
@@ -54,15 +62,30 @@ export function SessionPane({
           <span className="panel-title">Sessions</span>
           <span className="panel-count">{sortedSessions.length}</span>
         </div>
-        <button
-          type="button"
-          className="collapse-btn"
-          onClick={onToggleCollapsed}
-          aria-label={collapsed ? "Expand Sessions pane" : "Collapse Sessions pane"}
-          title={collapsed ? "Expand Sessions" : "Collapse Sessions"}
-        >
-          <ToolbarIcon name="chevronLeft" />
-        </button>
+        <div className="pane-head-controls">
+          <button
+            type="button"
+            className="collapse-btn sort-btn"
+            onClick={onToggleSortDirection}
+            aria-label={
+              sortDirection === "asc"
+                ? "Sort sessions descending"
+                : "Sort sessions ascending"
+            }
+            title={sortTooltip}
+          >
+            <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
+          </button>
+          <button
+            type="button"
+            className="collapse-btn pane-collapse-btn"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? "Expand Sessions pane" : "Collapse Sessions pane"}
+            title={collapsed ? "Expand Sessions" : "Collapse Sessions"}
+          >
+            <ToolbarIcon name="chevronLeft" />
+          </button>
+        </div>
       </div>
       <div className="list-scroll session-list">
         <button

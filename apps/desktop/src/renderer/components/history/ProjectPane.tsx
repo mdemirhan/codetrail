@@ -9,6 +9,7 @@ type ProjectSummary = IpcResponse<"projects:list">["projects"][number];
 export function ProjectPane({
   sortedProjects,
   selectedProjectId,
+  sortDirection,
   collapsed,
   projectQueryInput,
   projectProviders,
@@ -17,6 +18,7 @@ export function ProjectPane({
   onToggleCollapsed,
   onProjectQueryChange,
   onToggleProvider,
+  onToggleSortDirection,
   onSelectProject,
   onOpenProjectLocation,
   canOpenSessionLocation,
@@ -24,6 +26,7 @@ export function ProjectPane({
 }: {
   sortedProjects: ProjectSummary[];
   selectedProjectId: string;
+  sortDirection: "asc" | "desc";
   collapsed: boolean;
   projectQueryInput: string;
   projectProviders: Provider[];
@@ -32,12 +35,17 @@ export function ProjectPane({
   onToggleCollapsed: () => void;
   onProjectQueryChange: (value: string) => void;
   onToggleProvider: (provider: Provider) => void;
+  onToggleSortDirection: () => void;
   onSelectProject: (projectId: string) => void;
   onOpenProjectLocation: () => void;
   canOpenSessionLocation: boolean;
   onOpenSessionLocation: () => void;
 }) {
   const selectedProjectRef = useRef<HTMLButtonElement | null>(null);
+  const sortTooltip =
+    sortDirection === "asc"
+      ? "Projects: oldest activity first. Click to show newest activity first."
+      : "Projects: newest activity first. Click to show oldest activity first.";
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -53,15 +61,30 @@ export function ProjectPane({
           <span className="panel-title">Projects</span>
           <span className="panel-count">{sortedProjects.length}</span>
         </div>
-        <button
-          type="button"
-          className="collapse-btn"
-          onClick={onToggleCollapsed}
-          aria-label={collapsed ? "Expand Projects pane" : "Collapse Projects pane"}
-          title={collapsed ? "Expand Projects" : "Collapse Projects"}
-        >
-          <ToolbarIcon name="chevronLeft" />
-        </button>
+        <div className="pane-head-controls">
+          <button
+            type="button"
+            className="collapse-btn sort-btn"
+            onClick={onToggleSortDirection}
+            aria-label={
+              sortDirection === "asc"
+                ? "Sort projects descending"
+                : "Sort projects ascending"
+            }
+            title={sortTooltip}
+          >
+            <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
+          </button>
+          <button
+            type="button"
+            className="collapse-btn pane-collapse-btn"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? "Expand Projects pane" : "Collapse Projects pane"}
+            title={collapsed ? "Expand Projects" : "Collapse Projects"}
+          >
+            <ToolbarIcon name="chevronLeft" />
+          </button>
+        </div>
       </div>
       <div className="search-wrapper">
         <div className="search-box">

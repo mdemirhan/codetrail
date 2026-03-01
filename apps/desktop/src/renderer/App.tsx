@@ -72,6 +72,7 @@ type MainView = "history" | "search" | "settings";
 type HistoryMode = "session" | "bookmarks" | "project_all";
 type BulkExpandScope = "all" | MessageCategory;
 type SystemMessageRegexRules = Record<Provider, string[]>;
+type SortDirection = "asc" | "desc";
 
 const EMPTY_BOOKMARKS_RESPONSE: BookmarkListResponse = {
   projectId: "",
@@ -153,6 +154,11 @@ export function App() {
   const [systemMessageRegexRules, setSystemMessageRegexRules] = useState<SystemMessageRegexRules>(
     EMPTY_SYSTEM_MESSAGE_REGEX_RULES,
   );
+  const [projectSortDirection, setProjectSortDirection] = useState<SortDirection>("desc");
+  const [sessionSortDirection, setSessionSortDirection] = useState<SortDirection>("desc");
+  const [messageSortDirection, setMessageSortDirection] = useState<SortDirection>("asc");
+  const [bookmarkSortDirection, setBookmarkSortDirection] = useState<SortDirection>("asc");
+  const [projectAllSortDirection, setProjectAllSortDirection] = useState<SortDirection>("desc");
   const [sessionQueryInput, setSessionQueryInput] = useState("");
   const [bookmarkQueryInput, setBookmarkQueryInput] = useState("");
   const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>([
@@ -230,23 +236,23 @@ export function App() {
   const sortedProjects = useMemo(() => {
     const next = [...projects];
     next.sort((left, right) => {
-      return (
+      const byRecent =
         compareRecent(right.lastActivity, left.lastActivity) || left.name.localeCompare(right.name)
-      );
+      return projectSortDirection === "desc" ? byRecent : -byRecent;
     });
     return next;
-  }, [projects]);
+  }, [projectSortDirection, projects]);
 
   const sortedSessions = useMemo(() => {
     const next = [...sessions];
     next.sort((left, right) => {
-      return (
+      const byRecent =
         compareRecent(sessionActivityOf(right), sessionActivityOf(left)) ||
         right.messageCount - left.messageCount
-      );
+      return sessionSortDirection === "desc" ? byRecent : -byRecent;
     });
     return next;
-  }, [sessions]);
+  }, [sessionSortDirection, sessions]);
 
   const loadProjects = useCallback(async () => {
     setProjectsLoaded(false);
@@ -361,6 +367,11 @@ export function App() {
     selectedProjectId,
     selectedSessionId,
     historyMode,
+    projectSortDirection,
+    sessionSortDirection,
+    messageSortDirection,
+    bookmarkSortDirection,
+    projectAllSortDirection,
     sessionPage,
     sessionScrollTop,
     systemMessageRegexRules,
@@ -379,6 +390,11 @@ export function App() {
     setSelectedProjectId,
     setSelectedSessionId,
     setHistoryMode,
+    setProjectSortDirection,
+    setSessionSortDirection,
+    setMessageSortDirection,
+    setBookmarkSortDirection,
+    setProjectAllSortDirection,
     setSessionPage,
     setSessionScrollTop,
     setSystemMessageRegexRules,
@@ -604,6 +620,7 @@ export function App() {
         pageSize: PAGE_SIZE,
         categories: effectiveCategories,
         query: effectiveQuery,
+        sortDirection: projectAllSortDirection,
         focusMessageId: pendingRevealTarget?.messageId || undefined,
         focusSourceId: pendingRevealTarget?.sourceId || undefined,
       })
@@ -633,6 +650,7 @@ export function App() {
     historyMode,
     selectedSessionId,
     sessionPage,
+    messageSortDirection,
     historyCategories,
     effectiveSessionQuery,
     pendingRevealTarget,
@@ -657,6 +675,7 @@ export function App() {
         pageSize: PAGE_SIZE,
         categories: effectiveCategories,
         query: effectiveQuery,
+        sortDirection: messageSortDirection,
         focusMessageId: pendingRevealTarget?.messageId || undefined,
         focusSourceId: pendingRevealTarget?.sourceId || undefined,
       })
@@ -686,6 +705,7 @@ export function App() {
     historyMode,
     selectedProjectId,
     sessionPage,
+    projectAllSortDirection,
     historyCategories,
     effectiveSessionQuery,
     pendingRevealTarget,
@@ -714,10 +734,31 @@ export function App() {
     void loadSettingsInfo();
   }, [loadSettingsInfo, mainView, settingsInfo, settingsLoading]);
 
-  const bookmarkMessages = useMemo(
-    () => bookmarksResponse.results.map((entry) => entry.message),
-    [bookmarksResponse.results],
-  );
+  const bookmarkMessages = useMemo(() => {
+    const next = bookmarksResponse.results.map((entry) => entry.message);
+    next.sort((left, right) => {
+      const byTime = compareRecent(left.createdAt, right.createdAt) || left.id.localeCompare(right.id);
+      return bookmarkSortDirection === "asc" ? byTime : -byTime;
+    });
+    return next;
+  }, [bookmarksResponse.results, bookmarkSortDirection]);
+
+  const activeMessageSortDirection: SortDirection =
+    historyMode === "project_all"
+      ? projectAllSortDirection
+      : historyMode === "bookmarks"
+        ? bookmarkSortDirection
+        : messageSortDirection;
+  const messageSortScopeLabel =
+    historyMode === "project_all"
+      ? "All Sessions messages"
+      : historyMode === "bookmarks"
+        ? "bookmarked messages"
+        : "session messages";
+  const messageSortTooltip =
+    activeMessageSortDirection === "asc"
+      ? `${messageSortScopeLabel}: oldest to newest. Click to switch to newest first.`
+      : `${messageSortScopeLabel}: newest to oldest. Click to switch to oldest first.`;
   const bookmarkOrphanedByMessageId = useMemo(
     () =>
       new Map(
@@ -738,6 +779,15 @@ export function App() {
     }
     return sessionDetail?.messages ?? [];
   }, [bookmarkMessages, historyMode, projectCombinedDetail?.messages, sessionDetail?.messages]);
+
+  const sortedHistoryMessages = useMemo(() => {
+    const next = [...activeHistoryMessages];
+    next.sort((left, right) => {
+      const byTime = compareRecent(left.createdAt, right.createdAt) || left.id.localeCompare(right.id);
+      return activeMessageSortDirection === "asc" ? byTime : -byTime;
+    });
+    return next;
+  }, [activeHistoryMessages, activeMessageSortDirection]);
 
   const visibleFocusedMessageId = useMemo(() => {
     if (!focusMessageId) {
@@ -956,7 +1006,7 @@ export function App() {
       : historyMode === "project_all"
         ? (projectCombinedDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS)
         : (sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS);
-  const sessionMessages = activeHistoryMessages;
+  const sessionMessages = sortedHistoryMessages;
   const isExpandedByDefault = useCallback(
     (category: MessageCategory) => expandedByDefaultCategories.includes(category),
     [expandedByDefaultCategories],
@@ -1173,6 +1223,7 @@ export function App() {
             <ProjectPane
               sortedProjects={sortedProjects}
               selectedProjectId={selectedProjectId}
+              sortDirection={projectSortDirection}
               collapsed={projectPaneCollapsed}
               projectQueryInput={projectQueryInput}
               projectProviders={projectProviders}
@@ -1182,6 +1233,9 @@ export function App() {
               onProjectQueryChange={setProjectQueryInput}
               onToggleProvider={(provider) =>
                 setProjectProviders((value) => toggleValue(value, provider))
+              }
+              onToggleSortDirection={() =>
+                setProjectSortDirection((value) => (value === "asc" ? "desc" : "asc"))
               }
               onSelectProject={(projectId) => {
                 setPendingSearchNavigation(null);
@@ -1217,12 +1271,16 @@ export function App() {
             <SessionPane
               sortedSessions={sortedSessions}
               selectedSessionId={selectedSessionId}
+              sortDirection={sessionSortDirection}
               allSessionsCount={allSessionsCount}
               allSessionsSelected={historyMode === "project_all"}
               bookmarksCount={bookmarksResponse.totalCount}
               bookmarksSelected={historyMode === "bookmarks"}
               collapsed={sessionPaneCollapsed}
               onToggleCollapsed={() => setSessionPaneCollapsed((value) => !value)}
+              onToggleSortDirection={() =>
+                setSessionSortDirection((value) => (value === "asc" ? "desc" : "asc"))
+              }
               onSelectAllSessions={() => {
                 setPendingSearchNavigation(null);
                 setHistoryMode("project_all");
@@ -1271,6 +1329,33 @@ export function App() {
                         : "Session Detail"}
                   </div>
                   <div className="msg-toolbar">
+                    <button
+                      type="button"
+                      className="toolbar-btn sort-btn msg-sort-btn"
+                      onClick={() => {
+                        if (historyMode === "project_all") {
+                          setProjectAllSortDirection((value) => (value === "asc" ? "desc" : "asc"));
+                          setSessionPage(0);
+                          return;
+                        }
+                        if (historyMode === "bookmarks") {
+                          setBookmarkSortDirection((value) => (value === "asc" ? "desc" : "asc"));
+                          return;
+                        }
+                        setMessageSortDirection((value) => (value === "asc" ? "desc" : "asc"));
+                        setSessionPage(0);
+                      }}
+                      aria-label={
+                        activeMessageSortDirection === "asc"
+                          ? `Sort ${messageSortScopeLabel} descending`
+                          : `Sort ${messageSortScopeLabel} ascending`
+                      }
+                      title={messageSortTooltip}
+                    >
+                      <ToolbarIcon
+                        name={activeMessageSortDirection === "asc" ? "sortAsc" : "sortDesc"}
+                      />
+                    </button>
                     <div className="expand-scope-control">
                       <button
                         type="button"

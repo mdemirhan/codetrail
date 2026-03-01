@@ -351,6 +351,13 @@ function getProjectCombinedDetailWithDatabase(
   db: DatabaseHandle,
   request: IpcRequest<"projects:getCombinedDetail">,
 ): IpcResponse<"projects:getCombinedDetail"> {
+  const isAscending = request.sortDirection === "asc";
+  const messageOrder = isAscending
+    ? "m.created_at ASC, m.id ASC"
+    : "m.created_at DESC, m.id DESC";
+  const focusComparison = isAscending
+    ? "(m.created_at < ? OR (m.created_at = ? AND m.id <= ?))"
+    : "(m.created_at > ? OR (m.created_at = ? AND m.id >= ?))";
   const pageSize = request.pageSize;
   let page = request.page;
   const messageFilters: {
@@ -398,29 +405,45 @@ function getProjectCombinedDetailWithDatabase(
 
   let focusIndex: number | null = null;
   if (request.focusMessageId || request.focusSourceId) {
-    const focusParam = request.focusMessageId ?? request.focusSourceId ?? "";
-    const focusField = request.focusMessageId ? "id" : "source_id";
-    const focusRow = db
-      .prepare(
-        `SELECT row_index FROM (
-           SELECT
-             m.id,
-             m.source_id,
-             ROW_NUMBER() OVER (
-               ORDER BY m.created_at ASC, m.id ASC
-             ) - 1 AS row_index
+    const focusTarget = request.focusMessageId
+      ? ((db
+          .prepare(
+            "SELECT m.id, m.created_at FROM messages m JOIN sessions s ON s.id = m.session_id WHERE s.project_id = ? AND m.id = ?",
+          )
+          .get(request.projectId, request.focusMessageId) as
+          | {
+              id: string;
+              created_at: string;
+            }
+          | undefined) ?? undefined)
+      : ((db
+          .prepare(
+            "SELECT m.id, m.created_at FROM messages m JOIN sessions s ON s.id = m.session_id WHERE s.project_id = ? AND m.source_id = ? ORDER BY m.created_at ASC, m.id ASC LIMIT 1",
+          )
+          .get(request.projectId, request.focusSourceId) as
+          | {
+              id: string;
+              created_at: string;
+            }
+          | undefined) ?? undefined);
+
+    if (focusTarget) {
+      const focusRow = db
+        .prepare(
+          `SELECT COUNT(*) as cnt
            FROM messages m
            JOIN sessions s ON s.id = m.session_id
            WHERE ${whereClause}
-         ) ordered
-         WHERE ${focusField} = ?
-         LIMIT 1`,
-      )
-      .get(...params, focusParam) as { row_index: number } | undefined;
-
-    if (focusRow) {
-      focusIndex = Number(focusRow.row_index);
-      page = Math.floor(focusIndex / pageSize);
+           AND ${focusComparison}`,
+        )
+        .get(...params, focusTarget.created_at, focusTarget.created_at, focusTarget.id) as
+        | { cnt: number }
+        | undefined;
+      const countBefore = Number(focusRow?.cnt ?? 0);
+      if (countBefore > 0) {
+        focusIndex = countBefore - 1;
+        page = Math.floor(focusIndex / pageSize);
+      }
     }
   }
 
@@ -452,7 +475,7 @@ function getProjectCombinedDetailWithDatabase(
        JOIN sessions s ON s.id = m.session_id
        ${SESSION_TITLE_JOIN_SQL}
        WHERE ${whereClause}
-       ORDER BY m.created_at ASC, m.id ASC
+       ORDER BY ${messageOrder}
        LIMIT ? OFFSET ?`,
     )
     .all(...params, pageSize, page * pageSize) as ProjectCombinedMessageRow[];
@@ -472,6 +495,13 @@ function getSessionDetailWithDatabase(
   db: DatabaseHandle,
   request: IpcRequest<"sessions:getDetail">,
 ): IpcResponse<"sessions:getDetail"> {
+  const isAscending = request.sortDirection === "asc";
+  const messageOrder = isAscending
+    ? "m.created_at ASC, m.id ASC"
+    : "m.created_at DESC, m.id DESC";
+  const focusComparison = isAscending
+    ? "(m.created_at < ? OR (m.created_at = ? AND m.id <= ?))"
+    : "(m.created_at > ? OR (m.created_at = ? AND m.id >= ?))";
   const sessionRow = db
     .prepare(
       `SELECT
@@ -572,7 +602,7 @@ function getSessionDetailWithDatabase(
           `SELECT COUNT(*) as cnt
            FROM messages m
            WHERE ${whereClause}
-           AND (m.created_at < ? OR (m.created_at = ? AND m.id <= ?))`,
+           AND ${focusComparison}`,
         )
         .get(...params, focusTarget.created_at, focusTarget.created_at, focusTarget.id) as
         | { cnt: number }
@@ -606,7 +636,7 @@ function getSessionDetailWithDatabase(
          m.operation_duration_confidence
        FROM messages m
        WHERE ${whereClause}
-       ORDER BY m.created_at, m.id
+       ORDER BY ${messageOrder}
        LIMIT ? OFFSET ?`,
     )
     .all(...params, pageSize, page * pageSize) as MessageRow[];

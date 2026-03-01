@@ -16,7 +16,9 @@ export function ToolbarIcon({
     | "zoomReset"
     | "expandAll"
     | "collapseAll"
-    | "chevronLeft";
+    | "chevronLeft"
+    | "sortAsc"
+    | "sortDesc";
 }) {
   const path = (() => {
     if (name === "history") {
@@ -61,12 +63,17 @@ export function ToolbarIcon({
     if (name === "chevronLeft") {
       return "M15 5l-6 7 6 7";
     }
+    if (name === "sortAsc") {
+      return "M7 17V6M7 6l-3 3M7 6l3 3M12 17h8M12 13h6M12 9h4M12 5h2";
+    }
+    if (name === "sortDesc") {
+      return "M7 6v11M7 17l-3-3M7 17l3-3M12 17h2M12 13h4M12 9h6M12 5h8";
+    }
     return "M4 7h16M4 12h16M4 17h10";
   })();
 
   return (
     <svg className="toolbar-icon" viewBox="0 0 24 24" aria-hidden>
-      <title>{name}</title>
       <path d={path} />
     </svg>
   );

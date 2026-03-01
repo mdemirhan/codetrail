@@ -144,6 +144,11 @@ describe("bootstrapMainProcess", () => {
     selectedProjectId: "project-1",
     selectedSessionId: "session-1",
     historyMode: "bookmarks",
+    projectSortDirection: "desc",
+    sessionSortDirection: "desc",
+    messageSortDirection: "asc",
+    bookmarkSortDirection: "asc",
+    projectAllSortDirection: "desc",
     sessionPage: 2,
     sessionScrollTop: 180,
     systemMessageRegexRules: {
@@ -359,6 +364,11 @@ describe("bootstrapMainProcess", () => {
       selectedProjectId: "project-1",
       selectedSessionId: "session-1",
       historyMode: "bookmarks",
+      projectSortDirection: "desc",
+      sessionSortDirection: "desc",
+      messageSortDirection: "asc",
+      bookmarkSortDirection: "asc",
+      projectAllSortDirection: "desc",
       sessionPage: 2,
       sessionScrollTop: 180,
       systemMessageRegexRules: {

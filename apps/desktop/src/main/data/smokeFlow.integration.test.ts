@@ -99,6 +99,7 @@ describe("desktop smoke flow", () => {
       sessionId: result.sessionId,
       page: 0,
       pageSize: 1,
+      sortDirection: "asc",
       categories: undefined,
       query: "",
       focusSourceId: result.messageSourceId,

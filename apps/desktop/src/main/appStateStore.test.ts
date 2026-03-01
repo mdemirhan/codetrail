@@ -69,6 +69,11 @@ describe("AppStateStore", () => {
       selectedProjectId: "project_alpha",
       selectedSessionId: "session_beta",
       historyMode: "bookmarks",
+      projectSortDirection: "desc",
+      sessionSortDirection: "desc",
+      messageSortDirection: "asc",
+      bookmarkSortDirection: "asc",
+      projectAllSortDirection: "desc",
       sessionPage: 3,
       sessionScrollTop: 672,
       systemMessageRegexRules: {
@@ -93,6 +98,11 @@ describe("AppStateStore", () => {
       selectedProjectId: "project_alpha",
       selectedSessionId: "session_beta",
       historyMode: "bookmarks",
+      projectSortDirection: "desc",
+      sessionSortDirection: "desc",
+      messageSortDirection: "asc",
+      bookmarkSortDirection: "asc",
+      projectAllSortDirection: "desc",
       sessionPage: 3,
       sessionScrollTop: 672,
       systemMessageRegexRules: {

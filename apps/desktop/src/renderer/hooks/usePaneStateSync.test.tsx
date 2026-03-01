@@ -38,6 +38,11 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
   const [historyMode, setHistoryMode] = useState<"session" | "bookmarks" | "project_all">(
     "session",
   );
+  const [projectSortDirection, setProjectSortDirection] = useState<"asc" | "desc">("desc");
+  const [sessionSortDirection, setSessionSortDirection] = useState<"asc" | "desc">("desc");
+  const [messageSortDirection, setMessageSortDirection] = useState<"asc" | "desc">("asc");
+  const [bookmarkSortDirection, setBookmarkSortDirection] = useState<"asc" | "desc">("asc");
+  const [projectAllSortDirection, setProjectAllSortDirection] = useState<"asc" | "desc">("desc");
   const [sessionPage, setSessionPage] = useState(0);
   const [sessionScrollTop, setSessionScrollTop] = useState(0);
   const [systemMessageRegexRules, setSystemMessageRegexRules] = useState<
@@ -71,6 +76,11 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     selectedProjectId,
     selectedSessionId,
     historyMode,
+    projectSortDirection,
+    sessionSortDirection,
+    messageSortDirection,
+    bookmarkSortDirection,
+    projectAllSortDirection,
     sessionPage,
     sessionScrollTop,
     systemMessageRegexRules,
@@ -89,6 +99,11 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     setSelectedProjectId,
     setSelectedSessionId,
     setHistoryMode,
+    setProjectSortDirection,
+    setSessionSortDirection,
+    setMessageSortDirection,
+    setBookmarkSortDirection,
+    setProjectAllSortDirection,
     setSessionPage,
     setSessionScrollTop,
     setSystemMessageRegexRules,
@@ -127,6 +142,11 @@ describe("usePaneStateSync", () => {
           selectedProjectId: "project_1",
           selectedSessionId: "session_1",
           historyMode: "bookmarks",
+          projectSortDirection: "desc",
+          sessionSortDirection: "desc",
+          messageSortDirection: "asc",
+          bookmarkSortDirection: "asc",
+          projectAllSortDirection: "desc",
           sessionPage: 2,
           sessionScrollTop: 222,
           systemMessageRegexRules: {

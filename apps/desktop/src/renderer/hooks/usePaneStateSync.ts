@@ -21,6 +21,7 @@ type RestoredScrollTarget = {
 
 type HistoryMode = "session" | "bookmarks" | "project_all";
 type SystemMessageRegexRules = Record<Provider, string[]>;
+type SortDirection = "asc" | "desc";
 
 export function usePaneStateSync(args: {
   logError: (context: string, error: unknown) => void;
@@ -39,6 +40,11 @@ export function usePaneStateSync(args: {
   selectedProjectId: string;
   selectedSessionId: string;
   historyMode: HistoryMode;
+  projectSortDirection: SortDirection;
+  sessionSortDirection: SortDirection;
+  messageSortDirection: SortDirection;
+  bookmarkSortDirection: SortDirection;
+  projectAllSortDirection: SortDirection;
   sessionPage: number;
   sessionScrollTop: number;
   systemMessageRegexRules: SystemMessageRegexRules;
@@ -57,6 +63,11 @@ export function usePaneStateSync(args: {
   setSelectedProjectId: Dispatch<SetStateAction<string>>;
   setSelectedSessionId: Dispatch<SetStateAction<string>>;
   setHistoryMode: Dispatch<SetStateAction<HistoryMode>>;
+  setProjectSortDirection: Dispatch<SetStateAction<SortDirection>>;
+  setSessionSortDirection: Dispatch<SetStateAction<SortDirection>>;
+  setMessageSortDirection: Dispatch<SetStateAction<SortDirection>>;
+  setBookmarkSortDirection: Dispatch<SetStateAction<SortDirection>>;
+  setProjectAllSortDirection: Dispatch<SetStateAction<SortDirection>>;
   setSessionPage: Dispatch<SetStateAction<number>>;
   setSessionScrollTop: Dispatch<SetStateAction<number>>;
   setSystemMessageRegexRules: Dispatch<SetStateAction<SystemMessageRegexRules>>;
@@ -80,6 +91,11 @@ export function usePaneStateSync(args: {
     selectedProjectId,
     selectedSessionId,
     historyMode,
+    projectSortDirection,
+    sessionSortDirection,
+    messageSortDirection,
+    bookmarkSortDirection,
+    projectAllSortDirection,
     sessionPage,
     sessionScrollTop,
     systemMessageRegexRules,
@@ -98,6 +114,11 @@ export function usePaneStateSync(args: {
     setSelectedProjectId,
     setSelectedSessionId,
     setHistoryMode,
+    setProjectSortDirection,
+    setSessionSortDirection,
+    setMessageSortDirection,
+    setBookmarkSortDirection,
+    setProjectAllSortDirection,
     setSessionPage,
     setSessionScrollTop,
     setSystemMessageRegexRules,
@@ -161,6 +182,21 @@ export function usePaneStateSync(args: {
         if (response.historyMode !== null) {
           setHistoryMode(response.historyMode);
         }
+        if (response.projectSortDirection !== null) {
+          setProjectSortDirection(response.projectSortDirection);
+        }
+        if (response.sessionSortDirection !== null) {
+          setSessionSortDirection(response.sessionSortDirection);
+        }
+        if (response.messageSortDirection !== null) {
+          setMessageSortDirection(response.messageSortDirection);
+        }
+        if (response.bookmarkSortDirection !== null) {
+          setBookmarkSortDirection(response.bookmarkSortDirection);
+        }
+        if (response.projectAllSortDirection !== null) {
+          setProjectAllSortDirection(response.projectAllSortDirection);
+        }
         if (response.sessionPage !== null) {
           setSessionPage(response.sessionPage);
         }
@@ -211,6 +247,11 @@ export function usePaneStateSync(args: {
     setSelectedProjectId,
     setSelectedSessionId,
     setHistoryMode,
+    setProjectSortDirection,
+    setSessionSortDirection,
+    setMessageSortDirection,
+    setBookmarkSortDirection,
+    setProjectAllSortDirection,
     setSessionPage,
     setSessionPaneWidth,
     setSessionScrollTop,
@@ -246,6 +287,11 @@ export function usePaneStateSync(args: {
           selectedProjectId,
           selectedSessionId,
           historyMode,
+          projectSortDirection,
+          sessionSortDirection,
+          messageSortDirection,
+          bookmarkSortDirection,
+          projectAllSortDirection,
           sessionPage,
           sessionScrollTop,
           systemMessageRegexRules,
@@ -275,6 +321,11 @@ export function usePaneStateSync(args: {
     selectedProjectId,
     selectedSessionId,
     historyMode,
+    projectSortDirection,
+    sessionSortDirection,
+    messageSortDirection,
+    bookmarkSortDirection,
+    projectAllSortDirection,
     sessionPage,
     sessionScrollTop,
     systemMessageRegexRules,

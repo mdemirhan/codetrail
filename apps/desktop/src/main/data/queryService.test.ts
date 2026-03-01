@@ -134,6 +134,7 @@ describe("queryService in-memory", () => {
       sessionId: "session_1",
       page: 0,
       pageSize: 100,
+      sortDirection: "asc",
       categories: undefined,
       query: "",
       focusMessageId: undefined,
@@ -142,6 +143,19 @@ describe("queryService in-memory", () => {
     expect(detail.totalCount).toBe(2);
     expect(detail.categoryCounts.user).toBe(1);
     expect(detail.categoryCounts.assistant).toBe(1);
+    expect(detail.messages.map((message) => message.id)).toEqual(["message_1", "message_2"]);
+
+    const detailDesc = service.getSessionDetail({
+      sessionId: "session_1",
+      page: 0,
+      pageSize: 100,
+      sortDirection: "desc",
+      categories: undefined,
+      query: "",
+      focusMessageId: undefined,
+      focusSourceId: undefined,
+    });
+    expect(detailDesc.messages.map((message) => message.id)).toEqual(["message_2", "message_1"]);
 
     const bookmarked = service.toggleBookmark({
       projectId: "project_1",
@@ -375,6 +389,7 @@ describe("queryService in-memory", () => {
       projectId: "project_1",
       page: 0,
       pageSize: 100,
+      sortDirection: "asc",
       categories: undefined,
       query: "",
       focusMessageId: undefined,
@@ -390,6 +405,23 @@ describe("queryService in-memory", () => {
     ]);
     expect(combined.messages[0]?.sessionTitle).toBe("old session user");
     expect(combined.messages[2]?.sessionTitle).toBe("new session user");
+
+    const combinedDesc = service.getProjectCombinedDetail({
+      projectId: "project_1",
+      page: 0,
+      pageSize: 100,
+      sortDirection: "desc",
+      categories: undefined,
+      query: "",
+      focusMessageId: undefined,
+      focusSourceId: undefined,
+    });
+    expect(combinedDesc.messages.map((message) => message.id)).toEqual([
+      "message_new_2",
+      "message_new_1",
+      "message_old_2",
+      "message_old_1",
+    ]);
   });
 
   it("supports injected openDatabase dependency in path-based helpers", () => {
