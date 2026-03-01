@@ -14,11 +14,43 @@ export default defineConfig({
     ],
     environment: "node",
     globals: true,
+    setupFiles: ["./apps/desktop/src/renderer/test/setup.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary", "html"],
+      include: ["apps/desktop/src/**/*.{ts,tsx}", "packages/core/src/**/*.{ts,tsx}"],
+      exclude: [
+        "**/*.d.ts",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/test/**",
+        "apps/desktop/src/main/main.ts",
+        "apps/desktop/src/main/indexingWorker.ts",
+        "apps/desktop/src/preload/**",
+        "apps/desktop/src/renderer/main.tsx",
+        "apps/desktop/forge.config.ts",
+        "apps/desktop/out/**",
+        "**/node_modules/**",
+        "coverage/**",
+      ],
+      thresholds: {
+        statements: 85,
+        lines: 85,
+        functions: 85,
+        branches: 75,
+      },
+    },
   },
   resolve: {
-    alias: {
-      "@codetrail/core": coreIndexPath,
-      "@codetrail/core/": coreDirPath,
-    },
+    alias: [
+      {
+        find: /^@codetrail\/core\/(.*)$/,
+        replacement: `${coreDirPath}$1`,
+      },
+      {
+        find: "@codetrail/core",
+        replacement: coreIndexPath,
+      },
+    ],
   },
 });

@@ -9,6 +9,11 @@ import {
 } from "@codetrail/core";
 
 type DatabaseHandle = ReturnType<typeof openDatabase>;
+type OpenDatabase = typeof openDatabase;
+
+export type QueryServiceDependencies = {
+  openDatabase?: OpenDatabase;
+};
 
 type SessionSummaryRow = {
   id: string;
@@ -71,9 +76,17 @@ export type QueryService = {
   close: () => void;
 };
 
-export function createQueryService(dbPath: string): QueryService {
-  const db = openDatabase(dbPath);
+export function createQueryService(
+  dbPath: string,
+  dependencies: QueryServiceDependencies = {},
+): QueryService {
+  const openDatabaseFn = dependencies.openDatabase ?? openDatabase;
+  const db = openDatabaseFn(dbPath);
+  return createQueryServiceFromDb(db);
+}
 
+export function createQueryServiceFromDb(db: DatabaseHandle): QueryService {
+  let closed = false;
   return {
     listProjects: (request) => listProjectsWithDatabase(db, request),
     listSessions: (request) => listSessionsWithDatabase(db, request),
@@ -82,6 +95,10 @@ export function createQueryService(dbPath: string): QueryService {
     toggleBookmark: (request) => toggleBookmarkWithDatabase(db, request),
     runSearchQuery: (request) => runSearchQueryWithDatabase(db, request),
     close: () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
       db.close();
     },
   };
@@ -90,43 +107,73 @@ export function createQueryService(dbPath: string): QueryService {
 export function listProjects(
   dbPath: string,
   request: IpcRequest<"projects:list">,
+  dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"projects:list"> {
-  return withDatabase(dbPath, (db) => listProjectsWithDatabase(db, request));
+  return withDatabase(
+    dbPath,
+    (db) => listProjectsWithDatabase(db, request),
+    dependencies.openDatabase,
+  );
 }
 
 export function listSessions(
   dbPath: string,
   request: IpcRequest<"sessions:list">,
+  dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"sessions:list"> {
-  return withDatabase(dbPath, (db) => listSessionsWithDatabase(db, request));
+  return withDatabase(
+    dbPath,
+    (db) => listSessionsWithDatabase(db, request),
+    dependencies.openDatabase,
+  );
 }
 
 export function getSessionDetail(
   dbPath: string,
   request: IpcRequest<"sessions:getDetail">,
+  dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"sessions:getDetail"> {
-  return withDatabase(dbPath, (db) => getSessionDetailWithDatabase(db, request));
+  return withDatabase(
+    dbPath,
+    (db) => getSessionDetailWithDatabase(db, request),
+    dependencies.openDatabase,
+  );
 }
 
 export function listProjectBookmarks(
   dbPath: string,
   request: IpcRequest<"bookmarks:listProject">,
+  dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"bookmarks:listProject"> {
-  return withDatabase(dbPath, (db) => listProjectBookmarksWithDatabase(db, request));
+  return withDatabase(
+    dbPath,
+    (db) => listProjectBookmarksWithDatabase(db, request),
+    dependencies.openDatabase,
+  );
 }
 
 export function toggleBookmark(
   dbPath: string,
   request: IpcRequest<"bookmarks:toggle">,
+  dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"bookmarks:toggle"> {
-  return withDatabase(dbPath, (db) => toggleBookmarkWithDatabase(db, request));
+  return withDatabase(
+    dbPath,
+    (db) => toggleBookmarkWithDatabase(db, request),
+    dependencies.openDatabase,
+  );
 }
 
 export function runSearchQuery(
   dbPath: string,
   request: IpcRequest<"search:query">,
+  dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"search:query"> {
-  return withDatabase(dbPath, (db) => runSearchQueryWithDatabase(db, request));
+  return withDatabase(
+    dbPath,
+    (db) => runSearchQueryWithDatabase(db, request),
+    dependencies.openDatabase,
+  );
 }
 
 function listProjectsWithDatabase(
@@ -675,8 +722,12 @@ function mapSessionSummaryRow(
   };
 }
 
-function withDatabase<T>(dbPath: string, callback: (db: DatabaseHandle) => T): T {
-  const db = openDatabase(dbPath);
+function withDatabase<T>(
+  dbPath: string,
+  callback: (db: DatabaseHandle) => T,
+  openDatabaseFn: OpenDatabase = openDatabase,
+): T {
+  const db = openDatabaseFn(dbPath);
   try {
     return callback(db);
   } finally {

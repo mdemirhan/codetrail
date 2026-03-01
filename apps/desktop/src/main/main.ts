@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -8,9 +8,47 @@ import { type AppStateStore, createAppStateStore } from "./appStateStore";
 import { bootstrapMainProcess, shutdownMainProcess } from "./bootstrap";
 
 let mainWindowRef: BrowserWindow | null = null;
+let debugLogPathCache: string | null = null;
+const verboseLoggingEnabled =
+  process.argv.includes("--verbose") || app.commandLine.hasSwitch("verbose");
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
+}
+
+function getDebugLogPath(): string {
+  if (debugLogPathCache) {
+    return debugLogPathCache;
+  }
+  const userDataDir = app.getPath("userData");
+  mkdirSync(userDataDir, { recursive: true });
+  debugLogPathCache = join(userDataDir, "codetrail-debug.log");
+  return debugLogPathCache;
+}
+
+function writeDebugLog(message: string, details?: unknown): void {
+  if (!verboseLoggingEnabled) {
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  let serializedDetails = "";
+  if (details !== undefined) {
+    try {
+      serializedDetails = ` ${JSON.stringify(details)}`;
+    } catch {
+      serializedDetails = ` ${String(details)}`;
+    }
+  }
+  const line = `${timestamp} ${message}${serializedDetails}\n`;
+  if (process.env.CODETRAIL_DEBUG_LOG_STDOUT === "1") {
+    console.log(line.trimEnd());
+  }
+  try {
+    appendFileSync(getDebugLogPath(), line, "utf8");
+  } catch (error) {
+    console.error("[codetrail] failed writing debug log", error);
+  }
 }
 
 function createWindow(appStateStore: AppStateStore): BrowserWindow {
@@ -42,26 +80,37 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
   } satisfies BrowserWindowConstructorOptions;
 
   const mainWindow = new BrowserWindow(windowOptions);
+  if (verboseLoggingEnabled) {
+    const logRenderer = (message: string, details?: unknown) => {
+      writeDebugLog(message, details);
+    };
 
-  const debugRenderer = process.env.CODETRAIL_DEBUG_RENDERER === "1";
-  if (debugRenderer) {
-    mainWindow.webContents.on("did-finish-load", () => {
-      console.log("[codetrail] renderer loaded", mainWindow.webContents.getURL());
+    mainWindow.webContents.on("did-start-loading", () => {
+      logRenderer("renderer did-start-loading", { url: mainWindow.webContents.getURL() });
     });
-
+    mainWindow.webContents.on("did-finish-load", () => {
+      logRenderer("renderer did-finish-load", { url: mainWindow.webContents.getURL() });
+    });
+    mainWindow.webContents.on("did-stop-loading", () => {
+      logRenderer("renderer did-stop-loading", { url: mainWindow.webContents.getURL() });
+    });
     mainWindow.webContents.on(
       "did-fail-load",
       (_event, errorCode, errorDescription, validatedURL) => {
-        console.error("[codetrail] did-fail-load", { errorCode, errorDescription, validatedURL });
+        logRenderer("renderer did-fail-load", { errorCode, errorDescription, validatedURL });
       },
     );
-
     mainWindow.webContents.on("render-process-gone", (_event, details) => {
-      console.error("[codetrail] render-process-gone", details);
+      logRenderer("renderer render-process-gone", details);
     });
-
     mainWindow.webContents.on("preload-error", (_event, preloadScriptPath, error) => {
-      console.error("[codetrail] preload-error", preloadScriptPath, error);
+      logRenderer("renderer preload-error", {
+        preloadScriptPath,
+        error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+      });
+    });
+    mainWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+      logRenderer("renderer console-message", { level, message, line, sourceId });
     });
   }
 
@@ -131,6 +180,10 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
 
 if (hasSingleInstanceLock) {
   app.whenReady().then(async () => {
+    if (verboseLoggingEnabled) {
+      console.log(`[codetrail] verbose logging enabled: ${getDebugLogPath()}`);
+    }
+    writeDebugLog("app whenReady");
     const appStateStore = createAppStateStore(join(app.getPath("userData"), "ui-state.json"));
     const iconPath = resolveAppIconPath();
     if (iconPath && process.platform === "darwin") {
@@ -140,15 +193,23 @@ if (hasSingleInstanceLock) {
       }
     }
     try {
+      writeDebugLog("bootstrapMainProcess start");
       await bootstrapMainProcess({ appStateStore });
+      writeDebugLog("bootstrapMainProcess success");
       mainWindowRef = createWindow(appStateStore);
+      writeDebugLog("createWindow success");
     } catch (error) {
       console.error("[codetrail] bootstrap failure", error);
+      writeDebugLog(
+        "bootstrap failure",
+        error instanceof Error ? (error.stack ?? error.message) : error,
+      );
       app.exit(1);
       return;
     }
 
     app.on("before-quit", () => {
+      writeDebugLog("before-quit");
       shutdownMainProcess();
       appStateStore.flush();
     });
@@ -161,6 +222,7 @@ if (hasSingleInstanceLock) {
   });
 
   app.on("second-instance", () => {
+    writeDebugLog("second-instance");
     const window = mainWindowRef ?? BrowserWindow.getAllWindows()[0] ?? null;
     if (!window) {
       return;
@@ -172,6 +234,7 @@ if (hasSingleInstanceLock) {
   });
 
   app.on("window-all-closed", () => {
+    writeDebugLog("window-all-closed", { platform: process.platform });
     if (process.platform !== "darwin") {
       app.quit();
     }

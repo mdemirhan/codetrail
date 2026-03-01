@@ -12,6 +12,7 @@
     "prestart": "bun run build && bun run fix:native",
     "predev": "bun run prestart",
     "start": "electron .",
+    "start:verbose": "electron . --verbose",
     "dev": "electron .",
     "make:mac": "./scripts/make-macos-app.sh",
     "make:mac:x64": "./scripts/make-macos-app.sh x64",

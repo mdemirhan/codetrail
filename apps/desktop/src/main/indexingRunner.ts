@@ -12,34 +12,6 @@ export type RefreshJobResponse = {
   jobId: string;
 };
 
-export class WorkerIndexingRunner {
-  private sequence = 0;
-  private queue: Promise<void> = Promise.resolve();
-  private readonly dbPath: string;
-  private readonly workerUrl: URL | null;
-
-  constructor(dbPath: string) {
-    this.dbPath = dbPath;
-    this.workerUrl = resolveIndexingWorkerUrl();
-  }
-
-  async enqueue(request: RefreshJobRequest): Promise<RefreshJobResponse> {
-    const jobId = `refresh-${++this.sequence}`;
-    const task = this.queue.then(async () => {
-      await runIndexingJob({
-        dbPath: this.dbPath,
-        forceReindex: request.force,
-        workerUrl: this.workerUrl,
-      });
-    });
-
-    this.queue = task.catch(() => undefined);
-    await task;
-
-    return { jobId };
-  }
-}
-
 type IndexingWorkerRequest = {
   dbPath: string;
   forceReindex: boolean;
@@ -54,13 +26,67 @@ type IndexingWorkerResponse =
       message: string;
     };
 
+type WorkerLike = {
+  once(event: "message", listener: (value: IndexingWorkerResponse) => void): void;
+  once(event: "error", listener: (error: unknown) => void): void;
+  once(event: "exit", listener: (code: number) => void): void;
+  postMessage: (value: IndexingWorkerRequest) => void;
+  terminate: () => undefined | Promise<number>;
+};
+
+export type IndexingRunnerDependencies = {
+  runIncrementalIndexing?: typeof runIncrementalIndexing;
+  resolveWorkerUrl?: () => URL | null;
+  createWorker?: (workerUrl: URL) => WorkerLike;
+};
+
+export class WorkerIndexingRunner {
+  private sequence = 0;
+  private queue: Promise<void> = Promise.resolve();
+  private readonly dbPath: string;
+  private readonly workerUrl: URL | null;
+  private readonly runIncrementalIndexingFn: typeof runIncrementalIndexing;
+  private readonly createWorkerFn: (workerUrl: URL) => WorkerLike;
+
+  constructor(dbPath: string, dependencies: IndexingRunnerDependencies = {}) {
+    this.dbPath = dbPath;
+    this.workerUrl = (dependencies.resolveWorkerUrl ?? resolveIndexingWorkerUrl)();
+    this.runIncrementalIndexingFn = dependencies.runIncrementalIndexing ?? runIncrementalIndexing;
+    this.createWorkerFn =
+      dependencies.createWorker ??
+      ((workerUrl) => {
+        return new Worker(workerUrl);
+      });
+  }
+
+  async enqueue(request: RefreshJobRequest): Promise<RefreshJobResponse> {
+    const jobId = `refresh-${++this.sequence}`;
+    const task = this.queue.then(async () => {
+      await runIndexingJob({
+        dbPath: this.dbPath,
+        forceReindex: request.force,
+        workerUrl: this.workerUrl,
+        runIncrementalIndexing: this.runIncrementalIndexingFn,
+        createWorker: this.createWorkerFn,
+      });
+    });
+
+    this.queue = task.catch(() => undefined);
+    await task;
+
+    return { jobId };
+  }
+}
+
 async function runIndexingJob(args: {
   dbPath: string;
   forceReindex: boolean;
   workerUrl: URL | null;
+  runIncrementalIndexing: typeof runIncrementalIndexing;
+  createWorker: (workerUrl: URL) => WorkerLike;
 }): Promise<void> {
   if (!args.workerUrl) {
-    runIncrementalIndexing({
+    args.runIncrementalIndexing({
       dbPath: args.dbPath,
       forceReindex: args.forceReindex,
     });
@@ -68,21 +94,29 @@ async function runIndexingJob(args: {
   }
 
   try {
-    await runIndexingInWorker(args.workerUrl, {
-      dbPath: args.dbPath,
-      forceReindex: args.forceReindex,
-    });
+    await runIndexingInWorker(
+      args.workerUrl,
+      {
+        dbPath: args.dbPath,
+        forceReindex: args.forceReindex,
+      },
+      args.createWorker,
+    );
   } catch {
-    runIncrementalIndexing({
+    args.runIncrementalIndexing({
       dbPath: args.dbPath,
       forceReindex: args.forceReindex,
     });
   }
 }
 
-function runIndexingInWorker(workerUrl: URL, request: IndexingWorkerRequest): Promise<void> {
+function runIndexingInWorker(
+  workerUrl: URL,
+  request: IndexingWorkerRequest,
+  createWorker: (workerUrl: URL) => WorkerLike,
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(workerUrl);
+    const worker = createWorker(workerUrl);
     let settled = false;
 
     const finish = (callback: () => void) => {

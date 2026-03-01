@@ -51,6 +51,24 @@ type AppState = {
   window?: WindowState;
 };
 
+type AppStateStoreFileSystem = {
+  existsSync: (path: string) => boolean;
+  mkdirSync: (path: string, options: { recursive: true }) => void;
+  readFileSync: (path: string, encoding: "utf8") => string;
+  writeFileSync: (path: string, data: string, encoding: "utf8") => void;
+};
+
+type AppStateStoreTimer = {
+  setTimeout: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
+  clearTimeout: (timer: ReturnType<typeof setTimeout>) => void;
+};
+
+export type AppStateStoreDependencies = {
+  fs?: AppStateStoreFileSystem;
+  timer?: AppStateStoreTimer;
+  onPersistError?: (error: unknown) => void;
+};
+
 const PANE_MIN = 120;
 const PANE_MAX = 2000;
 const PAGE_MIN = 0;
@@ -67,15 +85,35 @@ const REGULAR_FONT_VALUES: RegularFontFamily[] = [...UI_REGULAR_FONT_VALUES];
 const MONO_FONT_SIZE_VALUES: MonoFontSize[] = [...UI_MONO_FONT_SIZE_VALUES];
 const REGULAR_FONT_SIZE_VALUES: RegularFontSize[] = [...UI_REGULAR_FONT_SIZE_VALUES];
 const HISTORY_MODE_VALUES = ["session", "bookmarks"] as const;
+const DEFAULT_FILE_SYSTEM: AppStateStoreFileSystem = {
+  existsSync: (path) => existsSync(path),
+  mkdirSync: (path, options) => mkdirSync(path, options),
+  readFileSync: (path, encoding) => readFileSync(path, encoding),
+  writeFileSync: (path, data, encoding) => writeFileSync(path, data, encoding),
+};
+const DEFAULT_TIMER: AppStateStoreTimer = {
+  setTimeout,
+  clearTimeout,
+};
 
 export class AppStateStore {
   private readonly filePath: string;
+  private readonly fileSystem: AppStateStoreFileSystem;
+  private readonly timer: AppStateStoreTimer;
+  private readonly onPersistError: (error: unknown) => void;
   private state: AppState;
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(filePath: string) {
+  constructor(filePath: string, dependencies: AppStateStoreDependencies = {}) {
     this.filePath = filePath;
-    this.state = readState(filePath);
+    this.fileSystem = dependencies.fs ?? DEFAULT_FILE_SYSTEM;
+    this.timer = dependencies.timer ?? DEFAULT_TIMER;
+    this.onPersistError =
+      dependencies.onPersistError ??
+      ((error) => {
+        console.error("[codetrail] failed persisting app state", error);
+      });
+    this.state = readState(filePath, this.fileSystem);
   }
 
   getFilePath(): string {
@@ -116,35 +154,38 @@ export class AppStateStore {
 
   flush(): void {
     if (this.persistTimer) {
-      clearTimeout(this.persistTimer);
+      this.timer.clearTimeout(this.persistTimer);
       this.persistTimer = null;
     }
-    persistState(this.filePath, this.state);
+    persistState(this.filePath, this.state, this.fileSystem, this.onPersistError);
   }
 
   private schedulePersist(): void {
     if (this.persistTimer) {
-      clearTimeout(this.persistTimer);
+      this.timer.clearTimeout(this.persistTimer);
     }
 
-    this.persistTimer = setTimeout(() => {
+    this.persistTimer = this.timer.setTimeout(() => {
       this.persistTimer = null;
-      persistState(this.filePath, this.state);
+      persistState(this.filePath, this.state, this.fileSystem, this.onPersistError);
     }, 150);
   }
 }
 
-export function createAppStateStore(filePath: string): AppStateStore {
-  return new AppStateStore(filePath);
+export function createAppStateStore(
+  filePath: string,
+  dependencies: AppStateStoreDependencies = {},
+): AppStateStore {
+  return new AppStateStore(filePath, dependencies);
 }
 
-function readState(filePath: string): AppState {
-  if (!existsSync(filePath)) {
+function readState(filePath: string, fileSystem: AppStateStoreFileSystem): AppState {
+  if (!fileSystem.existsSync(filePath)) {
     return {};
   }
 
   try {
-    const raw = readFileSync(filePath, "utf8");
+    const raw = fileSystem.readFileSync(filePath, "utf8");
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return {};
@@ -162,12 +203,17 @@ function readState(filePath: string): AppState {
   }
 }
 
-function persistState(filePath: string, state: AppState): void {
+function persistState(
+  filePath: string,
+  state: AppState,
+  fileSystem: AppStateStoreFileSystem,
+  onPersistError: (error: unknown) => void,
+): void {
   try {
-    mkdirSync(dirname(filePath), { recursive: true });
-    writeFileSync(filePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    fileSystem.mkdirSync(dirname(filePath), { recursive: true });
+    fileSystem.writeFileSync(filePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
   } catch (error) {
-    console.error("[codetrail] failed persisting app state", error);
+    onPersistError(error);
   }
 }
 

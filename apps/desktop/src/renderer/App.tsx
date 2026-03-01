@@ -26,6 +26,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { usePaneStateSync } from "./hooks/usePaneStateSync";
 import { useResizablePanes } from "./hooks/useResizablePanes";
 import { copyTextToClipboard } from "./lib/clipboard";
+import { isMissingCodetrailClient, useCodetrailClient } from "./lib/codetrailClient";
 import { openInFileManager, openPath } from "./lib/pathActions";
 import { decideSessionSelectionAfterLoad } from "./lib/sessionSelection";
 import {
@@ -104,6 +105,8 @@ function formatDuration(durationMs: number | null): string {
 }
 
 export function App() {
+  const codetrail = useCodetrailClient();
+  const preloadUnavailable = isMissingCodetrailClient(codetrail);
   const [refreshing, setRefreshing] = useState(false);
 
   const [mainView, setMainView] = useState<MainView>("history");
@@ -229,13 +232,13 @@ export function App() {
 
   const loadProjects = useCallback(async () => {
     setProjectsLoaded(false);
-    const response = await window.codetrail.invoke("projects:list", {
+    const response = await codetrail.invoke("projects:list", {
       providers: projectProviders,
       query: projectQuery,
     });
     setProjects(response.projects);
     setProjectsLoaded(true);
-  }, [projectProviders, projectQuery]);
+  }, [codetrail, projectProviders, projectQuery]);
 
   const loadSessions = useCallback(async () => {
     if (!selectedProjectId) {
@@ -246,12 +249,12 @@ export function App() {
     }
 
     setSessionsLoadedProjectId(null);
-    const response = await window.codetrail.invoke("sessions:list", {
+    const response = await codetrail.invoke("sessions:list", {
       projectId: selectedProjectId,
     });
     setSessions(response.sessions);
     setSessionsLoadedProjectId(selectedProjectId);
-  }, [selectedProjectId]);
+  }, [codetrail, selectedProjectId]);
 
   const loadBookmarks = useCallback(async () => {
     const requestToken = bookmarksLoadTokenRef.current + 1;
@@ -266,7 +269,7 @@ export function App() {
     }
     setBookmarksLoadedProjectId(null);
     const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
-    const response = await window.codetrail.invoke("bookmarks:listProject", {
+    const response = await codetrail.invoke("bookmarks:listProject", {
       projectId: selectedProjectId,
       categories: isAllHistoryCategoriesSelected ? undefined : historyCategories,
     });
@@ -275,7 +278,7 @@ export function App() {
     }
     setBookmarksResponse(response);
     setBookmarksLoadedProjectId(selectedProjectId);
-  }, [historyCategories, selectedProjectId]);
+  }, [codetrail, historyCategories, selectedProjectId]);
 
   const loadSearch = useCallback(async () => {
     const trimmed = searchQuery.trim();
@@ -290,7 +293,7 @@ export function App() {
       return;
     }
 
-    const response = await window.codetrail.invoke("search:query", {
+    const response = await codetrail.invoke("search:query", {
       query: searchQuery,
       categories: isAllHistoryCategoriesSelected ? undefined : historyCategories,
       providers: searchProviders.length > 0 ? searchProviders : undefined,
@@ -300,20 +303,27 @@ export function App() {
       offset: 0,
     });
     setSearchResponse(response);
-  }, [historyCategories, searchProjectId, searchProjectQuery, searchProviders, searchQuery]);
+  }, [
+    codetrail,
+    historyCategories,
+    searchProjectId,
+    searchProjectQuery,
+    searchProviders,
+    searchQuery,
+  ]);
 
   const loadSettingsInfo = useCallback(async () => {
     setSettingsLoading(true);
     setSettingsError(null);
     try {
-      const response = await window.codetrail.invoke("app:getSettingsInfo", {});
+      const response = await codetrail.invoke("app:getSettingsInfo", {});
       setSettingsInfo(response);
     } catch (error) {
       setSettingsError(toErrorMessage(error));
     } finally {
       setSettingsLoading(false);
     }
-  }, []);
+  }, [codetrail]);
 
   const { paneStateHydrated } = usePaneStateSync({
     logError,
@@ -357,7 +367,7 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    void window.codetrail
+    void codetrail
       .invoke("ui:getZoom", {})
       .then((response) => {
         if (!cancelled) {
@@ -373,7 +383,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [logError]);
+  }, [codetrail, logError]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -563,7 +573,7 @@ export function App() {
     const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
     const effectiveCategories = isAllHistoryCategoriesSelected ? undefined : historyCategories;
     const effectiveQuery = isRevealing ? "" : effectiveSessionQuery;
-    void window.codetrail
+    void codetrail
       .invoke("sessions:getDetail", {
         sessionId: selectedSessionId,
         page: sessionPage,
@@ -595,6 +605,7 @@ export function App() {
       cancelled = true;
     };
   }, [
+    codetrail,
     selectedSessionId,
     sessionPage,
     historyCategories,
@@ -714,7 +725,7 @@ export function App() {
     async (force: boolean) => {
       setRefreshing(true);
       try {
-        await window.codetrail.invoke("indexer:refresh", { force });
+        await codetrail.invoke("indexer:refresh", { force });
         await Promise.all([loadProjects(), loadSessions(), loadBookmarks(), loadSearch()]);
       } catch (error) {
         logError("Refresh failed", error);
@@ -722,7 +733,7 @@ export function App() {
         setRefreshing(false);
       }
     },
-    [loadBookmarks, loadProjects, loadSearch, loadSessions, logError],
+    [codetrail, loadBookmarks, loadProjects, loadSearch, loadSessions, logError],
   );
 
   const handleIncrementalRefresh = useCallback(async () => {
@@ -751,13 +762,13 @@ export function App() {
   const applyZoomAction = useCallback(
     async (action: "in" | "out" | "reset") => {
       try {
-        const response = await window.codetrail.invoke("ui:setZoom", { action });
+        const response = await codetrail.invoke("ui:setZoom", { action });
         setZoomPercent(response.percent);
       } catch (error) {
         logError(`Failed applying zoom action '${action}'`, error);
       }
     },
-    [logError],
+    [codetrail, logError],
   );
 
   const handleCopySessionDetails = useCallback(async () => {
@@ -956,7 +967,7 @@ export function App() {
         return;
       }
       try {
-        await window.codetrail.invoke("bookmarks:toggle", {
+        await codetrail.invoke("bookmarks:toggle", {
           projectId: selectedProjectId,
           sessionId: message.sessionId,
           messageId: message.id,
@@ -967,7 +978,7 @@ export function App() {
         logError("Failed toggling bookmark", error);
       }
     },
-    [loadBookmarks, logError, selectedProjectId],
+    [codetrail, loadBookmarks, logError, selectedProjectId],
   );
 
   const handleMessageListScroll = useCallback((event: ReactUIEvent<HTMLDivElement>) => {
@@ -999,6 +1010,17 @@ export function App() {
 
   return (
     <main className="app-shell">
+      {preloadUnavailable ? (
+        <section className="pane content-pane" style={{ display: "grid", placeItems: "center" }}>
+          <div style={{ maxWidth: 760, padding: 24, textAlign: "left" }}>
+            <h2 style={{ marginTop: 0 }}>Preload Bridge Unavailable</h2>
+            <p>
+              The renderer could not access <code>window.codetrail</code>. Check preload loading and
+              context isolation setup.
+            </p>
+          </div>
+        </section>
+      ) : null}
       <TopBar
         mainView={mainView}
         theme={theme}

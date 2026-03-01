@@ -31,6 +31,26 @@ export type IndexingResult = {
   };
 };
 
+type ReadFileText = (filePath: string) => string;
+
+export type IndexingDependencies = {
+  discoverSessionFiles?: typeof discoverSessionFiles;
+  openDatabase?: typeof openDatabase;
+  ensureDatabaseSchema?: typeof ensureDatabaseSchema;
+  clearIndexedData?: typeof clearIndexedData;
+  readFileText?: ReadFileText;
+  now?: () => Date;
+};
+
+type ResolvedIndexingDependencies = {
+  discoverSessionFiles: typeof discoverSessionFiles;
+  openDatabase: typeof openDatabase;
+  ensureDatabaseSchema: typeof ensureDatabaseSchema;
+  clearIndexedData: typeof clearIndexedData;
+  readFileText: ReadFileText;
+  now: () => Date;
+};
+
 type IndexedFileRow = {
   file_path: string;
   provider: Provider;
@@ -48,17 +68,21 @@ type IndexedMessage = ReturnType<typeof parseSession>["messages"][number];
 
 const MAX_DERIVED_DURATION_MS = 15 * 60 * 1000;
 
-export function runIncrementalIndexing(config: IndexingConfig): IndexingResult {
+export function runIncrementalIndexing(
+  config: IndexingConfig,
+  dependencies: IndexingDependencies = {},
+): IndexingResult {
+  const resolvedDependencies = resolveIndexingDependencies(dependencies);
   const discoveryConfig = resolveDiscoveryConfig(config.discoveryConfig);
-  const discoveredFiles = discoverSessionFiles(discoveryConfig);
+  const discoveredFiles = resolvedDependencies.discoverSessionFiles(discoveryConfig);
   const discoveredByFilePath = new Map(discoveredFiles.map((file) => [file.filePath, file]));
 
-  const db = openDatabase(config.dbPath);
+  const db = resolvedDependencies.openDatabase(config.dbPath);
   try {
-    const schema = ensureDatabaseSchema(db);
+    const schema = resolvedDependencies.ensureDatabaseSchema(db);
 
     if (config.forceReindex) {
-      clearIndexedData(db);
+      resolvedDependencies.clearIndexedData(db);
     }
 
     const existingRows = listIndexedFiles(db);
@@ -179,7 +203,7 @@ export function runIncrementalIndexing(config: IndexingConfig): IndexingResult {
          indexed_at = excluded.indexed_at`,
     );
 
-    const nowIso = new Date().toISOString();
+    const nowIso = resolvedDependencies.now().toISOString();
 
     for (const discovered of discoveredFiles) {
       const existing = existingByFilePath.get(discovered.filePath);
@@ -197,7 +221,11 @@ export function runIncrementalIndexing(config: IndexingConfig): IndexingResult {
         continue;
       }
 
-      const source = readProviderSource(discovered.provider, discovered.filePath);
+      const source = readProviderSource(
+        discovered.provider,
+        discovered.filePath,
+        resolvedDependencies.readFileText,
+      );
       if (source === null) {
         diagnostics.errors += 1;
         continue;
@@ -342,6 +370,19 @@ function resolveDiscoveryConfig(config?: Partial<DiscoveryConfig>): DiscoveryCon
   };
 }
 
+function resolveIndexingDependencies(
+  dependencies: IndexingDependencies = {},
+): ResolvedIndexingDependencies {
+  return {
+    discoverSessionFiles: dependencies.discoverSessionFiles ?? discoverSessionFiles,
+    openDatabase: dependencies.openDatabase ?? openDatabase,
+    ensureDatabaseSchema: dependencies.ensureDatabaseSchema ?? ensureDatabaseSchema,
+    clearIndexedData: dependencies.clearIndexedData ?? clearIndexedData,
+    readFileText: dependencies.readFileText ?? ((filePath) => readFileSync(filePath, "utf8")),
+    now: dependencies.now ?? (() => new Date()),
+  };
+}
+
 function listIndexedFiles(db: SqliteDatabase): IndexedFileRow[] {
   return db
     .prepare(
@@ -376,20 +417,21 @@ function deleteSessionDataForFilePath(db: SqliteDatabase, filePath: string): voi
 function readProviderSource(
   provider: Provider,
   filePath: string,
+  readFileText: ReadFileText,
 ): {
   rawPayload: unknown[] | Record<string, unknown>;
   parsePayload: unknown[] | Record<string, unknown>;
 } | null {
   try {
     if (provider === "gemini") {
-      const parsed = JSON.parse(readFileSync(filePath, "utf8")) as Record<string, unknown>;
+      const parsed = JSON.parse(readFileText(filePath)) as Record<string, unknown>;
       return {
         rawPayload: parsed,
         parsePayload: parsed,
       };
     }
 
-    const lines = readFileSync(filePath, "utf8")
+    const lines = readFileText(filePath)
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line.length > 0);

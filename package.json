@@ -9,23 +9,30 @@
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "ELECTRON_RUN_AS_NODE=1 ./apps/desktop/node_modules/.bin/electron ./node_modules/vitest/vitest.mjs run",
+    "test:coverage": "ELECTRON_RUN_AS_NODE=1 ./apps/desktop/node_modules/.bin/electron ./node_modules/vitest/vitest.mjs run --coverage",
     "test:watch": "ELECTRON_RUN_AS_NODE=1 ./apps/desktop/node_modules/.bin/electron ./node_modules/vitest/vitest.mjs",
     "test:e2e": "playwright test",
     "desktop:build": "bun run --cwd apps/desktop build",
     "desktop:start": "bun run --cwd apps/desktop start",
+    "desktop:start:verbose": "bun run --cwd apps/desktop start:verbose",
     "desktop:dev": "bun run --cwd apps/desktop start",
     "desktop:make:mac": "bun run --cwd apps/desktop make:mac",
     "desktop:make:mac:x64": "bun run --cwd apps/desktop make:mac:x64",
     "desktop:make:mac:arm64": "bun run --cwd apps/desktop make:mac:arm64",
-    "ci": "bun run lint && bun run typecheck && bun run test"
+    "ci": "bun run lint && bun run typecheck && bun run test && bun run test:coverage"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@playwright/test": "1.51.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/better-sqlite3": "7.6.12",
     "@types/node": "22.13.10",
     "@types/react": "19.0.12",
     "@types/react-dom": "19.0.4",
+    "@vitest/coverage-v8": "3.0.8",
+    "jsdom": "^28.1.0",
     "typescript": "5.8.2",
     "vitest": "3.0.8"
   }

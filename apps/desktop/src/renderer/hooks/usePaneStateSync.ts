@@ -10,6 +10,7 @@ import type {
   RegularFontSize,
   ThemeMode,
 } from "../../shared/uiPreferences";
+import { useCodetrailClient } from "../lib/codetrailClient";
 import { clamp } from "../lib/viewUtils";
 
 type RestoredScrollTarget = {
@@ -98,11 +99,12 @@ export function usePaneStateSync(args: {
     sessionScrollTopRef,
     pendingRestoredSessionScrollRef,
   } = args;
+  const codetrail = useCodetrailClient();
   const [paneStateHydrated, setPaneStateHydrated] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    void window.codetrail
+    void codetrail
       .invoke("ui:getState", {})
       .then((response) => {
         if (cancelled) {
@@ -189,6 +191,7 @@ export function usePaneStateSync(args: {
       cancelled = true;
     };
   }, [
+    codetrail,
     logError,
     pendingRestoredSessionScrollRef,
     sessionScrollTopRef,
@@ -217,7 +220,7 @@ export function usePaneStateSync(args: {
     }
 
     const timer = window.setTimeout(() => {
-      void window.codetrail
+      void codetrail
         .invoke("ui:setState", {
           projectPaneWidth: Math.round(projectPaneWidth),
           sessionPaneWidth: Math.round(sessionPaneWidth),
@@ -246,6 +249,7 @@ export function usePaneStateSync(args: {
       window.clearTimeout(timer);
     };
   }, [
+    codetrail,
     historyCategories,
     logError,
     paneStateHydrated,
