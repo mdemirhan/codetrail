@@ -25,7 +25,6 @@ type MessageCardProps = {
   isOrphaned?: boolean;
   isExpanded: boolean;
   onToggleExpanded: (messageId: string, category: MessageCategory) => void;
-  onToggleFocused: (messageId: string) => void;
   onToggleBookmark?: (message: SessionMessage) => void;
   onRevealInSession?: (messageId: string, sourceId: string) => void;
   cardRef?: Ref<HTMLDivElement> | null;
@@ -40,7 +39,6 @@ function MessageCardComponent({
   isOrphaned = false,
   isExpanded,
   onToggleExpanded,
-  onToggleFocused,
   onToggleBookmark,
   onRevealInSession,
   cardRef,
@@ -75,11 +73,6 @@ function MessageCardComponent({
 
     event.preventDefault();
     toggleExpanded();
-  };
-
-  const handleSelectButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    onToggleFocused(message.id);
   };
 
   const handleCopyRawButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -169,15 +162,6 @@ function MessageCardComponent({
             title="Copy raw message data"
           >
             Copy Raw
-          </button>
-          <button
-            type="button"
-            className={`message-action-button message-select-button${isFocused ? " is-active" : ""}`}
-            onClick={handleSelectButtonClick}
-            aria-label={isFocused ? "Clear message focus" : "Focus this message"}
-            title={isFocused ? "Unselect message" : "Select message"}
-          >
-            <span className="message-select-label">{isFocused ? "Unselect" : "Select"}</span>
           </button>
           {onRevealInSession ? (
             <button

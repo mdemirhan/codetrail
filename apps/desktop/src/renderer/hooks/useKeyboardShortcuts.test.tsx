@@ -24,8 +24,10 @@ describe("useKeyboardShortcuts", () => {
       <Harness
         mainView="history"
         showShortcuts={false}
+        hasFocusedHistoryMessage={false}
         setMainView={setMainView}
         setShowShortcuts={setShowShortcuts}
+        clearFocusedHistoryMessage={vi.fn()}
         focusGlobalSearch={focusGlobalSearch}
         focusSessionSearch={focusSessionSearch}
         applyZoomAction={applyZoomAction}
@@ -55,8 +57,10 @@ describe("useKeyboardShortcuts", () => {
       <Harness
         mainView="search"
         showShortcuts={false}
+        hasFocusedHistoryMessage={false}
         setMainView={setMainView}
         setShowShortcuts={setShowShortcuts}
+        clearFocusedHistoryMessage={vi.fn()}
         focusGlobalSearch={vi.fn()}
         focusSessionSearch={vi.fn()}
         applyZoomAction={vi.fn(async () => undefined)}
@@ -72,8 +76,10 @@ describe("useKeyboardShortcuts", () => {
       <Harness
         mainView="history"
         showShortcuts={true}
+        hasFocusedHistoryMessage={false}
         setMainView={setMainView}
         setShowShortcuts={setShowShortcuts}
+        clearFocusedHistoryMessage={vi.fn()}
         focusGlobalSearch={vi.fn()}
         focusSessionSearch={vi.fn()}
         applyZoomAction={vi.fn(async () => undefined)}
@@ -87,5 +93,28 @@ describe("useKeyboardShortcuts", () => {
 
     expect(setShowShortcuts).toHaveBeenCalledWith(false);
     expect(setShowShortcuts).toHaveBeenCalledWith(true);
+  });
+
+  it("clears focused history message on escape", () => {
+    const clearFocusedHistoryMessage = vi.fn();
+
+    render(
+      <Harness
+        mainView="history"
+        showShortcuts={false}
+        hasFocusedHistoryMessage={true}
+        setMainView={vi.fn()}
+        setShowShortcuts={vi.fn()}
+        clearFocusedHistoryMessage={clearFocusedHistoryMessage}
+        focusGlobalSearch={vi.fn()}
+        focusSessionSearch={vi.fn()}
+        applyZoomAction={vi.fn(async () => undefined)}
+        handleForceRefresh={vi.fn(async () => undefined)}
+        handleIncrementalRefresh={vi.fn(async () => undefined)}
+      />,
+    );
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(clearFocusedHistoryMessage).toHaveBeenCalledTimes(1);
   });
 });

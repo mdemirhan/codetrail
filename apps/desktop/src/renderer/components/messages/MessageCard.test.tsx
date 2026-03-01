@@ -34,7 +34,6 @@ describe("MessageCard", () => {
   it("renders expanded message and handles action buttons", async () => {
     const user = userEvent.setup();
     const onToggleExpanded = vi.fn();
-    const onToggleFocused = vi.fn();
     const onToggleBookmark = vi.fn();
     const onRevealInSession = vi.fn();
 
@@ -48,7 +47,6 @@ describe("MessageCard", () => {
         isOrphaned={true}
         isExpanded={true}
         onToggleExpanded={onToggleExpanded}
-        onToggleFocused={onToggleFocused}
         onToggleBookmark={onToggleBookmark}
         onRevealInSession={onRevealInSession}
       />,
@@ -61,13 +59,11 @@ describe("MessageCard", () => {
     await user.click(screen.getByRole("button", { name: "Collapse message" }));
     await user.click(screen.getByRole("button", { name: "Copy formatted message body" }));
     await user.click(screen.getByRole("button", { name: "Copy raw message data" }));
-    await user.click(screen.getByRole("button", { name: "Focus this message" }));
     await user.click(screen.getByRole("button", { name: "Reveal this message in session" }));
     await user.click(screen.getByRole("button", { name: "Bookmark this message" }));
 
     expect(onToggleExpanded).toHaveBeenCalledWith("message_1", "assistant");
     expect(copyTextToClipboard).toHaveBeenCalledTimes(2);
-    expect(onToggleFocused).toHaveBeenCalledWith("message_1");
     expect(onRevealInSession).toHaveBeenCalledWith("message_1", "source_1");
     expect(onToggleBookmark).toHaveBeenCalledWith(message);
   });
@@ -89,7 +85,6 @@ describe("MessageCard", () => {
         isBookmarked={true}
         isExpanded={false}
         onToggleExpanded={onToggleExpanded}
-        onToggleFocused={vi.fn()}
       />,
     );
 

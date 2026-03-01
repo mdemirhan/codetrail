@@ -840,8 +840,10 @@ export function App() {
   useKeyboardShortcuts({
     mainView,
     showShortcuts,
+    hasFocusedHistoryMessage: Boolean(visibleFocusedMessageId),
     setMainView,
     setShowShortcuts,
+    clearFocusedHistoryMessage: () => setFocusMessageId(""),
     focusGlobalSearch,
     focusSessionSearch,
     applyZoomAction,
@@ -916,7 +918,7 @@ export function App() {
       "Cmd/Ctrl+Shift+R: Force reindex",
       "Toolbar: Reindex, Copy session, Settings",
       "?: Shortcut help",
-      "Esc: Close shortcuts",
+      "Esc: Close shortcuts / clear focused message",
     ];
     const contextual =
       mainView === "history"
@@ -948,10 +950,6 @@ export function App() {
     },
     [isExpandedByDefault],
   );
-
-  const handleToggleMessageFocused = useCallback((messageId: string) => {
-    setFocusMessageId((value) => (value === messageId ? "" : messageId));
-  }, []);
 
   const handleRevealInSession = useCallback(
     (messageId: string, sourceId: string) => {
@@ -1021,11 +1019,11 @@ export function App() {
     }
     event.preventDefault();
     const focusTarget =
-      messageListRef.current?.querySelector<HTMLButtonElement>(
-        ".message.focused .message-select-button",
+      messageListRef.current?.querySelector<HTMLElement>(
+        ".message.focused .message-toggle-button",
       ) ??
-      messageListRef.current?.querySelector<HTMLButtonElement>(".message .message-select-button") ??
-      messageListRef.current?.querySelector<HTMLButtonElement>(".message .msg-role");
+      messageListRef.current?.querySelector<HTMLElement>(".message .message-toggle-button") ??
+      messageListRef.current?.querySelector<HTMLElement>(".message .message-header");
     focusTarget?.focus();
   }, []);
 
@@ -1308,7 +1306,6 @@ export function App() {
                         messageExpanded[message.id] ?? isExpandedByDefault(message.category)
                       }
                       onToggleExpanded={handleToggleMessageExpanded}
-                      onToggleFocused={handleToggleMessageFocused}
                       onToggleBookmark={handleToggleBookmark}
                       onRevealInSession={handleRevealInSession}
                       cardRef={focusMessageId === message.id ? focusedMessageRef : null}

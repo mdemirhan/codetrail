@@ -5,8 +5,10 @@ type MainView = "history" | "search" | "settings";
 export function useKeyboardShortcuts(args: {
   mainView: MainView;
   showShortcuts: boolean;
+  hasFocusedHistoryMessage: boolean;
   setMainView: (view: MainView | ((value: MainView) => MainView)) => void;
   setShowShortcuts: (value: boolean | ((current: boolean) => boolean)) => void;
+  clearFocusedHistoryMessage: () => void;
   focusGlobalSearch: () => void;
   focusSessionSearch: () => void;
   applyZoomAction: (action: "in" | "out" | "reset") => Promise<void>;
@@ -16,8 +18,10 @@ export function useKeyboardShortcuts(args: {
   const {
     mainView,
     showShortcuts,
+    hasFocusedHistoryMessage,
     setMainView,
     setShowShortcuts,
+    clearFocusedHistoryMessage,
     focusGlobalSearch,
     focusSessionSearch,
     applyZoomAction,
@@ -30,6 +34,9 @@ export function useKeyboardShortcuts(args: {
       const command = event.metaKey || event.ctrlKey;
       const shift = event.shiftKey;
       const key = event.key.toLowerCase();
+      if (event.defaultPrevented) {
+        return;
+      }
       if (event.key === "?") {
         setShowShortcuts(true);
       } else if (event.key === "Escape") {
@@ -39,6 +46,9 @@ export function useKeyboardShortcuts(args: {
         } else if (mainView === "search" || mainView === "settings") {
           event.preventDefault();
           setMainView("history");
+        } else if (mainView === "history" && hasFocusedHistoryMessage) {
+          event.preventDefault();
+          clearFocusedHistoryMessage();
         }
       } else if (command && shift && key === "f") {
         event.preventDefault();
@@ -76,8 +86,10 @@ export function useKeyboardShortcuts(args: {
     };
   }, [
     applyZoomAction,
+    clearFocusedHistoryMessage,
     focusGlobalSearch,
     focusSessionSearch,
+    hasFocusedHistoryMessage,
     handleForceRefresh,
     handleIncrementalRefresh,
     mainView,
