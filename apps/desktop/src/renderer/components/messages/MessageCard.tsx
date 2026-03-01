@@ -125,20 +125,20 @@ export function MessageCard({
           <button
             type="button"
             className="message-action-button"
-            onClick={handleCopyRawButtonClick}
-            aria-label="Copy raw message data"
-            title="Copy raw message data"
-          >
-            Copy Raw
-          </button>
-          <button
-            type="button"
-            className="message-action-button"
             onClick={handleCopyBodyButtonClick}
             aria-label="Copy formatted message body"
             title="Copy formatted message body"
           >
             Copy
+          </button>
+          <button
+            type="button"
+            className="message-action-button"
+            onClick={handleCopyRawButtonClick}
+            aria-label="Copy raw message data"
+            title="Copy raw message data"
+          >
+            Copy Raw
           </button>
           <button
             type="button"
