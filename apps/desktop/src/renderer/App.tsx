@@ -27,6 +27,7 @@ import { usePaneStateSync } from "./hooks/usePaneStateSync";
 import { useResizablePanes } from "./hooks/useResizablePanes";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { openInFileManager, openPath } from "./lib/pathActions";
+import { decideSessionSelectionAfterLoad } from "./lib/sessionSelection";
 import {
   compareRecent,
   countProviders,
@@ -430,27 +431,20 @@ export function App() {
   }, [loadSessions, logError]);
 
   useEffect(() => {
-    if (!paneStateHydrated) {
+    const decision = decideSessionSelectionAfterLoad({
+      paneStateHydrated,
+      sessionsLoadedProjectId,
+      selectedProjectId,
+      hasPendingSearchNavigation: pendingSearchNavigation !== null,
+      selectedSessionId,
+      sortedSessions,
+    });
+    if (!decision) {
       return;
     }
 
-    if (sessionsLoadedProjectId !== selectedProjectId) {
-      return;
-    }
-
-    if (sortedSessions.length === 0) {
-      if (!pendingSearchNavigation) {
-        setSelectedSessionId("");
-      }
-      return;
-    }
-
-    if (pendingSearchNavigation) {
-      return;
-    }
-
-    if (!selectedSessionId || !sortedSessions.some((session) => session.id === selectedSessionId)) {
-      setSelectedSessionId(sortedSessions[0]?.id ?? "");
+    setSelectedSessionId(decision.nextSelectedSessionId);
+    if (decision.resetPage) {
       setSessionPage(0);
     }
   }, [

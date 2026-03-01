@@ -1,8 +1,9 @@
 import type { IpcResponse } from "@codetrail/core";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
 import { ToolbarIcon } from "../ToolbarIcon";
+import { scheduleSelectedSessionScroll } from "./sessionAutoScroll";
 
 type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
 
@@ -19,14 +20,20 @@ export function SessionPane({
   onToggleCollapsed: () => void;
   onSelectSession: (sessionId: string) => void;
 }) {
-  const selectedSessionRef = useRef<HTMLButtonElement | null>(null);
+  const [selectedSessionElement, setSelectedSessionElement] = useState<HTMLButtonElement | null>(
+    null,
+  );
+  const selectedSessionRef = useCallback((node: HTMLButtonElement | null) => {
+    setSelectedSessionElement(node);
+  }, []);
 
   useEffect(() => {
-    if (!selectedSessionId) {
-      return;
-    }
-    selectedSessionRef.current?.scrollIntoView({ block: "nearest" });
-  }, [selectedSessionId]);
+    return scheduleSelectedSessionScroll({
+      selectedSessionId,
+      collapsed,
+      selectedSessionElement,
+    });
+  }, [collapsed, selectedSessionElement, selectedSessionId]);
 
   return (
     <aside className={`panel session-pane${collapsed ? " collapsed" : ""}`}>
