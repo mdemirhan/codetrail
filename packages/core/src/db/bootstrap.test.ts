@@ -28,7 +28,6 @@ describe("initializeDatabase", () => {
     expect(result.schemaRebuilt).toBe(false);
     expect(result.tables).toEqual(
       expect.arrayContaining([
-        "bookmarks",
         "indexed_files",
         "message_fts",
         "messages",
@@ -72,7 +71,7 @@ describe("initializeDatabase", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("clears indexed data without violating bookmark foreign keys", () => {
+  it("clears indexed data for generated tables", () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-db-clear-"));
     const dbPath = join(dir, "test-clear.db");
     initializeDatabase(dbPath);
@@ -95,8 +94,6 @@ describe("initializeDatabase", () => {
                'm1', 'src-1', 's1', 'claude', 'assistant', 'content',
                '2026-01-01T00:00:01.000Z', null, null, null, null, null
              )`);
-    db.exec(`INSERT INTO bookmarks (project_id, session_id, message_id, message_source_id, created_at)
-             VALUES ('p1', 's1', 'm1', 'src-1', '2026-01-01T00:00:01.000Z')`);
     db.exec(`INSERT INTO indexed_files (
                file_path, provider, project_path, session_identity, file_size, file_mtime_ms, indexed_at
              ) VALUES (
@@ -105,7 +102,6 @@ describe("initializeDatabase", () => {
 
     expect(() => clearIndexedData(db)).not.toThrow();
     const counts = {
-      bookmarks: (db.prepare("SELECT COUNT(*) as c FROM bookmarks").get() as { c: number }).c,
       messages: (db.prepare("SELECT COUNT(*) as c FROM messages").get() as { c: number }).c,
       sessions: (db.prepare("SELECT COUNT(*) as c FROM sessions").get() as { c: number }).c,
       projects: (db.prepare("SELECT COUNT(*) as c FROM projects").get() as { c: number }).c,
@@ -115,7 +111,6 @@ describe("initializeDatabase", () => {
     db.close();
 
     expect(counts).toEqual({
-      bookmarks: 0,
       messages: 0,
       sessions: 0,
       projects: 0,

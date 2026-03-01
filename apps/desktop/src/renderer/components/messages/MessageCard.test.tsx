@@ -45,6 +45,7 @@ describe("MessageCard", () => {
         pathRoots={[]}
         isFocused={false}
         isBookmarked={false}
+        isOrphaned={true}
         isExpanded={true}
         onToggleExpanded={onToggleExpanded}
         onToggleFocused={onToggleFocused}
@@ -55,6 +56,7 @@ describe("MessageCard", () => {
 
     expect(screen.getByText("Assistant response body")).toBeInTheDocument();
     expect(screen.getByText("Took: ~5s")).toBeInTheDocument();
+    expect(screen.getByText("Orphaned")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Collapse message" }));
     await user.click(screen.getByRole("button", { name: "Copy formatted message body" }));

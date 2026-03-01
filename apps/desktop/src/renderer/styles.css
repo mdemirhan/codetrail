@@ -1430,6 +1430,12 @@ body.platform-macos .titlebar-left {
   color: var(--text-tertiary);
 }
 
+.msg-orphaned-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-orange);
+}
+
 .provider-label.provider-claude {
   color: var(--accent-orange);
 }

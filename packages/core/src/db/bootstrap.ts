@@ -64,17 +64,6 @@ const tableStatements = [
     completed_at TEXT,
     FOREIGN KEY(message_id) REFERENCES messages(id)
   )`,
-  `CREATE TABLE IF NOT EXISTS bookmarks (
-    project_id TEXT NOT NULL,
-    session_id TEXT NOT NULL,
-    message_id TEXT NOT NULL,
-    message_source_id TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (project_id, message_id),
-    FOREIGN KEY(project_id) REFERENCES projects(id),
-    FOREIGN KEY(session_id) REFERENCES sessions(id),
-    FOREIGN KEY(message_id) REFERENCES messages(id)
-  )`,
   `CREATE TABLE IF NOT EXISTS indexed_files (
     file_path TEXT PRIMARY KEY,
     provider TEXT NOT NULL,
@@ -99,18 +88,9 @@ const indexStatements = [
   "CREATE INDEX IF NOT EXISTS idx_messages_session_created ON messages(session_id, created_at, id)",
   "CREATE INDEX IF NOT EXISTS idx_messages_session_category_created ON messages(session_id, category, created_at, id)",
   "CREATE INDEX IF NOT EXISTS idx_messages_session_source_id ON messages(session_id, source_id)",
-  "CREATE INDEX IF NOT EXISTS idx_bookmarks_project_created ON bookmarks(project_id, created_at DESC, message_id)",
-  "CREATE INDEX IF NOT EXISTS idx_bookmarks_session_id ON bookmarks(session_id)",
 ] as const;
 
-const dataTables = [
-  "bookmarks",
-  "tool_calls",
-  "messages",
-  "sessions",
-  "projects",
-  "indexed_files",
-] as const;
+const dataTables = ["tool_calls", "messages", "sessions", "projects", "indexed_files"] as const;
 
 export function openDatabase(databasePath: string): SqliteDatabase {
   const db = new Database(databasePath);
@@ -174,7 +154,6 @@ function recreateSchema(db: SqliteDatabase): void {
 
 function clearAllSchemaObjects(db: SqliteDatabase): void {
   db.exec("DROP TABLE IF EXISTS message_fts");
-  db.exec("DROP TABLE IF EXISTS bookmarks");
   db.exec("DROP TABLE IF EXISTS tool_calls");
   db.exec("DROP TABLE IF EXISTS messages");
   db.exec("DROP TABLE IF EXISTS sessions");

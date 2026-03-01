@@ -10,18 +10,13 @@ describe("core testing helpers", () => {
     const tables = db
       .prepare(
         `SELECT name FROM sqlite_master
-         WHERE type = 'table' AND name IN ('projects', 'sessions', 'messages', 'bookmarks')
+         WHERE type = 'table' AND name IN ('projects', 'sessions', 'messages')
          ORDER BY name`,
       )
       .all() as Array<{ name: string }>;
     db.close();
 
-    expect(tables.map((row) => row.name)).toEqual([
-      "bookmarks",
-      "messages",
-      "projects",
-      "sessions",
-    ]);
+    expect(tables.map((row) => row.name)).toEqual(["messages", "projects", "sessions"]);
   });
 
   it("runs callback with in-memory db and closes automatically", () => {

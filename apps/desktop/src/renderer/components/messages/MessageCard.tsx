@@ -22,6 +22,7 @@ type MessageCardProps = {
   pathRoots: string[];
   isFocused: boolean;
   isBookmarked?: boolean;
+  isOrphaned?: boolean;
   isExpanded: boolean;
   onToggleExpanded: (messageId: string, category: MessageCategory) => void;
   onToggleFocused: (messageId: string) => void;
@@ -36,6 +37,7 @@ function MessageCardComponent({
   pathRoots,
   isFocused,
   isBookmarked = false,
+  isOrphaned = false,
   isExpanded,
   onToggleExpanded,
   onToggleFocused,
@@ -137,6 +139,14 @@ function MessageCardComponent({
                   ·
                 </span>
                 <span className="msg-time">Took: {operationDurationLabel}</span>
+              </>
+            ) : null}
+            {isOrphaned ? (
+              <>
+                <span className="msg-separator" aria-hidden="true">
+                  ·
+                </span>
+                <span className="msg-orphaned-badge">Orphaned</span>
               </>
             ) : null}
           </div>

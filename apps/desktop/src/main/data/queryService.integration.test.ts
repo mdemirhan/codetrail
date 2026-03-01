@@ -445,7 +445,7 @@ describe("queryService", () => {
     cleanup();
   });
 
-  it("auto-removes stale bookmarks when backing messages disappear", () => {
+  it("keeps stale bookmarks and marks them orphaned when backing messages disappear", () => {
     const { dbPath, cleanup } = setupIndexedDb();
 
     const db = openDatabase(dbPath);
@@ -484,16 +484,26 @@ describe("queryService", () => {
       projectId: target.project_id,
       categories: undefined,
     });
-    expect(listed.totalCount).toBe(0);
-    expect(listed.filteredCount).toBe(0);
-    expect(listed.results).toEqual([]);
+    expect(listed.totalCount).toBe(1);
+    expect(listed.filteredCount).toBe(1);
+    expect(listed.results[0]?.message.id).toBe(target.id);
+    expect(listed.results[0]?.isOrphaned).toBe(true);
+    expect(listed.results[0]?.orphanedAt).toBeNull();
 
-    const dbVerify = openDatabase(dbPath);
-    const remaining = dbVerify
-      .prepare("SELECT COUNT(*) as count FROM bookmarks WHERE project_id = ?")
-      .get(target.project_id) as { count: number };
-    dbVerify.close();
-    expect(remaining.count).toBe(0);
+    const unbookmarked = toggleBookmark(dbPath, {
+      projectId: target.project_id,
+      sessionId: target.session_id,
+      messageId: target.id,
+      messageSourceId: target.source_id,
+    });
+    expect(unbookmarked.bookmarked).toBe(false);
+
+    const afterDelete = listProjectBookmarks(dbPath, {
+      projectId: target.project_id,
+      categories: undefined,
+    });
+    expect(afterDelete.totalCount).toBe(0);
+    expect(afterDelete.results).toEqual([]);
 
     cleanup();
   });

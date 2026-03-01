@@ -3,7 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkerIndexingRunner } from "./indexingRunner";
 
 type WorkerMessage = { ok: true } | { ok: false; message: string };
-type WorkerRequest = { dbPath: string; forceReindex: boolean };
+type WorkerRequest = {
+  dbPath: string;
+  forceReindex: boolean;
+  systemMessageRegexRules?: {
+    claude?: string[];
+    codex?: string[];
+    gemini?: string[];
+  };
+};
 
 type WorkerController = {
   worker: {
@@ -68,12 +76,38 @@ function makeIndexingResult() {
   };
 }
 
+function createBookmarkStoreHarness() {
+  const reconcileWithIndexedData = vi.fn(() => ({
+    deletedMissingProjects: 0,
+    markedOrphaned: 0,
+    restored: 0,
+  }));
+  const close = vi.fn();
+  const createBookmarkStore = vi.fn(() => ({
+    listProjectBookmarks: vi.fn(),
+    getBookmark: vi.fn(() => null),
+    upsertBookmark: vi.fn(),
+    removeBookmark: vi.fn(() => false),
+    reconcileWithIndexedData,
+    close,
+  }));
+
+  return {
+    createBookmarkStore,
+    reconcileWithIndexedData,
+    close,
+  };
+}
+
 describe("WorkerIndexingRunner", () => {
   it("runs indexing directly when worker is unavailable", async () => {
     const runIncrementalIndexing = vi.fn(() => makeIndexingResult());
+    const bookmarkHarness = createBookmarkStoreHarness();
     const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
       runIncrementalIndexing,
       resolveWorkerUrl: () => null,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
+      bookmarksDbPath: "/tmp/codetrail.bookmarks.sqlite",
     });
 
     const result = await runner.enqueue({ force: true });
@@ -84,13 +118,17 @@ describe("WorkerIndexingRunner", () => {
       dbPath: "/tmp/codetrail.db",
       forceReindex: true,
     });
+    expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
+    expect(bookmarkHarness.close).toHaveBeenCalledTimes(1);
   });
 
   it("passes configured system message regex rules into indexing jobs", async () => {
     const runIncrementalIndexing = vi.fn(() => makeIndexingResult());
+    const bookmarkHarness = createBookmarkStoreHarness();
     const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
       runIncrementalIndexing,
       resolveWorkerUrl: () => null,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
       getSystemMessageRegexRules: () => ({
         claude: ["^<command-name>"],
         codex: ["^<environment_context>"],
@@ -109,16 +147,19 @@ describe("WorkerIndexingRunner", () => {
         gemini: [],
       },
     });
+    expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
   });
 
   it("uses worker path when worker returns success", async () => {
     const runIncrementalIndexing = vi.fn(() => makeIndexingResult());
     const controller = createWorkerController();
+    const bookmarkHarness = createBookmarkStoreHarness();
 
     const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
       runIncrementalIndexing,
       resolveWorkerUrl: () => new URL("file:///tmp/indexingWorker.js"),
       createWorker: () => controller.worker,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
     });
 
     const job = runner.enqueue({ force: false });
@@ -132,16 +173,19 @@ describe("WorkerIndexingRunner", () => {
 
     await expect(job).resolves.toEqual({ jobId: "refresh-1" });
     expect(runIncrementalIndexing).not.toHaveBeenCalled();
+    expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
   });
 
   it("falls back to direct indexing when worker returns error payload", async () => {
     const runIncrementalIndexing = vi.fn(() => makeIndexingResult());
     const controller = createWorkerController();
+    const bookmarkHarness = createBookmarkStoreHarness();
 
     const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
       runIncrementalIndexing,
       resolveWorkerUrl: () => new URL("file:///tmp/indexingWorker.js"),
       createWorker: () => controller.worker,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
     });
 
     const job = runner.enqueue({ force: false });
@@ -150,16 +194,19 @@ describe("WorkerIndexingRunner", () => {
 
     await expect(job).resolves.toEqual({ jobId: "refresh-1" });
     expect(runIncrementalIndexing).toHaveBeenCalledTimes(1);
+    expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
   });
 
   it("falls back to direct indexing when worker exits non-zero", async () => {
     const runIncrementalIndexing = vi.fn(() => makeIndexingResult());
     const controller = createWorkerController();
+    const bookmarkHarness = createBookmarkStoreHarness();
 
     const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
       runIncrementalIndexing,
       resolveWorkerUrl: () => new URL("file:///tmp/indexingWorker.js"),
       createWorker: () => controller.worker,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
     });
 
     const job = runner.enqueue({ force: true });
@@ -172,11 +219,13 @@ describe("WorkerIndexingRunner", () => {
       dbPath: "/tmp/codetrail.db",
       forceReindex: true,
     });
+    expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
   });
 
   it("serializes queued jobs and increments job ids", async () => {
     const runIncrementalIndexing = vi.fn(() => makeIndexingResult());
     const workers: WorkerController[] = [];
+    const bookmarkHarness = createBookmarkStoreHarness();
 
     const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
       runIncrementalIndexing,
@@ -186,6 +235,7 @@ describe("WorkerIndexingRunner", () => {
         workers.push(controller);
         return controller.worker;
       },
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
     });
 
     const first = runner.enqueue({ force: false });
@@ -211,5 +261,6 @@ describe("WorkerIndexingRunner", () => {
     workers[1]?.emitMessage({ ok: true });
     await expect(second).resolves.toEqual({ jobId: "refresh-2" });
     expect(runIncrementalIndexing).not.toHaveBeenCalled();
+    expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledTimes(2);
   });
 });

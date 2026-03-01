@@ -651,6 +651,13 @@ export function App() {
     () => bookmarksResponse.results.map((entry) => entry.message),
     [bookmarksResponse.results],
   );
+  const bookmarkOrphanedByMessageId = useMemo(
+    () =>
+      new Map(
+        bookmarksResponse.results.map((entry) => [entry.message.id, entry.isOrphaned] as const),
+      ),
+    [bookmarksResponse.results],
+  );
   const bookmarkedMessageIds = useMemo(
     () => new Set(bookmarksResponse.results.map((entry) => entry.message.id)),
     [bookmarksResponse.results],
@@ -1281,6 +1288,11 @@ export function App() {
                       pathRoots={messagePathRoots}
                       isFocused={message.id === focusMessageId}
                       isBookmarked={bookmarkedMessageIds.has(message.id)}
+                      isOrphaned={
+                        historyMode === "bookmarks"
+                          ? (bookmarkOrphanedByMessageId.get(message.id) ?? false)
+                          : false
+                      }
                       isExpanded={
                         messageExpanded[message.id] ?? isExpandedByDefault(message.category)
                       }

@@ -11,6 +11,7 @@ import {
 } from "@codetrail/core";
 
 import type { AppStateStore } from "./appStateStore";
+import { initializeBookmarkStore, resolveBookmarksDbPath } from "./data/bookmarkStore";
 import { type QueryService, createQueryService } from "./data/queryService";
 import { WorkerIndexingRunner } from "./indexingRunner";
 import { registerIpcHandlers } from "./ipc";
@@ -32,16 +33,19 @@ export async function bootstrapMainProcess(
   options: BootstrapOptions = {},
 ): Promise<BootstrapResult> {
   const dbPath = options.dbPath ?? join(app.getPath("userData"), "codetrail.sqlite");
+  const bookmarksDbPath = resolveBookmarksDbPath(dbPath);
 
   const dbBootstrap = initializeDatabase(dbPath);
+  initializeBookmarkStore(bookmarksDbPath);
   const indexingRunner = new WorkerIndexingRunner(dbPath, {
+    bookmarksDbPath,
     getSystemMessageRegexRules: () =>
       options.appStateStore?.getPaneState()?.systemMessageRegexRules,
   });
   if (activeQueryService) {
     activeQueryService.close();
   }
-  const queryService = createQueryService(dbPath);
+  const queryService = createQueryService(dbPath, { bookmarksDbPath });
   activeQueryService = queryService;
 
   registerIpcHandlers(ipcMain, {

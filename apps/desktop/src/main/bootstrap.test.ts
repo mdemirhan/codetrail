@@ -7,6 +7,8 @@ const {
   mockGetVersion,
   mockInitializeDatabase,
   mockResolveSystemMessageRegexRules,
+  mockInitializeBookmarkStore,
+  mockResolveBookmarksDbPath,
   mockCreateQueryService,
   mockWorkerIndexingRunner,
   mockRegisterIpcHandlers,
@@ -44,6 +46,8 @@ const {
       }
     );
   }),
+  mockInitializeBookmarkStore: vi.fn(),
+  mockResolveBookmarksDbPath: vi.fn((dbPath: string) => `${dbPath}.bookmarks`),
   mockCreateQueryService: vi.fn(),
   mockWorkerIndexingRunner: vi.fn(),
   mockRegisterIpcHandlers: vi.fn(),
@@ -75,6 +79,11 @@ vi.mock("@codetrail/core", () => ({
 
 vi.mock("./data/queryService", () => ({
   createQueryService: mockCreateQueryService,
+}));
+
+vi.mock("./data/bookmarkStore", () => ({
+  initializeBookmarkStore: mockInitializeBookmarkStore,
+  resolveBookmarksDbPath: mockResolveBookmarksDbPath,
 }));
 
 vi.mock("./indexingRunner", () => ({
@@ -183,9 +192,12 @@ describe("bootstrapMainProcess", () => {
 
     expect(result).toEqual({ schemaVersion: 7, tableCount: 1 });
     expect(mockInitializeDatabase).toHaveBeenCalledWith("/tmp/codetrail.sqlite");
+    expect(mockResolveBookmarksDbPath).toHaveBeenCalledWith("/tmp/codetrail.sqlite");
+    expect(mockInitializeBookmarkStore).toHaveBeenCalledWith("/tmp/codetrail.sqlite.bookmarks");
     expect(mockWorkerIndexingRunner).toHaveBeenCalledWith(
       "/tmp/codetrail.sqlite",
       expect.objectContaining({
+        bookmarksDbPath: "/tmp/codetrail.sqlite.bookmarks",
         getSystemMessageRegexRules: expect.any(Function),
       }),
     );

@@ -53,6 +53,8 @@ const bookmarkEntrySchema = z.object({
   sessionId: z.string().min(1),
   sessionTitle: z.string(),
   bookmarkedAt: z.string(),
+  isOrphaned: z.boolean(),
+  orphanedAt: z.string().nullable(),
   message: sessionMessageSchema,
 });
 

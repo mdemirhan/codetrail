@@ -3,6 +3,11 @@ import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 
 import { type SystemMessageRegexRuleOverrides, runIncrementalIndexing } from "@codetrail/core";
+import {
+  type BookmarkStore,
+  createBookmarkStore,
+  resolveBookmarksDbPath,
+} from "./data/bookmarkStore";
 
 export type RefreshJobRequest = {
   force: boolean;
@@ -40,6 +45,8 @@ export type IndexingRunnerDependencies = {
   resolveWorkerUrl?: () => URL | null;
   createWorker?: (workerUrl: URL) => WorkerLike;
   getSystemMessageRegexRules?: () => SystemMessageRegexRuleOverrides | undefined;
+  bookmarksDbPath?: string;
+  createBookmarkStore?: (bookmarksDbPath: string) => BookmarkStore;
 };
 
 export class WorkerIndexingRunner {
@@ -52,6 +59,8 @@ export class WorkerIndexingRunner {
   private readonly getSystemMessageRegexRulesFn:
     | (() => SystemMessageRegexRuleOverrides | undefined)
     | null;
+  private readonly bookmarksDbPath: string;
+  private readonly createBookmarkStoreFn: (bookmarksDbPath: string) => BookmarkStore;
 
   constructor(dbPath: string, dependencies: IndexingRunnerDependencies = {}) {
     this.dbPath = dbPath;
@@ -63,6 +72,8 @@ export class WorkerIndexingRunner {
         return new Worker(workerUrl);
       });
     this.getSystemMessageRegexRulesFn = dependencies.getSystemMessageRegexRules ?? null;
+    this.bookmarksDbPath = dependencies.bookmarksDbPath ?? resolveBookmarksDbPath(dbPath);
+    this.createBookmarkStoreFn = dependencies.createBookmarkStore ?? createBookmarkStore;
   }
 
   async enqueue(request: RefreshJobRequest): Promise<RefreshJobResponse> {
@@ -77,6 +88,12 @@ export class WorkerIndexingRunner {
         runIncrementalIndexing: this.runIncrementalIndexingFn,
         createWorker: this.createWorkerFn,
       });
+      const bookmarkStore = this.createBookmarkStoreFn(this.bookmarksDbPath);
+      try {
+        bookmarkStore.reconcileWithIndexedData(this.dbPath);
+      } finally {
+        bookmarkStore.close();
+      }
     });
 
     this.queue = task.catch(() => undefined);

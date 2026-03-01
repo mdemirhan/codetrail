@@ -8,11 +8,23 @@ import {
   searchMessages,
 } from "@codetrail/core";
 
+import {
+  type BookmarkStore,
+  type StoredBookmark,
+  createBookmarkStore,
+  resolveBookmarksDbPath,
+} from "./bookmarkStore";
+
 type DatabaseHandle = ReturnType<typeof openDatabase>;
 type OpenDatabase = typeof openDatabase;
 
+type CreateBookmarkStore = (bookmarksDbPath: string) => BookmarkStore;
+
 export type QueryServiceDependencies = {
   openDatabase?: OpenDatabase;
+  bookmarksDbPath?: string;
+  createBookmarkStore?: CreateBookmarkStore;
+  bookmarkStore?: BookmarkStore;
 };
 
 type SessionSummaryRow = {
@@ -45,6 +57,11 @@ type MessageRow = {
   operation_duration_ms: number | null;
   operation_duration_source: "native" | "derived" | null;
   operation_duration_confidence: "high" | "low" | null;
+};
+
+type BookmarkMessageLookupRow = MessageRow & {
+  project_id: string;
+  session_title: string;
 };
 
 const SESSION_TITLE_JOIN_SQL = `
@@ -91,17 +108,39 @@ export function createQueryService(
 ): QueryService {
   const openDatabaseFn = dependencies.openDatabase ?? openDatabase;
   const db = openDatabaseFn(dbPath);
-  return createQueryServiceFromDb(db);
+  const bookmarkStore =
+    dependencies.bookmarkStore ??
+    (dependencies.createBookmarkStore ?? createBookmarkStore)(
+      dependencies.bookmarksDbPath ?? resolveBookmarksDbPath(dbPath),
+    );
+
+  return createQueryServiceFromDb(db, {
+    bookmarkStore,
+    ownsBookmarkStore: dependencies.bookmarkStore === undefined,
+  });
 }
 
-export function createQueryServiceFromDb(db: DatabaseHandle): QueryService {
+export function createQueryServiceFromDb(
+  db: DatabaseHandle,
+  dependencies: {
+    bookmarkStore?: BookmarkStore;
+    createBookmarkStore?: CreateBookmarkStore;
+    ownsBookmarkStore?: boolean;
+  } = {},
+): QueryService {
+  const bookmarkStore =
+    dependencies.bookmarkStore ??
+    (dependencies.createBookmarkStore ?? createBookmarkStore)(":memory:");
+  const ownsBookmarkStore =
+    dependencies.ownsBookmarkStore ?? dependencies.bookmarkStore === undefined;
+
   let closed = false;
   return {
     listProjects: (request) => listProjectsWithDatabase(db, request),
     listSessions: (request) => listSessionsWithDatabase(db, request),
     getSessionDetail: (request) => getSessionDetailWithDatabase(db, request),
-    listProjectBookmarks: (request) => listProjectBookmarksWithDatabase(db, request),
-    toggleBookmark: (request) => toggleBookmarkWithDatabase(db, request),
+    listProjectBookmarks: (request) => listProjectBookmarksWithStore(db, bookmarkStore, request),
+    toggleBookmark: (request) => toggleBookmarkWithStore(db, bookmarkStore, request),
     runSearchQuery: (request) => runSearchQueryWithDatabase(db, request),
     close: () => {
       if (closed) {
@@ -109,6 +148,9 @@ export function createQueryServiceFromDb(db: DatabaseHandle): QueryService {
       }
       closed = true;
       db.close();
+      if (ownsBookmarkStore) {
+        bookmarkStore.close();
+      }
     },
   };
 }
@@ -154,10 +196,10 @@ export function listProjectBookmarks(
   request: IpcRequest<"bookmarks:listProject">,
   dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"bookmarks:listProject"> {
-  return withDatabase(
+  return withDatabaseAndBookmarkStore(
     dbPath,
-    (db) => listProjectBookmarksWithDatabase(db, request),
-    dependencies.openDatabase,
+    (db, bookmarkStore) => listProjectBookmarksWithStore(db, bookmarkStore, request),
+    dependencies,
   );
 }
 
@@ -166,10 +208,10 @@ export function toggleBookmark(
   request: IpcRequest<"bookmarks:toggle">,
   dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"bookmarks:toggle"> {
-  return withDatabase(
+  return withDatabaseAndBookmarkStore(
     dbPath,
-    (db) => toggleBookmarkWithDatabase(db, request),
-    dependencies.openDatabase,
+    (db, bookmarkStore) => toggleBookmarkWithStore(db, bookmarkStore, request),
+    dependencies,
   );
 }
 
@@ -435,64 +477,80 @@ function getSessionDetailWithDatabase(
   };
 }
 
-function listProjectBookmarksWithDatabase(
+function listProjectBookmarksWithStore(
   db: DatabaseHandle,
+  bookmarkStore: BookmarkStore,
   request: IpcRequest<"bookmarks:listProject">,
 ): IpcResponse<"bookmarks:listProject"> {
-  pruneOrphanBookmarks(db);
+  const storedRows = bookmarkStore.listProjectBookmarks(request.projectId);
+  const liveRowsByMessageId = listLiveBookmarkMessagesById(
+    db,
+    request.projectId,
+    storedRows.map((row) => row.message_id),
+  );
 
   const categoryCounts = makeEmptyCategoryCounts();
-  const categoryRows = db
-    .prepare(
-      `SELECT m.category as category, COUNT(*) as cnt
-       FROM bookmarks b
-       JOIN sessions s ON s.id = b.session_id AND s.project_id = b.project_id
-       JOIN messages m ON m.id = b.message_id AND m.session_id = s.id
-       WHERE b.project_id = ?
-       GROUP BY m.category`,
-    )
-    .all(request.projectId) as Array<{ category: string; cnt: number }>;
+  const normalizedRequestedCategories =
+    request.categories === undefined ? null : normalizeMessageCategories(request.categories);
 
-  for (const row of categoryRows) {
-    categoryCounts[normalizeMessageCategory(row.category)] += Number(row.cnt ?? 0);
+  const includeCategory = (
+    category: IpcResponse<"sessions:getDetail">["messages"][number]["category"],
+  ) => {
+    if (normalizedRequestedCategories === null) {
+      return true;
+    }
+    if (normalizedRequestedCategories.length === 0) {
+      return false;
+    }
+    return normalizedRequestedCategories.includes(category);
+  };
+
+  const results: IpcResponse<"bookmarks:listProject">["results"] = [];
+
+  for (const row of storedRows) {
+    const live = liveRowsByMessageId.get(row.message_id);
+    const isLiveMatch = live !== undefined && live.session_id === row.session_id;
+    const message = isLiveMatch ? mapSessionMessageRow(live) : mapStoredBookmarkMessageRow(row);
+
+    categoryCounts[message.category] += 1;
+    if (!includeCategory(message.category)) {
+      continue;
+    }
+
+    results.push({
+      projectId: row.project_id,
+      sessionId: row.session_id,
+      sessionTitle: isLiveMatch ? live.session_title : row.session_title,
+      bookmarkedAt: row.bookmarked_at,
+      isOrphaned: !isLiveMatch,
+      orphanedAt: isLiveMatch ? null : row.orphaned_at,
+      message,
+    });
   }
 
-  const totalRow = db
-    .prepare(
-      `SELECT COUNT(*) as cnt
-       FROM bookmarks b
-       JOIN sessions s ON s.id = b.session_id AND s.project_id = b.project_id
-       JOIN messages m ON m.id = b.message_id AND m.session_id = s.id
-       WHERE b.project_id = ?`,
-    )
-    .get(request.projectId) as { cnt: number } | undefined;
-  const totalCount = Number(totalRow?.cnt ?? 0);
+  return {
+    projectId: request.projectId,
+    totalCount: storedRows.length,
+    filteredCount: results.length,
+    categoryCounts,
+    results,
+  };
+}
 
-  const bookmarkFiltersArgs: {
-    projectId: string;
-    categories?: string[];
-  } = { projectId: request.projectId };
-  if (request.categories !== undefined) {
-    bookmarkFiltersArgs.categories = request.categories;
+function listLiveBookmarkMessagesById(
+  db: DatabaseHandle,
+  projectId: string,
+  messageIds: string[],
+): Map<string, BookmarkMessageLookupRow> {
+  if (messageIds.length === 0) {
+    return new Map();
   }
-  const bookmarkFilters = buildBookmarkFilters(bookmarkFiltersArgs);
-  const filteredRow = db
-    .prepare(
-      `SELECT COUNT(*) as cnt
-       FROM bookmarks b
-       JOIN sessions s ON s.id = b.session_id AND s.project_id = b.project_id
-       JOIN messages m ON m.id = b.message_id AND m.session_id = s.id
-       WHERE ${bookmarkFilters.whereClause}`,
-    )
-    .get(...bookmarkFilters.params) as { cnt: number } | undefined;
-  const filteredCount = Number(filteredRow?.cnt ?? 0);
 
+  const placeholders = messageIds.map(() => "?").join(",");
   const rows = db
     .prepare(
       `SELECT
-         b.project_id,
-         b.session_id,
-         b.created_at as bookmarked_at,
+         s.project_id,
          COALESCE(first_title.content, '') as session_title,
          m.id,
          m.source_id,
@@ -506,60 +564,43 @@ function listProjectBookmarksWithDatabase(
          m.operation_duration_ms,
          m.operation_duration_source,
          m.operation_duration_confidence
-       FROM bookmarks b
-       JOIN sessions s ON s.id = b.session_id AND s.project_id = b.project_id
-       JOIN messages m ON m.id = b.message_id AND m.session_id = s.id
+       FROM messages m
+       JOIN sessions s ON s.id = m.session_id
        ${SESSION_TITLE_JOIN_SQL}
-       WHERE ${bookmarkFilters.whereClause}
-       ORDER BY m.created_at DESC, m.id DESC`,
+       WHERE s.project_id = ?
+         AND m.id IN (${placeholders})`,
     )
-    .all(...bookmarkFilters.params) as Array<
-    {
-      project_id: string;
-      session_id: string;
-      bookmarked_at: string;
-      session_title: string;
-    } & MessageRow
-  >;
+    .all(projectId, ...messageIds) as BookmarkMessageLookupRow[];
 
-  return {
-    projectId: request.projectId,
-    totalCount,
-    filteredCount,
-    categoryCounts,
-    results: rows.map((row) => ({
-      projectId: row.project_id,
-      sessionId: row.session_id,
-      sessionTitle: row.session_title,
-      bookmarkedAt: row.bookmarked_at,
-      message: mapSessionMessageRow(row),
-    })),
-  };
+  return new Map(rows.map((row) => [row.id, row]));
 }
 
-function toggleBookmarkWithDatabase(
+function toggleBookmarkWithStore(
   db: DatabaseHandle,
+  bookmarkStore: BookmarkStore,
   request: IpcRequest<"bookmarks:toggle">,
 ): IpcResponse<"bookmarks:toggle"> {
-  pruneOrphanBookmarks(db);
-
-  const existing = db
-    .prepare("SELECT 1 as present FROM bookmarks WHERE project_id = ? AND message_id = ?")
-    .get(request.projectId, request.messageId) as { present: number } | undefined;
-
+  const existing = bookmarkStore.getBookmark(request.projectId, request.messageId);
   if (existing) {
-    db.prepare("DELETE FROM bookmarks WHERE project_id = ? AND message_id = ?").run(
-      request.projectId,
-      request.messageId,
-    );
+    bookmarkStore.removeBookmark(request.projectId, request.messageId);
     return { bookmarked: false };
   }
 
   const messageRow = db
     .prepare(
-      `SELECT m.id, m.source_id, m.session_id, s.project_id
+      `SELECT
+         m.id,
+         m.source_id,
+         m.session_id,
+         m.provider,
+         m.category,
+         m.content,
+         m.created_at,
+         s.project_id,
+         COALESCE(first_title.content, '') as session_title
        FROM messages m
        JOIN sessions s ON s.id = m.session_id
+       ${SESSION_TITLE_JOIN_SQL}
        WHERE m.id = ?`,
     )
     .get(request.messageId) as
@@ -567,7 +608,12 @@ function toggleBookmarkWithDatabase(
         id: string;
         source_id: string;
         session_id: string;
+        provider: "claude" | "codex" | "gemini";
+        category: string;
+        content: string;
+        created_at: string;
         project_id: string;
+        session_title: string;
       }
     | undefined;
 
@@ -580,16 +626,18 @@ function toggleBookmarkWithDatabase(
     return { bookmarked: false };
   }
 
-  db.prepare(
-    `INSERT INTO bookmarks (project_id, session_id, message_id, message_source_id, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(
-    request.projectId,
-    request.sessionId,
-    request.messageId,
-    request.messageSourceId,
-    new Date().toISOString(),
-  );
+  bookmarkStore.upsertBookmark({
+    projectId: request.projectId,
+    sessionId: request.sessionId,
+    messageId: request.messageId,
+    messageSourceId: request.messageSourceId,
+    provider: messageRow.provider,
+    sessionTitle: messageRow.session_title,
+    messageCategory: normalizeMessageCategory(messageRow.category),
+    messageContent: messageRow.content,
+    messageCreatedAt: messageRow.created_at,
+    bookmarkedAt: new Date().toISOString(),
+  });
 
   return { bookmarked: true };
 }
@@ -653,44 +701,6 @@ function buildMessageFilters(args: {
   return { whereClause: conditions.join(" AND "), params };
 }
 
-function buildBookmarkFilters(args: {
-  projectId: string;
-  categories?: string[];
-}): { whereClause: string; params: string[] } {
-  const conditions = ["b.project_id = ?"];
-  const params = [args.projectId];
-
-  if (args.categories !== undefined) {
-    const categories = normalizeMessageCategories(args.categories);
-    if (categories.length > 0) {
-      conditions.push(`m.category IN (${categories.map(() => "?").join(",")})`);
-      params.push(...categories);
-    } else {
-      conditions.push("1 = 0");
-    }
-  }
-
-  return { whereClause: conditions.join(" AND "), params };
-}
-
-function pruneOrphanBookmarks(db: DatabaseHandle): void {
-  db.prepare(
-    `DELETE FROM bookmarks
-     WHERE NOT EXISTS (
-         SELECT 1
-         FROM sessions s
-         WHERE s.id = bookmarks.session_id
-           AND s.project_id = bookmarks.project_id
-       )
-       OR NOT EXISTS (
-         SELECT 1
-         FROM messages m
-         WHERE m.id = bookmarks.message_id
-           AND m.session_id = bookmarks.session_id
-       )`,
-  ).run();
-}
-
 function mapSessionMessageRow(
   row: MessageRow,
 ): IpcResponse<"sessions:getDetail">["messages"][number] {
@@ -707,6 +717,25 @@ function mapSessionMessageRow(
     operationDurationMs: row.operation_duration_ms,
     operationDurationSource: row.operation_duration_source,
     operationDurationConfidence: row.operation_duration_confidence,
+  };
+}
+
+function mapStoredBookmarkMessageRow(
+  row: StoredBookmark,
+): IpcResponse<"sessions:getDetail">["messages"][number] {
+  return {
+    id: row.message_id,
+    sourceId: row.message_source_id,
+    sessionId: row.session_id,
+    provider: row.provider,
+    category: normalizeMessageCategory(row.message_category),
+    content: row.message_content,
+    createdAt: row.message_created_at,
+    tokenInput: null,
+    tokenOutput: null,
+    operationDurationMs: null,
+    operationDurationSource: null,
+    operationDurationConfidence: null,
   };
 }
 
@@ -741,5 +770,24 @@ function withDatabase<T>(
     return callback(db);
   } finally {
     db.close();
+  }
+}
+
+function withDatabaseAndBookmarkStore<T>(
+  dbPath: string,
+  callback: (db: DatabaseHandle, bookmarkStore: BookmarkStore) => T,
+  dependencies: QueryServiceDependencies,
+): T {
+  const createStore = dependencies.createBookmarkStore ?? createBookmarkStore;
+  const bookmarkStore =
+    dependencies.bookmarkStore ??
+    createStore(dependencies.bookmarksDbPath ?? resolveBookmarksDbPath(dbPath));
+
+  try {
+    return withDatabase(dbPath, (db) => callback(db, bookmarkStore), dependencies.openDatabase);
+  } finally {
+    if (!dependencies.bookmarkStore) {
+      bookmarkStore.close();
+    }
   }
 }
