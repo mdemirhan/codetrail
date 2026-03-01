@@ -110,6 +110,8 @@ export async function bootstrapMainProcess(
       return {
         projectPaneWidth: paneState?.projectPaneWidth ?? null,
         sessionPaneWidth: paneState?.sessionPaneWidth ?? null,
+        projectPaneCollapsed: paneState?.projectPaneCollapsed ?? null,
+        sessionPaneCollapsed: paneState?.sessionPaneCollapsed ?? null,
         projectProviders: paneState?.projectProviders ?? null,
         historyCategories: paneState?.historyCategories ?? null,
         expandedByDefaultCategories: paneState?.expandedByDefaultCategories ?? null,
@@ -137,6 +139,8 @@ export async function bootstrapMainProcess(
       options.appStateStore?.setPaneState({
         projectPaneWidth: payload.projectPaneWidth,
         sessionPaneWidth: payload.sessionPaneWidth,
+        projectPaneCollapsed: payload.projectPaneCollapsed,
+        sessionPaneCollapsed: payload.sessionPaneCollapsed,
         projectProviders: payload.projectProviders,
         historyCategories: payload.historyCategories,
         expandedByDefaultCategories: payload.expandedByDefaultCategories,

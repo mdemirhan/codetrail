@@ -21,6 +21,8 @@ import { usePaneStateSync } from "./usePaneStateSync";
 function Harness({ logError }: { logError: (context: string, error: unknown) => void }) {
   const [projectPaneWidth, setProjectPaneWidth] = useState(280);
   const [sessionPaneWidth, setSessionPaneWidth] = useState(300);
+  const [projectPaneCollapsed, setProjectPaneCollapsed] = useState(false);
+  const [sessionPaneCollapsed, setSessionPaneCollapsed] = useState(false);
   const [projectProviders, setProjectProviders] = useState<Provider[]>(["claude"]);
   const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>(["assistant"]);
   const [expandedByDefaultCategories, setExpandedByDefaultCategories] = useState<MessageCategory[]>(
@@ -63,6 +65,8 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     logError,
     projectPaneWidth,
     sessionPaneWidth,
+    projectPaneCollapsed,
+    sessionPaneCollapsed,
     projectProviders,
     historyCategories,
     expandedByDefaultCategories,
@@ -86,6 +90,8 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     systemMessageRegexRules,
     setProjectPaneWidth,
     setSessionPaneWidth,
+    setProjectPaneCollapsed,
+    setSessionPaneCollapsed,
     setProjectProviders,
     setHistoryCategories,
     setExpandedByDefaultCategories,
@@ -129,6 +135,8 @@ describe("usePaneStateSync", () => {
         return {
           projectPaneWidth: 340,
           sessionPaneWidth: 410,
+          projectPaneCollapsed: true,
+          sessionPaneCollapsed: false,
           projectProviders: ["claude", "codex"],
           historyCategories: ["assistant", "user"],
           expandedByDefaultCategories: ["assistant"],

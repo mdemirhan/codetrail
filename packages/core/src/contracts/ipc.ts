@@ -123,6 +123,8 @@ const systemMessageRegexRulesSchema = z.object({
 const paneStateSchema = z.object({
   projectPaneWidth: z.number().int().positive().nullable(),
   sessionPaneWidth: z.number().int().positive().nullable(),
+  projectPaneCollapsed: z.boolean().nullable(),
+  sessionPaneCollapsed: z.boolean().nullable(),
   projectProviders: z.array(providerSchema).nullable(),
   historyCategories: z.array(messageCategorySchema).nullable(),
   expandedByDefaultCategories: z.array(messageCategorySchema).nullable(),
@@ -311,6 +313,8 @@ export const ipcContractSchemas = {
     request: z.object({
       projectPaneWidth: z.number().int().positive(),
       sessionPaneWidth: z.number().int().positive(),
+      projectPaneCollapsed: z.boolean(),
+      sessionPaneCollapsed: z.boolean(),
       projectProviders: z.array(providerSchema),
       historyCategories: z.array(messageCategorySchema),
       expandedByDefaultCategories: z.array(messageCategorySchema),

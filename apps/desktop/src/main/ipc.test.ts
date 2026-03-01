@@ -107,6 +107,8 @@ describe("registerIpcHandlers", () => {
         "ui:getState": () => ({
           projectPaneWidth: null,
           sessionPaneWidth: null,
+          projectPaneCollapsed: null,
+          sessionPaneCollapsed: null,
           projectProviders: null,
           historyCategories: null,
           expandedByDefaultCategories: null,
@@ -247,6 +249,8 @@ describe("registerIpcHandlers", () => {
         "ui:getState": () => ({
           projectPaneWidth: null,
           sessionPaneWidth: null,
+          projectPaneCollapsed: null,
+          sessionPaneCollapsed: null,
           projectProviders: null,
           historyCategories: null,
           expandedByDefaultCategories: null,

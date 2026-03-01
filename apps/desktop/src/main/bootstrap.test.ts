@@ -131,6 +131,8 @@ describe("bootstrapMainProcess", () => {
   const paneState: PaneState = {
     projectPaneWidth: 220,
     sessionPaneWidth: 480,
+    projectPaneCollapsed: false,
+    sessionPaneCollapsed: true,
     projectProviders: ["claude", "codex"],
     historyCategories: ["assistant"],
     expandedByDefaultCategories: ["assistant", "tool_use"],
@@ -351,6 +353,8 @@ describe("bootstrapMainProcess", () => {
     expect(getRequiredHandler(handlers, "ui:getState")({})).toEqual({
       projectPaneWidth: 220,
       sessionPaneWidth: 480,
+      projectPaneCollapsed: false,
+      sessionPaneCollapsed: true,
       projectProviders: ["claude", "codex"],
       historyCategories: ["assistant"],
       expandedByDefaultCategories: ["assistant", "tool_use"],

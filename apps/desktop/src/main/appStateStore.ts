@@ -21,6 +21,8 @@ import {
 export type PaneState = {
   projectPaneWidth: number;
   sessionPaneWidth: number;
+  projectPaneCollapsed?: boolean;
+  sessionPaneCollapsed?: boolean;
   projectProviders?: Provider[];
   historyCategories?: MessageCategory[];
   expandedByDefaultCategories?: MessageCategory[];
@@ -237,6 +239,8 @@ function sanitizePaneState(value: unknown): PaneState | null {
   if (projectPaneWidth === null || sessionPaneWidth === null) {
     return null;
   }
+  const projectPaneCollapsed = sanitizeOptionalBoolean(record.projectPaneCollapsed);
+  const sessionPaneCollapsed = sanitizeOptionalBoolean(record.sessionPaneCollapsed);
   const projectProviders = sanitizeStringArray(record.projectProviders, PROVIDER_VALUES);
   const historyCategories = sanitizeStringArray(record.historyCategories, CATEGORY_VALUES);
   const expandedByDefaultCategories = sanitizeStringArray(
@@ -275,6 +279,8 @@ function sanitizePaneState(value: unknown): PaneState | null {
   return {
     projectPaneWidth,
     sessionPaneWidth,
+    ...(projectPaneCollapsed === null ? {} : { projectPaneCollapsed }),
+    ...(sessionPaneCollapsed === null ? {} : { sessionPaneCollapsed }),
     ...(projectProviders ? { projectProviders } : {}),
     ...(historyCategories ? { historyCategories } : {}),
     ...(expandedByDefaultCategories ? { expandedByDefaultCategories } : {}),

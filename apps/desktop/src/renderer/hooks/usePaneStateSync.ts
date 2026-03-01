@@ -27,6 +27,8 @@ export function usePaneStateSync(args: {
   logError: (context: string, error: unknown) => void;
   projectPaneWidth: number;
   sessionPaneWidth: number;
+  projectPaneCollapsed: boolean;
+  sessionPaneCollapsed: boolean;
   projectProviders: Provider[];
   historyCategories: MessageCategory[];
   expandedByDefaultCategories: MessageCategory[];
@@ -50,6 +52,8 @@ export function usePaneStateSync(args: {
   systemMessageRegexRules: SystemMessageRegexRules;
   setProjectPaneWidth: Dispatch<SetStateAction<number>>;
   setSessionPaneWidth: Dispatch<SetStateAction<number>>;
+  setProjectPaneCollapsed: Dispatch<SetStateAction<boolean>>;
+  setSessionPaneCollapsed: Dispatch<SetStateAction<boolean>>;
   setProjectProviders: Dispatch<SetStateAction<Provider[]>>;
   setHistoryCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setExpandedByDefaultCategories: Dispatch<SetStateAction<MessageCategory[]>>;
@@ -78,6 +82,8 @@ export function usePaneStateSync(args: {
     logError,
     projectPaneWidth,
     sessionPaneWidth,
+    projectPaneCollapsed,
+    sessionPaneCollapsed,
     projectProviders,
     historyCategories,
     expandedByDefaultCategories,
@@ -101,6 +107,8 @@ export function usePaneStateSync(args: {
     systemMessageRegexRules,
     setProjectPaneWidth,
     setSessionPaneWidth,
+    setProjectPaneCollapsed,
+    setSessionPaneCollapsed,
     setProjectProviders,
     setHistoryCategories,
     setExpandedByDefaultCategories,
@@ -142,6 +150,12 @@ export function usePaneStateSync(args: {
         }
         if (response.sessionPaneWidth !== null) {
           setSessionPaneWidth(clamp(response.sessionPaneWidth, 250, 620));
+        }
+        if (response.projectPaneCollapsed !== null) {
+          setProjectPaneCollapsed(response.projectPaneCollapsed);
+        }
+        if (response.sessionPaneCollapsed !== null) {
+          setSessionPaneCollapsed(response.sessionPaneCollapsed);
         }
         if (response.projectProviders !== null) {
           setProjectProviders(response.projectProviders);
@@ -242,6 +256,7 @@ export function usePaneStateSync(args: {
     setHistoryCategories,
     setProjectPaneWidth,
     setProjectProviders,
+    setProjectPaneCollapsed,
     setExpandedByDefaultCategories,
     setSearchProviders,
     setSelectedProjectId,
@@ -254,6 +269,7 @@ export function usePaneStateSync(args: {
     setProjectAllSortDirection,
     setSessionPage,
     setSessionPaneWidth,
+    setSessionPaneCollapsed,
     setSessionScrollTop,
     setSystemMessageRegexRules,
     setTheme,
@@ -274,6 +290,8 @@ export function usePaneStateSync(args: {
         .invoke("ui:setState", {
           projectPaneWidth: Math.round(projectPaneWidth),
           sessionPaneWidth: Math.round(sessionPaneWidth),
+          projectPaneCollapsed,
+          sessionPaneCollapsed,
           projectProviders,
           historyCategories,
           expandedByDefaultCategories,
@@ -310,6 +328,7 @@ export function usePaneStateSync(args: {
     logError,
     paneStateHydrated,
     projectPaneWidth,
+    projectPaneCollapsed,
     projectProviders,
     expandedByDefaultCategories,
     searchProviders,
@@ -330,6 +349,7 @@ export function usePaneStateSync(args: {
     sessionScrollTop,
     systemMessageRegexRules,
     sessionPaneWidth,
+    sessionPaneCollapsed,
     theme,
   ]);
 

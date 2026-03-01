@@ -168,6 +168,8 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
     response: {
       projectPaneWidth: null,
       sessionPaneWidth: null,
+      projectPaneCollapsed: null,
+      sessionPaneCollapsed: null,
       projectProviders: null,
       historyCategories: null,
       expandedByDefaultCategories: null,
@@ -195,6 +197,8 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
     request: {
       projectPaneWidth: 300,
       sessionPaneWidth: 360,
+      projectPaneCollapsed: false,
+      sessionPaneCollapsed: false,
       projectProviders: ["claude", "codex", "gemini"],
       historyCategories: ["user", "assistant"],
       expandedByDefaultCategories: ["assistant"],

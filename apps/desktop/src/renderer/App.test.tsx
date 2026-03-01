@@ -18,6 +18,8 @@ function createAppClient() {
       return {
         projectPaneWidth: null,
         sessionPaneWidth: null,
+        projectPaneCollapsed: null,
+        sessionPaneCollapsed: null,
         projectProviders: null,
         historyCategories: null,
         expandedByDefaultCategories: null,
@@ -332,6 +334,8 @@ function createBookmarksSearchClient() {
       return {
         projectPaneWidth: null,
         sessionPaneWidth: null,
+        projectPaneCollapsed: null,
+        sessionPaneCollapsed: null,
         projectProviders: null,
         historyCategories: null,
         expandedByDefaultCategories: null,
