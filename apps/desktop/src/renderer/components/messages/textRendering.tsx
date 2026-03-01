@@ -570,11 +570,21 @@ export function CodeBlock({
   );
 }
 
-export function DiffBlock({ codeValue }: { codeValue: string }) {
+export function DiffBlock({
+  codeValue,
+  filePath,
+  pathRoots = [],
+}: {
+  codeValue: string;
+  filePath?: string | null;
+  pathRoots?: string[];
+}) {
   const lines = codeValue.split(/\r?\n/);
   const rows: ReactNode[] = [];
   let oldLineNumber = 1;
   let newLineNumber = 1;
+  let addedLineCount = 0;
+  let removedLineCount = 0;
   let index = 0;
   while (index < lines.length) {
     const line = lines[index] ?? "";
@@ -585,13 +595,6 @@ export function DiffBlock({ codeValue }: { codeValue: string }) {
         oldLineNumber = hunkStart.oldLine;
         newLineNumber = hunkStart.newLine;
       }
-      rows.push(
-        <div key={`${lineKey}:meta`} className="diff-row diff-meta">
-          <span className="diff-ln old"> </span>
-          <span className="diff-ln new"> </span>
-          <span className="diff-code">{line}</span>
-        </div>,
-      );
       index += 1;
       continue;
     }
@@ -639,6 +642,8 @@ export function DiffBlock({ codeValue }: { codeValue: string }) {
           </span>
         </div>,
       );
+      removedLineCount += 1;
+      addedLineCount += 1;
       oldLineNumber += 1;
       newLineNumber += 1;
       index += 2;
@@ -653,6 +658,7 @@ export function DiffBlock({ codeValue }: { codeValue: string }) {
           <span className="diff-code">{line.slice(1)}</span>
         </div>,
       );
+      addedLineCount += 1;
       newLineNumber += 1;
     } else if (isRemovedDiffLine(line)) {
       rows.push(
@@ -662,6 +668,7 @@ export function DiffBlock({ codeValue }: { codeValue: string }) {
           <span className="diff-code">{line.slice(1)}</span>
         </div>,
       );
+      removedLineCount += 1;
       oldLineNumber += 1;
     } else if (
       line.startsWith("diff --git") ||
@@ -669,13 +676,8 @@ export function DiffBlock({ codeValue }: { codeValue: string }) {
       line.startsWith("--- ") ||
       line.startsWith("+++ ")
     ) {
-      rows.push(
-        <div key={`${lineKey}:meta`} className="diff-row diff-meta">
-          <span className="diff-ln old"> </span>
-          <span className="diff-ln new"> </span>
-          <span className="diff-code">{line}</span>
-        </div>,
-      );
+      index += 1;
+      continue;
     } else {
       rows.push(
         <div key={`${lineKey}:context`} className="diff-row diff-context">
@@ -690,9 +692,20 @@ export function DiffBlock({ codeValue }: { codeValue: string }) {
     index += 1;
   }
 
+  const parsedFilePath = filePath ?? extractDiffFilePath(lines);
+  const displayFilePath = parsedFilePath
+    ? trimProjectPrefixFromPath(parsedFilePath, pathRoots)
+    : "Diff";
+
   return (
     <div className="code-block diff-block">
-      <div className="code-meta">diff</div>
+      <div className="code-meta diff-meta-bar">
+        <span className="diff-meta-file">{displayFilePath}</span>
+        <span className="diff-meta-counts">
+          <span className="diff-meta-added">+{addedLineCount}</span>
+          <span className="diff-meta-removed">-{removedLineCount}</span>
+        </span>
+      </div>
       <div className="diff-table">{rows}</div>
     </div>
   );
@@ -956,6 +969,42 @@ function parseDiffHunkStart(line: string): { oldLine: number; newLine: number } 
     return null;
   }
   return { oldLine, newLine };
+}
+
+function extractDiffFilePath(lines: string[]): string | null {
+  const headerLine =
+    lines.find((line) => line.startsWith("+++ ") && !line.includes("/dev/null")) ??
+    lines.find((line) => line.startsWith("--- ") && !line.includes("/dev/null")) ??
+    null;
+  if (!headerLine) {
+    return null;
+  }
+
+  const candidate = headerLine.slice(4).trim();
+  if (!candidate) {
+    return null;
+  }
+
+  return candidate.replace(/^["']|["']$/g, "").replace(/^[ab]\//, "");
+}
+
+function trimProjectPrefixFromPath(filePath: string, pathRoots: string[]): string {
+  const normalizedFilePath = filePath.replace(/\\/g, "/");
+  const normalizedRoots = pathRoots.map((root) => root.replace(/\\/g, "/").replace(/\/+$/, ""));
+
+  for (const root of normalizedRoots) {
+    if (!root) {
+      continue;
+    }
+    if (normalizedFilePath === root) {
+      return normalizedFilePath.split("/").pop() ?? normalizedFilePath;
+    }
+    if (normalizedFilePath.startsWith(`${root}/`)) {
+      return normalizedFilePath.slice(root.length + 1);
+    }
+  }
+
+  return normalizedFilePath;
 }
 
 function diffInlineSegments(

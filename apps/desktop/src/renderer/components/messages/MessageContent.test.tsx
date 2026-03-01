@@ -47,6 +47,7 @@ describe("MessageContent", () => {
 
     expect(screen.getByText("src/file.ts")).toBeInTheDocument();
     expect(document.body.textContent).toContain("const a = 2;");
+    expect(document.querySelector(".tool-edit-view .tool-edit-path")).toBeNull();
 
     rerender(
       <MessageContent
@@ -57,6 +58,7 @@ describe("MessageContent", () => {
     );
 
     expect(screen.getByText("src/write.ts")).toBeInTheDocument();
+    expect(document.querySelector(".tool-edit-view .tool-edit-path")).not.toBeNull();
     expect(screen.getByText("Written Content")).toBeInTheDocument();
     expect(document.body.textContent).toContain("new content");
   });

@@ -40,11 +40,11 @@ export function MessageContent({
   }
 
   if (category === "tool_edit") {
-    return <ToolEditContent text={text} query={query} />;
+    return <ToolEditContent text={text} query={query} pathRoots={pathRoots} />;
   }
 
   if (category === "tool_use") {
-    return <ToolUseContent text={text} query={query} />;
+    return <ToolUseContent text={text} query={query} pathRoots={pathRoots} />;
   }
 
   if (category === "tool_result") {
@@ -61,7 +61,15 @@ export function MessageContent({
   return <div className="rich-block">{renderRichText(text, query, "msg", pathRoots)}</div>;
 }
 
-function ToolUseContent({ text, query }: { text: string; query: string }) {
+function ToolUseContent({
+  text,
+  query,
+  pathRoots,
+}: {
+  text: string;
+  query: string;
+  pathRoots: string[];
+}) {
   const parsed = parseToolInvocationPayload(text);
   if (!parsed) {
     const formatted = tryFormatJson(text);
@@ -73,7 +81,7 @@ function ToolUseContent({ text, query }: { text: string; query: string }) {
   }
 
   if (parsed.isWrite) {
-    return <ToolEditContent text={text} query={query} />;
+    return <ToolEditContent text={text} query={query} pathRoots={pathRoots} />;
   }
 
   const command = asNonEmptyString(parsed.inputRecord?.cmd ?? parsed.inputRecord?.command);
@@ -143,7 +151,15 @@ function ToolResultContent({ text }: { text: string }) {
   );
 }
 
-function ToolEditContent({ text, query }: { text: string; query: string }) {
+function ToolEditContent({
+  text,
+  query,
+  pathRoots,
+}: {
+  text: string;
+  query: string;
+  pathRoots: string[];
+}) {
   const parsed = parseToolEditPayload(text);
   if (!parsed) {
     const formatted = tryFormatJson(text);
@@ -157,8 +173,7 @@ function ToolEditContent({ text, query }: { text: string; query: string }) {
   if (parsed.diff && isLikelyDiff("diff", parsed.diff)) {
     return (
       <div className="tool-edit-view">
-        {parsed.filePath ? <div className="tool-edit-path">{parsed.filePath}</div> : null}
-        <DiffBlock codeValue={parsed.diff} />
+        <DiffBlock codeValue={parsed.diff} filePath={parsed.filePath} pathRoots={pathRoots} />
       </div>
     );
   }
@@ -171,8 +186,7 @@ function ToolEditContent({ text, query }: { text: string; query: string }) {
     });
     return (
       <div className="tool-edit-view">
-        {parsed.filePath ? <div className="tool-edit-path">{parsed.filePath}</div> : null}
-        <DiffBlock codeValue={diff} />
+        <DiffBlock codeValue={diff} filePath={parsed.filePath} pathRoots={pathRoots} />
       </div>
     );
   }

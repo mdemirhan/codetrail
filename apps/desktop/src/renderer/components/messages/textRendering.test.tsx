@@ -16,6 +16,7 @@ vi.mock("./toolParsing", () => ({
 }));
 
 import {
+  DiffBlock,
   buildHighlightedTextNodes,
   detectLanguageFromContent,
   detectLanguageFromFilePath,
@@ -120,6 +121,9 @@ describe("renderRichText", () => {
   it("renders fenced diffs using diff table rows", () => {
     const markdown = [
       "```diff",
+      "diff --git a/a.ts b/a.ts",
+      "--- a/a.ts",
+      "+++ b/a.ts",
       "@@ -1,1 +1,1 @@",
       "-const value = 1",
       "+const value = 2",
@@ -134,6 +138,26 @@ describe("renderRichText", () => {
     expect(html).toContain('class="diff-row diff-add"');
     expect(html).toContain('class="diff-word-remove"');
     expect(html).toContain('class="diff-word-add"');
+    expect(html).toContain(">a.ts<");
+    expect(html).toContain(">+1<");
+    expect(html).toContain(">-1<");
+    expect(html).not.toContain("diff --git a/a.ts b/a.ts");
+    expect(html).not.toContain("--- a/a.ts");
+    expect(html).not.toContain("+++ b/a.ts");
+    expect(html).not.toContain("@@ -1,1 +1,1 @@");
+    expect(html).not.toContain('class="diff-row diff-meta"');
+  });
+
+  it("trims project root prefix from diff file path in the diff header", () => {
+    const html = renderNode(
+      <DiffBlock
+        codeValue={["-old", "+new"].join("\n")}
+        filePath="/Users/acme/repo/src/module/file.ts"
+        pathRoots={["/Users/acme/repo"]}
+      />,
+    );
+
+    expect(html).toContain(">src/module/file.ts<");
   });
 });
 

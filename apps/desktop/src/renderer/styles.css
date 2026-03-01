@@ -1685,6 +1685,39 @@ body.platform-macos .titlebar-left {
   padding: 5px 7px;
 }
 
+.diff-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.diff-meta-file {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-meta-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.diff-meta-added {
+  color: var(--diff-add-text);
+}
+
+.diff-meta-removed {
+  color: var(--diff-remove-text);
+}
+
 .code-pre,
 .diff-table {
   font-family: var(--font-mono);
