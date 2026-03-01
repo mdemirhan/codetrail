@@ -823,7 +823,6 @@ export function App() {
 
   const focusSessionSearch = useCallback(() => {
     setMainView("history");
-    setHistoryMode("session");
     window.setTimeout(() => {
       sessionSearchInputRef.current?.focus();
       sessionSearchInputRef.current?.select();
@@ -911,7 +910,7 @@ export function App() {
     const global = [
       "Cmd/Ctrl+1: History view",
       "Cmd/Ctrl+2: Search view",
-      "Cmd/Ctrl+F: Focus session search",
+      "Cmd/Ctrl+F: Focus history search",
       "Cmd/Ctrl+Shift+F: Open global search",
       "Cmd/Ctrl+R: Refresh index",
       "Cmd/Ctrl+Shift+R: Force reindex",

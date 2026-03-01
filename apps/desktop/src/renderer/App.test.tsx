@@ -536,4 +536,34 @@ describe("App", () => {
       ).toBe(true);
     });
   });
+
+  it("keeps bookmarks mode when Cmd/Ctrl+F focuses history search", async () => {
+    const user = userEvent.setup();
+    const client = createBookmarksSearchClient();
+
+    renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(screen.getByText("Project One")).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("Bookmarked messages")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Bookmarked messages"));
+    await waitFor(() => {
+      expect(screen.getByText("Parser behavior inspected and fixed.")).toBeInTheDocument();
+    });
+
+    const bookmarksSearch = screen.getByPlaceholderText(
+      "Search in bookmarks...",
+    ) as HTMLInputElement;
+
+    await user.keyboard("{Control>}f{/Control}");
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(bookmarksSearch);
+    });
+    expect(screen.getByPlaceholderText("Search in bookmarks...")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search in session...")).toBeNull();
+  });
 });
