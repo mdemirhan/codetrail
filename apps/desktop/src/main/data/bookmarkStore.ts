@@ -10,7 +10,7 @@ import {
 
 type DatabaseHandle = ReturnType<typeof openDatabase>;
 
-const BOOKMARKS_DB_SCHEMA_VERSION = 1;
+const BOOKMARKS_DB_SCHEMA_VERSION = 2;
 const SNAPSHOT_VERSION = 1;
 const BOOKMARKS_DB_FILE_NAME = "codetrail.bookmarks.sqlite";
 
@@ -53,7 +53,7 @@ export type BookmarkReconciliationResult = {
 };
 
 export type BookmarkStore = {
-  listProjectBookmarks: (projectId: string) => StoredBookmark[];
+  listProjectBookmarks: (projectId: string, query?: string) => StoredBookmark[];
   getBookmark: (projectId: string, messageId: string) => StoredBookmark | null;
   upsertBookmark: (snapshot: Omit<BookmarkSnapshot, "snapshotVersion" | "snapshotJson">) => void;
   removeBookmark: (projectId: string, messageId: string) => boolean;
@@ -92,6 +92,27 @@ export function createBookmarkStore(bookmarksDbPath: string): BookmarkStore {
        snapshot_json
      FROM bookmarks
      WHERE project_id = ?
+     ORDER BY message_created_at DESC, message_id DESC`,
+  );
+  const listByQueryStmt = db.prepare(
+    `SELECT
+       project_id,
+       session_id,
+       message_id,
+       message_source_id,
+       provider,
+       session_title,
+       message_category,
+       message_content,
+       message_created_at,
+       bookmarked_at,
+       is_orphaned,
+       orphaned_at,
+       snapshot_version,
+       snapshot_json
+     FROM bookmarks
+     WHERE project_id = ?
+       AND LOWER(message_content) LIKE ?
      ORDER BY message_created_at DESC, message_id DESC`,
   );
 
@@ -150,7 +171,13 @@ export function createBookmarkStore(bookmarksDbPath: string): BookmarkStore {
   const removeStmt = db.prepare("DELETE FROM bookmarks WHERE project_id = ? AND message_id = ?");
 
   return {
-    listProjectBookmarks: (projectId) => listStmt.all(projectId) as StoredBookmark[],
+    listProjectBookmarks: (projectId, query) => {
+      const normalizedQuery = query?.trim().toLowerCase() ?? "";
+      if (normalizedQuery.length === 0) {
+        return listStmt.all(projectId) as StoredBookmark[];
+      }
+      return listByQueryStmt.all(projectId, `%${normalizedQuery}%`) as StoredBookmark[];
+    },
     getBookmark: (projectId, messageId) => {
       const row = getStmt.get(projectId, messageId) as StoredBookmark | undefined;
       return row ?? null;
@@ -224,6 +251,9 @@ function ensureBookmarkSchema(db: DatabaseHandle): void {
   );
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_bookmarks_project_category ON bookmarks(project_id, message_category)",
+  );
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_bookmarks_project_message_content_lower ON bookmarks(project_id, LOWER(message_content))",
   );
   db.exec("CREATE INDEX IF NOT EXISTS idx_bookmarks_session_id ON bookmarks(session_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_bookmarks_orphaned ON bookmarks(is_orphaned)");

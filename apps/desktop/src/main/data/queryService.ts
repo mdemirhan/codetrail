@@ -482,7 +482,11 @@ function listProjectBookmarksWithStore(
   bookmarkStore: BookmarkStore,
   request: IpcRequest<"bookmarks:listProject">,
 ): IpcResponse<"bookmarks:listProject"> {
-  const storedRows = bookmarkStore.listProjectBookmarks(request.projectId);
+  const allStoredRows = bookmarkStore.listProjectBookmarks(request.projectId);
+  const hasQuery = (request.query?.trim().length ?? 0) > 0;
+  const storedRows = hasQuery
+    ? bookmarkStore.listProjectBookmarks(request.projectId, request.query)
+    : allStoredRows;
   const liveRowsByMessageId = listLiveBookmarkMessagesById(
     db,
     request.projectId,
@@ -530,7 +534,7 @@ function listProjectBookmarksWithStore(
 
   return {
     projectId: request.projectId,
-    totalCount: storedRows.length,
+    totalCount: allStoredRows.length,
     filteredCount: results.length,
     categoryCounts,
     results,

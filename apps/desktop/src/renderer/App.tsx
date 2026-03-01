@@ -148,6 +148,7 @@ export function App() {
     EMPTY_SYSTEM_MESSAGE_REGEX_RULES,
   );
   const [sessionQueryInput, setSessionQueryInput] = useState("");
+  const [bookmarkQueryInput, setBookmarkQueryInput] = useState("");
   const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>([
     ...DEFAULT_MESSAGE_CATEGORIES,
   ]);
@@ -186,9 +187,11 @@ export function App() {
 
   const projectQuery = useDebouncedValue(projectQueryInput, 180);
   const sessionQuery = useDebouncedValue(sessionQueryInput, 180);
+  const bookmarkQuery = useDebouncedValue(bookmarkQueryInput, 180);
   const searchQuery = useDebouncedValue(searchQueryInput, 220);
   const searchProjectQuery = useDebouncedValue(searchProjectQueryInput, 180);
   const effectiveSessionQuery = sessionQueryInput.trim().length === 0 ? "" : sessionQuery;
+  const effectiveBookmarkQuery = bookmarkQueryInput.trim().length === 0 ? "" : bookmarkQuery;
   const logError = useCallback((context: string, error: unknown) => {
     console.error(`[codetrail] ${context}: ${toErrorMessage(error)}`);
   }, []);
@@ -280,6 +283,7 @@ export function App() {
     const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
     const response = await codetrail.invoke("bookmarks:listProject", {
       projectId: selectedProjectId,
+      query: effectiveBookmarkQuery,
       categories: isAllHistoryCategoriesSelected ? undefined : historyCategories,
     });
     if (requestToken !== bookmarksLoadTokenRef.current) {
@@ -287,7 +291,7 @@ export function App() {
     }
     setBookmarksResponse(response);
     setBookmarksLoadedProjectId(selectedProjectId);
-  }, [codetrail, historyCategories, selectedProjectId]);
+  }, [codetrail, effectiveBookmarkQuery, historyCategories, selectedProjectId]);
 
   const loadSearch = useCallback(async () => {
     const trimmed = searchQuery.trim();
@@ -1012,7 +1016,7 @@ export function App() {
     }, 120);
   }, []);
 
-  const handleSessionSearchKeyDown = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
+  const handleHistorySearchKeyDown = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Escape") {
       return;
     }
@@ -1255,24 +1259,30 @@ export function App() {
                 ))}
               </div>
 
-              {historyMode === "session" ? (
-                <div className="msg-search">
-                  <div className="search-box">
-                    <ToolbarIcon name="search" />
-                    <input
-                      ref={sessionSearchInputRef}
-                      className="search-input"
-                      value={sessionQueryInput}
-                      onKeyDown={handleSessionSearchKeyDown}
-                      onChange={(event) => {
-                        setSessionQueryInput(event.target.value);
-                        setSessionPage(0);
-                      }}
-                      placeholder="Search in session..."
-                    />
-                  </div>
+              <div className="msg-search">
+                <div className="search-box">
+                  <ToolbarIcon name="search" />
+                  <input
+                    ref={sessionSearchInputRef}
+                    className="search-input"
+                    value={historyMode === "bookmarks" ? bookmarkQueryInput : sessionQueryInput}
+                    onKeyDown={handleHistorySearchKeyDown}
+                    onChange={(event) => {
+                      if (historyMode === "bookmarks") {
+                        setBookmarkQueryInput(event.target.value);
+                        return;
+                      }
+                      setSessionQueryInput(event.target.value);
+                      setSessionPage(0);
+                    }}
+                    placeholder={
+                      historyMode === "bookmarks"
+                        ? "Search in bookmarks..."
+                        : "Search in session..."
+                    }
+                  />
                 </div>
-              ) : null}
+              </div>
 
               <div
                 className="msg-scroll message-list"
@@ -1284,7 +1294,9 @@ export function App() {
                     <MessageCard
                       key={message.id}
                       message={message}
-                      query={historyMode === "session" ? effectiveSessionQuery : ""}
+                      query={
+                        historyMode === "bookmarks" ? effectiveBookmarkQuery : effectiveSessionQuery
+                      }
                       pathRoots={messagePathRoots}
                       isFocused={message.id === focusMessageId}
                       isBookmarked={bookmarkedMessageIds.has(message.id)}

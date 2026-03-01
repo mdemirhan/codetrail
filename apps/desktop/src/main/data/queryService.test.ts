@@ -153,11 +153,21 @@ describe("queryService in-memory", () => {
 
     const bookmarks = service.listProjectBookmarks({
       projectId: "project_1",
+      query: "stable",
       categories: ["assistant"],
     });
     expect(bookmarks.totalCount).toBe(1);
     expect(bookmarks.filteredCount).toBe(1);
     expect(bookmarks.results[0]?.message.id).toBe("message_2");
+
+    const queryMiss = service.listProjectBookmarks({
+      projectId: "project_1",
+      query: "not-present",
+      categories: undefined,
+    });
+    expect(queryMiss.totalCount).toBe(1);
+    expect(queryMiss.filteredCount).toBe(0);
+    expect(queryMiss.results).toEqual([]);
 
     const unbookmarked = service.toggleBookmark({
       projectId: "project_1",

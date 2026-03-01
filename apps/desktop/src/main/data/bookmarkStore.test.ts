@@ -107,6 +107,145 @@ describe("bookmarkStore", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("filters bookmarks by query using database-side matching", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-bookmark-query-"));
+    const indexedDbPath = join(dir, "indexed.sqlite");
+    seedIndexedDb(indexedDbPath);
+
+    const store = createBookmarkStore(resolveBookmarksDbPath(indexedDbPath));
+    store.upsertBookmark({
+      projectId: "p1",
+      sessionId: "s1",
+      messageId: "m1",
+      messageSourceId: "src1",
+      provider: "claude",
+      sessionTitle: "Project intro",
+      messageCategory: "assistant",
+      messageContent: "Parser bug is fixed",
+      messageCreatedAt: "2026-03-01T10:00:05.000Z",
+      bookmarkedAt: "2026-03-01T10:01:00.000Z",
+    });
+
+    store.upsertBookmark({
+      projectId: "p1",
+      sessionId: "s1",
+      messageId: "m2",
+      messageSourceId: "src2",
+      provider: "claude",
+      sessionTitle: "Project intro",
+      messageCategory: "assistant",
+      messageContent: "Formatting looks clean",
+      messageCreatedAt: "2026-03-01T10:00:06.000Z",
+      bookmarkedAt: "2026-03-01T10:01:01.000Z",
+    });
+
+    const all = store.listProjectBookmarks("p1");
+    expect(all).toHaveLength(2);
+
+    const parserMatches = store.listProjectBookmarks("p1", "parser");
+    expect(parserMatches).toHaveLength(1);
+    expect(parserMatches[0]?.message_id).toBe("m1");
+
+    const uppercaseMatches = store.listProjectBookmarks("p1", "FORMATTING");
+    expect(uppercaseMatches).toHaveLength(1);
+    expect(uppercaseMatches[0]?.message_id).toBe("m2");
+
+    const noMatches = store.listProjectBookmarks("p1", "does-not-exist");
+    expect(noMatches).toEqual([]);
+
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("applies additive schema changes for existing bookmark databases on open", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-bookmark-migrate-"));
+    const indexedDbPath = join(dir, "indexed.sqlite");
+    const bookmarksDbPath = resolveBookmarksDbPath(indexedDbPath);
+
+    const db = openDatabase(bookmarksDbPath);
+    db.exec(
+      `CREATE TABLE IF NOT EXISTS meta (
+         key TEXT PRIMARY KEY,
+         value TEXT NOT NULL
+       )`,
+    );
+    db.exec(
+      `CREATE TABLE IF NOT EXISTS bookmarks (
+         project_id TEXT NOT NULL,
+         session_id TEXT NOT NULL,
+         message_id TEXT NOT NULL,
+         message_source_id TEXT NOT NULL,
+         provider TEXT NOT NULL,
+         session_title TEXT NOT NULL,
+         message_category TEXT NOT NULL,
+         message_content TEXT NOT NULL,
+         message_created_at TEXT NOT NULL,
+         bookmarked_at TEXT NOT NULL,
+         is_orphaned INTEGER NOT NULL DEFAULT 0,
+         orphaned_at TEXT,
+         snapshot_version INTEGER NOT NULL,
+         snapshot_json TEXT NOT NULL,
+         PRIMARY KEY (project_id, message_id)
+       )`,
+    );
+    db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '1')").run();
+    db.exec(
+      `INSERT INTO bookmarks (
+         project_id,
+         session_id,
+         message_id,
+         message_source_id,
+         provider,
+         session_title,
+         message_category,
+         message_content,
+         message_created_at,
+         bookmarked_at,
+         is_orphaned,
+         orphaned_at,
+         snapshot_version,
+         snapshot_json
+       ) VALUES (
+         'p1',
+         's1',
+         'm1',
+         'src1',
+         'claude',
+         'Project intro',
+         'assistant',
+         'existing schema row',
+         '2026-03-01T10:00:05.000Z',
+         '2026-03-01T10:01:00.000Z',
+         0,
+         NULL,
+         1,
+         '{}'
+       )`,
+    );
+    db.close();
+
+    const store = createBookmarkStore(bookmarksDbPath);
+    const rows = store.listProjectBookmarks("p1", "existing");
+    expect(rows).toHaveLength(1);
+
+    const metaDb = openDatabase(bookmarksDbPath);
+    const schemaVersion = metaDb
+      .prepare("SELECT value FROM meta WHERE key = 'schema_version'")
+      .get() as { value: string } | undefined;
+    const indexes = metaDb.prepare("PRAGMA index_list('bookmarks')").all() as Array<{
+      name: string;
+    }>;
+    metaDb.close();
+
+    expect(schemaVersion?.value).toBe("2");
+    expect(
+      indexes.some((index) => index.name === "idx_bookmarks_project_message_content_lower"),
+    ).toBe(true);
+
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("marks missing messages as orphaned and restores when they reappear", () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-bookmark-reconcile-"));
     const indexedDbPath = join(dir, "indexed.sqlite");

@@ -309,14 +309,35 @@ describe("queryService", () => {
 
     const listed = listProjectBookmarks(dbPath, {
       projectId: target.project_id,
+      query: "",
       categories: undefined,
     });
     expect(listed.totalCount).toBe(1);
     expect(listed.filteredCount).toBe(1);
     expect(listed.results[0]?.message.id).toBe(target.id);
 
+    const queried = listProjectBookmarks(dbPath, {
+      projectId: target.project_id,
+      query: "fixed",
+      categories: undefined,
+    });
+    expect(queried.totalCount).toBe(1);
+    expect(queried.filteredCount).toBe(1);
+    expect(queried.results[0]?.message.id).toBe(target.id);
+
+    const queryMiss = listProjectBookmarks(dbPath, {
+      projectId: target.project_id,
+      query: "no-match-token",
+      categories: undefined,
+    });
+    expect(queryMiss.totalCount).toBe(1);
+    expect(queryMiss.filteredCount).toBe(0);
+    expect(queryMiss.categoryCounts.assistant).toBe(0);
+    expect(queryMiss.results).toEqual([]);
+
     const filteredOut = listProjectBookmarks(dbPath, {
       projectId: target.project_id,
+      query: "",
       categories: ["tool_use"],
     });
     expect(filteredOut.totalCount).toBe(1);
@@ -333,6 +354,7 @@ describe("queryService", () => {
 
     const afterDelete = listProjectBookmarks(dbPath, {
       projectId: target.project_id,
+      query: "",
       categories: undefined,
     });
     expect(afterDelete.totalCount).toBe(0);
@@ -388,6 +410,7 @@ describe("queryService", () => {
 
     const listed = listProjectBookmarks(dbPath, {
       projectId: older.project_id,
+      query: "",
       categories: undefined,
     });
     expect(listed.totalCount).toBe(2);
@@ -438,6 +461,7 @@ describe("queryService", () => {
 
     const listed = listProjectBookmarks(dbPath, {
       projectId: target.project_id,
+      query: "",
       categories: undefined,
     });
     expect(listed.totalCount).toBe(0);
@@ -500,6 +524,7 @@ describe("queryService", () => {
 
     const afterDelete = listProjectBookmarks(dbPath, {
       projectId: target.project_id,
+      query: "",
       categories: undefined,
     });
     expect(afterDelete.totalCount).toBe(0);

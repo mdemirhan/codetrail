@@ -218,6 +218,7 @@ export const ipcContractSchemas = {
   "bookmarks:listProject": {
     request: z.object({
       projectId: z.string().min(1),
+      query: z.string().optional(),
       categories: z.array(z.string().min(1)).optional(),
     }),
     response: z.object({

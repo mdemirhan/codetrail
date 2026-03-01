@@ -77,6 +77,7 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
   "bookmarks:listProject": {
     request: {
       projectId: "project_1",
+      query: "parser",
       categories: ["assistant"],
     },
     response: {
