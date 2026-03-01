@@ -86,6 +86,31 @@ describe("WorkerIndexingRunner", () => {
     });
   });
 
+  it("passes configured system message regex rules into indexing jobs", async () => {
+    const runIncrementalIndexing = vi.fn(() => makeIndexingResult());
+    const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
+      runIncrementalIndexing,
+      resolveWorkerUrl: () => null,
+      getSystemMessageRegexRules: () => ({
+        claude: ["^<command-name>"],
+        codex: ["^<environment_context>"],
+        gemini: [],
+      }),
+    });
+
+    await runner.enqueue({ force: false });
+
+    expect(runIncrementalIndexing).toHaveBeenCalledWith({
+      dbPath: "/tmp/codetrail.db",
+      forceReindex: false,
+      systemMessageRegexRules: {
+        claude: ["^<command-name>"],
+        codex: ["^<environment_context>"],
+        gemini: [],
+      },
+    });
+  });
+
   it("uses worker path when worker returns success", async () => {
     const runIncrementalIndexing = vi.fn(() => makeIndexingResult());
     const controller = createWorkerController();

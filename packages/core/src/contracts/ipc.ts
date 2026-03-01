@@ -102,6 +102,11 @@ const regularFontSizeSchema = z.enum([
   "18px",
   "20px",
 ]);
+const systemMessageRegexRulesSchema = z.object({
+  claude: z.array(z.string()),
+  codex: z.array(z.string()),
+  gemini: z.array(z.string()),
+});
 
 const paneStateSchema = z.object({
   projectPaneWidth: z.number().int().positive().nullable(),
@@ -121,6 +126,7 @@ const paneStateSchema = z.object({
   historyMode: z.enum(["session", "bookmarks"]).nullable(),
   sessionPage: z.number().int().nonnegative().nullable(),
   sessionScrollTop: z.number().int().nonnegative().nullable(),
+  systemMessageRegexRules: systemMessageRegexRulesSchema.nullable(),
 });
 
 const uiZoomResponseSchema = z.object({
@@ -279,6 +285,7 @@ export const ipcContractSchemas = {
       historyMode: z.enum(["session", "bookmarks"]),
       sessionPage: z.number().int().nonnegative(),
       sessionScrollTop: z.number().int().nonnegative(),
+      systemMessageRegexRules: systemMessageRegexRulesSchema,
     }),
     response: z.object({
       ok: z.literal(true),

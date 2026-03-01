@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { MessageCategory } from "@codetrail/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -35,84 +36,54 @@ const info = {
   },
 };
 
+function createBaseProps() {
+  return {
+    monoFontFamily: "droid_sans_mono" as const,
+    regularFontFamily: "current" as const,
+    monoFontSize: "12px" as const,
+    regularFontSize: "13.5px" as const,
+    useMonospaceForAllMessages: false,
+    onMonoFontFamilyChange: vi.fn(),
+    onRegularFontFamilyChange: vi.fn(),
+    onMonoFontSizeChange: vi.fn(),
+    onRegularFontSizeChange: vi.fn(),
+    onUseMonospaceForAllMessagesChange: vi.fn(),
+    expandedByDefaultCategories: ["assistant"] as MessageCategory[],
+    onToggleExpandedByDefault: vi.fn(),
+    systemMessageRegexRules: {
+      claude: ["^<command-name>"],
+      codex: ["^<environment_context>"],
+      gemini: [],
+    },
+    onAddSystemMessageRegexRule: vi.fn(),
+    onUpdateSystemMessageRegexRule: vi.fn(),
+    onRemoveSystemMessageRegexRule: vi.fn(),
+  };
+}
+
 describe("SettingsView", () => {
   it("renders loading and error states", () => {
+    const baseProps = createBaseProps();
     const { rerender } = render(
-      <SettingsView
-        info={null}
-        loading={true}
-        error={null}
-        monoFontFamily="droid_sans_mono"
-        regularFontFamily="current"
-        monoFontSize="12px"
-        regularFontSize="13.5px"
-        useMonospaceForAllMessages={false}
-        onMonoFontFamilyChange={vi.fn()}
-        onRegularFontFamilyChange={vi.fn()}
-        onMonoFontSizeChange={vi.fn()}
-        onRegularFontSizeChange={vi.fn()}
-        onUseMonospaceForAllMessagesChange={vi.fn()}
-        expandedByDefaultCategories={["assistant"]}
-        onToggleExpandedByDefault={vi.fn()}
-      />,
+      <SettingsView info={null} loading={true} error={null} {...baseProps} />,
     );
 
     expect(screen.getByText("Loading settings...")).toBeInTheDocument();
 
-    rerender(
-      <SettingsView
-        info={null}
-        loading={false}
-        error="boom"
-        monoFontFamily="droid_sans_mono"
-        regularFontFamily="current"
-        monoFontSize="12px"
-        regularFontSize="13.5px"
-        useMonospaceForAllMessages={false}
-        onMonoFontFamilyChange={vi.fn()}
-        onRegularFontFamilyChange={vi.fn()}
-        onMonoFontSizeChange={vi.fn()}
-        onRegularFontSizeChange={vi.fn()}
-        onUseMonospaceForAllMessagesChange={vi.fn()}
-        expandedByDefaultCategories={["assistant"]}
-        onToggleExpandedByDefault={vi.fn()}
-      />,
-    );
+    rerender(<SettingsView info={null} loading={false} error="boom" {...baseProps} />);
 
     expect(screen.getByText("boom")).toBeInTheDocument();
   });
 
   it("renders settings details and handles control interactions", async () => {
     const user = userEvent.setup();
-    const onMonoFontFamilyChange = vi.fn();
-    const onRegularFontFamilyChange = vi.fn();
-    const onMonoFontSizeChange = vi.fn();
-    const onRegularFontSizeChange = vi.fn();
-    const onUseMonospaceForAllMessagesChange = vi.fn();
-    const onToggleExpandedByDefault = vi.fn();
+    const baseProps = createBaseProps();
 
-    render(
-      <SettingsView
-        info={info}
-        loading={false}
-        error={null}
-        monoFontFamily="droid_sans_mono"
-        regularFontFamily="current"
-        monoFontSize="12px"
-        regularFontSize="13.5px"
-        useMonospaceForAllMessages={false}
-        onMonoFontFamilyChange={onMonoFontFamilyChange}
-        onRegularFontFamilyChange={onRegularFontFamilyChange}
-        onMonoFontSizeChange={onMonoFontSizeChange}
-        onRegularFontSizeChange={onRegularFontSizeChange}
-        onUseMonospaceForAllMessagesChange={onUseMonospaceForAllMessagesChange}
-        expandedByDefaultCategories={["assistant"]}
-        onToggleExpandedByDefault={onToggleExpandedByDefault}
-      />,
-    );
+    render(<SettingsView info={info} loading={false} error={null} {...baseProps} />);
 
     expect(screen.getByText("Storage")).toBeInTheDocument();
     expect(screen.getByText("Discovery Roots")).toBeInTheDocument();
+    expect(screen.getByText("System Message Rules")).toBeInTheDocument();
 
     const selects = screen.getAllByRole("combobox");
     expect(selects).toHaveLength(4);
@@ -125,6 +96,9 @@ describe("SettingsView", () => {
       screen.getByRole("checkbox", { name: "Use monospaced fonts for all messages" }),
     );
     await user.click(screen.getByRole("button", { name: "User" }));
+    await user.click(screen.getByRole("button", { name: "Add claude regex rule" }));
+    await user.type(screen.getByRole("textbox", { name: "claude regex rule 1" }), "$");
+    await user.click(screen.getByRole("button", { name: "Remove claude regex rule 1" }));
 
     const copyButtons = screen.getAllByRole("button", { name: /Copy /i });
     const openButtons = screen.getAllByRole("button", { name: /Open /i });
@@ -133,12 +107,19 @@ describe("SettingsView", () => {
     await user.click(copyButtons[0] as HTMLElement);
     await user.click(openButtons[0] as HTMLElement);
 
-    expect(onMonoFontFamilyChange).toHaveBeenCalledWith("current");
-    expect(onMonoFontSizeChange).toHaveBeenCalledWith("13px");
-    expect(onRegularFontFamilyChange).toHaveBeenCalledWith("inter");
-    expect(onRegularFontSizeChange).toHaveBeenCalledWith("14px");
-    expect(onUseMonospaceForAllMessagesChange).toHaveBeenCalledWith(true);
-    expect(onToggleExpandedByDefault).toHaveBeenCalledWith("user");
+    expect(baseProps.onMonoFontFamilyChange).toHaveBeenCalledWith("current");
+    expect(baseProps.onMonoFontSizeChange).toHaveBeenCalledWith("13px");
+    expect(baseProps.onRegularFontFamilyChange).toHaveBeenCalledWith("inter");
+    expect(baseProps.onRegularFontSizeChange).toHaveBeenCalledWith("14px");
+    expect(baseProps.onUseMonospaceForAllMessagesChange).toHaveBeenCalledWith(true);
+    expect(baseProps.onToggleExpandedByDefault).toHaveBeenCalledWith("user");
+    expect(baseProps.onAddSystemMessageRegexRule).toHaveBeenCalledWith("claude");
+    expect(baseProps.onUpdateSystemMessageRegexRule).toHaveBeenCalledWith(
+      "claude",
+      0,
+      "^<command-name>$",
+    );
+    expect(baseProps.onRemoveSystemMessageRegexRule).toHaveBeenCalledWith("claude", 0);
     expect(copyTextToClipboard).toHaveBeenCalled();
     expect(openPath).toHaveBeenCalled();
   });

@@ -71,6 +71,11 @@ describe("AppStateStore", () => {
       historyMode: "bookmarks",
       sessionPage: 3,
       sessionScrollTop: 672,
+      systemMessageRegexRules: {
+        claude: ["^<command-name>"],
+        codex: ["^<environment_context>"],
+        gemini: [],
+      },
     });
     store.setWindowState({ width: 1440, height: 920, x: 48, y: 72, isMaximized: false });
     store.flush();
@@ -90,6 +95,11 @@ describe("AppStateStore", () => {
       historyMode: "bookmarks",
       sessionPage: 3,
       sessionScrollTop: 672,
+      systemMessageRegexRules: {
+        claude: ["^<command-name>"],
+        codex: ["^<environment_context>"],
+        gemini: [],
+      },
     });
     expect(reloaded.getWindowState()).toEqual({
       width: 1440,

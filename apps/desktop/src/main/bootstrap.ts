@@ -7,6 +7,7 @@ import {
   DATABASE_SCHEMA_VERSION,
   DEFAULT_DISCOVERY_CONFIG,
   initializeDatabase,
+  resolveSystemMessageRegexRules,
 } from "@codetrail/core";
 
 import type { AppStateStore } from "./appStateStore";
@@ -33,7 +34,10 @@ export async function bootstrapMainProcess(
   const dbPath = options.dbPath ?? join(app.getPath("userData"), "codetrail.sqlite");
 
   const dbBootstrap = initializeDatabase(dbPath);
-  const indexingRunner = new WorkerIndexingRunner(dbPath);
+  const indexingRunner = new WorkerIndexingRunner(dbPath, {
+    getSystemMessageRegexRules: () =>
+      options.appStateStore?.getPaneState()?.systemMessageRegexRules,
+  });
   if (activeQueryService) {
     activeQueryService.close();
   }
@@ -115,6 +119,7 @@ export async function bootstrapMainProcess(
         historyMode: paneState?.historyMode ?? null,
         sessionPage: paneState?.sessionPage ?? null,
         sessionScrollTop: paneState?.sessionScrollTop ?? null,
+        systemMessageRegexRules: resolveSystemMessageRegexRules(paneState?.systemMessageRegexRules),
       };
     },
     "ui:setState": (payload) => {
@@ -136,6 +141,7 @@ export async function bootstrapMainProcess(
         historyMode: payload.historyMode,
         sessionPage: payload.sessionPage,
         sessionScrollTop: payload.sessionScrollTop,
+        systemMessageRegexRules: payload.systemMessageRegexRules,
       });
       return { ok: true };
     },

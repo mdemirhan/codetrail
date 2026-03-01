@@ -54,12 +54,21 @@ const SESSION_TITLE_JOIN_SQL = `
       SELECT
         m.session_id,
         m.content,
-        ROW_NUMBER() OVER (PARTITION BY m.session_id ORDER BY m.created_at, m.id) AS row_num
+        ROW_NUMBER() OVER (
+          PARTITION BY m.session_id
+          ORDER BY
+            CASE
+              WHEN m.category = 'user' THEN 0
+              WHEN m.category = 'assistant' THEN 1
+              ELSE 2
+            END,
+            m.created_at,
+            m.id
+        ) AS row_num
       FROM messages m
-      WHERE m.category = 'user'
     ) ranked
     WHERE ranked.row_num = 1
-  ) first_user ON first_user.session_id = s.id
+  ) first_title ON first_title.session_id = s.id
 `;
 
 export type QueryService = {
@@ -252,7 +261,7 @@ function listSessionsWithDatabase(
          s.project_id,
          s.provider,
          s.file_path,
-         COALESCE(first_user.content, '') as title,
+         COALESCE(first_title.content, '') as title,
          s.model_names,
          s.started_at,
          s.ended_at,
@@ -283,7 +292,7 @@ function getSessionDetailWithDatabase(
          s.project_id,
          s.provider,
          s.file_path,
-         COALESCE(first_user.content, '') as title,
+         COALESCE(first_title.content, '') as title,
          s.model_names,
          s.started_at,
          s.ended_at,
@@ -484,7 +493,7 @@ function listProjectBookmarksWithDatabase(
          b.project_id,
          b.session_id,
          b.created_at as bookmarked_at,
-         COALESCE(first_user.content, '') as session_title,
+         COALESCE(first_title.content, '') as session_title,
          m.id,
          m.source_id,
          m.session_id,

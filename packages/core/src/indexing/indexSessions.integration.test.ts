@@ -340,4 +340,101 @@ describe("runIncrementalIndexing", () => {
     expect(rows.c).toBe(2);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it("applies default and overridden system message regex rules during ingestion", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-index-system-rules-"));
+    const dbPath = join(dir, "index.db");
+
+    const claudeRoot = join(dir, ".claude", "projects");
+    const claudeProject = join(claudeRoot, "project-system-rules");
+    mkdirSync(claudeProject, { recursive: true });
+    writeFileSync(
+      join(claudeProject, "claude-session-1.jsonl"),
+      `${[
+        JSON.stringify({
+          type: "user",
+          timestamp: "2026-02-27T10:00:00Z",
+          message: {
+            role: "user",
+            content: [{ type: "text", text: "<command-name>/exit</command-name>" }],
+          },
+        }),
+      ].join("\n")}\n`,
+    );
+
+    const codexRoot = join(dir, ".codex", "sessions", "2026", "02", "27");
+    mkdirSync(codexRoot, { recursive: true });
+    writeFileSync(
+      join(codexRoot, "codex-session-1.jsonl"),
+      `${[
+        JSON.stringify({
+          timestamp: "2026-02-27T11:00:00Z",
+          type: "session_meta",
+          payload: {
+            id: "codex-session-1",
+            cwd: "/workspace/codex",
+            git: { branch: "dev" },
+          },
+        }),
+        JSON.stringify({
+          timestamp: "2026-02-27T11:00:01Z",
+          type: "response_item",
+          payload: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: "<environment_context>" }],
+          },
+        }),
+      ].join("\n")}\n`,
+    );
+
+    const discoveryConfig = {
+      claudeRoot,
+      codexRoot: join(dir, ".codex", "sessions"),
+      geminiRoot: join(dir, ".gemini", "tmp"),
+      geminiHistoryRoot: join(dir, ".gemini", "history"),
+      geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      includeClaudeSubagents: false,
+    };
+
+    runIncrementalIndexing({
+      dbPath,
+      discoveryConfig,
+    });
+
+    const dbAfterDefault = openDatabase(dbPath);
+    const defaultRows = dbAfterDefault
+      .prepare("SELECT provider, category FROM messages WHERE category = 'system'")
+      .all() as Array<{ provider: string; category: string }>;
+    dbAfterDefault.close();
+
+    expect(defaultRows.some((row) => row.provider === "claude")).toBe(true);
+    expect(defaultRows.some((row) => row.provider === "codex")).toBe(true);
+
+    runIncrementalIndexing({
+      dbPath,
+      forceReindex: true,
+      discoveryConfig,
+      systemMessageRegexRules: {
+        claude: [],
+        codex: [],
+        gemini: [],
+      },
+    });
+
+    const dbAfterOverride = openDatabase(dbPath);
+    const overriddenRows = dbAfterOverride
+      .prepare("SELECT provider, category FROM messages WHERE content = '<environment_context>'")
+      .all() as Array<{ provider: string; category: string }>;
+    dbAfterOverride.close();
+
+    expect(overriddenRows).toEqual([
+      {
+        provider: "codex",
+        category: "user",
+      },
+    ]);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
 });

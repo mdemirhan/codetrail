@@ -12,11 +12,16 @@ import { parseSession } from "../parsing";
 import { asArray, asRecord, readString } from "../parsing/helpers";
 
 import { makeMessageId, makeProjectId, makeSessionId, makeToolCallId } from "./ids";
+import {
+  type SystemMessageRegexRuleOverrides,
+  resolveSystemMessageRegexRules,
+} from "./systemMessageRules";
 
 export type IndexingConfig = {
   dbPath: string;
   forceReindex?: boolean;
   discoveryConfig?: Partial<DiscoveryConfig>;
+  systemMessageRegexRules?: SystemMessageRegexRuleOverrides;
 };
 
 export type IndexingResult = {
@@ -67,6 +72,7 @@ type SessionFileRow = {
 type IndexedMessage = ReturnType<typeof parseSession>["messages"][number];
 
 const MAX_DERIVED_DURATION_MS = 15 * 60 * 1000;
+const PROVIDERS: Provider[] = ["claude", "codex", "gemini"];
 
 export function runIncrementalIndexing(
   config: IndexingConfig,
@@ -96,6 +102,8 @@ export function runIncrementalIndexing(
     let skippedFiles = 0;
     let removedFiles = 0;
     const diagnostics = { warnings: 0, errors: 0 };
+    const compiledSystemMessageRules = compileSystemMessageRules(config.systemMessageRegexRules);
+    diagnostics.warnings += compiledSystemMessageRules.invalidCount;
 
     if (!config.forceReindex) {
       for (const existing of existingRows) {
@@ -253,7 +261,11 @@ export function runIncrementalIndexing(
 
       const projectId = makeProjectId(discovered.provider, discovered.projectPath);
       const sourceMeta = extractSourceMetadata(discovered.provider, source.rawPayload);
-      const messagesWithDuration = deriveOperationDurations(parsed.messages);
+      const normalizedMessages = reclassifySystemMessages(
+        parsed.messages,
+        compiledSystemMessageRules.compiledByProvider[discovered.provider],
+      );
+      const messagesWithDuration = deriveOperationDurations(normalizedMessages);
       const aggregate = buildSessionAggregate(
         messagesWithDuration.map((message) => ({
           ...message,
@@ -613,6 +625,59 @@ function selectDerivedBaseline(
 
 function splitMessageRoot(id: string): string {
   return id.replace(/#\d+$/, "");
+}
+
+function compileSystemMessageRules(overrides?: SystemMessageRegexRuleOverrides): {
+  compiledByProvider: Record<Provider, RegExp[]>;
+  invalidCount: number;
+} {
+  const resolved = resolveSystemMessageRegexRules(overrides);
+  const compiledByProvider: Record<Provider, RegExp[]> = {
+    claude: [],
+    codex: [],
+    gemini: [],
+  };
+
+  let invalidCount = 0;
+  for (const provider of PROVIDERS) {
+    const compiled: RegExp[] = [];
+    for (const pattern of resolved[provider]) {
+      const normalized = pattern.trim();
+      if (normalized.length === 0) {
+        continue;
+      }
+      try {
+        compiled.push(new RegExp(normalized, "u"));
+      } catch {
+        invalidCount += 1;
+      }
+    }
+    compiledByProvider[provider] = compiled;
+  }
+
+  return { compiledByProvider, invalidCount };
+}
+
+function reclassifySystemMessages(messages: IndexedMessage[], rules: RegExp[]): IndexedMessage[] {
+  if (rules.length === 0) {
+    return messages;
+  }
+
+  return messages.map((message) => {
+    if (message.category === "system") {
+      return message;
+    }
+
+    const isSystemMatch = rules.some((rule) => rule.test(message.content));
+    if (!isSystemMatch) {
+      return message;
+    }
+
+    return {
+      ...message,
+      category: "system",
+    };
+  });
 }
 
 function buildSessionAggregate(

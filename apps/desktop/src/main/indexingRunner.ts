@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 
-import { runIncrementalIndexing } from "@codetrail/core";
+import { type SystemMessageRegexRuleOverrides, runIncrementalIndexing } from "@codetrail/core";
 
 export type RefreshJobRequest = {
   force: boolean;
@@ -15,6 +15,7 @@ export type RefreshJobResponse = {
 type IndexingWorkerRequest = {
   dbPath: string;
   forceReindex: boolean;
+  systemMessageRegexRules?: SystemMessageRegexRuleOverrides;
 };
 
 type IndexingWorkerResponse =
@@ -38,6 +39,7 @@ export type IndexingRunnerDependencies = {
   runIncrementalIndexing?: typeof runIncrementalIndexing;
   resolveWorkerUrl?: () => URL | null;
   createWorker?: (workerUrl: URL) => WorkerLike;
+  getSystemMessageRegexRules?: () => SystemMessageRegexRuleOverrides | undefined;
 };
 
 export class WorkerIndexingRunner {
@@ -47,6 +49,9 @@ export class WorkerIndexingRunner {
   private readonly workerUrl: URL | null;
   private readonly runIncrementalIndexingFn: typeof runIncrementalIndexing;
   private readonly createWorkerFn: (workerUrl: URL) => WorkerLike;
+  private readonly getSystemMessageRegexRulesFn:
+    | (() => SystemMessageRegexRuleOverrides | undefined)
+    | null;
 
   constructor(dbPath: string, dependencies: IndexingRunnerDependencies = {}) {
     this.dbPath = dbPath;
@@ -57,14 +62,17 @@ export class WorkerIndexingRunner {
       ((workerUrl) => {
         return new Worker(workerUrl);
       });
+    this.getSystemMessageRegexRulesFn = dependencies.getSystemMessageRegexRules ?? null;
   }
 
   async enqueue(request: RefreshJobRequest): Promise<RefreshJobResponse> {
     const jobId = `refresh-${++this.sequence}`;
+    const systemMessageRegexRules = this.getSystemMessageRegexRulesFn?.();
     const task = this.queue.then(async () => {
       await runIndexingJob({
         dbPath: this.dbPath,
         forceReindex: request.force,
+        ...(systemMessageRegexRules ? { systemMessageRegexRules } : {}),
         workerUrl: this.workerUrl,
         runIncrementalIndexing: this.runIncrementalIndexingFn,
         createWorker: this.createWorkerFn,
@@ -81,6 +89,7 @@ export class WorkerIndexingRunner {
 async function runIndexingJob(args: {
   dbPath: string;
   forceReindex: boolean;
+  systemMessageRegexRules?: SystemMessageRegexRuleOverrides;
   workerUrl: URL | null;
   runIncrementalIndexing: typeof runIncrementalIndexing;
   createWorker: (workerUrl: URL) => WorkerLike;
@@ -89,6 +98,9 @@ async function runIndexingJob(args: {
     args.runIncrementalIndexing({
       dbPath: args.dbPath,
       forceReindex: args.forceReindex,
+      ...(args.systemMessageRegexRules
+        ? { systemMessageRegexRules: args.systemMessageRegexRules }
+        : {}),
     });
     return;
   }
@@ -99,6 +111,9 @@ async function runIndexingJob(args: {
       {
         dbPath: args.dbPath,
         forceReindex: args.forceReindex,
+        ...(args.systemMessageRegexRules
+          ? { systemMessageRegexRules: args.systemMessageRegexRules }
+          : {}),
       },
       args.createWorker,
     );
@@ -106,6 +121,9 @@ async function runIndexingJob(args: {
     args.runIncrementalIndexing({
       dbPath: args.dbPath,
       forceReindex: args.forceReindex,
+      ...(args.systemMessageRegexRules
+        ? { systemMessageRegexRules: args.systemMessageRegexRules }
+        : {}),
     });
   }
 }

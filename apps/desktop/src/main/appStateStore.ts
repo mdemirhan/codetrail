@@ -36,6 +36,7 @@ export type PaneState = {
   historyMode?: "session" | "bookmarks";
   sessionPage?: number;
   sessionScrollTop?: number;
+  systemMessageRegexRules?: Record<Provider, string[]>;
 };
 
 export type WindowState = {
@@ -75,6 +76,8 @@ const PAGE_MIN = 0;
 const PAGE_MAX = 1_000_000;
 const SCROLL_TOP_MIN = 0;
 const SCROLL_TOP_MAX = 10_000_000;
+const SYSTEM_MESSAGE_RULES_MAX = 100;
+const SYSTEM_MESSAGE_RULE_LENGTH_MAX = 2000;
 const WINDOW_MIN = 320;
 const WINDOW_MAX = 6000;
 const PROVIDER_VALUES: Provider[] = [...UI_PROVIDER_VALUES];
@@ -250,6 +253,7 @@ function sanitizePaneState(value: unknown): PaneState | null {
     SCROLL_TOP_MIN,
     SCROLL_TOP_MAX,
   );
+  const systemMessageRegexRules = sanitizeSystemMessageRegexRules(record.systemMessageRegexRules);
 
   return {
     projectPaneWidth,
@@ -269,6 +273,7 @@ function sanitizePaneState(value: unknown): PaneState | null {
     ...(historyMode ? { historyMode } : {}),
     ...(sessionPage === null ? {} : { sessionPage }),
     ...(sessionScrollTop === null ? {} : { sessionScrollTop }),
+    ...(systemMessageRegexRules ? { systemMessageRegexRules } : {}),
   };
 }
 
@@ -359,4 +364,42 @@ function sanitizeOptionalBoolean(value: unknown): boolean | null {
     return null;
   }
   return value;
+}
+
+function sanitizeSystemMessageRegexRules(value: unknown): Record<Provider, string[]> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const rules: Record<Provider, string[]> = {
+    claude: [],
+    codex: [],
+    gemini: [],
+  };
+
+  for (const provider of PROVIDER_VALUES) {
+    const rawPatterns = record[provider];
+    if (!Array.isArray(rawPatterns) || rawPatterns.length > SYSTEM_MESSAGE_RULES_MAX) {
+      return null;
+    }
+
+    const patterns: string[] = [];
+    for (const rawPattern of rawPatterns) {
+      if (typeof rawPattern !== "string") {
+        return null;
+      }
+      const pattern = rawPattern.trim();
+      if (pattern.length === 0 || pattern.length > SYSTEM_MESSAGE_RULE_LENGTH_MAX) {
+        continue;
+      }
+      if (!patterns.includes(pattern)) {
+        patterns.push(pattern);
+      }
+    }
+
+    rules[provider] = patterns;
+  }
+
+  return rules;
 }

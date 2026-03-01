@@ -1,10 +1,11 @@
 import { parentPort } from "node:worker_threads";
 
-import { runIncrementalIndexing } from "@codetrail/core";
+import { type SystemMessageRegexRuleOverrides, runIncrementalIndexing } from "@codetrail/core";
 
 type IndexingWorkerRequest = {
   dbPath: string;
   forceReindex: boolean;
+  systemMessageRegexRules?: SystemMessageRegexRuleOverrides;
 };
 
 type IndexingWorkerResponse =
@@ -25,6 +26,9 @@ parentPort.on("message", (request: IndexingWorkerRequest) => {
     runIncrementalIndexing({
       dbPath: request.dbPath,
       forceReindex: request.forceReindex,
+      ...(request.systemMessageRegexRules
+        ? { systemMessageRegexRules: request.systemMessageRegexRules }
+        : {}),
     });
     const response: IndexingWorkerResponse = { ok: true };
     parentPort?.postMessage(response);

@@ -33,6 +33,7 @@ function createAppClient() {
         historyMode: null,
         sessionPage: null,
         sessionScrollTop: null,
+        systemMessageRegexRules: null,
       };
     }
 

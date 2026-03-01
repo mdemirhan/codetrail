@@ -104,6 +104,7 @@ describe("registerIpcHandlers", () => {
           historyMode: null,
           sessionPage: null,
           sessionScrollTop: null,
+          systemMessageRegexRules: null,
         }),
         "ui:setState": () => ({
           ok: true,
@@ -220,6 +221,7 @@ describe("registerIpcHandlers", () => {
           historyMode: null,
           sessionPage: null,
           sessionScrollTop: null,
+          systemMessageRegexRules: null,
         }),
         "ui:setState": () => ({ ok: true }),
         "ui:getZoom": () => ({ percent: 100 }),

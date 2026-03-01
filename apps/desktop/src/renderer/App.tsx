@@ -68,6 +68,7 @@ const EMPTY_CATEGORY_COUNTS = {
 type MainView = "history" | "search" | "settings";
 type HistoryMode = "session" | "bookmarks";
 type BulkExpandScope = "all" | MessageCategory;
+type SystemMessageRegexRules = Record<Provider, string[]>;
 
 const EMPTY_BOOKMARKS_RESPONSE: BookmarkListResponse = {
   projectId: "",
@@ -75,6 +76,11 @@ const EMPTY_BOOKMARKS_RESPONSE: BookmarkListResponse = {
   filteredCount: 0,
   categoryCounts: EMPTY_CATEGORY_COUNTS,
   results: [],
+};
+const EMPTY_SYSTEM_MESSAGE_REGEX_RULES: SystemMessageRegexRules = {
+  claude: [],
+  codex: [],
+  gemini: [],
 };
 
 const MONO_FONT_STACKS: Record<MonoFontFamily, string> = {
@@ -138,6 +144,9 @@ export function App() {
     useState<BookmarkListResponse>(EMPTY_BOOKMARKS_RESPONSE);
   const [sessionPage, setSessionPage] = useState(0);
   const [sessionScrollTop, setSessionScrollTop] = useState(0);
+  const [systemMessageRegexRules, setSystemMessageRegexRules] = useState<SystemMessageRegexRules>(
+    EMPTY_SYSTEM_MESSAGE_REGEX_RULES,
+  );
   const [sessionQueryInput, setSessionQueryInput] = useState("");
   const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>([
     ...DEFAULT_MESSAGE_CATEGORIES,
@@ -344,6 +353,7 @@ export function App() {
     historyMode,
     sessionPage,
     sessionScrollTop,
+    systemMessageRegexRules,
     setProjectPaneWidth,
     setSessionPaneWidth,
     setProjectProviders,
@@ -361,6 +371,7 @@ export function App() {
     setHistoryMode,
     setSessionPage,
     setSessionScrollTop,
+    setSystemMessageRegexRules,
     sessionScrollTopRef,
     pendingRestoredSessionScrollRef,
   });
@@ -1447,6 +1458,39 @@ export function App() {
                 setExpandedByDefaultCategories((value) =>
                   toggleValue<MessageCategory>(value, category),
                 )
+              }
+              systemMessageRegexRules={systemMessageRegexRules}
+              onAddSystemMessageRegexRule={(provider) =>
+                setSystemMessageRegexRules((value) => ({
+                  ...value,
+                  [provider]: [...value[provider], ""],
+                }))
+              }
+              onUpdateSystemMessageRegexRule={(provider, index, pattern) =>
+                setSystemMessageRegexRules((value) => {
+                  const current = value[provider] ?? [];
+                  if (index < 0 || index >= current.length) {
+                    return value;
+                  }
+                  const next = [...current];
+                  next[index] = pattern;
+                  return {
+                    ...value,
+                    [provider]: next,
+                  };
+                })
+              }
+              onRemoveSystemMessageRegexRule={(provider, index) =>
+                setSystemMessageRegexRules((value) => {
+                  const current = value[provider] ?? [];
+                  if (index < 0 || index >= current.length) {
+                    return value;
+                  }
+                  return {
+                    ...value,
+                    [provider]: current.filter((_, candidateIndex) => candidateIndex !== index),
+                  };
+                })
               }
             />
           )}

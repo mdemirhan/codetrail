@@ -103,7 +103,14 @@ const indexStatements = [
   "CREATE INDEX IF NOT EXISTS idx_bookmarks_session_id ON bookmarks(session_id)",
 ] as const;
 
-const dataTables = ["tool_calls", "messages", "sessions", "projects", "indexed_files"] as const;
+const dataTables = [
+  "bookmarks",
+  "tool_calls",
+  "messages",
+  "sessions",
+  "projects",
+  "indexed_files",
+] as const;
 
 export function openDatabase(databasePath: string): SqliteDatabase {
   const db = new Database(databasePath);

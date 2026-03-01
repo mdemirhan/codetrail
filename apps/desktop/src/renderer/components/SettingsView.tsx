@@ -19,6 +19,8 @@ import { ToolbarIcon } from "./ToolbarIcon";
 
 type SettingsInfo = IpcResponse<"app:getSettingsInfo">;
 type DiscoveryProvider = "claude" | "codex" | "gemini";
+type RegexRuleProvider = "claude" | "codex" | "gemini";
+type SystemMessageRegexRules = Record<RegexRuleProvider, string[]>;
 
 const MONO_FONT_OPTIONS: Array<{ value: MonoFontFamily; label: string }> = [
   ...UI_MONO_FONT_VALUES.map((value) => ({
@@ -56,6 +58,10 @@ export function SettingsView({
   onUseMonospaceForAllMessagesChange,
   expandedByDefaultCategories,
   onToggleExpandedByDefault,
+  systemMessageRegexRules,
+  onAddSystemMessageRegexRule,
+  onUpdateSystemMessageRegexRule,
+  onRemoveSystemMessageRegexRule,
 }: {
   info: SettingsInfo | null;
   loading: boolean;
@@ -72,6 +78,14 @@ export function SettingsView({
   onUseMonospaceForAllMessagesChange: (enabled: boolean) => void;
   expandedByDefaultCategories: MessageCategory[];
   onToggleExpandedByDefault: (category: MessageCategory) => void;
+  systemMessageRegexRules: SystemMessageRegexRules;
+  onAddSystemMessageRegexRule: (provider: RegexRuleProvider) => void;
+  onUpdateSystemMessageRegexRule: (
+    provider: RegexRuleProvider,
+    index: number,
+    pattern: string,
+  ) => void;
+  onRemoveSystemMessageRegexRule: (provider: RegexRuleProvider, index: number) => void;
 }) {
   const storageRows = info
     ? [
@@ -219,6 +233,76 @@ export function SettingsView({
                 );
               })}
             </div>
+          </div>
+        </section>
+
+        <section className="settings-section">
+          <div className="settings-section-header">
+            <h3>System Message Rules</h3>
+            <p>
+              Regex patterns applied during ingestion to classify matching messages as system
+              messages. Run Reindex manually after changing these to update already indexed
+              sessions.
+            </p>
+          </div>
+          <div className="settings-section-body">
+            {(["claude", "codex", "gemini"] as const).map((provider) => {
+              const patterns = systemMessageRegexRules[provider] ?? [];
+              const keyedPatterns = patterns.map((pattern) => pattern);
+              const seenPatternCounts = new Map<string, number>();
+              return (
+                <div key={provider} className="settings-rule-group">
+                  <div className="settings-rule-group-header">
+                    <span className={`settings-provider-badge settings-provider-${provider}`}>
+                      {provider}
+                    </span>
+                    <button
+                      type="button"
+                      className="settings-rule-button settings-rule-add-button"
+                      onClick={() => onAddSystemMessageRegexRule(provider)}
+                      aria-label={`Add ${provider} regex rule`}
+                      title={`Add ${provider} regex rule`}
+                    >
+                      Add Pattern
+                    </button>
+                  </div>
+                  {patterns.length === 0 ? (
+                    <p className="settings-rule-empty">No regex rules configured.</p>
+                  ) : (
+                    <div className="settings-rule-list">
+                      {keyedPatterns.map((pattern, index) => {
+                        const nextCount = (seenPatternCounts.get(pattern) ?? 0) + 1;
+                        seenPatternCounts.set(pattern, nextCount);
+                        const ruleKey = `${provider}-rule-${pattern}-${nextCount}`;
+                        return (
+                          <div key={ruleKey} className="settings-rule-row">
+                            <input
+                              className="settings-rule-input"
+                              type="text"
+                              value={pattern}
+                              onChange={(event) =>
+                                onUpdateSystemMessageRegexRule(provider, index, event.target.value)
+                              }
+                              placeholder="Regex pattern"
+                              aria-label={`${provider} regex rule ${index + 1}`}
+                            />
+                            <button
+                              type="button"
+                              className="settings-rule-button settings-rule-remove-button"
+                              onClick={() => onRemoveSystemMessageRegexRule(provider, index)}
+                              aria-label={`Remove ${provider} regex rule ${index + 1}`}
+                              title={`Remove ${provider} regex rule ${index + 1}`}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
 

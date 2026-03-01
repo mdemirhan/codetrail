@@ -189,4 +189,188 @@ describe("queryService in-memory", () => {
     expect(result.projects).toHaveLength(1);
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("selects session titles from user first, assistant second, then first message", () => {
+    const db = createInMemoryDatabase();
+    const now = "2026-03-01T10:00:00.000Z";
+
+    db.prepare(
+      `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run("project_1", "claude", "Project One", "/workspace/project-one", now, now);
+
+    const insertSession = db.prepare(
+      `INSERT INTO sessions (
+        id,
+        project_id,
+        provider,
+        file_path,
+        model_names,
+        started_at,
+        ended_at,
+        duration_ms,
+        git_branch,
+        cwd,
+        message_count,
+        token_input_total,
+        token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    insertSession.run(
+      "session_user_title",
+      "project_1",
+      "claude",
+      "/workspace/project-one/session-user-title.jsonl",
+      "claude-opus-4-1",
+      now,
+      now,
+      1,
+      "main",
+      "/workspace/project-one",
+      2,
+      0,
+      0,
+    );
+    insertSession.run(
+      "session_assistant_title",
+      "project_1",
+      "claude",
+      "/workspace/project-one/session-assistant-title.jsonl",
+      "claude-opus-4-1",
+      now,
+      now,
+      1,
+      "main",
+      "/workspace/project-one",
+      2,
+      0,
+      0,
+    );
+    insertSession.run(
+      "session_first_message_title",
+      "project_1",
+      "claude",
+      "/workspace/project-one/session-first-message-title.jsonl",
+      "claude-opus-4-1",
+      now,
+      now,
+      1,
+      "main",
+      "/workspace/project-one",
+      2,
+      0,
+      0,
+    );
+
+    const insertMessage = db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    insertMessage.run(
+      "m_u_1",
+      "src_u_1",
+      "session_user_title",
+      "claude",
+      "assistant",
+      "Assistant message should not win when user exists",
+      "2026-03-01T10:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "m_u_2",
+      "src_u_2",
+      "session_user_title",
+      "claude",
+      "user",
+      "User title wins",
+      "2026-03-01T10:00:01.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "m_a_1",
+      "src_a_1",
+      "session_assistant_title",
+      "claude",
+      "system",
+      "System message should not win when assistant exists",
+      "2026-03-01T10:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "m_a_2",
+      "src_a_2",
+      "session_assistant_title",
+      "claude",
+      "assistant",
+      "Assistant title wins",
+      "2026-03-01T10:00:01.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "m_f_1",
+      "src_f_1",
+      "session_first_message_title",
+      "claude",
+      "system",
+      "First message title wins",
+      "2026-03-01T10:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "m_f_2",
+      "src_f_2",
+      "session_first_message_title",
+      "claude",
+      "tool_result",
+      "Second message should not win",
+      "2026-03-01T10:00:01.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+
+    const service = createQueryServiceFromDb(db);
+    const sessions = service.listSessions({ projectId: "project_1" });
+    const byId = new Map(sessions.sessions.map((session) => [session.id, session.title]));
+
+    expect(byId.get("session_user_title")).toBe("User title wins");
+    expect(byId.get("session_assistant_title")).toBe("Assistant title wins");
+    expect(byId.get("session_first_message_title")).toBe("First message title wins");
+  });
 });

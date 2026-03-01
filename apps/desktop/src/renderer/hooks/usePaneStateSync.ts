@@ -20,6 +20,7 @@ type RestoredScrollTarget = {
 };
 
 type HistoryMode = "session" | "bookmarks";
+type SystemMessageRegexRules = Record<Provider, string[]>;
 
 export function usePaneStateSync(args: {
   logError: (context: string, error: unknown) => void;
@@ -40,6 +41,7 @@ export function usePaneStateSync(args: {
   historyMode: HistoryMode;
   sessionPage: number;
   sessionScrollTop: number;
+  systemMessageRegexRules: SystemMessageRegexRules;
   setProjectPaneWidth: Dispatch<SetStateAction<number>>;
   setSessionPaneWidth: Dispatch<SetStateAction<number>>;
   setProjectProviders: Dispatch<SetStateAction<Provider[]>>;
@@ -57,6 +59,7 @@ export function usePaneStateSync(args: {
   setHistoryMode: Dispatch<SetStateAction<HistoryMode>>;
   setSessionPage: Dispatch<SetStateAction<number>>;
   setSessionScrollTop: Dispatch<SetStateAction<number>>;
+  setSystemMessageRegexRules: Dispatch<SetStateAction<SystemMessageRegexRules>>;
   sessionScrollTopRef: MutableRefObject<number>;
   pendingRestoredSessionScrollRef: MutableRefObject<RestoredScrollTarget | null>;
 }): { paneStateHydrated: boolean } {
@@ -79,6 +82,7 @@ export function usePaneStateSync(args: {
     historyMode,
     sessionPage,
     sessionScrollTop,
+    systemMessageRegexRules,
     setProjectPaneWidth,
     setSessionPaneWidth,
     setProjectProviders,
@@ -96,6 +100,7 @@ export function usePaneStateSync(args: {
     setHistoryMode,
     setSessionPage,
     setSessionScrollTop,
+    setSystemMessageRegexRules,
     sessionScrollTopRef,
     pendingRestoredSessionScrollRef,
   } = args;
@@ -163,6 +168,9 @@ export function usePaneStateSync(args: {
           sessionScrollTopRef.current = response.sessionScrollTop;
           setSessionScrollTop(response.sessionScrollTop);
         }
+        if (response.systemMessageRegexRules !== null) {
+          setSystemMessageRegexRules(response.systemMessageRegexRules);
+        }
         if (
           response.selectedSessionId !== null &&
           response.sessionPage !== null &&
@@ -206,6 +214,7 @@ export function usePaneStateSync(args: {
     setSessionPage,
     setSessionPaneWidth,
     setSessionScrollTop,
+    setSystemMessageRegexRules,
     setTheme,
     setMonoFontFamily,
     setRegularFontFamily,
@@ -239,6 +248,7 @@ export function usePaneStateSync(args: {
           historyMode,
           sessionPage,
           sessionScrollTop,
+          systemMessageRegexRules,
         })
         .catch((error: unknown) => {
           logError("Failed saving UI state", error);
@@ -267,6 +277,7 @@ export function usePaneStateSync(args: {
     historyMode,
     sessionPage,
     sessionScrollTop,
+    systemMessageRegexRules,
     sessionPaneWidth,
     theme,
   ]);

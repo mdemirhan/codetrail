@@ -152,6 +152,7 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
       historyMode: null,
       sessionPage: null,
       sessionScrollTop: null,
+      systemMessageRegexRules: null,
     },
   },
   "ui:setState": {
@@ -173,6 +174,11 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
       historyMode: "session",
       sessionPage: 0,
       sessionScrollTop: 0,
+      systemMessageRegexRules: {
+        claude: ["^<command-name>"],
+        codex: ["^<environment_context>"],
+        gemini: [],
+      },
     },
     response: { ok: true },
   },

@@ -38,6 +38,13 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
   const [historyMode, setHistoryMode] = useState<"session" | "bookmarks">("session");
   const [sessionPage, setSessionPage] = useState(0);
   const [sessionScrollTop, setSessionScrollTop] = useState(0);
+  const [systemMessageRegexRules, setSystemMessageRegexRules] = useState<
+    Record<Provider, string[]>
+  >({
+    claude: [],
+    codex: [],
+    gemini: [],
+  });
   const sessionScrollTopRef = useRef(0);
   const pendingRestoredSessionScrollRef = useRef<{
     sessionId: string;
@@ -64,6 +71,7 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     historyMode,
     sessionPage,
     sessionScrollTop,
+    systemMessageRegexRules,
     setProjectPaneWidth,
     setSessionPaneWidth,
     setProjectProviders,
@@ -81,6 +89,7 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     setHistoryMode,
     setSessionPage,
     setSessionScrollTop,
+    setSystemMessageRegexRules,
     sessionScrollTopRef,
     pendingRestoredSessionScrollRef,
   });
@@ -118,6 +127,11 @@ describe("usePaneStateSync", () => {
           historyMode: "bookmarks",
           sessionPage: 2,
           sessionScrollTop: 222,
+          systemMessageRegexRules: {
+            claude: ["^<command-name>"],
+            codex: ["^<environment_context>"],
+            gemini: [],
+          },
         };
       }
       return { ok: true };
@@ -138,6 +152,14 @@ describe("usePaneStateSync", () => {
 
     const saveCalls = client.invoke.mock.calls.filter(([channel]) => channel === "ui:setState");
     expect(saveCalls.length).toBeGreaterThan(0);
+    const lastSavePayload = saveCalls.at(-1)?.[1];
+    expect(lastSavePayload).toMatchObject({
+      systemMessageRegexRules: {
+        claude: ["^<command-name>"],
+        codex: ["^<environment_context>"],
+        gemini: [],
+      },
+    });
     expect(logError).not.toHaveBeenCalled();
   });
 

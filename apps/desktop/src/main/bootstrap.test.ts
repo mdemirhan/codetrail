@@ -6,6 +6,7 @@ const {
   mockGetPath,
   mockGetVersion,
   mockInitializeDatabase,
+  mockResolveSystemMessageRegexRules,
   mockCreateQueryService,
   mockWorkerIndexingRunner,
   mockRegisterIpcHandlers,
@@ -34,6 +35,15 @@ const {
   mockInitializeDatabase: vi.fn<
     () => { schemaVersion: number | undefined; tables: Array<{ name: string }> }
   >(() => ({ schemaVersion: 7, tables: [{ name: "messages" }] })),
+  mockResolveSystemMessageRegexRules: vi.fn((overrides?: Record<string, string[]>) => {
+    return (
+      overrides ?? {
+        claude: ["^<command-name>"],
+        codex: ["^<environment_context>"],
+        gemini: [],
+      }
+    );
+  }),
   mockCreateQueryService: vi.fn(),
   mockWorkerIndexingRunner: vi.fn(),
   mockRegisterIpcHandlers: vi.fn(),
@@ -60,6 +70,7 @@ vi.mock("@codetrail/core", () => ({
     geminiProjectsPath: null,
   },
   initializeDatabase: mockInitializeDatabase,
+  resolveSystemMessageRegexRules: mockResolveSystemMessageRegexRules,
 }));
 
 vi.mock("./data/queryService", () => ({
@@ -124,6 +135,11 @@ describe("bootstrapMainProcess", () => {
     historyMode: "bookmarks",
     sessionPage: 2,
     sessionScrollTop: 180,
+    systemMessageRegexRules: {
+      claude: ["^<command-name>"],
+      codex: ["^<environment_context>"],
+      gemini: [],
+    },
   };
 
   beforeEach(() => {
@@ -167,6 +183,12 @@ describe("bootstrapMainProcess", () => {
 
     expect(result).toEqual({ schemaVersion: 7, tableCount: 1 });
     expect(mockInitializeDatabase).toHaveBeenCalledWith("/tmp/codetrail.sqlite");
+    expect(mockWorkerIndexingRunner).toHaveBeenCalledWith(
+      "/tmp/codetrail.sqlite",
+      expect.objectContaining({
+        getSystemMessageRegexRules: expect.any(Function),
+      }),
+    );
     expect(mockRegisterIpcHandlers).toHaveBeenCalledOnce();
     expect(getRequiredHandler(handlers, "app:getHealth")({})).toEqual({
       status: "ok",
@@ -249,7 +271,11 @@ describe("bootstrapMainProcess", () => {
         jobId: "job-1",
       },
     );
-    expect(mockEnqueue).toHaveBeenCalledWith(expect.objectContaining({ force: true }));
+    expect(mockEnqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        force: true,
+      }),
+    );
   });
 
   it("manages path actions for files, directories and fallback errors", async () => {
@@ -309,6 +335,11 @@ describe("bootstrapMainProcess", () => {
       historyMode: "bookmarks",
       sessionPage: 2,
       sessionScrollTop: 180,
+      systemMessageRegexRules: {
+        claude: ["^<command-name>"],
+        codex: ["^<environment_context>"],
+        gemini: [],
+      },
     });
 
     const updated = {

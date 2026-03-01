@@ -2076,6 +2076,83 @@ mark {
   gap: 8px;
 }
 
+.settings-rule-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.settings-rule-group + .settings-rule-group {
+  margin-top: 12px;
+}
+
+.settings-rule-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-rule-button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.settings-rule-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-active);
+  color: var(--text-primary);
+}
+
+.settings-rule-add-button {
+  margin-left: auto;
+}
+
+.settings-rule-remove-button {
+  min-width: 86px;
+  justify-self: end;
+}
+
+.settings-rule-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.settings-rule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-rule-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.settings-rule-empty {
+  margin-top: 10px;
+}
+
 .settings-chip {
   display: inline-flex;
   align-items: center;
@@ -2175,6 +2252,20 @@ mark {
 
   .settings-font-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-rule-row {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-rule-add-button {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .settings-rule-remove-button {
+    width: 100%;
+    justify-self: stretch;
   }
 }
 
