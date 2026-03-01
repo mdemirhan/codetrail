@@ -232,6 +232,7 @@ function createAppClient() {
           settingsFile: "/tmp/ui-state.json",
           cacheDir: "/tmp/cache",
           databaseFile: "/tmp/codetrail.sqlite",
+          bookmarksDatabaseFile: "/tmp/codetrail.bookmarks.sqlite",
           userDataDir: "/tmp",
         },
         discovery: {

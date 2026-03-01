@@ -59,6 +59,7 @@ export async function bootstrapMainProcess(
           options.appStateStore?.getFilePath() ?? join(app.getPath("userData"), "ui-state.json"),
         cacheDir: app.getPath("sessionData"),
         databaseFile: dbPath,
+        bookmarksDatabaseFile: bookmarksDbPath,
         userDataDir: app.getPath("userData"),
       },
       discovery: {

@@ -19,6 +19,7 @@ describe("registerIpcHandlers", () => {
             settingsFile: "/tmp/codetrail/ui-state.json",
             cacheDir: "/tmp/codetrail/cache",
             databaseFile: "/tmp/codetrail/codetrail.sqlite",
+            bookmarksDatabaseFile: "/tmp/codetrail/codetrail.bookmarks.sqlite",
             userDataDir: "/tmp/codetrail",
           },
           discovery: {
@@ -141,6 +142,7 @@ describe("registerIpcHandlers", () => {
             settingsFile: "/tmp/codetrail/ui-state.json",
             cacheDir: "/tmp/codetrail/cache",
             databaseFile: "/tmp/codetrail/codetrail.sqlite",
+            bookmarksDatabaseFile: "/tmp/codetrail/codetrail.bookmarks.sqlite",
             userDataDir: "/tmp/codetrail",
           },
           discovery: {

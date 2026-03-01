@@ -140,6 +140,7 @@ const settingsInfoResponseSchema = z.object({
     settingsFile: z.string().min(1),
     cacheDir: z.string().min(1),
     databaseFile: z.string().min(1),
+    bookmarksDatabaseFile: z.string().min(1),
     userDataDir: z.string().min(1),
   }),
   discovery: z.object({

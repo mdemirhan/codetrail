@@ -91,6 +91,7 @@ export function SettingsView({
     ? [
         { label: "Settings file", value: info.storage.settingsFile },
         { label: "Database file", value: info.storage.databaseFile },
+        { label: "Bookmarks database file", value: info.storage.bookmarksDatabaseFile },
         { label: "User data directory", value: info.storage.userDataDir },
       ]
     : [];

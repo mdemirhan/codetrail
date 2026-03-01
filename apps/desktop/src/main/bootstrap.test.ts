@@ -213,6 +213,7 @@ describe("bootstrapMainProcess", () => {
         settingsFile: string;
         cacheDir: string;
         databaseFile: string;
+        bookmarksDatabaseFile: string;
         userDataDir: string;
       };
       discovery: {
@@ -227,6 +228,7 @@ describe("bootstrapMainProcess", () => {
       settingsFile: "/tmp/state.json",
       cacheDir: "/tmp/session-data",
       databaseFile: "/tmp/codetrail.sqlite",
+      bookmarksDatabaseFile: "/tmp/codetrail.sqlite.bookmarks",
       userDataDir: "/tmp/user-data",
     });
     expect(settings.discovery).toEqual({
