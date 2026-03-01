@@ -55,7 +55,7 @@ export function TopBar({
           onClick={onIncrementalRefresh}
           disabled={refreshing}
           aria-label={refreshing ? "Refreshing index" : "Refresh index"}
-          title={refreshing ? "Refreshing index..." : "Refresh index (Cmd/Ctrl+R)"}
+          title={refreshing ? "Refreshing index..." : "Refresh index"}
         >
           <ToolbarIcon name="refresh" />
           {refreshing ? "Refreshing..." : "Refresh"}
@@ -66,7 +66,7 @@ export function TopBar({
           onClick={onForceRefresh}
           disabled={refreshing}
           aria-label="Force reindex"
-          title="Force full reindex (Cmd/Ctrl+Shift+R)"
+          title="Force full reindex"
         >
           <ToolbarIcon name="reindex" />
           Reindex

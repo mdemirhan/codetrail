@@ -978,20 +978,6 @@ export function App() {
     }, 0);
   }, []);
 
-  useKeyboardShortcuts({
-    mainView,
-    showShortcuts,
-    hasFocusedHistoryMessage: Boolean(visibleFocusedMessageId),
-    setMainView,
-    setShowShortcuts,
-    clearFocusedHistoryMessage: () => setFocusMessageId(""),
-    focusGlobalSearch,
-    focusSessionSearch,
-    applyZoomAction,
-    handleForceRefresh,
-    handleIncrementalRefresh,
-  });
-
   const projectProviderCounts = useMemo(
     () => countProviders(sortedProjects.map((project) => project.provider)),
     [sortedProjects],
@@ -1055,23 +1041,27 @@ export function App() {
     : undefined;
 
   const shortcutItems = useMemo(() => {
-    const global = [
-      "Cmd/Ctrl+1: History view",
-      "Cmd/Ctrl+2: Search view",
-      "Cmd/Ctrl+F: Focus history search",
-      "Cmd/Ctrl+Shift+F: Open global search",
-      "Cmd/Ctrl+R: Refresh index",
-      "Cmd/Ctrl+Shift+R: Force reindex",
-      "Toolbar: Reindex, Settings",
-      "?: Shortcut help",
-      "Esc: Close shortcuts / clear focused message",
+    return [
+      { shortcut: "Cmd/Ctrl+F", description: "Search messages" },
+      { shortcut: "Cmd/Ctrl+Shift+F", description: "Open global search" },
+      { shortcut: "Cmd/Ctrl+Shift+M", description: "Toggle focus mode" },
+      { shortcut: "Cmd/Ctrl+E", description: "Expand/collapse session messages" },
+      { shortcut: "Cmd/Ctrl++", description: "Zoom in" },
+      { shortcut: "Cmd/Ctrl+-", description: "Zoom out" },
+      { shortcut: "Cmd/Ctrl+0", description: "Reset zoom" },
+      { shortcut: "Cmd/Ctrl+1", description: "Toggle User button on session messages" },
+      { shortcut: "Cmd/Ctrl+2", description: "Toggle Assistant button on session messages" },
+      { shortcut: "Cmd/Ctrl+3", description: "Toggle Write button on session messages" },
+      { shortcut: "Cmd/Ctrl+4", description: "Toggle Tool Use button on session messages" },
+      { shortcut: "Cmd/Ctrl+5", description: "Toggle Tool Result button on session messages" },
+      { shortcut: "Cmd/Ctrl+6", description: "Toggle Thinking button on session messages" },
+      { shortcut: "Cmd/Ctrl+7", description: "Toggle System button on session messages" },
+      { shortcut: "Cmd/Ctrl+B", description: "Expand/collapse Projects pane" },
+      { shortcut: "Cmd/Ctrl+Shift+B", description: "Expand/collapse Sessions pane" },
+      { shortcut: "?", description: "Shortcut help" },
+      { shortcut: "Esc", description: "Close shortcuts / clear focused message" },
     ];
-    const contextual =
-      mainView === "history"
-        ? ["Current view: History", `Selected session: ${selectedSession ? "yes" : "none"}`]
-        : ["Current view: Search", `Results: ${searchResponse.totalCount}`];
-    return [...contextual, ...global];
-  }, [mainView, searchResponse.totalCount, selectedSession]);
+  }, []);
 
   const handleToggleScopedMessagesExpanded = useCallback(() => {
     if (scopedMessages.length === 0) {
@@ -1086,6 +1076,11 @@ export function App() {
       return next;
     });
   }, [areScopedMessagesExpanded, scopedMessages]);
+
+  const handleToggleHistoryCategoryShortcut = useCallback((category: MessageCategory) => {
+    setHistoryCategories((value) => toggleValue<MessageCategory>(value, category));
+    setSessionPage(0);
+  }, []);
 
   const handleToggleMessageExpanded = useCallback(
     (messageId: string, category: MessageCategory) => {
@@ -1189,6 +1184,23 @@ export function App() {
       messageListRef.current?.querySelector<HTMLElement>(".message .message-header");
     focusTarget?.focus();
   }, []);
+
+  useKeyboardShortcuts({
+    mainView,
+    showShortcuts,
+    hasFocusedHistoryMessage: Boolean(visibleFocusedMessageId),
+    setMainView,
+    setShowShortcuts,
+    clearFocusedHistoryMessage: () => setFocusMessageId(""),
+    focusGlobalSearch,
+    focusSessionSearch,
+    toggleFocusMode: () => setFocusMode((value) => !value),
+    toggleScopedMessagesExpanded: handleToggleScopedMessagesExpanded,
+    toggleHistoryCategory: handleToggleHistoryCategoryShortcut,
+    toggleProjectPaneCollapsed: () => setProjectPaneCollapsed((value) => !value),
+    toggleSessionPaneCollapsed: () => setSessionPaneCollapsed((value) => !value),
+    applyZoomAction,
+  });
 
   return (
     <main className="app-shell">

@@ -2513,29 +2513,71 @@ mark {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 340px;
+  width: 620px;
   max-width: calc(100vw - 28px);
   border: 1px solid var(--border-active);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   box-shadow: var(--shadow-lg);
-  padding: 12px;
+  padding: 14px;
 }
 
 .shortcuts-dialog h3 {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   color: var(--text-primary);
   font-size: 15px;
 }
 
-.shortcuts-dialog p {
-  margin: 0 0 6px;
+.shortcuts-table-wrap {
+  max-height: min(58vh, 460px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 12px;
-  color: var(--text-tertiary);
+}
+
+.shortcuts-table th,
+.shortcuts-table td {
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.shortcuts-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.shortcuts-table td:first-child {
+  width: 36%;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.shortcuts-table td:last-child {
+  color: var(--text-secondary);
+}
+
+.shortcuts-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .shortcuts-dialog button {
-  margin-top: 6px;
+  margin-top: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);

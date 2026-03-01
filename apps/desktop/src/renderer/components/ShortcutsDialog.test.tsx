@@ -12,12 +12,22 @@ describe("ShortcutsDialog", () => {
     const onClose = vi.fn();
 
     render(
-      <ShortcutsDialog shortcutItems={["Cmd/Ctrl+F: Search", "Esc: Close"]} onClose={onClose} />,
+      <ShortcutsDialog
+        shortcutItems={[
+          { shortcut: "Cmd/Ctrl+F", description: "Search messages" },
+          { shortcut: "Esc", description: "Close shortcuts" },
+        ]}
+        onClose={onClose}
+      />,
     );
 
     expect(screen.getByText("Keyboard Shortcuts")).toBeInTheDocument();
-    expect(screen.getByText("Cmd/Ctrl+F: Search")).toBeInTheDocument();
-    expect(screen.getByText("Esc: Close")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Shortcut" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Description" })).toBeInTheDocument();
+    expect(screen.getByText("Cmd/Ctrl+F")).toBeInTheDocument();
+    expect(screen.getByText("Search messages")).toBeInTheDocument();
+    expect(screen.getByText("Esc")).toBeInTheDocument();
+    expect(screen.getByText("Close shortcuts")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Close shortcuts" }));
     expect(onClose).toHaveBeenCalledTimes(1);

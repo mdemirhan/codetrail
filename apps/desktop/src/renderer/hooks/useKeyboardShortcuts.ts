@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import type { MessageCategory } from "@codetrail/core";
 
 type MainView = "history" | "search" | "settings";
 
@@ -11,9 +12,12 @@ export function useKeyboardShortcuts(args: {
   clearFocusedHistoryMessage: () => void;
   focusGlobalSearch: () => void;
   focusSessionSearch: () => void;
+  toggleFocusMode: () => void;
+  toggleScopedMessagesExpanded: () => void;
+  toggleHistoryCategory: (category: MessageCategory) => void;
+  toggleProjectPaneCollapsed: () => void;
+  toggleSessionPaneCollapsed: () => void;
   applyZoomAction: (action: "in" | "out" | "reset") => Promise<void>;
-  handleForceRefresh: () => Promise<void>;
-  handleIncrementalRefresh: () => Promise<void>;
 }): void {
   const {
     mainView,
@@ -24,9 +28,12 @@ export function useKeyboardShortcuts(args: {
     clearFocusedHistoryMessage,
     focusGlobalSearch,
     focusSessionSearch,
+    toggleFocusMode,
+    toggleScopedMessagesExpanded,
+    toggleHistoryCategory,
+    toggleProjectPaneCollapsed,
+    toggleSessionPaneCollapsed,
     applyZoomAction,
-    handleForceRefresh,
-    handleIncrementalRefresh,
   } = args;
 
   useEffect(() => {
@@ -56,12 +63,6 @@ export function useKeyboardShortcuts(args: {
       } else if (command && key === "f") {
         event.preventDefault();
         focusSessionSearch();
-      } else if (command && event.key === "1") {
-        event.preventDefault();
-        setMainView("history");
-      } else if (command && event.key === "2") {
-        event.preventDefault();
-        setMainView("search");
       } else if (command && (event.key === "+" || event.key === "=")) {
         event.preventDefault();
         void applyZoomAction("in");
@@ -71,12 +72,39 @@ export function useKeyboardShortcuts(args: {
       } else if (command && event.key === "0") {
         event.preventDefault();
         void applyZoomAction("reset");
-      } else if (command && shift && key === "r") {
+      } else if (mainView === "history" && command && shift && key === "m") {
         event.preventDefault();
-        void handleForceRefresh();
-      } else if (command && key === "r") {
+        toggleFocusMode();
+      } else if (mainView === "history" && command && key === "e") {
         event.preventDefault();
-        void handleIncrementalRefresh();
+        toggleScopedMessagesExpanded();
+      } else if (mainView === "history" && command && shift && key === "b") {
+        event.preventDefault();
+        toggleSessionPaneCollapsed();
+      } else if (mainView === "history" && command && key === "b") {
+        event.preventDefault();
+        toggleProjectPaneCollapsed();
+      } else if (mainView === "history" && command && event.key === "1") {
+        event.preventDefault();
+        toggleHistoryCategory("user");
+      } else if (mainView === "history" && command && event.key === "2") {
+        event.preventDefault();
+        toggleHistoryCategory("assistant");
+      } else if (mainView === "history" && command && event.key === "3") {
+        event.preventDefault();
+        toggleHistoryCategory("tool_edit");
+      } else if (mainView === "history" && command && event.key === "4") {
+        event.preventDefault();
+        toggleHistoryCategory("tool_use");
+      } else if (mainView === "history" && command && event.key === "5") {
+        event.preventDefault();
+        toggleHistoryCategory("tool_result");
+      } else if (mainView === "history" && command && event.key === "6") {
+        event.preventDefault();
+        toggleHistoryCategory("thinking");
+      } else if (mainView === "history" && command && event.key === "7") {
+        event.preventDefault();
+        toggleHistoryCategory("system");
       }
     };
 
@@ -90,11 +118,14 @@ export function useKeyboardShortcuts(args: {
     focusGlobalSearch,
     focusSessionSearch,
     hasFocusedHistoryMessage,
-    handleForceRefresh,
-    handleIncrementalRefresh,
     mainView,
     setMainView,
     setShowShortcuts,
     showShortcuts,
+    toggleFocusMode,
+    toggleHistoryCategory,
+    toggleProjectPaneCollapsed,
+    toggleScopedMessagesExpanded,
+    toggleSessionPaneCollapsed,
   ]);
 }

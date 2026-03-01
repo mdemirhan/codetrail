@@ -674,9 +674,9 @@ describe("App", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Bookmarked messages")).toBeInTheDocument();
+      expect(screen.getByText("Bookmarked Messages")).toBeInTheDocument();
     });
-    await user.click(screen.getByText("Bookmarked messages"));
+    await user.click(screen.getByText("Bookmarked Messages"));
     await waitFor(() => {
       expect(screen.getByText("Parser behavior inspected and fixed.")).toBeInTheDocument();
     });
@@ -699,7 +699,7 @@ describe("App", () => {
     });
   });
 
-  it("keeps bookmarks mode when Cmd/Ctrl+F focuses history search", async () => {
+  it("keeps bookmarks mode when Cmd/Ctrl+F searches messages", async () => {
     const user = userEvent.setup();
     const client = createBookmarksSearchClient();
 
@@ -709,9 +709,9 @@ describe("App", () => {
       expect(screen.getByText("Project One")).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(screen.getByText("Bookmarked messages")).toBeInTheDocument();
+      expect(screen.getByText("Bookmarked Messages")).toBeInTheDocument();
     });
-    await user.click(screen.getByText("Bookmarked messages"));
+    await user.click(screen.getByText("Bookmarked Messages"));
     await waitFor(() => {
       expect(screen.getByText("Parser behavior inspected and fixed.")).toBeInTheDocument();
     });

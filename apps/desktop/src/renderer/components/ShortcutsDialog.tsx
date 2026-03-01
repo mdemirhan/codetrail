@@ -2,15 +2,30 @@ export function ShortcutsDialog({
   shortcutItems,
   onClose,
 }: {
-  shortcutItems: string[];
+  shortcutItems: Array<{ shortcut: string; description: string }>;
   onClose: () => void;
 }) {
   return (
     <dialog open className="shortcuts-dialog">
       <h3>Keyboard Shortcuts</h3>
-      {shortcutItems.map((item) => (
-        <p key={`dialog-${item}`}>{item}</p>
-      ))}
+      <div className="shortcuts-table-wrap">
+        <table className="shortcuts-table">
+          <thead>
+            <tr>
+              <th scope="col">Shortcut</th>
+              <th scope="col">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shortcutItems.map((item) => (
+              <tr key={`dialog-${item.shortcut}-${item.description}`}>
+                <td>{item.shortcut}</td>
+                <td>{item.description}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <button
         type="button"
         onClick={onClose}

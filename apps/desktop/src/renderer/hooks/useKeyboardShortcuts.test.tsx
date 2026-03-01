@@ -11,14 +11,17 @@ function Harness(args: Parameters<typeof useKeyboardShortcuts>[0]) {
 }
 
 describe("useKeyboardShortcuts", () => {
-  it("routes global/session search shortcuts and zoom actions", () => {
+  it("routes search, zoom, and history shortcuts", () => {
     const setMainView = vi.fn();
     const setShowShortcuts = vi.fn();
     const focusGlobalSearch = vi.fn();
     const focusSessionSearch = vi.fn();
+    const toggleFocusMode = vi.fn();
+    const toggleScopedMessagesExpanded = vi.fn();
+    const toggleHistoryCategory = vi.fn();
+    const toggleProjectPaneCollapsed = vi.fn();
+    const toggleSessionPaneCollapsed = vi.fn();
     const applyZoomAction = vi.fn(async () => undefined);
-    const handleForceRefresh = vi.fn(async () => undefined);
-    const handleIncrementalRefresh = vi.fn(async () => undefined);
 
     render(
       <Harness
@@ -30,21 +33,32 @@ describe("useKeyboardShortcuts", () => {
         clearFocusedHistoryMessage={vi.fn()}
         focusGlobalSearch={focusGlobalSearch}
         focusSessionSearch={focusSessionSearch}
+        toggleFocusMode={toggleFocusMode}
+        toggleScopedMessagesExpanded={toggleScopedMessagesExpanded}
+        toggleHistoryCategory={toggleHistoryCategory}
+        toggleProjectPaneCollapsed={toggleProjectPaneCollapsed}
+        toggleSessionPaneCollapsed={toggleSessionPaneCollapsed}
         applyZoomAction={applyZoomAction}
-        handleForceRefresh={handleForceRefresh}
-        handleIncrementalRefresh={handleIncrementalRefresh}
       />,
     );
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true, shiftKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "=", metaKey: true }));
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", metaKey: true, shiftKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "m", metaKey: true, shiftKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "e", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "b", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "b", metaKey: true, shiftKey: true }));
 
     expect(focusGlobalSearch).toHaveBeenCalledTimes(1);
     expect(focusSessionSearch).toHaveBeenCalledTimes(1);
     expect(applyZoomAction).toHaveBeenCalledWith("in");
-    expect(handleForceRefresh).toHaveBeenCalledTimes(1);
+    expect(toggleFocusMode).toHaveBeenCalledTimes(1);
+    expect(toggleScopedMessagesExpanded).toHaveBeenCalledTimes(1);
+    expect(toggleHistoryCategory).toHaveBeenCalledWith("user");
+    expect(toggleProjectPaneCollapsed).toHaveBeenCalledTimes(1);
+    expect(toggleSessionPaneCollapsed).toHaveBeenCalledTimes(1);
     expect(setMainView).not.toHaveBeenCalledWith("history");
     expect(setShowShortcuts).not.toHaveBeenCalledWith(false);
   });
@@ -63,9 +77,12 @@ describe("useKeyboardShortcuts", () => {
         clearFocusedHistoryMessage={vi.fn()}
         focusGlobalSearch={vi.fn()}
         focusSessionSearch={vi.fn()}
+        toggleFocusMode={vi.fn()}
+        toggleScopedMessagesExpanded={vi.fn()}
+        toggleHistoryCategory={vi.fn()}
+        toggleProjectPaneCollapsed={vi.fn()}
+        toggleSessionPaneCollapsed={vi.fn()}
         applyZoomAction={vi.fn(async () => undefined)}
-        handleForceRefresh={vi.fn(async () => undefined)}
-        handleIncrementalRefresh={vi.fn(async () => undefined)}
       />,
     );
 
@@ -82,9 +99,12 @@ describe("useKeyboardShortcuts", () => {
         clearFocusedHistoryMessage={vi.fn()}
         focusGlobalSearch={vi.fn()}
         focusSessionSearch={vi.fn()}
+        toggleFocusMode={vi.fn()}
+        toggleScopedMessagesExpanded={vi.fn()}
+        toggleHistoryCategory={vi.fn()}
+        toggleProjectPaneCollapsed={vi.fn()}
+        toggleSessionPaneCollapsed={vi.fn()}
         applyZoomAction={vi.fn(async () => undefined)}
-        handleForceRefresh={vi.fn(async () => undefined)}
-        handleIncrementalRefresh={vi.fn(async () => undefined)}
       />,
     );
 
@@ -108,9 +128,12 @@ describe("useKeyboardShortcuts", () => {
         clearFocusedHistoryMessage={clearFocusedHistoryMessage}
         focusGlobalSearch={vi.fn()}
         focusSessionSearch={vi.fn()}
+        toggleFocusMode={vi.fn()}
+        toggleScopedMessagesExpanded={vi.fn()}
+        toggleHistoryCategory={vi.fn()}
+        toggleProjectPaneCollapsed={vi.fn()}
+        toggleSessionPaneCollapsed={vi.fn()}
         applyZoomAction={vi.fn(async () => undefined)}
-        handleForceRefresh={vi.fn(async () => undefined)}
-        handleIncrementalRefresh={vi.fn(async () => undefined)}
       />,
     );
 
