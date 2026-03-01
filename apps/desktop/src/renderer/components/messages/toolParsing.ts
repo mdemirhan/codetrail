@@ -1,4 +1,4 @@
-import { isLikelyEditOperation } from "@codetrail/core";
+import { isLikelyEditOperation } from "@codetrail/core/tooling/editOperations";
 
 export function parseToolInvocationPayload(text: string): {
   record: Record<string, unknown>;

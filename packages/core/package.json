@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./tooling/editOperations": "./src/tooling/editOperations.ts"
   },
   "dependencies": {
     "better-sqlite3": "11.8.1",
