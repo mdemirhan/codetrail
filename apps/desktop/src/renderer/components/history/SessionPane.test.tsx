@@ -112,6 +112,9 @@ describe("SessionPane", () => {
     expect(onSelectAllSessions).toHaveBeenCalledTimes(1);
     expect(onSelectBookmarks).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Switch to Bookmarks" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sort sessions descending" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy session details" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open session folder" })).toBeNull();
     expect(screen.getByText("All Sessions")).toBeInTheDocument();
     expect(screen.queryByText("Bookmarked messages")).toBeNull();
     expect(screen.getByRole("button", { name: "Expand Sessions pane" })).toBeInTheDocument();

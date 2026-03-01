@@ -60,29 +60,33 @@ export function ProjectPane({
           <span className="panel-count">{sortedProjects.length}</span>
         </div>
         <div className="pane-head-controls">
-          <button
-            type="button"
-            className="collapse-btn sort-btn"
-            onClick={onToggleSortDirection}
-            aria-label={
-              sortDirection === "asc"
-                ? "Sort projects descending"
-                : "Sort projects ascending"
-            }
-            title={sortTooltip}
-          >
-            <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
-          </button>
-          <button
-            type="button"
-            className="collapse-btn pane-open-location-btn"
-            onClick={onOpenProjectLocation}
-            aria-label="Open project folder"
-            title="Open project folder"
-            disabled={!canOpenProjectLocation}
-          >
-            <ToolbarIcon name="folderOpen" />
-          </button>
+          {!collapsed ? (
+            <>
+              <button
+                type="button"
+                className="collapse-btn sort-btn"
+                onClick={onToggleSortDirection}
+                aria-label={
+                  sortDirection === "asc"
+                    ? "Sort projects descending"
+                    : "Sort projects ascending"
+                }
+                title={sortTooltip}
+              >
+                <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
+              </button>
+              <button
+                type="button"
+                className="collapse-btn pane-open-location-btn"
+                onClick={onOpenProjectLocation}
+                aria-label="Open project folder"
+                title="Open project folder"
+                disabled={!canOpenProjectLocation}
+              >
+                <ToolbarIcon name="folderOpen" />
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             className="collapse-btn pane-collapse-btn"

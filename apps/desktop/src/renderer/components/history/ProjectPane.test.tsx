@@ -78,7 +78,7 @@ describe("ProjectPane", () => {
     expect(onOpenProjectLocation).toHaveBeenCalledTimes(1);
   });
 
-  it("disables project-location button when project path is unavailable", () => {
+  it("hides sort and open-location actions when collapsed", () => {
     render(
       <ProjectPane
         sortedProjects={projects}
@@ -100,6 +100,7 @@ describe("ProjectPane", () => {
     );
 
     expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open project folder" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Sort projects descending" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open project folder" })).toBeNull();
   });
 });

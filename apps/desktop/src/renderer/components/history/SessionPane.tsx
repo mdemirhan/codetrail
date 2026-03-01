@@ -71,39 +71,43 @@ export function SessionPane({
           <span className="panel-count">{sortedSessions.length}</span>
         </div>
         <div className="pane-head-controls">
-          <button
-            type="button"
-            className="collapse-btn sort-btn"
-            onClick={onToggleSortDirection}
-            aria-label={
-              sortDirection === "asc"
-                ? "Sort sessions descending"
-                : "Sort sessions ascending"
-            }
-            title={sortTooltip}
-          >
-            <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
-          </button>
-          <button
-            type="button"
-            className="collapse-btn"
-            onClick={onCopySession}
-            aria-label="Copy session details"
-            title="Copy session details"
-            disabled={!canCopySession}
-          >
-            <ToolbarIcon name="copy" />
-          </button>
-          <button
-            type="button"
-            className="collapse-btn pane-open-location-btn"
-            onClick={onOpenSessionLocation}
-            aria-label="Open session folder"
-            title="Open session folder"
-            disabled={!canOpenSessionLocation}
-          >
-            <ToolbarIcon name="folderOpen" />
-          </button>
+          {!collapsed ? (
+            <>
+              <button
+                type="button"
+                className="collapse-btn sort-btn"
+                onClick={onToggleSortDirection}
+                aria-label={
+                  sortDirection === "asc"
+                    ? "Sort sessions descending"
+                    : "Sort sessions ascending"
+                }
+                title={sortTooltip}
+              >
+                <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
+              </button>
+              <button
+                type="button"
+                className="collapse-btn"
+                onClick={onCopySession}
+                aria-label="Copy session details"
+                title="Copy session details"
+                disabled={!canCopySession}
+              >
+                <ToolbarIcon name="copy" />
+              </button>
+              <button
+                type="button"
+                className="collapse-btn pane-open-location-btn"
+                onClick={onOpenSessionLocation}
+                aria-label="Open session folder"
+                title="Open session folder"
+                disabled={!canOpenSessionLocation}
+              >
+                <ToolbarIcon name="folderOpen" />
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             className="collapse-btn pane-collapse-btn"
