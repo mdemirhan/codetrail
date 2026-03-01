@@ -942,6 +942,26 @@ export function App() {
     }
   }, [logError, selectedProject, selectedSession, sessionDetail?.totalCount, sessionPage]);
 
+  const handleCopyProjectDetails = useCallback(async () => {
+    if (!selectedProject) {
+      return;
+    }
+    const lines = [
+      `Name: ${selectedProject.name || "(untitled project)"}`,
+      `Provider: ${prettyProvider(selectedProject.provider)}`,
+      `Project ID: ${selectedProject.id}`,
+      `Path: ${selectedProject.path || "-"}`,
+      `Sessions: ${selectedProject.sessionCount}`,
+      `Messages: ${allSessionsCount}`,
+      `Last Activity: ${selectedProject.lastActivity ?? "-"}`,
+    ];
+    const projectDetailsText = lines.join("\n");
+    const copied = await copyTextToClipboard(projectDetailsText);
+    if (!copied) {
+      logError("Failed copying project details", "Clipboard API unavailable");
+    }
+  }, [allSessionsCount, logError, selectedProject]);
+
   const focusSessionSearch = useCallback(() => {
     setMainView("history");
     window.setTimeout(() => {
@@ -1042,7 +1062,7 @@ export function App() {
       "Cmd/Ctrl+Shift+F: Open global search",
       "Cmd/Ctrl+R: Refresh index",
       "Cmd/Ctrl+Shift+R: Force reindex",
-      "Toolbar: Reindex, Copy session, Settings",
+      "Toolbar: Reindex, Settings",
       "?: Shortcut help",
       "Esc: Close shortcuts / clear focused message",
     ];
@@ -1189,14 +1209,12 @@ export function App() {
         refreshing={refreshing}
         focusMode={focusMode}
         focusDisabled={mainView !== "history"}
-        copyDisabled={!selectedSession || historyMode !== "session" || mainView !== "history"}
         onToggleSearchView={() =>
           setMainView((value) => (value === "search" ? "history" : "search"))
         }
         onThemeChange={setTheme}
         onIncrementalRefresh={() => void handleIncrementalRefresh()}
         onForceRefresh={() => void handleForceRefresh()}
-        onCopySession={() => void handleCopySessionDetails()}
         onToggleFocus={() => setFocusMode((value) => !value)}
         onToggleShortcuts={() => setShowShortcuts((value) => !value)}
         onToggleSettings={() =>
@@ -1231,6 +1249,7 @@ export function App() {
               onToggleSortDirection={() =>
                 setProjectSortDirection((value) => (value === "asc" ? "desc" : "asc"))
               }
+              onCopyProjectDetails={() => void handleCopyProjectDetails()}
               onSelectProject={(projectId) => {
                 setPendingSearchNavigation(null);
                 setSelectedProjectId(projectId);
@@ -1250,6 +1269,7 @@ export function App() {
                   }
                 });
               }}
+              canCopyProjectDetails={Boolean(selectedProject)}
               canOpenProjectLocation={Boolean(selectedProject?.path?.trim())}
             />
 

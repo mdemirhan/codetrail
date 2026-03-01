@@ -837,7 +837,7 @@ body.platform-macos .titlebar-left {
 }
 
 .session-item.bookmarks-item .session-preview {
-  color: var(--accent-blue);
+  color: var(--accent-green);
 }
 
 .session-pane .panel-title,

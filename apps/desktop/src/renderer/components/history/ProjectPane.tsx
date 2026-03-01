@@ -19,8 +19,10 @@ export function ProjectPane({
   onProjectQueryChange,
   onToggleProvider,
   onToggleSortDirection,
+  onCopyProjectDetails,
   onSelectProject,
   onOpenProjectLocation,
+  canCopyProjectDetails,
   canOpenProjectLocation,
 }: {
   sortedProjects: ProjectSummary[];
@@ -35,8 +37,10 @@ export function ProjectPane({
   onProjectQueryChange: (value: string) => void;
   onToggleProvider: (provider: Provider) => void;
   onToggleSortDirection: () => void;
+  onCopyProjectDetails: () => void;
   onSelectProject: (projectId: string) => void;
   onOpenProjectLocation: () => void;
+  canCopyProjectDetails: boolean;
   canOpenProjectLocation: boolean;
 }) {
   const selectedProjectRef = useRef<HTMLButtonElement | null>(null);
@@ -74,6 +78,16 @@ export function ProjectPane({
                 title={sortTooltip}
               >
                 <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
+              </button>
+              <button
+                type="button"
+                className="collapse-btn"
+                onClick={onCopyProjectDetails}
+                aria-label="Copy project details"
+                title="Copy project details"
+                disabled={!canCopyProjectDetails}
+              >
+                <ToolbarIcon name="copy" />
               </button>
               <button
                 type="button"

@@ -6,12 +6,10 @@ export function TopBar({
   refreshing,
   focusMode,
   focusDisabled,
-  copyDisabled,
   onToggleSearchView,
   onThemeChange,
   onIncrementalRefresh,
   onForceRefresh,
-  onCopySession,
   onToggleFocus,
   onToggleShortcuts,
   onToggleSettings,
@@ -21,12 +19,10 @@ export function TopBar({
   refreshing: boolean;
   focusMode: boolean;
   focusDisabled: boolean;
-  copyDisabled: boolean;
   onToggleSearchView: () => void;
   onThemeChange: (theme: "light" | "dark") => void;
   onIncrementalRefresh: () => void;
   onForceRefresh: () => void;
-  onCopySession: () => void;
   onToggleFocus: () => void;
   onToggleShortcuts: () => void;
   onToggleSettings: () => void;
@@ -78,17 +74,6 @@ export function TopBar({
         <button
           type="button"
           className="tb-btn"
-          onClick={onCopySession}
-          disabled={copyDisabled}
-          aria-label="Copy session details"
-          title="Copy selected session details"
-        >
-          <ToolbarIcon name="copy" />
-          Copy
-        </button>
-        <button
-          type="button"
-          className="tb-btn"
           onClick={onToggleFocus}
           disabled={focusDisabled}
           aria-label={focusMode ? "Exit focus mode" : "Enter focus mode"}
@@ -99,7 +84,7 @@ export function TopBar({
         </button>
         <button
           type="button"
-          className="tb-btn primary"
+          className="tb-btn"
           onClick={onToggleShortcuts}
           aria-label="Show keyboard shortcuts"
           title="Show keyboard shortcuts (?)"

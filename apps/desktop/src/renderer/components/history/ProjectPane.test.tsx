@@ -38,6 +38,7 @@ describe("ProjectPane", () => {
     const onProjectQueryChange = vi.fn();
     const onToggleProvider = vi.fn();
     const onSelectProject = vi.fn();
+    const onCopyProjectDetails = vi.fn();
     const onOpenProjectLocation = vi.fn();
 
     render(
@@ -54,8 +55,10 @@ describe("ProjectPane", () => {
         onProjectQueryChange={onProjectQueryChange}
         onToggleProvider={onToggleProvider}
         onToggleSortDirection={onToggleSortDirection}
+        onCopyProjectDetails={onCopyProjectDetails}
         onSelectProject={onSelectProject}
         onOpenProjectLocation={onOpenProjectLocation}
+        canCopyProjectDetails={true}
         canOpenProjectLocation={true}
       />,
     );
@@ -65,6 +68,7 @@ describe("ProjectPane", () => {
 
     await user.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
     await user.click(screen.getByRole("button", { name: "Sort projects ascending" }));
+    await user.click(screen.getByRole("button", { name: "Copy project details" }));
     await user.click(screen.getByRole("button", { name: "Open project folder" }));
     await user.type(screen.getByPlaceholderText("Filter projects..."), "abc");
     await user.click(screen.getByRole("button", { name: /Gemini/i }));
@@ -75,6 +79,7 @@ describe("ProjectPane", () => {
     expect(onProjectQueryChange).toHaveBeenCalled();
     expect(onToggleProvider).toHaveBeenCalledWith("gemini");
     expect(onSelectProject).toHaveBeenCalledWith("project_2");
+    expect(onCopyProjectDetails).toHaveBeenCalledTimes(1);
     expect(onOpenProjectLocation).toHaveBeenCalledTimes(1);
   });
 
@@ -93,14 +98,17 @@ describe("ProjectPane", () => {
         onProjectQueryChange={vi.fn()}
         onToggleProvider={vi.fn()}
         onToggleSortDirection={vi.fn()}
+        onCopyProjectDetails={vi.fn()}
         onSelectProject={vi.fn()}
         onOpenProjectLocation={vi.fn()}
+        canCopyProjectDetails={false}
         canOpenProjectLocation={false}
       />,
     );
 
     expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sort projects descending" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy project details" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Open project folder" })).toBeNull();
   });
 });

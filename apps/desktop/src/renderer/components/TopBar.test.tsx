@@ -13,7 +13,6 @@ describe("TopBar", () => {
     const onThemeChange = vi.fn();
     const onIncrementalRefresh = vi.fn();
     const onForceRefresh = vi.fn();
-    const onCopySession = vi.fn();
     const onToggleFocus = vi.fn();
     const onToggleShortcuts = vi.fn();
     const onToggleSettings = vi.fn();
@@ -25,12 +24,10 @@ describe("TopBar", () => {
         refreshing={false}
         focusMode={false}
         focusDisabled={false}
-        copyDisabled={false}
         onToggleSearchView={onToggleSearchView}
         onThemeChange={onThemeChange}
         onIncrementalRefresh={onIncrementalRefresh}
         onForceRefresh={onForceRefresh}
-        onCopySession={onCopySession}
         onToggleFocus={onToggleFocus}
         onToggleShortcuts={onToggleShortcuts}
         onToggleSettings={onToggleSettings}
@@ -40,7 +37,6 @@ describe("TopBar", () => {
     await user.click(screen.getByRole("button", { name: "Global Search" }));
     await user.click(screen.getByRole("button", { name: "Refresh index" }));
     await user.click(screen.getByRole("button", { name: "Force reindex" }));
-    await user.click(screen.getByRole("button", { name: "Copy session details" }));
     await user.click(screen.getByRole("button", { name: "Enter focus mode" }));
     await user.click(screen.getByRole("button", { name: "Show keyboard shortcuts" }));
     await user.click(screen.getByRole("button", { name: "Switch to Dark theme" }));
@@ -49,7 +45,6 @@ describe("TopBar", () => {
     expect(onToggleSearchView).toHaveBeenCalledTimes(1);
     expect(onIncrementalRefresh).toHaveBeenCalledTimes(1);
     expect(onForceRefresh).toHaveBeenCalledTimes(1);
-    expect(onCopySession).toHaveBeenCalledTimes(1);
     expect(onToggleFocus).toHaveBeenCalledTimes(1);
     expect(onToggleShortcuts).toHaveBeenCalledTimes(1);
     expect(onThemeChange).toHaveBeenCalledWith("dark");
@@ -64,12 +59,10 @@ describe("TopBar", () => {
         refreshing={true}
         focusMode={true}
         focusDisabled={true}
-        copyDisabled={true}
         onToggleSearchView={vi.fn()}
         onThemeChange={vi.fn()}
         onIncrementalRefresh={vi.fn()}
         onForceRefresh={vi.fn()}
-        onCopySession={vi.fn()}
         onToggleFocus={vi.fn()}
         onToggleShortcuts={vi.fn()}
         onToggleSettings={vi.fn()}
@@ -78,7 +71,6 @@ describe("TopBar", () => {
 
     expect(screen.getByRole("button", { name: "Refreshing index" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Force reindex" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Copy session details" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Exit focus mode" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Switch to Light theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open settings" })).toBeInTheDocument();

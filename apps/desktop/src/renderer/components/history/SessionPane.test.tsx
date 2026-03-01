@@ -68,7 +68,7 @@ describe("SessionPane", () => {
     await user.click(screen.getByRole("button", { name: "Copy session details" }));
     await user.click(screen.getByRole("button", { name: "Open session folder" }));
     await user.click(screen.getByRole("button", { name: /All Sessions/i }));
-    await user.click(screen.getByRole("button", { name: /Bookmarked messages/i }));
+    await user.click(screen.getByRole("button", { name: /Bookmarked Messages/i }));
     await user.click(screen.getByRole("button", { name: /Investigate markdown rendering/i }));
 
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
@@ -116,7 +116,7 @@ describe("SessionPane", () => {
     expect(screen.queryByRole("button", { name: "Copy session details" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Open session folder" })).toBeNull();
     expect(screen.getByText("All Sessions")).toBeInTheDocument();
-    expect(screen.queryByText("Bookmarked messages")).toBeNull();
+    expect(screen.queryByText("Bookmarked Messages")).toBeNull();
     expect(screen.getByRole("button", { name: "Expand Sessions pane" })).toBeInTheDocument();
   });
 });

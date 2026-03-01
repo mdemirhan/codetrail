@@ -144,7 +144,7 @@ export function SessionPane({
               }
               onClick={onSelectBookmarks}
               aria-label="Switch to Bookmarks"
-              title="Bookmarked messages"
+              title="Bookmarked Messages"
             >
               <ToolbarIcon name="bookmark" />
             </button>
@@ -175,7 +175,7 @@ export function SessionPane({
             }
             onClick={onSelectBookmarks}
           >
-            <div className="session-preview">Bookmarked messages</div>
+            <div className="session-preview">Bookmarked Messages</div>
             <div className="session-meta">
               <span className="msg-count">{bookmarksCount} msgs</span>
               <span className="session-time">Project-wide</span>
