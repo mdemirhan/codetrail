@@ -4,6 +4,29 @@ import { dirname } from "node:path";
 import type { MessageCategory, Provider } from "@codetrail/core";
 
 export type ThemeMode = "light" | "dark";
+export type MonoFontFamily = "current" | "droid_sans_mono";
+export type RegularFontFamily = "current" | "inter";
+export type MonoFontSize =
+  | "10px"
+  | "11px"
+  | "12px"
+  | "13px"
+  | "14px"
+  | "15px"
+  | "16px"
+  | "17px"
+  | "18px";
+export type RegularFontSize =
+  | "11px"
+  | "12px"
+  | "13px"
+  | "13.5px"
+  | "14px"
+  | "15px"
+  | "16px"
+  | "17px"
+  | "18px"
+  | "20px";
 
 export type PaneState = {
   projectPaneWidth: number;
@@ -13,6 +36,11 @@ export type PaneState = {
   expandedByDefaultCategories?: MessageCategory[];
   searchProviders?: Provider[];
   theme?: ThemeMode;
+  monoFontFamily?: MonoFontFamily;
+  regularFontFamily?: RegularFontFamily;
+  monoFontSize?: MonoFontSize;
+  regularFontSize?: RegularFontSize;
+  useMonospaceForAllMessages?: boolean;
   selectedProjectId?: string;
   selectedSessionId?: string;
   sessionPage?: number;
@@ -51,6 +79,31 @@ const CATEGORY_VALUES: MessageCategory[] = [
   "system",
 ];
 const THEME_VALUES: ThemeMode[] = ["light", "dark"];
+const MONO_FONT_VALUES: MonoFontFamily[] = ["current", "droid_sans_mono"];
+const REGULAR_FONT_VALUES: RegularFontFamily[] = ["current", "inter"];
+const MONO_FONT_SIZE_VALUES: MonoFontSize[] = [
+  "10px",
+  "11px",
+  "12px",
+  "13px",
+  "14px",
+  "15px",
+  "16px",
+  "17px",
+  "18px",
+];
+const REGULAR_FONT_SIZE_VALUES: RegularFontSize[] = [
+  "11px",
+  "12px",
+  "13px",
+  "13.5px",
+  "14px",
+  "15px",
+  "16px",
+  "17px",
+  "18px",
+  "20px",
+];
 
 export class AppStateStore {
   private readonly filePath: string;
@@ -174,6 +227,11 @@ function sanitizePaneState(value: unknown): PaneState | null {
   );
   const searchProviders = sanitizeStringArray(record.searchProviders, PROVIDER_VALUES);
   const theme = sanitizeStringValue(record.theme, THEME_VALUES);
+  const monoFontFamily = sanitizeStringValue(record.monoFontFamily, MONO_FONT_VALUES);
+  const regularFontFamily = sanitizeStringValue(record.regularFontFamily, REGULAR_FONT_VALUES);
+  const monoFontSize = sanitizeStringValue(record.monoFontSize, MONO_FONT_SIZE_VALUES);
+  const regularFontSize = sanitizeStringValue(record.regularFontSize, REGULAR_FONT_SIZE_VALUES);
+  const useMonospaceForAllMessages = sanitizeOptionalBoolean(record.useMonospaceForAllMessages);
   const selectedProjectId = sanitizeOptionalNonEmptyString(record.selectedProjectId);
   const selectedSessionId = sanitizeOptionalNonEmptyString(record.selectedSessionId);
   const sessionPage = sanitizeOptionalInt(record.sessionPage, PAGE_MIN, PAGE_MAX);
@@ -191,6 +249,11 @@ function sanitizePaneState(value: unknown): PaneState | null {
     ...(expandedByDefaultCategories ? { expandedByDefaultCategories } : {}),
     ...(searchProviders ? { searchProviders } : {}),
     ...(theme ? { theme } : {}),
+    ...(monoFontFamily ? { monoFontFamily } : {}),
+    ...(regularFontFamily ? { regularFontFamily } : {}),
+    ...(monoFontSize ? { monoFontSize } : {}),
+    ...(regularFontSize ? { regularFontSize } : {}),
+    ...(useMonospaceForAllMessages === null ? {} : { useMonospaceForAllMessages }),
     ...(selectedProjectId ? { selectedProjectId } : {}),
     ...(selectedSessionId ? { selectedSessionId } : {}),
     ...(sessionPage === null ? {} : { sessionPage }),
@@ -272,6 +335,16 @@ function sanitizeOptionalNonEmptyString(value: unknown): string | null {
     return null;
   }
   if (value.length === 0 || value.length > 4096) {
+    return null;
+  }
+  return value;
+}
+
+function sanitizeOptionalBoolean(value: unknown): boolean | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "boolean") {
     return null;
   }
   return value;

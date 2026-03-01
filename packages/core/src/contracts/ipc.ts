@@ -71,6 +71,30 @@ const categoryCountsSchema = z.object({
   system: z.number().int().nonnegative(),
 });
 
+const monoFontSizeSchema = z.enum([
+  "10px",
+  "11px",
+  "12px",
+  "13px",
+  "14px",
+  "15px",
+  "16px",
+  "17px",
+  "18px",
+]);
+const regularFontSizeSchema = z.enum([
+  "11px",
+  "12px",
+  "13px",
+  "13.5px",
+  "14px",
+  "15px",
+  "16px",
+  "17px",
+  "18px",
+  "20px",
+]);
+
 const paneStateSchema = z.object({
   projectPaneWidth: z.number().int().positive().nullable(),
   sessionPaneWidth: z.number().int().positive().nullable(),
@@ -79,6 +103,11 @@ const paneStateSchema = z.object({
   expandedByDefaultCategories: z.array(messageCategorySchema).nullable(),
   searchProviders: z.array(providerSchema).nullable(),
   theme: z.enum(["light", "dark"]).nullable(),
+  monoFontFamily: z.enum(["current", "droid_sans_mono"]).nullable(),
+  regularFontFamily: z.enum(["current", "inter"]).nullable(),
+  monoFontSize: monoFontSizeSchema.nullable(),
+  regularFontSize: regularFontSizeSchema.nullable(),
+  useMonospaceForAllMessages: z.boolean().nullable(),
   selectedProjectId: z.string().nullable(),
   selectedSessionId: z.string().nullable(),
   sessionPage: z.number().int().nonnegative().nullable(),
@@ -207,6 +236,11 @@ export const ipcContractSchemas = {
       expandedByDefaultCategories: z.array(messageCategorySchema),
       searchProviders: z.array(providerSchema),
       theme: z.enum(["light", "dark"]),
+      monoFontFamily: z.enum(["current", "droid_sans_mono"]),
+      regularFontFamily: z.enum(["current", "inter"]),
+      monoFontSize: monoFontSizeSchema,
+      regularFontSize: regularFontSizeSchema,
+      useMonospaceForAllMessages: z.boolean(),
       selectedProjectId: z.string(),
       selectedSessionId: z.string(),
       sessionPage: z.number().int().nonnegative(),

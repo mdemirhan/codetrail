@@ -61,7 +61,31 @@ const EMPTY_CATEGORY_COUNTS = {
 
 type MainView = "history" | "search" | "settings";
 type ThemeMode = "light" | "dark";
+type MonoFontFamily = "current" | "droid_sans_mono";
+type RegularFontFamily = "current" | "inter";
+type MonoFontSize = "10px" | "11px" | "12px" | "13px" | "14px" | "15px" | "16px" | "17px" | "18px";
+type RegularFontSize =
+  | "11px"
+  | "12px"
+  | "13px"
+  | "13.5px"
+  | "14px"
+  | "15px"
+  | "16px"
+  | "17px"
+  | "18px"
+  | "20px";
 type BulkExpandScope = "all" | MessageCategory;
+
+const MONO_FONT_STACKS: Record<MonoFontFamily, string> = {
+  current: '"JetBrains Mono", "IBM Plex Mono", monospace',
+  droid_sans_mono: '"Droid Sans Mono", "JetBrains Mono", "IBM Plex Mono", monospace',
+};
+
+const REGULAR_FONT_STACKS: Record<RegularFontFamily, string> = {
+  current: '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  inter: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+};
 
 function formatDuration(durationMs: number | null): string {
   if (durationMs === null || !Number.isFinite(durationMs) || durationMs <= 0) {
@@ -85,6 +109,11 @@ export function App() {
 
   const [mainView, setMainView] = useState<MainView>("history");
   const [theme, setTheme] = useState<ThemeMode>("light");
+  const [monoFontFamily, setMonoFontFamily] = useState<MonoFontFamily>("droid_sans_mono");
+  const [regularFontFamily, setRegularFontFamily] = useState<RegularFontFamily>("current");
+  const [monoFontSize, setMonoFontSize] = useState<MonoFontSize>("12px");
+  const [regularFontSize, setRegularFontSize] = useState<RegularFontSize>("13.5px");
+  const [useMonospaceForAllMessages, setUseMonospaceForAllMessages] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [projectPaneCollapsed, setProjectPaneCollapsed] = useState(false);
   const [sessionPaneCollapsed, setSessionPaneCollapsed] = useState(false);
@@ -267,6 +296,11 @@ export function App() {
     expandedByDefaultCategories,
     searchProviders,
     theme,
+    monoFontFamily,
+    regularFontFamily,
+    monoFontSize,
+    regularFontSize,
+    useMonospaceForAllMessages,
     selectedProjectId,
     selectedSessionId,
     sessionPage,
@@ -278,6 +312,11 @@ export function App() {
     setExpandedByDefaultCategories,
     setSearchProviders,
     setTheme,
+    setMonoFontFamily,
+    setRegularFontFamily,
+    setMonoFontSize,
+    setRegularFontSize,
+    setUseMonospaceForAllMessages,
     setSelectedProjectId,
     setSelectedSessionId,
     setSessionPage,
@@ -309,6 +348,31 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--font-mono", MONO_FONT_STACKS[monoFontFamily]);
+  }, [monoFontFamily]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--font-sans",
+      REGULAR_FONT_STACKS[regularFontFamily],
+    );
+  }, [regularFontFamily]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--message-mono-font-size", monoFontSize);
+  }, [monoFontSize]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--message-font-size", regularFontSize);
+  }, [regularFontSize]);
+
+  useEffect(() => {
+    document.documentElement.dataset.useMonospaceMessages = useMonospaceForAllMessages
+      ? "true"
+      : "false";
+  }, [useMonospaceForAllMessages]);
 
   useEffect(() => {
     return () => {
@@ -1186,6 +1250,16 @@ export function App() {
               info={settingsInfo}
               loading={settingsLoading}
               error={settingsError}
+              monoFontFamily={monoFontFamily}
+              regularFontFamily={regularFontFamily}
+              monoFontSize={monoFontSize}
+              regularFontSize={regularFontSize}
+              useMonospaceForAllMessages={useMonospaceForAllMessages}
+              onMonoFontFamilyChange={setMonoFontFamily}
+              onRegularFontFamilyChange={setRegularFontFamily}
+              onMonoFontSizeChange={setMonoFontSize}
+              onRegularFontSizeChange={setRegularFontSize}
+              onUseMonospaceForAllMessagesChange={setUseMonospaceForAllMessages}
               expandedByDefaultCategories={expandedByDefaultCategories}
               onToggleExpandedByDefault={(category) =>
                 setExpandedByDefaultCategories((value) =>

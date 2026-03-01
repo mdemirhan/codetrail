@@ -6,6 +6,20 @@ import type { MessageCategory, Provider } from "@codetrail/core";
 import { clamp } from "../lib/viewUtils";
 
 type ThemeMode = "light" | "dark";
+type MonoFontFamily = "current" | "droid_sans_mono";
+type RegularFontFamily = "current" | "inter";
+type MonoFontSize = "10px" | "11px" | "12px" | "13px" | "14px" | "15px" | "16px" | "17px" | "18px";
+type RegularFontSize =
+  | "11px"
+  | "12px"
+  | "13px"
+  | "13.5px"
+  | "14px"
+  | "15px"
+  | "16px"
+  | "17px"
+  | "18px"
+  | "20px";
 
 type RestoredScrollTarget = {
   sessionId: string;
@@ -22,6 +36,11 @@ export function usePaneStateSync(args: {
   expandedByDefaultCategories: MessageCategory[];
   searchProviders: Provider[];
   theme: ThemeMode;
+  monoFontFamily: MonoFontFamily;
+  regularFontFamily: RegularFontFamily;
+  monoFontSize: MonoFontSize;
+  regularFontSize: RegularFontSize;
+  useMonospaceForAllMessages: boolean;
   selectedProjectId: string;
   selectedSessionId: string;
   sessionPage: number;
@@ -33,6 +52,11 @@ export function usePaneStateSync(args: {
   setExpandedByDefaultCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setSearchProviders: Dispatch<SetStateAction<Provider[]>>;
   setTheme: Dispatch<SetStateAction<ThemeMode>>;
+  setMonoFontFamily: Dispatch<SetStateAction<MonoFontFamily>>;
+  setRegularFontFamily: Dispatch<SetStateAction<RegularFontFamily>>;
+  setMonoFontSize: Dispatch<SetStateAction<MonoFontSize>>;
+  setRegularFontSize: Dispatch<SetStateAction<RegularFontSize>>;
+  setUseMonospaceForAllMessages: Dispatch<SetStateAction<boolean>>;
   setSelectedProjectId: Dispatch<SetStateAction<string>>;
   setSelectedSessionId: Dispatch<SetStateAction<string>>;
   setSessionPage: Dispatch<SetStateAction<number>>;
@@ -49,6 +73,11 @@ export function usePaneStateSync(args: {
     expandedByDefaultCategories,
     searchProviders,
     theme,
+    monoFontFamily,
+    regularFontFamily,
+    monoFontSize,
+    regularFontSize,
+    useMonospaceForAllMessages,
     selectedProjectId,
     selectedSessionId,
     sessionPage,
@@ -60,6 +89,11 @@ export function usePaneStateSync(args: {
     setExpandedByDefaultCategories,
     setSearchProviders,
     setTheme,
+    setMonoFontFamily,
+    setRegularFontFamily,
+    setMonoFontSize,
+    setRegularFontSize,
+    setUseMonospaceForAllMessages,
     setSelectedProjectId,
     setSelectedSessionId,
     setSessionPage,
@@ -98,6 +132,21 @@ export function usePaneStateSync(args: {
         }
         if (response.theme !== null) {
           setTheme(response.theme);
+        }
+        if (response.monoFontFamily !== null) {
+          setMonoFontFamily(response.monoFontFamily);
+        }
+        if (response.regularFontFamily !== null) {
+          setRegularFontFamily(response.regularFontFamily);
+        }
+        if (response.monoFontSize !== null) {
+          setMonoFontSize(response.monoFontSize);
+        }
+        if (response.regularFontSize !== null) {
+          setRegularFontSize(response.regularFontSize);
+        }
+        if (response.useMonospaceForAllMessages !== null) {
+          setUseMonospaceForAllMessages(response.useMonospaceForAllMessages);
         }
         if (response.selectedProjectId !== null) {
           setSelectedProjectId(response.selectedProjectId);
@@ -154,6 +203,11 @@ export function usePaneStateSync(args: {
     setSessionPaneWidth,
     setSessionScrollTop,
     setTheme,
+    setMonoFontFamily,
+    setRegularFontFamily,
+    setMonoFontSize,
+    setRegularFontSize,
+    setUseMonospaceForAllMessages,
   ]);
 
   useEffect(() => {
@@ -171,6 +225,11 @@ export function usePaneStateSync(args: {
           expandedByDefaultCategories,
           searchProviders,
           theme,
+          monoFontFamily,
+          regularFontFamily,
+          monoFontSize,
+          regularFontSize,
+          useMonospaceForAllMessages,
           selectedProjectId,
           selectedSessionId,
           sessionPage,
@@ -192,6 +251,11 @@ export function usePaneStateSync(args: {
     projectProviders,
     expandedByDefaultCategories,
     searchProviders,
+    monoFontFamily,
+    regularFontFamily,
+    monoFontSize,
+    regularFontSize,
+    useMonospaceForAllMessages,
     selectedProjectId,
     selectedSessionId,
     sessionPage,

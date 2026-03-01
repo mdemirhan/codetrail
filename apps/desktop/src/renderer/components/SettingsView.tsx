@@ -7,6 +7,20 @@ import { ToolbarIcon } from "./ToolbarIcon";
 
 type SettingsInfo = IpcResponse<"app:getSettingsInfo">;
 type DiscoveryProvider = "claude" | "codex" | "gemini";
+type MonoFontFamily = "current" | "droid_sans_mono";
+type RegularFontFamily = "current" | "inter";
+type MonoFontSize = "10px" | "11px" | "12px" | "13px" | "14px" | "15px" | "16px" | "17px" | "18px";
+type RegularFontSize =
+  | "11px"
+  | "12px"
+  | "13px"
+  | "13.5px"
+  | "14px"
+  | "15px"
+  | "16px"
+  | "17px"
+  | "18px"
+  | "20px";
 
 const SETTINGS_MESSAGE_CATEGORIES: MessageCategory[] = [
   "user",
@@ -18,16 +32,71 @@ const SETTINGS_MESSAGE_CATEGORIES: MessageCategory[] = [
   "system",
 ];
 
+const MONO_FONT_OPTIONS: Array<{ value: MonoFontFamily; label: string }> = [
+  { value: "current", label: "JetBrains Mono" },
+  { value: "droid_sans_mono", label: "Droid Sans Mono" },
+];
+
+const REGULAR_FONT_OPTIONS: Array<{ value: RegularFontFamily; label: string }> = [
+  { value: "current", label: "Plus Jakarta Sans" },
+  { value: "inter", label: "Inter" },
+];
+
+const MONO_FONT_SIZE_OPTIONS: Array<{ value: MonoFontSize; label: string }> = [
+  { value: "10px", label: "10px" },
+  { value: "11px", label: "11px" },
+  { value: "12px", label: "12px" },
+  { value: "13px", label: "13px" },
+  { value: "14px", label: "14px" },
+  { value: "15px", label: "15px" },
+  { value: "16px", label: "16px" },
+  { value: "17px", label: "17px" },
+  { value: "18px", label: "18px" },
+];
+
+const REGULAR_FONT_SIZE_OPTIONS: Array<{ value: RegularFontSize; label: string }> = [
+  { value: "11px", label: "11px" },
+  { value: "12px", label: "12px" },
+  { value: "13px", label: "13px" },
+  { value: "13.5px", label: "13.5px" },
+  { value: "14px", label: "14px" },
+  { value: "15px", label: "15px" },
+  { value: "16px", label: "16px" },
+  { value: "17px", label: "17px" },
+  { value: "18px", label: "18px" },
+  { value: "20px", label: "20px" },
+];
+
 export function SettingsView({
   info,
   loading,
   error,
+  monoFontFamily,
+  regularFontFamily,
+  monoFontSize,
+  regularFontSize,
+  useMonospaceForAllMessages,
+  onMonoFontFamilyChange,
+  onRegularFontFamilyChange,
+  onMonoFontSizeChange,
+  onRegularFontSizeChange,
+  onUseMonospaceForAllMessagesChange,
   expandedByDefaultCategories,
   onToggleExpandedByDefault,
 }: {
   info: SettingsInfo | null;
   loading: boolean;
   error: string | null;
+  monoFontFamily: MonoFontFamily;
+  regularFontFamily: RegularFontFamily;
+  monoFontSize: MonoFontSize;
+  regularFontSize: RegularFontSize;
+  useMonospaceForAllMessages: boolean;
+  onMonoFontFamilyChange: (fontFamily: MonoFontFamily) => void;
+  onRegularFontFamilyChange: (fontFamily: RegularFontFamily) => void;
+  onMonoFontSizeChange: (fontSize: MonoFontSize) => void;
+  onRegularFontSizeChange: (fontSize: RegularFontSize) => void;
+  onUseMonospaceForAllMessagesChange: (enabled: boolean) => void;
   expandedByDefaultCategories: MessageCategory[];
   onToggleExpandedByDefault: (category: MessageCategory) => void;
 }) {
@@ -64,6 +133,89 @@ export function SettingsView({
           <ToolbarIcon name="settings" />
           <span>Settings</span>
         </div>
+
+        <section className="settings-section">
+          <div className="settings-section-header">
+            <h3>Fonts</h3>
+            <p>Choose regular and monospaced fonts used in the UI and message content.</p>
+          </div>
+          <div className="settings-section-body">
+            <div className="settings-font-grid">
+              <label className="settings-field">
+                <span className="settings-field-label">Monospaced font</span>
+                <select
+                  className="settings-select"
+                  value={monoFontFamily}
+                  onChange={(event) => onMonoFontFamilyChange(event.target.value as MonoFontFamily)}
+                >
+                  {MONO_FONT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="settings-field">
+                <span className="settings-field-label">Monospaced size</span>
+                <select
+                  className="settings-select"
+                  value={monoFontSize}
+                  onChange={(event) => onMonoFontSizeChange(event.target.value as MonoFontSize)}
+                >
+                  {MONO_FONT_SIZE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="settings-field">
+                <span className="settings-field-label">Regular font</span>
+                <select
+                  className="settings-select"
+                  value={regularFontFamily}
+                  onChange={(event) =>
+                    onRegularFontFamilyChange(event.target.value as RegularFontFamily)
+                  }
+                >
+                  {REGULAR_FONT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="settings-field">
+                <span className="settings-field-label">Regular size</span>
+                <select
+                  className="settings-select"
+                  value={regularFontSize}
+                  onChange={(event) =>
+                    onRegularFontSizeChange(event.target.value as RegularFontSize)
+                  }
+                >
+                  {REGULAR_FONT_SIZE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="settings-checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={useMonospaceForAllMessages}
+                  onChange={(event) => onUseMonospaceForAllMessagesChange(event.target.checked)}
+                />
+                <span>Use monospaced fonts for all messages</span>
+              </label>
+            </div>
+          </div>
+        </section>
 
         <section className="settings-section">
           <div className="settings-section-header">

@@ -18,6 +18,9 @@
     "make:mac:arm64": "./scripts/make-macos-app.sh arm64"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/plus-jakarta-sans": "^5.2.8",
     "better-sqlite3": "11.8.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
