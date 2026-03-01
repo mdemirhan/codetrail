@@ -274,7 +274,7 @@ export function App() {
     }
   }, []);
 
-  usePaneStateSync({
+  const { paneStateHydrated } = usePaneStateSync({
     logError,
     projectPaneWidth,
     sessionPaneWidth,
@@ -382,6 +382,10 @@ export function App() {
   }, [loadProjects, logError]);
 
   useEffect(() => {
+    if (!paneStateHydrated) {
+      return;
+    }
+
     if (!projectsLoaded) {
       return;
     }
@@ -404,7 +408,14 @@ export function App() {
     if (searchProjectId && !sortedProjects.some((project) => project.id === searchProjectId)) {
       setSearchProjectId("");
     }
-  }, [pendingSearchNavigation, projectsLoaded, searchProjectId, selectedProjectId, sortedProjects]);
+  }, [
+    paneStateHydrated,
+    pendingSearchNavigation,
+    projectsLoaded,
+    searchProjectId,
+    selectedProjectId,
+    sortedProjects,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -419,6 +430,10 @@ export function App() {
   }, [loadSessions, logError]);
 
   useEffect(() => {
+    if (!paneStateHydrated) {
+      return;
+    }
+
     if (sessionsLoadedProjectId !== selectedProjectId) {
       return;
     }
@@ -439,6 +454,7 @@ export function App() {
       setSessionPage(0);
     }
   }, [
+    paneStateHydrated,
     pendingSearchNavigation,
     selectedProjectId,
     selectedSessionId,
