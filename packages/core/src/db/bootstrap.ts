@@ -28,6 +28,7 @@ const tableStatements = [
     project_id TEXT NOT NULL,
     provider TEXT NOT NULL,
     file_path TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL DEFAULT '',
     model_names TEXT NOT NULL,
     started_at TEXT,
     ended_at TEXT,

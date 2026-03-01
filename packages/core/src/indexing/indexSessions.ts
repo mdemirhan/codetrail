@@ -133,6 +133,7 @@ export function runIncrementalIndexing(
          project_id,
          provider,
          file_path,
+         title,
          model_names,
          started_at,
          ended_at,
@@ -142,11 +143,12 @@ export function runIncrementalIndexing(
          message_count,
          token_input_total,
          token_output_total
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          project_id = excluded.project_id,
          provider = excluded.provider,
          file_path = excluded.file_path,
+         title = excluded.title,
          model_names = excluded.model_names,
          started_at = excluded.started_at,
          ended_at = excluded.ended_at,
@@ -266,6 +268,7 @@ export function runIncrementalIndexing(
         compiledSystemMessageRules.compiledByProvider[discovered.provider],
       );
       const messagesWithDuration = deriveOperationDurations(normalizedMessages);
+      const sessionTitle = deriveSessionTitle(messagesWithDuration);
       const aggregate = buildSessionAggregate(
         messagesWithDuration.map((message) => ({
           ...message,
@@ -291,6 +294,7 @@ export function runIncrementalIndexing(
           projectId,
           discovered.provider,
           discovered.filePath,
+          sessionTitle,
           sourceMeta.models.join(","),
           aggregate.startedAt,
           aggregate.endedAt,
@@ -763,4 +767,50 @@ function parseToolCallContent(content: string): {
       resultJson: null,
     };
   }
+}
+
+function deriveSessionTitle(messages: IndexedMessage[]): string {
+  if (messages.length === 0) {
+    return "";
+  }
+
+  const categoryPriority = (category: MessageCategory): number => {
+    if (category === "user") {
+      return 0;
+    }
+    if (category === "assistant") {
+      return 1;
+    }
+    return 2;
+  };
+
+  let selected = messages[0];
+  if (!selected) {
+    return "";
+  }
+  for (let index = 1; index < messages.length; index += 1) {
+    const candidate = messages[index];
+    if (!candidate || !selected) {
+      continue;
+    }
+
+    const selectedPriority = categoryPriority(selected.category);
+    const candidatePriority = categoryPriority(candidate.category);
+    if (candidatePriority < selectedPriority) {
+      selected = candidate;
+      continue;
+    }
+    if (candidatePriority > selectedPriority) {
+      continue;
+    }
+    if (candidate.createdAt < selected.createdAt) {
+      selected = candidate;
+      continue;
+    }
+    if (candidate.createdAt === selected.createdAt && candidate.id < selected.id) {
+      selected = candidate;
+    }
+  }
+
+  return selected.content;
 }

@@ -210,6 +210,7 @@ describe("queryService in-memory", () => {
         project_id,
         provider,
         file_path,
+        title,
         model_names,
         started_at,
         ended_at,
@@ -219,12 +220,13 @@ describe("queryService in-memory", () => {
         message_count,
         token_input_total,
         token_output_total
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       "session_new",
       "project_1",
       "claude",
       "/workspace/project-one/session-new.jsonl",
+      "new session user",
       "claude-opus-4-1",
       "2026-03-01T10:00:00.000Z",
       "2026-03-01T10:15:00.000Z",
@@ -241,6 +243,7 @@ describe("queryService in-memory", () => {
         project_id,
         provider,
         file_path,
+        title,
         model_names,
         started_at,
         ended_at,
@@ -250,12 +253,13 @@ describe("queryService in-memory", () => {
         message_count,
         token_input_total,
         token_output_total
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       "session_old",
       "project_1",
       "claude",
       "/workspace/project-one/session-old.jsonl",
+      "old session user",
       "claude-opus-4-1",
       "2026-03-01T09:00:00.000Z",
       "2026-03-01T09:05:00.000Z",
@@ -550,7 +554,7 @@ describe("queryService in-memory", () => {
     expect(ascPage0.messages[0]?.id).toBe("message_offset");
   });
 
-  it("selects session titles from user first, assistant second, then first message", () => {
+  it("returns persisted session titles from sessions table", () => {
     const db = createInMemoryDatabase();
     const now = "2026-03-01T10:00:00.000Z";
 
@@ -565,6 +569,7 @@ describe("queryService in-memory", () => {
         project_id,
         provider,
         file_path,
+        title,
         model_names,
         started_at,
         ended_at,
@@ -574,7 +579,7 @@ describe("queryService in-memory", () => {
         message_count,
         token_input_total,
         token_output_total
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     insertSession.run(
@@ -582,6 +587,7 @@ describe("queryService in-memory", () => {
       "project_1",
       "claude",
       "/workspace/project-one/session-user-title.jsonl",
+      "User title wins",
       "claude-opus-4-1",
       now,
       now,
@@ -597,6 +603,7 @@ describe("queryService in-memory", () => {
       "project_1",
       "claude",
       "/workspace/project-one/session-assistant-title.jsonl",
+      "Assistant title wins",
       "claude-opus-4-1",
       now,
       now,
@@ -612,6 +619,7 @@ describe("queryService in-memory", () => {
       "project_1",
       "claude",
       "/workspace/project-one/session-first-message-title.jsonl",
+      "First message title wins",
       "claude-opus-4-1",
       now,
       now,

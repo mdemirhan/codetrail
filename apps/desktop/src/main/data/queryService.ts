@@ -72,30 +72,6 @@ type BookmarkMessageLookupRow = MessageRow & {
   session_title: string;
 };
 
-const SESSION_TITLE_JOIN_SQL = `
-  LEFT JOIN (
-    SELECT ranked.session_id, ranked.content
-    FROM (
-      SELECT
-        m.session_id,
-        m.content,
-        ROW_NUMBER() OVER (
-          PARTITION BY m.session_id
-          ORDER BY
-            CASE
-              WHEN m.category = 'user' THEN 0
-              WHEN m.category = 'assistant' THEN 1
-              ELSE 2
-            END,
-            m.created_at,
-            m.id
-        ) AS row_num
-      FROM messages m
-    ) ranked
-    WHERE ranked.row_num = 1
-  ) first_title ON first_title.session_id = s.id
-`;
-
 export type QueryService = {
   listProjects: (request: IpcRequest<"projects:list">) => IpcResponse<"projects:list">;
   getProjectCombinedDetail: (
@@ -327,7 +303,7 @@ function listSessionsWithDatabase(
          s.project_id,
          s.provider,
          s.file_path,
-         COALESCE(first_title.content, '') as title,
+         s.title,
          s.model_names,
          s.started_at,
          s.ended_at,
@@ -338,7 +314,6 @@ function listSessionsWithDatabase(
          s.token_input_total,
          s.token_output_total
        FROM sessions s
-       ${SESSION_TITLE_JOIN_SQL}
        ${whereClause}
        ORDER BY COALESCE(s.ended_at, s.started_at) DESC, s.id DESC`,
     )
@@ -486,14 +461,13 @@ function getProjectCombinedDetailWithDatabase(
          m.operation_duration_ms,
          m.operation_duration_source,
          m.operation_duration_confidence,
-         COALESCE(first_title.content, '') as session_title,
+         s.title as session_title,
          s.started_at as session_started_at,
          s.ended_at as session_ended_at,
          s.git_branch as session_git_branch,
          s.cwd as session_cwd
        FROM messages m
        JOIN sessions s ON s.id = m.session_id
-       ${SESSION_TITLE_JOIN_SQL}
        WHERE ${whereClause}
        ORDER BY ${messageOrder}
        LIMIT ? OFFSET ?`,
@@ -542,7 +516,7 @@ function getSessionDetailWithDatabase(
          s.project_id,
          s.provider,
          s.file_path,
-         COALESCE(first_title.content, '') as title,
+         s.title,
          s.model_names,
          s.started_at,
          s.ended_at,
@@ -553,7 +527,6 @@ function getSessionDetailWithDatabase(
          s.token_input_total,
          s.token_output_total
        FROM sessions s
-       ${SESSION_TITLE_JOIN_SQL}
        WHERE s.id = ?`,
     )
     .get(request.sessionId) as SessionSummaryRow | undefined;
@@ -770,7 +743,7 @@ function listLiveBookmarkMessagesById(
     .prepare(
       `SELECT
          s.project_id,
-         COALESCE(first_title.content, '') as session_title,
+         s.title as session_title,
          m.id,
          m.source_id,
          m.session_id,
@@ -785,7 +758,6 @@ function listLiveBookmarkMessagesById(
          m.operation_duration_confidence
        FROM messages m
        JOIN sessions s ON s.id = m.session_id
-       ${SESSION_TITLE_JOIN_SQL}
        WHERE s.project_id = ?
          AND m.id IN (${placeholders})`,
     )
@@ -816,10 +788,9 @@ function toggleBookmarkWithStore(
          m.content,
          m.created_at,
          s.project_id,
-         COALESCE(first_title.content, '') as session_title
+         s.title as session_title
        FROM messages m
        JOIN sessions s ON s.id = m.session_id
-       ${SESSION_TITLE_JOIN_SQL}
        WHERE m.id = ?`,
     )
     .get(request.messageId) as
