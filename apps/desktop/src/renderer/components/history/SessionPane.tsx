@@ -87,6 +87,38 @@ export function SessionPane({
           </button>
         </div>
       </div>
+      {collapsed ? (
+        <div className="collapsed-quick-switch" aria-label="Collapsed session quick actions">
+          <button
+            type="button"
+            className={
+              allSessionsSelected
+                ? "collapse-btn collapsed-quick-btn active"
+                : "collapse-btn collapsed-quick-btn"
+            }
+            onClick={onSelectAllSessions}
+            aria-label="Switch to All Sessions"
+            title="All Sessions"
+          >
+            <ToolbarIcon name="history" />
+          </button>
+          {bookmarksCount > 0 ? (
+            <button
+              type="button"
+              className={
+                bookmarksSelected
+                  ? "collapse-btn collapsed-quick-btn active"
+                  : "collapse-btn collapsed-quick-btn"
+              }
+              onClick={onSelectBookmarks}
+              aria-label="Switch to Bookmarks"
+              title="Bookmarked messages"
+            >
+              <ToolbarIcon name="bookmark" />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="list-scroll session-list">
         <button
           type="button"

@@ -70,7 +70,11 @@ describe("SessionPane", () => {
     expect(onSelectSession).toHaveBeenCalledWith("session_1");
   });
 
-  it("hides bookmark row when bookmark count is zero", () => {
+  it("shows collapsed quick-switch icons and hides bookmark icon when count is zero", async () => {
+    const user = userEvent.setup();
+    const onSelectAllSessions = vi.fn();
+    const onSelectBookmarks = vi.fn();
+
     render(
       <SessionPane
         sortedSessions={sessions}
@@ -83,12 +87,17 @@ describe("SessionPane", () => {
         collapsed={true}
         onToggleCollapsed={vi.fn()}
         onToggleSortDirection={vi.fn()}
-        onSelectAllSessions={vi.fn()}
-        onSelectBookmarks={vi.fn()}
+        onSelectAllSessions={onSelectAllSessions}
+        onSelectBookmarks={onSelectBookmarks}
         onSelectSession={vi.fn()}
       />,
     );
 
+    await user.click(screen.getByRole("button", { name: "Switch to All Sessions" }));
+
+    expect(onSelectAllSessions).toHaveBeenCalledTimes(1);
+    expect(onSelectBookmarks).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Switch to Bookmarks" })).toBeNull();
     expect(screen.getByText("All Sessions")).toBeInTheDocument();
     expect(screen.queryByText("Bookmarked messages")).toBeNull();
     expect(screen.getByRole("button", { name: "Expand Sessions pane" })).toBeInTheDocument();

@@ -942,6 +942,29 @@ body.platform-macos .titlebar-left {
   gap: 6px;
 }
 
+.collapsed-quick-switch {
+  display: none;
+}
+
+.panel.collapsed .collapsed-quick-switch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+
+.collapsed-quick-btn {
+  width: 26px;
+  height: 26px;
+}
+
+.collapsed-quick-btn.active {
+  background: var(--accent-blue-dim);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
 .panel.collapsed .search-wrapper,
 .panel.collapsed .tag-row,
 .panel.collapsed .list-scroll,

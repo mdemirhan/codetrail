@@ -17,6 +17,7 @@ export function ToolbarIcon({
     | "expandAll"
     | "collapseAll"
     | "chevronLeft"
+    | "bookmark"
     | "sortAsc"
     | "sortDesc";
 }) {
@@ -62,6 +63,9 @@ export function ToolbarIcon({
     }
     if (name === "chevronLeft") {
       return "M15 5l-6 7 6 7";
+    }
+    if (name === "bookmark") {
+      return "M6 4h12v16l-6-4-6 4z";
     }
     if (name === "sortAsc") {
       return "M7 17V6M7 6l-3 3M7 6l3 3M12 17h8M12 13h6M12 9h4M12 5h2";
