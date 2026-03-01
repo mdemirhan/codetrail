@@ -895,12 +895,10 @@ export function App() {
     () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,
     [selectedSessionId, sortedSessions],
   );
-  const allSessionsCount = useMemo(() => {
-    if (projectCombinedDetail && projectCombinedDetail.projectId === selectedProjectId) {
-      return projectCombinedDetail.totalCount;
-    }
-    return sortedSessions.reduce((sum, session) => sum + session.messageCount, 0);
-  }, [projectCombinedDetail, selectedProjectId, sortedSessions]);
+  const allSessionsCount = useMemo(
+    () => sortedSessions.reduce((sum, session) => sum + session.messageCount, 0),
+    [sortedSessions],
+  );
   const messagePathRoots = useMemo(() => {
     if (!selectedProject?.path) {
       return [];
