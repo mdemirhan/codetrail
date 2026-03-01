@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import type { IpcResponse } from "@codetrail/core";
 
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
@@ -54,6 +55,15 @@ function showBootFailure(title: string, details: unknown): void {
   body.appendChild(container);
 }
 
+function applyInitialTheme(theme: "light" | "dark"): void {
+  document.documentElement.dataset.theme = theme;
+  try {
+    window.localStorage.setItem("codetrail-theme", theme);
+  } catch {
+    // Ignore storage errors at bootstrap.
+  }
+}
+
 window.addEventListener("error", (event) => {
   console.error("[codetrail] renderer window error", event.error ?? event.message);
   showBootFailure("Renderer Window Error", event.error ?? event.message);
@@ -66,14 +76,23 @@ window.addEventListener("unhandledrejection", (event) => {
 
 async function bootRenderer(): Promise<void> {
   try {
-    const [{ App }, { AppErrorBoundary }] = await Promise.all([
+    const initialPaneStatePromise: Promise<IpcResponse<"ui:getState"> | null> =
+      typeof window.codetrail?.invoke === "function"
+        ? window.codetrail.invoke("ui:getState", {}).catch((error: unknown) => {
+            console.error("[codetrail] failed loading initial ui state", error);
+            return null;
+          })
+        : Promise.resolve(null);
+    const [{ App }, { AppErrorBoundary }, initialPaneState] = await Promise.all([
       import("./App"),
       import("./AppErrorBoundary"),
+      initialPaneStatePromise,
     ]);
+    applyInitialTheme(initialPaneState?.theme ?? "light");
     createRoot(mountElement).render(
       <StrictMode>
         <AppErrorBoundary>
-          <App />
+          <App initialPaneState={initialPaneState} />
         </AppErrorBoundary>
       </StrictMode>,
     );

@@ -472,9 +472,17 @@ body.platform-macos .titlebar-left {
   display: grid;
 }
 
+.workspace.pane-layout-hydrating {
+  visibility: hidden;
+}
+
 .history-layout {
   grid-template-columns: 260px 1px 300px 1px minmax(420px, 1fr);
   transition: grid-template-columns 0.3s ease;
+}
+
+.history-layout.pane-layout-hydrating {
+  transition: none;
 }
 
 .single-layout,

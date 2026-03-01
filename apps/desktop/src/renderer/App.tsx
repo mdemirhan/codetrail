@@ -30,6 +30,7 @@ import { isMissingCodetrailClient, useCodetrailClient } from "./lib/codetrailCli
 import { openInFileManager, openPath } from "./lib/pathActions";
 import { decideSessionSelectionAfterLoad } from "./lib/sessionSelection";
 import {
+  clamp,
   compareRecent,
   countProviders,
   deriveSessionTitle,
@@ -73,6 +74,7 @@ type HistoryMode = "session" | "bookmarks" | "project_all";
 type BulkExpandScope = "all" | MessageCategory;
 type SystemMessageRegexRules = Record<Provider, string[]>;
 type SortDirection = "asc" | "desc";
+type PaneStateSnapshot = IpcResponse<"ui:getState">;
 
 const EMPTY_BOOKMARKS_RESPONSE: BookmarkListResponse = {
   projectId: "",
@@ -114,58 +116,89 @@ function formatDuration(durationMs: number | null): string {
   return `${seconds}s`;
 }
 
-export function App() {
+export function App({ initialPaneState = null }: { initialPaneState?: PaneStateSnapshot | null }) {
   const codetrail = useCodetrailClient();
   const preloadUnavailable = isMissingCodetrailClient(codetrail);
+  const initialProjectPaneWidth = clamp(initialPaneState?.projectPaneWidth ?? 300, 230, 520);
+  const initialSessionPaneWidth = clamp(initialPaneState?.sessionPaneWidth ?? 320, 250, 620);
+  const initialSessionScrollTop = initialPaneState?.sessionScrollTop ?? 0;
   const [refreshing, setRefreshing] = useState(false);
 
   const [mainView, setMainView] = useState<MainView>("history");
-  const [theme, setTheme] = useState<ThemeMode>("light");
-  const [monoFontFamily, setMonoFontFamily] = useState<MonoFontFamily>("droid_sans_mono");
-  const [regularFontFamily, setRegularFontFamily] = useState<RegularFontFamily>("current");
-  const [monoFontSize, setMonoFontSize] = useState<MonoFontSize>("12px");
-  const [regularFontSize, setRegularFontSize] = useState<RegularFontSize>("13.5px");
-  const [useMonospaceForAllMessages, setUseMonospaceForAllMessages] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(initialPaneState?.theme ?? "light");
+  const [monoFontFamily, setMonoFontFamily] = useState<MonoFontFamily>(
+    initialPaneState?.monoFontFamily ?? "droid_sans_mono",
+  );
+  const [regularFontFamily, setRegularFontFamily] = useState<RegularFontFamily>(
+    initialPaneState?.regularFontFamily ?? "current",
+  );
+  const [monoFontSize, setMonoFontSize] = useState<MonoFontSize>(
+    initialPaneState?.monoFontSize ?? "12px",
+  );
+  const [regularFontSize, setRegularFontSize] = useState<RegularFontSize>(
+    initialPaneState?.regularFontSize ?? "13.5px",
+  );
+  const [useMonospaceForAllMessages, setUseMonospaceForAllMessages] = useState(
+    initialPaneState?.useMonospaceForAllMessages ?? false,
+  );
   const [focusMode, setFocusMode] = useState(false);
-  const [projectPaneCollapsed, setProjectPaneCollapsed] = useState(false);
-  const [sessionPaneCollapsed, setSessionPaneCollapsed] = useState(false);
+  const [projectPaneCollapsed, setProjectPaneCollapsed] = useState(
+    initialPaneState?.projectPaneCollapsed ?? false,
+  );
+  const [sessionPaneCollapsed, setSessionPaneCollapsed] = useState(
+    initialPaneState?.sessionPaneCollapsed ?? false,
+  );
   const [showShortcuts, setShowShortcuts] = useState(false);
   const isHistoryLayout = mainView === "history" && !focusMode;
 
   const [projectQueryInput, setProjectQueryInput] = useState("");
-  const [projectProviders, setProjectProviders] = useState<Provider[]>([...PROVIDERS]);
+  const [projectProviders, setProjectProviders] = useState<Provider[]>(
+    initialPaneState?.projectProviders ?? [...PROVIDERS],
+  );
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState(initialPaneState?.selectedProjectId ?? "");
 
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoadedProjectId, setSessionsLoadedProjectId] = useState<string | null>(null);
   const [bookmarksLoadedProjectId, setBookmarksLoadedProjectId] = useState<string | null>(null);
-  const [historyMode, setHistoryMode] = useState<HistoryMode>("project_all");
-  const [selectedSessionId, setSelectedSessionId] = useState("");
+  const [historyMode, setHistoryMode] = useState<HistoryMode>(
+    initialPaneState?.historyMode ?? "project_all",
+  );
+  const [selectedSessionId, setSelectedSessionId] = useState(initialPaneState?.selectedSessionId ?? "");
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
   const [projectCombinedDetail, setProjectCombinedDetail] = useState<ProjectCombinedDetail | null>(
     null,
   );
   const [bookmarksResponse, setBookmarksResponse] =
     useState<BookmarkListResponse>(EMPTY_BOOKMARKS_RESPONSE);
-  const [sessionPage, setSessionPage] = useState(0);
-  const [sessionScrollTop, setSessionScrollTop] = useState(0);
+  const [sessionPage, setSessionPage] = useState(initialPaneState?.sessionPage ?? 0);
+  const [sessionScrollTop, setSessionScrollTop] = useState(initialSessionScrollTop);
   const [systemMessageRegexRules, setSystemMessageRegexRules] = useState<SystemMessageRegexRules>(
-    EMPTY_SYSTEM_MESSAGE_REGEX_RULES,
+    initialPaneState?.systemMessageRegexRules ?? EMPTY_SYSTEM_MESSAGE_REGEX_RULES,
   );
-  const [projectSortDirection, setProjectSortDirection] = useState<SortDirection>("desc");
-  const [sessionSortDirection, setSessionSortDirection] = useState<SortDirection>("desc");
-  const [messageSortDirection, setMessageSortDirection] = useState<SortDirection>("asc");
-  const [bookmarkSortDirection, setBookmarkSortDirection] = useState<SortDirection>("asc");
-  const [projectAllSortDirection, setProjectAllSortDirection] = useState<SortDirection>("desc");
+  const [projectSortDirection, setProjectSortDirection] = useState<SortDirection>(
+    initialPaneState?.projectSortDirection ?? "desc",
+  );
+  const [sessionSortDirection, setSessionSortDirection] = useState<SortDirection>(
+    initialPaneState?.sessionSortDirection ?? "desc",
+  );
+  const [messageSortDirection, setMessageSortDirection] = useState<SortDirection>(
+    initialPaneState?.messageSortDirection ?? "asc",
+  );
+  const [bookmarkSortDirection, setBookmarkSortDirection] = useState<SortDirection>(
+    initialPaneState?.bookmarkSortDirection ?? "asc",
+  );
+  const [projectAllSortDirection, setProjectAllSortDirection] = useState<SortDirection>(
+    initialPaneState?.projectAllSortDirection ?? "desc",
+  );
   const [sessionQueryInput, setSessionQueryInput] = useState("");
   const [bookmarkQueryInput, setBookmarkQueryInput] = useState("");
-  const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>([
-    ...DEFAULT_MESSAGE_CATEGORIES,
-  ]);
+  const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>(
+    initialPaneState?.historyCategories ?? [...DEFAULT_MESSAGE_CATEGORIES],
+  );
   const [expandedByDefaultCategories, setExpandedByDefaultCategories] = useState<MessageCategory[]>(
-    [...DEFAULT_MESSAGE_CATEGORIES],
+    initialPaneState?.expandedByDefaultCategories ?? [...DEFAULT_MESSAGE_CATEGORIES],
   );
   const [bulkExpandScope, setBulkExpandScope] = useState<BulkExpandScope>("all");
   const [messageExpanded, setMessageExpanded] = useState<Record<string, boolean>>({});
@@ -185,7 +218,9 @@ export function App() {
 
   const [searchQueryInput, setSearchQueryInput] = useState("");
   const [searchProjectQueryInput, setSearchProjectQueryInput] = useState("");
-  const [searchProviders, setSearchProviders] = useState<Provider[]>([]);
+  const [searchProviders, setSearchProviders] = useState<Provider[]>(
+    initialPaneState?.searchProviders ?? [],
+  );
   const [searchProjectId, setSearchProjectId] = useState("");
   const [searchResponse, setSearchResponse] = useState<SearchQueryResponse>({
     query: "",
@@ -216,9 +251,20 @@ export function App() {
     sessionId: string;
     sessionPage: number;
     scrollTop: number;
-  } | null>(null);
+  } | null>(
+    initialPaneState?.selectedSessionId &&
+      typeof initialPaneState?.sessionPage === "number" &&
+      typeof initialPaneState?.sessionScrollTop === "number" &&
+      initialPaneState.sessionScrollTop > 0
+      ? {
+          sessionId: initialPaneState.selectedSessionId,
+          sessionPage: initialPaneState.sessionPage,
+          scrollTop: initialPaneState.sessionScrollTop,
+        }
+      : null,
+  );
   const bookmarksLoadTokenRef = useRef(0);
-  const sessionScrollTopRef = useRef(0);
+  const sessionScrollTopRef = useRef(initialSessionScrollTop);
   const sessionScrollSyncTimerRef = useRef<number | null>(null);
   const {
     projectPaneWidth,
@@ -232,6 +278,8 @@ export function App() {
     projectMax: 520,
     sessionMin: 250,
     sessionMax: 620,
+    initialProjectPaneWidth,
+    initialSessionPaneWidth,
   });
   const sortedProjects = useMemo(() => {
     const next = [...projects];
@@ -351,6 +399,7 @@ export function App() {
   }, [codetrail]);
 
   const { paneStateHydrated } = usePaneStateSync({
+    initialPaneStateHydrated: initialPaneState !== null,
     logError,
     projectPaneWidth,
     sessionPaneWidth,
@@ -428,6 +477,11 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    try {
+      window.localStorage.setItem("codetrail-theme", theme);
+    } catch {
+      // Ignore storage errors when persisting the last selected theme.
+    }
   }, [theme]);
 
   useEffect(() => {
@@ -1239,8 +1293,9 @@ export function App() {
           mainView === "search" ? "search-layout" : ""
         }${projectPaneCollapsed ? " projects-collapsed" : ""}${
           sessionPaneCollapsed ? " sessions-collapsed" : ""
-        }`}
+        }${isHistoryLayout && !paneStateHydrated ? " pane-layout-hydrating" : ""}`}
         style={workspaceStyle}
+        aria-busy={isHistoryLayout && !paneStateHydrated}
       >
         {isHistoryLayout ? (
           <>
