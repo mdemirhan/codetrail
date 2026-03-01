@@ -817,6 +817,20 @@ export function App() {
     });
   }, [areScopedMessagesExpanded, scopedMessages]);
 
+  const handleToggleMessageExpanded = useCallback(
+    (messageId: string, category: MessageCategory) => {
+      setMessageExpanded((value) => ({
+        ...value,
+        [messageId]: !(value[messageId] ?? isExpandedByDefault(category)),
+      }));
+    },
+    [isExpandedByDefault],
+  );
+
+  const handleToggleMessageFocused = useCallback((messageId: string) => {
+    setFocusMessageId((value) => (value === messageId ? "" : messageId));
+  }, []);
+
   const handleRevealInSession = useCallback((messageId: string, sourceId: string) => {
     setSessionQueryInput("");
     setFocusMessageId(messageId);
@@ -1075,18 +1089,9 @@ export function App() {
                       isExpanded={
                         messageExpanded[message.id] ?? isExpandedByDefault(message.category)
                       }
-                      onToggleExpanded={() =>
-                        setMessageExpanded((value) => ({
-                          ...value,
-                          [message.id]: !(
-                            value[message.id] ?? isExpandedByDefault(message.category)
-                          ),
-                        }))
-                      }
-                      onToggleFocused={() =>
-                        setFocusMessageId((value) => (value === message.id ? "" : message.id))
-                      }
-                      onRevealInSession={() => handleRevealInSession(message.id, message.sourceId)}
+                      onToggleExpanded={handleToggleMessageExpanded}
+                      onToggleFocused={handleToggleMessageFocused}
+                      onRevealInSession={handleRevealInSession}
                       cardRef={focusMessageId === message.id ? focusedMessageRef : null}
                     />
                   ))

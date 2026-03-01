@@ -1,5 +1,5 @@
 import type { MessageCategory } from "@codetrail/core";
-import type { KeyboardEvent, MouseEvent, Ref } from "react";
+import { type KeyboardEvent, type MouseEvent, type Ref, memo, useMemo } from "react";
 
 import { copyTextToClipboard } from "../../lib/clipboard";
 import { formatDate, prettyCategory } from "../../lib/viewUtils";
@@ -16,7 +16,19 @@ import {
 } from "./toolParsing";
 import type { SessionMessage } from "./types";
 
-export function MessageCard({
+type MessageCardProps = {
+  message: SessionMessage;
+  query: string;
+  pathRoots: string[];
+  isFocused: boolean;
+  isExpanded: boolean;
+  onToggleExpanded: (messageId: string, category: MessageCategory) => void;
+  onToggleFocused: (messageId: string) => void;
+  onRevealInSession?: (messageId: string, sourceId: string) => void;
+  cardRef?: Ref<HTMLDivElement> | null;
+};
+
+function MessageCardComponent({
   message,
   query,
   pathRoots,
@@ -26,26 +38,24 @@ export function MessageCard({
   onToggleFocused,
   onRevealInSession,
   cardRef,
-}: {
-  message: SessionMessage;
-  query: string;
-  pathRoots: string[];
-  isFocused: boolean;
-  isExpanded: boolean;
-  onToggleExpanded: () => void;
-  onToggleFocused: () => void;
-  onRevealInSession?: () => void;
-  cardRef?: Ref<HTMLDivElement> | null;
-}) {
-  const typeLabel = formatMessageTypeLabel(message.category, message.content);
-  const operationDurationLabel = formatOperationDurationLabel(
-    message.operationDurationMs,
-    message.operationDurationConfidence,
+}: MessageCardProps) {
+  const typeLabel = useMemo(
+    () => formatMessageTypeLabel(message.category, message.content),
+    [message.category, message.content],
   );
+  const operationDurationLabel = useMemo(
+    () =>
+      formatOperationDurationLabel(
+        message.operationDurationMs,
+        message.operationDurationConfidence,
+      ),
+    [message.operationDurationConfidence, message.operationDurationMs],
+  );
+  const toggleExpanded = () => onToggleExpanded(message.id, message.category);
 
   const handleToggleButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    onToggleExpanded();
+    toggleExpanded();
   };
 
   const handleHeaderKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -58,12 +68,12 @@ export function MessageCard({
     }
 
     event.preventDefault();
-    onToggleExpanded();
+    toggleExpanded();
   };
 
   const handleSelectButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    onToggleFocused();
+    onToggleFocused(message.id);
   };
 
   const handleCopyRawButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -78,7 +88,7 @@ export function MessageCard({
 
   const handleRevealButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    onRevealInSession?.();
+    onRevealInSession?.(message.id, message.sourceId);
   };
 
   return (
@@ -90,7 +100,7 @@ export function MessageCard({
     >
       <header
         className="message-header"
-        onClick={onToggleExpanded}
+        onClick={toggleExpanded}
         onKeyDown={handleHeaderKeyDown}
         tabIndex={0}
       >
@@ -178,6 +188,9 @@ export function MessageCard({
     </article>
   );
 }
+
+export const MessageCard = memo(MessageCardComponent);
+MessageCard.displayName = "MessageCard";
 
 function formatMessageTypeLabel(category: MessageCategory, content: string): string {
   if (category !== "tool_use" && category !== "tool_edit") {
