@@ -44,7 +44,10 @@ import {
 type ProjectSummary = IpcResponse<"projects:list">["projects"][number];
 type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
 type SessionDetail = IpcResponse<"sessions:getDetail">;
-type SessionMessage = SessionDetail["messages"][number];
+type ProjectCombinedDetail = IpcResponse<"projects:getCombinedDetail">;
+type HistoryMessage =
+  | SessionDetail["messages"][number]
+  | ProjectCombinedDetail["messages"][number];
 type BookmarkListResponse = IpcResponse<"bookmarks:listProject">;
 type SearchQueryResponse = IpcResponse<"search:query">;
 type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
@@ -66,7 +69,7 @@ const EMPTY_CATEGORY_COUNTS = {
 };
 
 type MainView = "history" | "search" | "settings";
-type HistoryMode = "session" | "bookmarks";
+type HistoryMode = "session" | "bookmarks" | "project_all";
 type BulkExpandScope = "all" | MessageCategory;
 type SystemMessageRegexRules = Record<Provider, string[]>;
 
@@ -137,9 +140,12 @@ export function App() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoadedProjectId, setSessionsLoadedProjectId] = useState<string | null>(null);
   const [bookmarksLoadedProjectId, setBookmarksLoadedProjectId] = useState<string | null>(null);
-  const [historyMode, setHistoryMode] = useState<HistoryMode>("session");
+  const [historyMode, setHistoryMode] = useState<HistoryMode>("project_all");
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [projectCombinedDetail, setProjectCombinedDetail] = useState<ProjectCombinedDetail | null>(
+    null,
+  );
   const [bookmarksResponse, setBookmarksResponse] =
     useState<BookmarkListResponse>(EMPTY_BOOKMARKS_RESPONSE);
   const [sessionPage, setSessionPage] = useState(0);
@@ -514,7 +520,10 @@ export function App() {
       paneStateHydrated,
       sessionsLoadedProjectId,
       selectedProjectId,
-      hasPendingSearchNavigation: pendingSearchNavigation !== null || historyMode === "bookmarks",
+      hasPendingSearchNavigation:
+        pendingSearchNavigation !== null ||
+        historyMode === "bookmarks" ||
+        historyMode === "project_all",
       selectedSessionId,
       sortedSessions,
     });
@@ -574,11 +583,11 @@ export function App() {
     if (bookmarksResponse.totalCount > 0) {
       return;
     }
-    setHistoryMode("session");
+    setHistoryMode("project_all");
   }, [bookmarksLoadedProjectId, bookmarksResponse.totalCount, historyMode, selectedProjectId]);
 
   useEffect(() => {
-    if (!selectedSessionId) {
+    if (historyMode !== "session" || !selectedSessionId) {
       setSessionDetail(null);
       return;
     }
@@ -621,7 +630,61 @@ export function App() {
     };
   }, [
     codetrail,
+    historyMode,
     selectedSessionId,
+    sessionPage,
+    historyCategories,
+    effectiveSessionQuery,
+    pendingRevealTarget,
+    logError,
+  ]);
+
+  useEffect(() => {
+    if (historyMode !== "project_all" || !selectedProjectId) {
+      setProjectCombinedDetail(null);
+      return;
+    }
+
+    let cancelled = false;
+    const isRevealing = pendingRevealTarget !== null;
+    const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
+    const effectiveCategories = isAllHistoryCategoriesSelected ? undefined : historyCategories;
+    const effectiveQuery = isRevealing ? "" : effectiveSessionQuery;
+    void codetrail
+      .invoke("projects:getCombinedDetail", {
+        projectId: selectedProjectId,
+        page: sessionPage,
+        pageSize: PAGE_SIZE,
+        categories: effectiveCategories,
+        query: effectiveQuery,
+        focusMessageId: pendingRevealTarget?.messageId || undefined,
+        focusSourceId: pendingRevealTarget?.sourceId || undefined,
+      })
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+        setProjectCombinedDetail(response);
+        if (pendingRevealTarget !== null) {
+          setPendingRevealTarget(null);
+        }
+        if (response.page !== sessionPage) {
+          setSessionPage(response.page);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          logError("Failed loading project combined detail", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    codetrail,
+    historyMode,
+    selectedProjectId,
     sessionPage,
     historyCategories,
     effectiveSessionQuery,
@@ -666,8 +729,15 @@ export function App() {
     () => new Set(bookmarksResponse.results.map((entry) => entry.message.id)),
     [bookmarksResponse.results],
   );
-  const activeHistoryMessages =
-    historyMode === "bookmarks" ? bookmarkMessages : (sessionDetail?.messages ?? []);
+  const activeHistoryMessages: HistoryMessage[] = useMemo(() => {
+    if (historyMode === "bookmarks") {
+      return bookmarkMessages;
+    }
+    if (historyMode === "project_all") {
+      return projectCombinedDetail?.messages ?? [];
+    }
+    return sessionDetail?.messages ?? [];
+  }, [bookmarkMessages, historyMode, projectCombinedDetail?.messages, sessionDetail?.messages]);
 
   const visibleFocusedMessageId = useMemo(() => {
     if (!focusMessageId) {
@@ -694,7 +764,8 @@ export function App() {
       setSessionScrollTop(0);
       return;
     }
-    if (!selectedSessionId || sessionPage < 0) {
+    const scrollScopeId = historyMode === "project_all" ? selectedProjectId : selectedSessionId;
+    if (!scrollScopeId || sessionPage < 0) {
       messageListRef.current.scrollTop = 0;
       sessionScrollTopRef.current = 0;
       setSessionScrollTop(0);
@@ -704,7 +775,7 @@ export function App() {
     const pendingRestore = pendingRestoredSessionScrollRef.current;
     if (
       pendingRestore &&
-      pendingRestore.sessionId === selectedSessionId &&
+      pendingRestore.sessionId === scrollScopeId &&
       pendingRestore.sessionPage === sessionPage
     ) {
       messageListRef.current.scrollTop = pendingRestore.scrollTop;
@@ -720,7 +791,7 @@ export function App() {
     messageListRef.current.scrollTop = 0;
     sessionScrollTopRef.current = 0;
     setSessionScrollTop(0);
-  }, [historyMode, selectedSessionId, sessionPage]);
+  }, [historyMode, selectedProjectId, selectedSessionId, sessionPage]);
 
   useEffect(() => {
     if (
@@ -774,6 +845,12 @@ export function App() {
     () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,
     [selectedSessionId, sortedSessions],
   );
+  const allSessionsCount = useMemo(() => {
+    if (projectCombinedDetail && projectCombinedDetail.projectId === selectedProjectId) {
+      return projectCombinedDetail.totalCount;
+    }
+    return sortedSessions.reduce((sum, session) => sum + session.messageCount, 0);
+  }, [projectCombinedDetail, selectedProjectId, sortedSessions]);
   const messagePathRoots = useMemo(() => {
     if (!selectedProject?.path) {
       return [];
@@ -861,19 +938,24 @@ export function App() {
   );
 
   const totalPages = useMemo(() => {
-    const totalCount = sessionDetail?.totalCount ?? 0;
+    const totalCount =
+      historyMode === "project_all"
+        ? (projectCombinedDetail?.totalCount ?? 0)
+        : (sessionDetail?.totalCount ?? 0);
     if (totalCount === 0) {
       return 1;
     }
     return Math.ceil(totalCount / PAGE_SIZE);
-  }, [sessionDetail?.totalCount]);
+  }, [historyMode, projectCombinedDetail?.totalCount, sessionDetail?.totalCount]);
 
   const canZoomIn = zoomPercent < 500;
   const canZoomOut = zoomPercent > 25;
   const historyCategoryCounts =
     historyMode === "bookmarks"
       ? bookmarksResponse.categoryCounts
-      : (sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS);
+      : historyMode === "project_all"
+        ? (projectCombinedDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS)
+        : (sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS);
   const sessionMessages = activeHistoryMessages;
   const isExpandedByDefault = useCallback(
     (category: MessageCategory) => expandedByDefaultCategories.includes(category),
@@ -973,15 +1055,32 @@ export function App() {
         return;
       }
 
+      if (historyMode === "project_all") {
+        const projectMessage = activeHistoryMessages.find((entry) => entry.id === messageId);
+        if (!projectMessage || !selectedProjectId) {
+          return;
+        }
+        setPendingSearchNavigation({
+          projectId: selectedProjectId,
+          sessionId: projectMessage.sessionId,
+          messageId,
+          sourceId,
+          historyCategories: [...historyCategories],
+        });
+        setHistoryMode("session");
+        setMainView("history");
+        return;
+      }
+
       setSessionQueryInput("");
       setFocusMessageId(messageId);
       setPendingRevealTarget({ messageId, sourceId });
     },
-    [bookmarksResponse.results, historyCategories, historyMode],
+    [activeHistoryMessages, bookmarksResponse.results, historyCategories, historyMode, selectedProjectId],
   );
 
   const handleToggleBookmark = useCallback(
-    async (message: SessionMessage) => {
+    async (message: HistoryMessage) => {
       if (!selectedProjectId) {
         return;
       }
@@ -1087,6 +1186,9 @@ export function App() {
               onSelectProject={(projectId) => {
                 setPendingSearchNavigation(null);
                 setSelectedProjectId(projectId);
+                setHistoryMode("project_all");
+                setSelectedSessionId("");
+                setSessionPage(0);
                 setFocusMessageId("");
                 setPendingRevealTarget(null);
               }}
@@ -1115,10 +1217,21 @@ export function App() {
             <SessionPane
               sortedSessions={sortedSessions}
               selectedSessionId={selectedSessionId}
+              allSessionsCount={allSessionsCount}
+              allSessionsSelected={historyMode === "project_all"}
               bookmarksCount={bookmarksResponse.totalCount}
               bookmarksSelected={historyMode === "bookmarks"}
               collapsed={sessionPaneCollapsed}
               onToggleCollapsed={() => setSessionPaneCollapsed((value) => !value)}
+              onSelectAllSessions={() => {
+                setPendingSearchNavigation(null);
+                setHistoryMode("project_all");
+                setSelectedSessionId("");
+                setSessionPage(0);
+                setFocusMessageId("");
+                setPendingRevealTarget(null);
+                setMainView("history");
+              }}
               onSelectBookmarks={() => {
                 setPendingSearchNavigation(null);
                 setHistoryMode("bookmarks");
@@ -1151,6 +1264,8 @@ export function App() {
                   <div className="msg-header-title">
                     {historyMode === "bookmarks"
                       ? "Bookmarks"
+                      : historyMode === "project_all"
+                        ? "All Sessions"
                       : selectedSession
                         ? deriveSessionTitle(selectedSession)
                         : "Session Detail"}
@@ -1230,7 +1345,9 @@ export function App() {
                   <span>
                     {historyMode === "bookmarks"
                       ? `${bookmarksResponse.filteredCount} of ${bookmarksResponse.totalCount} bookmarked messages`
-                      : `${sessionDetail?.totalCount ?? 0} messages`}
+                      : historyMode === "project_all"
+                        ? `${projectCombinedDetail?.totalCount ?? 0} messages`
+                        : `${sessionDetail?.totalCount ?? 0} messages`}
                   </span>
                 </div>
               </div>
@@ -1275,7 +1392,9 @@ export function App() {
                     placeholder={
                       historyMode === "bookmarks"
                         ? "Search in bookmarks..."
-                        : "Search in session..."
+                        : historyMode === "project_all"
+                          ? "Search in project sessions..."
+                          : "Search in session..."
                     }
                   />
                 </div>
@@ -1320,7 +1439,7 @@ export function App() {
                 )}
               </div>
 
-              {historyMode === "session" ? (
+              {historyMode !== "bookmarks" ? (
                 <div className="msg-pagination pagination-row">
                   <button
                     type="button"
@@ -1331,7 +1450,10 @@ export function App() {
                     Previous
                   </button>
                   <span className="page-info">
-                    Page {sessionPage + 1} / {totalPages} ({sessionDetail?.totalCount ?? 0}{" "}
+                    Page {sessionPage + 1} / {totalPages} (
+                    {historyMode === "project_all"
+                      ? (projectCombinedDetail?.totalCount ?? 0)
+                      : (sessionDetail?.totalCount ?? 0)}{" "}
                     messages)
                   </span>
                   <button

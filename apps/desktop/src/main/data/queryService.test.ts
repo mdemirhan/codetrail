@@ -181,6 +181,217 @@ describe("queryService in-memory", () => {
     expect(() => service.close()).not.toThrow();
   });
 
+  it("returns project combined detail sorted by message timestamp", () => {
+    const db = createInMemoryDatabase();
+    const now = "2026-03-01T10:00:00.000Z";
+
+    db.prepare(
+      `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run("project_1", "claude", "Project One", "/workspace/project-one", now, now);
+
+    db.prepare(
+      `INSERT INTO sessions (
+        id,
+        project_id,
+        provider,
+        file_path,
+        model_names,
+        started_at,
+        ended_at,
+        duration_ms,
+        git_branch,
+        cwd,
+        message_count,
+        token_input_total,
+        token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "session_new",
+      "project_1",
+      "claude",
+      "/workspace/project-one/session-new.jsonl",
+      "claude-opus-4-1",
+      "2026-03-01T10:00:00.000Z",
+      "2026-03-01T10:15:00.000Z",
+      1000,
+      "main",
+      "/workspace/project-one",
+      2,
+      0,
+      0,
+    );
+    db.prepare(
+      `INSERT INTO sessions (
+        id,
+        project_id,
+        provider,
+        file_path,
+        model_names,
+        started_at,
+        ended_at,
+        duration_ms,
+        git_branch,
+        cwd,
+        message_count,
+        token_input_total,
+        token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "session_old",
+      "project_1",
+      "claude",
+      "/workspace/project-one/session-old.jsonl",
+      "claude-opus-4-1",
+      "2026-03-01T09:00:00.000Z",
+      "2026-03-01T09:05:00.000Z",
+      1000,
+      "main",
+      "/workspace/project-one",
+      2,
+      0,
+      0,
+    );
+
+    db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "message_new_1",
+      "source_new_1",
+      "session_new",
+      "claude",
+      "user",
+      "new session user",
+      "2026-03-01T10:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "message_new_2",
+      "source_new_2",
+      "session_new",
+      "claude",
+      "assistant",
+      "new session assistant",
+      "2026-03-01T10:01:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "message_old_1",
+      "source_old_1",
+      "session_old",
+      "claude",
+      "user",
+      "old session user",
+      "2026-03-01T09:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "message_old_2",
+      "source_old_2",
+      "session_old",
+      "claude",
+      "assistant",
+      "old session assistant",
+      "2026-03-01T09:01:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+
+    const service = createQueryServiceFromDb(db);
+    const combined = service.getProjectCombinedDetail({
+      projectId: "project_1",
+      page: 0,
+      pageSize: 100,
+      categories: undefined,
+      query: "",
+      focusMessageId: undefined,
+      focusSourceId: undefined,
+    });
+
+    expect(combined.totalCount).toBe(4);
+    expect(combined.messages.map((message) => message.id)).toEqual([
+      "message_old_1",
+      "message_old_2",
+      "message_new_1",
+      "message_new_2",
+    ]);
+    expect(combined.messages[0]?.sessionTitle).toBe("old session user");
+    expect(combined.messages[2]?.sessionTitle).toBe("new session user");
+  });
+
   it("supports injected openDatabase dependency in path-based helpers", () => {
     const db = seedQueryDb();
     const closeSpy = vi.spyOn(db, "close");

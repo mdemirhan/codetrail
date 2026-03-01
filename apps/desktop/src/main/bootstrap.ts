@@ -82,6 +82,7 @@ export async function bootstrapMainProcess(
       return { jobId: job.jobId };
     },
     "projects:list": (payload) => queryService.listProjects(payload),
+    "projects:getCombinedDetail": (payload) => queryService.getProjectCombinedDetail(payload),
     "sessions:list": (payload) => queryService.listSessions(payload),
     "sessions:getDetail": (payload) => queryService.getSessionDetail(payload),
     "bookmarks:listProject": (payload) => queryService.listProjectBookmarks(payload),

@@ -34,6 +34,7 @@ describe("SessionPane", () => {
 
     const user = userEvent.setup();
     const onToggleCollapsed = vi.fn();
+    const onSelectAllSessions = vi.fn();
     const onSelectBookmarks = vi.fn();
     const onSelectSession = vi.fn();
 
@@ -41,20 +42,25 @@ describe("SessionPane", () => {
       <SessionPane
         sortedSessions={sessions}
         selectedSessionId="session_1"
+        allSessionsCount={7}
+        allSessionsSelected={false}
         bookmarksCount={2}
         bookmarksSelected={false}
         collapsed={false}
         onToggleCollapsed={onToggleCollapsed}
+        onSelectAllSessions={onSelectAllSessions}
         onSelectBookmarks={onSelectBookmarks}
         onSelectSession={onSelectSession}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "Collapse Sessions pane" }));
+    await user.click(screen.getByRole("button", { name: /All Sessions/i }));
     await user.click(screen.getByRole("button", { name: /Bookmarked messages/i }));
     await user.click(screen.getByRole("button", { name: /Investigate markdown rendering/i }));
 
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+    expect(onSelectAllSessions).toHaveBeenCalledTimes(1);
     expect(onSelectBookmarks).toHaveBeenCalledTimes(1);
     expect(onSelectSession).toHaveBeenCalledWith("session_1");
   });
@@ -64,15 +70,19 @@ describe("SessionPane", () => {
       <SessionPane
         sortedSessions={sessions}
         selectedSessionId=""
+        allSessionsCount={3}
+        allSessionsSelected={true}
         bookmarksCount={0}
         bookmarksSelected={false}
         collapsed={true}
         onToggleCollapsed={vi.fn()}
+        onSelectAllSessions={vi.fn()}
         onSelectBookmarks={vi.fn()}
         onSelectSession={vi.fn()}
       />,
     );
 
+    expect(screen.getByText("All Sessions")).toBeInTheDocument();
     expect(screen.queryByText("Bookmarked messages")).toBeNull();
     expect(screen.getByRole("button", { name: "Expand Sessions pane" })).toBeInTheDocument();
   });

@@ -43,6 +43,33 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
     request: { providers: ["claude"], query: "" },
     response: { projects: [] },
   },
+  "projects:getCombinedDetail": {
+    request: {
+      projectId: "project_1",
+      page: 0,
+      pageSize: 100,
+      categories: ["assistant"],
+      query: "",
+      focusMessageId: "message_1",
+    },
+    response: {
+      projectId: "project_1",
+      totalCount: 0,
+      categoryCounts: {
+        user: 0,
+        assistant: 0,
+        tool_use: 0,
+        tool_edit: 0,
+        tool_result: 0,
+        thinking: 0,
+        system: 0,
+      },
+      page: 0,
+      pageSize: 100,
+      focusIndex: null,
+      messages: [],
+    },
+  },
   "sessions:list": {
     request: { projectId: "project_1" },
     response: { sessions: [] },

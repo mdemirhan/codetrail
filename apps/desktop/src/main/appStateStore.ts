@@ -33,7 +33,7 @@ export type PaneState = {
   useMonospaceForAllMessages?: boolean;
   selectedProjectId?: string;
   selectedSessionId?: string;
-  historyMode?: "session" | "bookmarks";
+  historyMode?: "session" | "bookmarks" | "project_all";
   sessionPage?: number;
   sessionScrollTop?: number;
   systemMessageRegexRules?: Record<Provider, string[]>;
@@ -87,7 +87,7 @@ const MONO_FONT_VALUES: MonoFontFamily[] = [...UI_MONO_FONT_VALUES];
 const REGULAR_FONT_VALUES: RegularFontFamily[] = [...UI_REGULAR_FONT_VALUES];
 const MONO_FONT_SIZE_VALUES: MonoFontSize[] = [...UI_MONO_FONT_SIZE_VALUES];
 const REGULAR_FONT_SIZE_VALUES: RegularFontSize[] = [...UI_REGULAR_FONT_SIZE_VALUES];
-const HISTORY_MODE_VALUES = ["session", "bookmarks"] as const;
+const HISTORY_MODE_VALUES = ["session", "bookmarks", "project_all"] as const;
 const DEFAULT_FILE_SYSTEM: AppStateStoreFileSystem = {
   existsSync: (path) => existsSync(path),
   mkdirSync: (path, options) => mkdirSync(path, options),

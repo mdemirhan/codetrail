@@ -83,6 +83,67 @@ function createAppClient() {
       };
     }
 
+    if (channel === "projects:getCombinedDetail") {
+      return {
+        projectId: "project_1",
+        totalCount: 2,
+        categoryCounts: {
+          user: 1,
+          assistant: 1,
+          tool_use: 0,
+          tool_edit: 0,
+          tool_result: 0,
+          thinking: 0,
+          system: 0,
+        },
+        page: 0,
+        pageSize: 100,
+        focusIndex: null,
+        messages: [
+          {
+            id: "m1",
+            sourceId: "src1",
+            sessionId: "session_1",
+            provider: "claude",
+            category: "user",
+            content: "Please review markdown table rendering",
+            createdAt: "2026-03-01T10:00:00.000Z",
+            tokenInput: null,
+            tokenOutput: null,
+            operationDurationMs: null,
+            operationDurationSource: null,
+            operationDurationConfidence: null,
+            sessionTitle: "Investigate markdown rendering",
+            sessionActivity: "2026-03-01T10:00:05.000Z",
+            sessionStartedAt: "2026-03-01T10:00:00.000Z",
+            sessionEndedAt: "2026-03-01T10:00:05.000Z",
+            sessionGitBranch: "main",
+            sessionCwd: "/workspace/project-one",
+          },
+          {
+            id: "m2",
+            sourceId: "src2",
+            sessionId: "session_1",
+            provider: "claude",
+            category: "assistant",
+            content: "Everything checks out.\n\n| A | B |\n|---|---|\n| 1 | 2 |",
+            createdAt: "2026-03-01T10:00:05.000Z",
+            tokenInput: 14,
+            tokenOutput: 8,
+            operationDurationMs: 5000,
+            operationDurationSource: "native",
+            operationDurationConfidence: "high",
+            sessionTitle: "Investigate markdown rendering",
+            sessionActivity: "2026-03-01T10:00:05.000Z",
+            sessionStartedAt: "2026-03-01T10:00:00.000Z",
+            sessionEndedAt: "2026-03-01T10:00:05.000Z",
+            sessionGitBranch: "main",
+            sessionCwd: "/workspace/project-one",
+          },
+        ],
+      };
+    }
+
     if (channel === "sessions:getDetail") {
       return {
         session: {
@@ -326,6 +387,67 @@ function createBookmarksSearchClient() {
             messageCount: 2,
             tokenInputTotal: 14,
             tokenOutputTotal: 8,
+          },
+        ],
+      };
+    }
+
+    if (channel === "projects:getCombinedDetail") {
+      return {
+        projectId: "project_1",
+        totalCount: 2,
+        categoryCounts: {
+          user: 0,
+          assistant: 1,
+          tool_use: 1,
+          tool_edit: 0,
+          tool_result: 0,
+          thinking: 0,
+          system: 0,
+        },
+        page: 0,
+        pageSize: 100,
+        focusIndex: null,
+        messages: [
+          {
+            id: "m_tool",
+            sourceId: "src_tool",
+            sessionId: "session_1",
+            provider: "claude",
+            category: "tool_use",
+            content: '{"name":"Read","args":{"path":"src/parser.ts"}}',
+            createdAt: "2026-03-01T10:00:01.000Z",
+            tokenInput: null,
+            tokenOutput: null,
+            operationDurationMs: null,
+            operationDurationSource: null,
+            operationDurationConfidence: null,
+            sessionTitle: "Investigate markdown rendering",
+            sessionActivity: "2026-03-01T10:00:05.000Z",
+            sessionStartedAt: "2026-03-01T10:00:00.000Z",
+            sessionEndedAt: "2026-03-01T10:00:05.000Z",
+            sessionGitBranch: "main",
+            sessionCwd: "/workspace/project-one",
+          },
+          {
+            id: "m_assistant",
+            sourceId: "src_assistant",
+            sessionId: "session_1",
+            provider: "claude",
+            category: "assistant",
+            content: "Parser behavior inspected and fixed.",
+            createdAt: "2026-03-01T10:00:05.000Z",
+            tokenInput: 10,
+            tokenOutput: 8,
+            operationDurationMs: 4000,
+            operationDurationSource: "native",
+            operationDurationConfidence: "high",
+            sessionTitle: "Investigate markdown rendering",
+            sessionActivity: "2026-03-01T10:00:05.000Z",
+            sessionStartedAt: "2026-03-01T10:00:00.000Z",
+            sessionEndedAt: "2026-03-01T10:00:05.000Z",
+            sessionGitBranch: "main",
+            sessionCwd: "/workspace/project-one",
           },
         ],
       };

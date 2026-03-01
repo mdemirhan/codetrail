@@ -35,7 +35,9 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
   const [useMonospaceForAllMessages, setUseMonospaceForAllMessages] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState("");
-  const [historyMode, setHistoryMode] = useState<"session" | "bookmarks">("session");
+  const [historyMode, setHistoryMode] = useState<"session" | "bookmarks" | "project_all">(
+    "session",
+  );
   const [sessionPage, setSessionPage] = useState(0);
   const [sessionScrollTop, setSessionScrollTop] = useState(0);
   const [systemMessageRegexRules, setSystemMessageRegexRules] = useState<

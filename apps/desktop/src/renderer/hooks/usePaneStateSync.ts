@@ -19,7 +19,7 @@ type RestoredScrollTarget = {
   scrollTop: number;
 };
 
-type HistoryMode = "session" | "bookmarks";
+type HistoryMode = "session" | "bookmarks" | "project_all";
 type SystemMessageRegexRules = Record<Provider, string[]>;
 
 export function usePaneStateSync(args: {

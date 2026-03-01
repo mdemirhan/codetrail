@@ -10,19 +10,25 @@ type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
 export function SessionPane({
   sortedSessions,
   selectedSessionId,
+  allSessionsCount,
+  allSessionsSelected,
   bookmarksCount,
   bookmarksSelected,
   collapsed,
   onToggleCollapsed,
+  onSelectAllSessions,
   onSelectBookmarks,
   onSelectSession,
 }: {
   sortedSessions: SessionSummary[];
   selectedSessionId: string;
+  allSessionsCount: number;
+  allSessionsSelected: boolean;
   bookmarksCount: number;
   bookmarksSelected: boolean;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  onSelectAllSessions: () => void;
   onSelectBookmarks: () => void;
   onSelectSession: (sessionId: string) => void;
 }) {
@@ -59,6 +65,19 @@ export function SessionPane({
         </button>
       </div>
       <div className="list-scroll session-list">
+        <button
+          type="button"
+          className={
+            allSessionsSelected ? "session-item all-sessions-item active" : "session-item all-sessions-item"
+          }
+          onClick={onSelectAllSessions}
+        >
+          <div className="session-preview">All Sessions</div>
+          <div className="session-meta">
+            <span className="msg-count">{allSessionsCount} msgs</span>
+            <span className="session-time">Project-wide</span>
+          </div>
+        </button>
         {bookmarksCount > 0 ? (
           <button
             type="button"

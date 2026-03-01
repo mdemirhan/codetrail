@@ -48,6 +48,15 @@ const sessionMessageSchema = z.object({
   operationDurationConfidence: operationDurationConfidenceSchema.nullable(),
 });
 
+const projectCombinedMessageSchema = sessionMessageSchema.extend({
+  sessionTitle: z.string(),
+  sessionActivity: z.string().nullable(),
+  sessionStartedAt: z.string().nullable(),
+  sessionEndedAt: z.string().nullable(),
+  sessionGitBranch: z.string().nullable(),
+  sessionCwd: z.string().nullable(),
+});
+
 const bookmarkEntrySchema = z.object({
   projectId: z.string().min(1),
   sessionId: z.string().min(1),
@@ -125,7 +134,7 @@ const paneStateSchema = z.object({
   useMonospaceForAllMessages: z.boolean().nullable(),
   selectedProjectId: z.string().nullable(),
   selectedSessionId: z.string().nullable(),
-  historyMode: z.enum(["session", "bookmarks"]).nullable(),
+  historyMode: z.enum(["session", "bookmarks", "project_all"]).nullable(),
   sessionPage: z.number().int().nonnegative().nullable(),
   sessionScrollTop: z.number().int().nonnegative().nullable(),
   systemMessageRegexRules: systemMessageRegexRulesSchema.nullable(),
@@ -185,6 +194,26 @@ export const ipcContractSchemas = {
     }),
     response: z.object({
       projects: z.array(projectSummarySchema),
+    }),
+  },
+  "projects:getCombinedDetail": {
+    request: z.object({
+      projectId: z.string().min(1),
+      page: z.number().int().nonnegative().default(0),
+      pageSize: z.number().int().positive().max(500).default(100),
+      categories: z.array(z.string().min(1)).optional(),
+      query: z.string().default(""),
+      focusMessageId: z.string().min(1).optional(),
+      focusSourceId: z.string().min(1).optional(),
+    }),
+    response: z.object({
+      projectId: z.string().min(1),
+      totalCount: z.number().int().nonnegative(),
+      categoryCounts: categoryCountsSchema,
+      page: z.number().int().nonnegative(),
+      pageSize: z.number().int().positive(),
+      focusIndex: z.number().int().nonnegative().nullable(),
+      messages: z.array(projectCombinedMessageSchema),
     }),
   },
   "sessions:list": {
@@ -286,7 +315,7 @@ export const ipcContractSchemas = {
       useMonospaceForAllMessages: z.boolean(),
       selectedProjectId: z.string(),
       selectedSessionId: z.string(),
-      historyMode: z.enum(["session", "bookmarks"]),
+      historyMode: z.enum(["session", "bookmarks", "project_all"]),
       sessionPage: z.number().int().nonnegative(),
       sessionScrollTop: z.number().int().nonnegative(),
       systemMessageRegexRules: systemMessageRegexRulesSchema,

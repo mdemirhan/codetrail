@@ -17,6 +17,7 @@ const {
   mockOpenPath,
   mockShowItemInFolder,
   mockListProjects,
+  mockGetProjectCombinedDetail,
   mockListSessions,
   mockGetSessionDetail,
   mockListProjectBookmarks,
@@ -56,6 +57,7 @@ const {
   mockOpenPath: vi.fn(async () => ""),
   mockShowItemInFolder: vi.fn(),
   mockListProjects: vi.fn((payload) => ({ items: [{ id: "p1", ...payload }], total: 1 })),
+  mockGetProjectCombinedDetail: vi.fn((payload) => ({ projectId: payload.projectId, messages: [] })),
   mockListSessions: vi.fn((payload) => ({ items: [{ id: "s1", ...payload }], total: 1 })),
   mockGetSessionDetail: vi.fn((payload) => ({ id: payload.id, messages: [] })),
   mockListProjectBookmarks: vi.fn((payload) => ({ items: [{ id: "b1", ...payload }], total: 1 })),
@@ -162,6 +164,7 @@ describe("bootstrapMainProcess", () => {
     }));
     mockCreateQueryService.mockImplementation(() => ({
       listProjects: mockListProjects,
+      getProjectCombinedDetail: mockGetProjectCombinedDetail,
       listSessions: mockListSessions,
       getSessionDetail: mockGetSessionDetail,
       listProjectBookmarks: mockListProjectBookmarks,
@@ -252,6 +255,15 @@ describe("bootstrapMainProcess", () => {
       total: 1,
     });
     expect(mockListSessions).toHaveBeenCalledWith(sessionsPayload);
+
+    const combinedDetailPayload = { projectId: "project-1", page: 0 };
+    expect(getRequiredHandler(handlers, "projects:getCombinedDetail")(combinedDetailPayload)).toEqual(
+      {
+        projectId: "project-1",
+        messages: [],
+      },
+    );
+    expect(mockGetProjectCombinedDetail).toHaveBeenCalledWith(combinedDetailPayload);
 
     const detailPayload = { id: "session-99" };
     expect(getRequiredHandler(handlers, "sessions:getDetail")(detailPayload)).toEqual({
@@ -426,6 +438,7 @@ describe("bootstrapMainProcess", () => {
     const secondClose = vi.fn();
     const baseService = {
       listProjects: vi.fn(),
+      getProjectCombinedDetail: vi.fn(),
       listSessions: vi.fn(),
       getSessionDetail: vi.fn(),
       listProjectBookmarks: vi.fn(),

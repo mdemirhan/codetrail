@@ -802,6 +802,14 @@ body.platform-macos .titlebar-left {
   border-style: dashed;
 }
 
+.session-item.all-sessions-item {
+  border-style: dashed;
+}
+
+.session-item.all-sessions-item .session-preview {
+  color: var(--accent-green);
+}
+
 .session-item.bookmarks-item .session-preview {
   color: var(--accent-blue);
 }

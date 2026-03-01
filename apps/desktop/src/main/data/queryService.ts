@@ -59,6 +59,14 @@ type MessageRow = {
   operation_duration_confidence: "high" | "low" | null;
 };
 
+type ProjectCombinedMessageRow = MessageRow & {
+  session_title: string;
+  session_started_at: string | null;
+  session_ended_at: string | null;
+  session_git_branch: string | null;
+  session_cwd: string | null;
+};
+
 type BookmarkMessageLookupRow = MessageRow & {
   project_id: string;
   session_title: string;
@@ -90,6 +98,9 @@ const SESSION_TITLE_JOIN_SQL = `
 
 export type QueryService = {
   listProjects: (request: IpcRequest<"projects:list">) => IpcResponse<"projects:list">;
+  getProjectCombinedDetail: (
+    request: IpcRequest<"projects:getCombinedDetail">,
+  ) => IpcResponse<"projects:getCombinedDetail">;
   listSessions: (request: IpcRequest<"sessions:list">) => IpcResponse<"sessions:list">;
   getSessionDetail: (
     request: IpcRequest<"sessions:getDetail">,
@@ -137,6 +148,7 @@ export function createQueryServiceFromDb(
   let closed = false;
   return {
     listProjects: (request) => listProjectsWithDatabase(db, request),
+    getProjectCombinedDetail: (request) => getProjectCombinedDetailWithDatabase(db, request),
     listSessions: (request) => listSessionsWithDatabase(db, request),
     getSessionDetail: (request) => getSessionDetailWithDatabase(db, request),
     listProjectBookmarks: (request) => listProjectBookmarksWithStore(db, bookmarkStore, request),
@@ -175,6 +187,18 @@ export function listSessions(
   return withDatabase(
     dbPath,
     (db) => listSessionsWithDatabase(db, request),
+    dependencies.openDatabase,
+  );
+}
+
+export function getProjectCombinedDetail(
+  dbPath: string,
+  request: IpcRequest<"projects:getCombinedDetail">,
+  dependencies: QueryServiceDependencies = {},
+): IpcResponse<"projects:getCombinedDetail"> {
+  return withDatabase(
+    dbPath,
+    (db) => getProjectCombinedDetailWithDatabase(db, request),
     dependencies.openDatabase,
   );
 }
@@ -321,6 +345,127 @@ function listSessionsWithDatabase(
     .all(...params) as SessionSummaryRow[];
 
   return { sessions: rows.map(mapSessionSummaryRow) };
+}
+
+function getProjectCombinedDetailWithDatabase(
+  db: DatabaseHandle,
+  request: IpcRequest<"projects:getCombinedDetail">,
+): IpcResponse<"projects:getCombinedDetail"> {
+  const pageSize = request.pageSize;
+  let page = request.page;
+  const messageFilters: {
+    projectId: string;
+    categories?: string[];
+    query: string;
+  } = {
+    projectId: request.projectId,
+    query: request.query,
+  };
+  if (request.categories !== undefined) {
+    messageFilters.categories = request.categories;
+  }
+
+  const { whereClause, params } = buildProjectMessageFilters(messageFilters);
+
+  const totalRow = db
+    .prepare(
+      `SELECT COUNT(*) as cnt
+       FROM messages m
+       JOIN sessions s ON s.id = m.session_id
+       WHERE ${whereClause}`,
+    )
+    .get(...params) as { cnt: number } | undefined;
+  const totalCount = Number(totalRow?.cnt ?? 0);
+  const categoryCounts = makeEmptyCategoryCounts();
+
+  const queryOnlyFilter = buildProjectMessageFilters({
+    projectId: request.projectId,
+    query: request.query,
+  });
+  const categoryRows = db
+    .prepare(
+      `SELECT m.category as category, COUNT(*) as cnt
+       FROM messages m
+       JOIN sessions s ON s.id = m.session_id
+       WHERE ${queryOnlyFilter.whereClause}
+       GROUP BY m.category`,
+    )
+    .all(...queryOnlyFilter.params) as Array<{ category: string; cnt: number }>;
+
+  for (const row of categoryRows) {
+    categoryCounts[normalizeMessageCategory(row.category)] += Number(row.cnt ?? 0);
+  }
+
+  let focusIndex: number | null = null;
+  if (request.focusMessageId || request.focusSourceId) {
+    const focusParam = request.focusMessageId ?? request.focusSourceId ?? "";
+    const focusField = request.focusMessageId ? "id" : "source_id";
+    const focusRow = db
+      .prepare(
+        `SELECT row_index FROM (
+           SELECT
+             m.id,
+             m.source_id,
+             ROW_NUMBER() OVER (
+               ORDER BY m.created_at ASC, m.id ASC
+             ) - 1 AS row_index
+           FROM messages m
+           JOIN sessions s ON s.id = m.session_id
+           WHERE ${whereClause}
+         ) ordered
+         WHERE ${focusField} = ?
+         LIMIT 1`,
+      )
+      .get(...params, focusParam) as { row_index: number } | undefined;
+
+    if (focusRow) {
+      focusIndex = Number(focusRow.row_index);
+      page = Math.floor(focusIndex / pageSize);
+    }
+  }
+
+  if (totalCount > 0 && page * pageSize >= totalCount) {
+    page = Math.floor((totalCount - 1) / pageSize);
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT
+         m.id,
+         m.source_id,
+         m.session_id,
+         m.provider,
+         m.category,
+         m.content,
+         m.created_at,
+         m.token_input,
+         m.token_output,
+         m.operation_duration_ms,
+         m.operation_duration_source,
+         m.operation_duration_confidence,
+         COALESCE(first_title.content, '') as session_title,
+         s.started_at as session_started_at,
+         s.ended_at as session_ended_at,
+         s.git_branch as session_git_branch,
+         s.cwd as session_cwd
+       FROM messages m
+       JOIN sessions s ON s.id = m.session_id
+       ${SESSION_TITLE_JOIN_SQL}
+       WHERE ${whereClause}
+       ORDER BY m.created_at ASC, m.id ASC
+       LIMIT ? OFFSET ?`,
+    )
+    .all(...params, pageSize, page * pageSize) as ProjectCombinedMessageRow[];
+
+  return {
+    projectId: request.projectId,
+    totalCount,
+    categoryCounts,
+    page,
+    pageSize,
+    focusIndex,
+    messages: rows.map(mapProjectCombinedMessageRow),
+  };
 }
 
 function getSessionDetailWithDatabase(
@@ -705,6 +850,33 @@ function buildMessageFilters(args: {
   return { whereClause: conditions.join(" AND "), params };
 }
 
+function buildProjectMessageFilters(args: {
+  projectId: string;
+  categories?: string[];
+  query: string;
+}): { whereClause: string; params: string[] } {
+  const conditions = ["s.project_id = ?"];
+  const params = [args.projectId];
+
+  if (args.categories !== undefined) {
+    const categories = normalizeMessageCategories(args.categories);
+    if (categories.length > 0) {
+      conditions.push(`m.category IN (${categories.map(() => "?").join(",")})`);
+      params.push(...categories);
+    } else {
+      conditions.push("1 = 0");
+    }
+  }
+
+  const query = args.query.trim().toLowerCase();
+  if (query.length > 0) {
+    conditions.push("LOWER(m.content) LIKE ?");
+    params.push(`%${query}%`);
+  }
+
+  return { whereClause: conditions.join(" AND "), params };
+}
+
 function mapSessionMessageRow(
   row: MessageRow,
 ): IpcResponse<"sessions:getDetail">["messages"][number] {
@@ -721,6 +893,20 @@ function mapSessionMessageRow(
     operationDurationMs: row.operation_duration_ms,
     operationDurationSource: row.operation_duration_source,
     operationDurationConfidence: row.operation_duration_confidence,
+  };
+}
+
+function mapProjectCombinedMessageRow(
+  row: ProjectCombinedMessageRow,
+): IpcResponse<"projects:getCombinedDetail">["messages"][number] {
+  return {
+    ...mapSessionMessageRow(row),
+    sessionTitle: row.session_title,
+    sessionActivity: row.session_ended_at ?? row.session_started_at,
+    sessionStartedAt: row.session_started_at,
+    sessionEndedAt: row.session_ended_at,
+    sessionGitBranch: row.session_git_branch,
+    sessionCwd: row.session_cwd,
   };
 }
 
