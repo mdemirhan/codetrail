@@ -23,6 +23,15 @@ describe("pathActions", () => {
     expect(client.invoke).toHaveBeenCalledWith("path:openInFileManager", { path: "/workspace/p1" });
   });
 
+  it("returns a clear error when selected project has no location", async () => {
+    const client = createMockCodetrailClient();
+
+    const result = await openInFileManager([{ id: "p1", path: "   " }], "p1", client);
+
+    expect(result).toEqual({ ok: false, error: "Selected project has no location." });
+    expect(client.invoke).not.toHaveBeenCalled();
+  });
+
   it("normalizes failed open responses with fallback text", async () => {
     const client = createMockCodetrailClient();
     client.invoke.mockResolvedValue({ ok: false, error: null });
@@ -30,5 +39,14 @@ describe("pathActions", () => {
     const result = await openPath("/workspace/missing", client);
 
     expect(result).toEqual({ ok: false, error: "Failed to open /workspace/missing" });
+  });
+
+  it("returns a clear error when openPath receives an empty path", async () => {
+    const client = createMockCodetrailClient();
+
+    const result = await openPath("   ", client);
+
+    expect(result).toEqual({ ok: false, error: "Path is empty." });
+    expect(client.invoke).not.toHaveBeenCalled();
   });
 });

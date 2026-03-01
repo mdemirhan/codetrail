@@ -57,6 +57,7 @@ describe("ProjectPane", () => {
         onToggleSortDirection={onToggleSortDirection}
         onSelectProject={onSelectProject}
         onOpenProjectLocation={onOpenProjectLocation}
+        canOpenProjectLocation={true}
         canOpenSessionLocation={true}
         onOpenSessionLocation={onOpenSessionLocation}
       />,
@@ -99,6 +100,7 @@ describe("ProjectPane", () => {
         onToggleSortDirection={vi.fn()}
         onSelectProject={vi.fn()}
         onOpenProjectLocation={vi.fn()}
+        canOpenProjectLocation={false}
         canOpenSessionLocation={false}
         onOpenSessionLocation={vi.fn()}
       />,

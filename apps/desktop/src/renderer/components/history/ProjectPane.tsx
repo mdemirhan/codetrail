@@ -21,6 +21,7 @@ export function ProjectPane({
   onToggleSortDirection,
   onSelectProject,
   onOpenProjectLocation,
+  canOpenProjectLocation,
   canOpenSessionLocation,
   onOpenSessionLocation,
 }: {
@@ -38,6 +39,7 @@ export function ProjectPane({
   onToggleSortDirection: () => void;
   onSelectProject: (projectId: string) => void;
   onOpenProjectLocation: () => void;
+  canOpenProjectLocation: boolean;
   canOpenSessionLocation: boolean;
   onOpenSessionLocation: () => void;
 }) {
@@ -146,7 +148,7 @@ export function ProjectPane({
           type="button"
           className="footer-btn"
           onClick={onOpenProjectLocation}
-          disabled={!selectedProjectId}
+          disabled={!canOpenProjectLocation}
         >
           Open Project Location
         </button>

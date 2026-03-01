@@ -1241,12 +1241,16 @@ export function App() {
                 setPendingRevealTarget(null);
               }}
               onOpenProjectLocation={() => {
+                if (!selectedProject?.path?.trim()) {
+                  return;
+                }
                 void openInFileManager(sortedProjects, selectedProjectId).then((result) => {
                   if (!result.ok) {
                     logError("Failed opening project location", result.error ?? "Unknown error");
                   }
                 });
               }}
+              canOpenProjectLocation={Boolean(selectedProject?.path?.trim())}
               canOpenSessionLocation={historyMode === "session" && !!selectedSession}
               onOpenSessionLocation={() => {
                 if (!selectedSession) {
