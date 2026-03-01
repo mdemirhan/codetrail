@@ -16,8 +16,12 @@ export function SessionPane({
   bookmarksCount,
   bookmarksSelected,
   collapsed,
+  canCopySession,
+  canOpenSessionLocation,
   onToggleCollapsed,
   onToggleSortDirection,
+  onCopySession,
+  onOpenSessionLocation,
   onSelectAllSessions,
   onSelectBookmarks,
   onSelectSession,
@@ -30,8 +34,12 @@ export function SessionPane({
   bookmarksCount: number;
   bookmarksSelected: boolean;
   collapsed: boolean;
+  canCopySession: boolean;
+  canOpenSessionLocation: boolean;
   onToggleCollapsed: () => void;
   onToggleSortDirection: () => void;
+  onCopySession: () => void;
+  onOpenSessionLocation: () => void;
   onSelectAllSessions: () => void;
   onSelectBookmarks: () => void;
   onSelectSession: (sessionId: string) => void;
@@ -75,6 +83,26 @@ export function SessionPane({
             title={sortTooltip}
           >
             <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
+          </button>
+          <button
+            type="button"
+            className="collapse-btn"
+            onClick={onCopySession}
+            aria-label="Copy session details"
+            title="Copy session details"
+            disabled={!canCopySession}
+          >
+            <ToolbarIcon name="copy" />
+          </button>
+          <button
+            type="button"
+            className="collapse-btn pane-open-location-btn"
+            onClick={onOpenSessionLocation}
+            aria-label="Open session folder"
+            title="Open session folder"
+            disabled={!canOpenSessionLocation}
+          >
+            <ToolbarIcon name="folderOpen" />
           </button>
           <button
             type="button"

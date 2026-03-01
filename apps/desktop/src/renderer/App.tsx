@@ -1251,17 +1251,6 @@ export function App() {
                 });
               }}
               canOpenProjectLocation={Boolean(selectedProject?.path?.trim())}
-              canOpenSessionLocation={historyMode === "session" && !!selectedSession}
-              onOpenSessionLocation={() => {
-                if (!selectedSession) {
-                  return;
-                }
-                void openPath(selectedSession.filePath).then((result) => {
-                  if (!result.ok) {
-                    logError("Failed opening session location", result.error ?? "Unknown error");
-                  }
-                });
-              }}
             />
 
             <div className="pane-resizer" onPointerDown={beginResize("project")} />
@@ -1275,10 +1264,25 @@ export function App() {
               bookmarksCount={bookmarksResponse.totalCount}
               bookmarksSelected={historyMode === "bookmarks"}
               collapsed={sessionPaneCollapsed}
+              canCopySession={historyMode === "session" && !!selectedSession}
+              canOpenSessionLocation={
+                historyMode === "session" && Boolean(selectedSession?.filePath?.trim())
+              }
               onToggleCollapsed={() => setSessionPaneCollapsed((value) => !value)}
               onToggleSortDirection={() =>
                 setSessionSortDirection((value) => (value === "asc" ? "desc" : "asc"))
               }
+              onCopySession={() => void handleCopySessionDetails()}
+              onOpenSessionLocation={() => {
+                if (!selectedSession?.filePath?.trim()) {
+                  return;
+                }
+                void openPath(selectedSession.filePath).then((result) => {
+                  if (!result.ok) {
+                    logError("Failed opening session location", result.error ?? "Unknown error");
+                  }
+                });
+              }}
               onSelectAllSessions={() => {
                 setPendingSearchNavigation(null);
                 setHistoryMode("project_all");

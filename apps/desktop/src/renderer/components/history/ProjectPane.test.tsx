@@ -39,7 +39,6 @@ describe("ProjectPane", () => {
     const onToggleProvider = vi.fn();
     const onSelectProject = vi.fn();
     const onOpenProjectLocation = vi.fn();
-    const onOpenSessionLocation = vi.fn();
 
     render(
       <ProjectPane
@@ -58,8 +57,6 @@ describe("ProjectPane", () => {
         onSelectProject={onSelectProject}
         onOpenProjectLocation={onOpenProjectLocation}
         canOpenProjectLocation={true}
-        canOpenSessionLocation={true}
-        onOpenSessionLocation={onOpenSessionLocation}
       />,
     );
 
@@ -68,11 +65,10 @@ describe("ProjectPane", () => {
 
     await user.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
     await user.click(screen.getByRole("button", { name: "Sort projects ascending" }));
+    await user.click(screen.getByRole("button", { name: "Open project folder" }));
     await user.type(screen.getByPlaceholderText("Filter projects..."), "abc");
     await user.click(screen.getByRole("button", { name: /Gemini/i }));
     await user.click(screen.getByRole("button", { name: /Project Two/i }));
-    await user.click(screen.getByRole("button", { name: "Open Project Location" }));
-    await user.click(screen.getByRole("button", { name: "Open Session Location" }));
 
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
     expect(onToggleSortDirection).toHaveBeenCalledTimes(1);
@@ -80,10 +76,9 @@ describe("ProjectPane", () => {
     expect(onToggleProvider).toHaveBeenCalledWith("gemini");
     expect(onSelectProject).toHaveBeenCalledWith("project_2");
     expect(onOpenProjectLocation).toHaveBeenCalledTimes(1);
-    expect(onOpenSessionLocation).toHaveBeenCalledTimes(1);
   });
 
-  it("disables session-location button when session path is unavailable", () => {
+  it("disables project-location button when project path is unavailable", () => {
     render(
       <ProjectPane
         sortedProjects={projects}
@@ -101,13 +96,10 @@ describe("ProjectPane", () => {
         onSelectProject={vi.fn()}
         onOpenProjectLocation={vi.fn()}
         canOpenProjectLocation={false}
-        canOpenSessionLocation={false}
-        onOpenSessionLocation={vi.fn()}
       />,
     );
 
     expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Project Location" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Open Session Location" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Open project folder" })).toBeDisabled();
   });
 });

@@ -35,6 +35,8 @@ describe("SessionPane", () => {
     const user = userEvent.setup();
     const onToggleCollapsed = vi.fn();
     const onToggleSortDirection = vi.fn();
+    const onCopySession = vi.fn();
+    const onOpenSessionLocation = vi.fn();
     const onSelectAllSessions = vi.fn();
     const onSelectBookmarks = vi.fn();
     const onSelectSession = vi.fn();
@@ -49,8 +51,12 @@ describe("SessionPane", () => {
         bookmarksCount={2}
         bookmarksSelected={false}
         collapsed={false}
+        canCopySession={true}
+        canOpenSessionLocation={true}
         onToggleCollapsed={onToggleCollapsed}
         onToggleSortDirection={onToggleSortDirection}
+        onCopySession={onCopySession}
+        onOpenSessionLocation={onOpenSessionLocation}
         onSelectAllSessions={onSelectAllSessions}
         onSelectBookmarks={onSelectBookmarks}
         onSelectSession={onSelectSession}
@@ -59,12 +65,16 @@ describe("SessionPane", () => {
 
     await user.click(screen.getByRole("button", { name: "Collapse Sessions pane" }));
     await user.click(screen.getByRole("button", { name: "Sort sessions ascending" }));
+    await user.click(screen.getByRole("button", { name: "Copy session details" }));
+    await user.click(screen.getByRole("button", { name: "Open session folder" }));
     await user.click(screen.getByRole("button", { name: /All Sessions/i }));
     await user.click(screen.getByRole("button", { name: /Bookmarked messages/i }));
     await user.click(screen.getByRole("button", { name: /Investigate markdown rendering/i }));
 
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
     expect(onToggleSortDirection).toHaveBeenCalledTimes(1);
+    expect(onCopySession).toHaveBeenCalledTimes(1);
+    expect(onOpenSessionLocation).toHaveBeenCalledTimes(1);
     expect(onSelectAllSessions).toHaveBeenCalledTimes(1);
     expect(onSelectBookmarks).toHaveBeenCalledTimes(1);
     expect(onSelectSession).toHaveBeenCalledWith("session_1");
@@ -85,8 +95,12 @@ describe("SessionPane", () => {
         bookmarksCount={0}
         bookmarksSelected={false}
         collapsed={true}
+        canCopySession={false}
+        canOpenSessionLocation={false}
         onToggleCollapsed={vi.fn()}
         onToggleSortDirection={vi.fn()}
+        onCopySession={vi.fn()}
+        onOpenSessionLocation={vi.fn()}
         onSelectAllSessions={onSelectAllSessions}
         onSelectBookmarks={onSelectBookmarks}
         onSelectSession={vi.fn()}

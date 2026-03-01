@@ -22,8 +22,6 @@ export function ProjectPane({
   onSelectProject,
   onOpenProjectLocation,
   canOpenProjectLocation,
-  canOpenSessionLocation,
-  onOpenSessionLocation,
 }: {
   sortedProjects: ProjectSummary[];
   selectedProjectId: string;
@@ -40,8 +38,6 @@ export function ProjectPane({
   onSelectProject: (projectId: string) => void;
   onOpenProjectLocation: () => void;
   canOpenProjectLocation: boolean;
-  canOpenSessionLocation: boolean;
-  onOpenSessionLocation: () => void;
 }) {
   const selectedProjectRef = useRef<HTMLButtonElement | null>(null);
   const sortTooltip =
@@ -76,6 +72,16 @@ export function ProjectPane({
             title={sortTooltip}
           >
             <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
+          </button>
+          <button
+            type="button"
+            className="collapse-btn pane-open-location-btn"
+            onClick={onOpenProjectLocation}
+            aria-label="Open project folder"
+            title="Open project folder"
+            disabled={!canOpenProjectLocation}
+          >
+            <ToolbarIcon name="folderOpen" />
           </button>
           <button
             type="button"
@@ -142,24 +148,6 @@ export function ProjectPane({
             </div>
           </button>
         ))}
-      </div>
-      <div className="panel-footer">
-        <button
-          type="button"
-          className="footer-btn"
-          onClick={onOpenProjectLocation}
-          disabled={!canOpenProjectLocation}
-        >
-          Open Project Location
-        </button>
-        <button
-          type="button"
-          className="footer-btn"
-          onClick={onOpenSessionLocation}
-          disabled={!canOpenSessionLocation}
-        >
-          Open Session Location
-        </button>
       </div>
     </aside>
   );
