@@ -4,6 +4,7 @@ import type {
   OperationDurationSource,
   Provider,
 } from "../contracts/canonical";
+import { isLikelyEditOperation } from "../tooling/editOperations";
 
 import type { ParserDiagnostic } from "./contracts";
 import {
@@ -971,7 +972,7 @@ function inferToolUseCategory(content: string): MessageCategory {
   const parsed = parseMaybeJson(content);
   const record = asRecord(parsed);
   if (!record) {
-    return looksLikeEditOperation(content) ? "tool_edit" : "tool_use";
+    return isLikelyEditOperation(content) ? "tool_edit" : "tool_use";
   }
 
   const candidates: string[] = [];
@@ -1004,28 +1005,5 @@ function inferToolUseCategory(content: string): MessageCategory {
   }
 
   const joined = candidates.join(" ");
-  return looksLikeEditOperation(joined) ? "tool_edit" : "tool_use";
-}
-
-function looksLikeEditOperation(value: string): boolean {
-  const normalized = value.toLowerCase();
-  if (normalized.length === 0) {
-    return false;
-  }
-
-  const editHints = [
-    "edit",
-    "write",
-    "rewrite",
-    "replace",
-    "apply_patch",
-    "patch",
-    "multi_edit",
-    "create_file",
-    "update_file",
-    "delete_file",
-    "insert",
-    "str_replace",
-  ];
-  return editHints.some((hint) => normalized.includes(hint));
+  return isLikelyEditOperation(joined) ? "tool_edit" : "tool_use";
 }

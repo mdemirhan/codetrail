@@ -5,6 +5,15 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { MessageCategory, Provider } from "@codetrail/core";
 import type { IpcResponse } from "@codetrail/core";
 
+import {
+  type MonoFontFamily,
+  type MonoFontSize,
+  type RegularFontFamily,
+  type RegularFontSize,
+  type ThemeMode,
+  UI_MESSAGE_CATEGORY_VALUES,
+  UI_PROVIDER_VALUES,
+} from "../shared/uiPreferences";
 import { SettingsView } from "./components/SettingsView";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { ToolbarIcon } from "./components/ToolbarIcon";
@@ -16,6 +25,7 @@ import { useDebouncedValue } from "./hooks/useDebouncedValue";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { usePaneStateSync } from "./hooks/usePaneStateSync";
 import { useResizablePanes } from "./hooks/useResizablePanes";
+import { copyTextToClipboard } from "./lib/clipboard";
 import { openInFileManager, openPath } from "./lib/pathActions";
 import {
   compareRecent,
@@ -38,16 +48,8 @@ type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
 const PAGE_SIZE = 100;
 const COLLAPSED_PANE_WIDTH = 48;
 
-const PROVIDERS: Provider[] = ["claude", "codex", "gemini"];
-const CATEGORIES: MessageCategory[] = [
-  "user",
-  "assistant",
-  "tool_edit",
-  "tool_use",
-  "tool_result",
-  "thinking",
-  "system",
-];
+const PROVIDERS: Provider[] = [...UI_PROVIDER_VALUES];
+const CATEGORIES: MessageCategory[] = [...UI_MESSAGE_CATEGORY_VALUES];
 const DEFAULT_MESSAGE_CATEGORIES: MessageCategory[] = ["user", "assistant"];
 const EMPTY_CATEGORY_COUNTS = {
   user: 0,
@@ -60,21 +62,6 @@ const EMPTY_CATEGORY_COUNTS = {
 };
 
 type MainView = "history" | "search" | "settings";
-type ThemeMode = "light" | "dark";
-type MonoFontFamily = "current" | "droid_sans_mono";
-type RegularFontFamily = "current" | "inter";
-type MonoFontSize = "10px" | "11px" | "12px" | "13px" | "14px" | "15px" | "16px" | "17px" | "18px";
-type RegularFontSize =
-  | "11px"
-  | "12px"
-  | "13px"
-  | "13.5px"
-  | "14px"
-  | "15px"
-  | "16px"
-  | "17px"
-  | "18px"
-  | "20px";
 type BulkExpandScope = "all" | MessageCategory;
 
 const MONO_FONT_STACKS: Record<MonoFontFamily, string> = {
@@ -699,22 +686,9 @@ export function App() {
       `Page: ${sessionPage + 1}/${pageCount}`,
     ];
     const sessionDetailsText = lines.join("\n");
-    try {
-      await navigator.clipboard.writeText(sessionDetailsText);
-      return;
-    } catch {
-      const fallback = document.createElement("textarea");
-      fallback.value = sessionDetailsText;
-      fallback.setAttribute("readonly", "");
-      fallback.style.position = "fixed";
-      fallback.style.left = "-9999px";
-      document.body.appendChild(fallback);
-      fallback.select();
-      const copied = document.execCommand("copy");
-      document.body.removeChild(fallback);
-      if (!copied) {
-        logError("Failed copying session details", "Clipboard API unavailable");
-      }
+    const copied = await copyTextToClipboard(sessionDetailsText);
+    if (!copied) {
+      logError("Failed copying session details", "Clipboard API unavailable");
     }
   }, [logError, selectedProject, selectedSession, sessionDetail?.totalCount, sessionPage]);
 

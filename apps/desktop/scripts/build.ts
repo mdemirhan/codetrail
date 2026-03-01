@@ -25,7 +25,7 @@ console.log(`Desktop build completed at ${outDir}`);
 
 async function buildMainAndPreload(): Promise<void> {
   const mainBuild = await Bun.build({
-    entrypoints: [join(srcDir, "main", "main.ts")],
+    entrypoints: [join(srcDir, "main", "main.ts"), join(srcDir, "main", "indexingWorker.ts")],
     outdir: join(outDir, "main"),
     target: "node",
     format: "esm",

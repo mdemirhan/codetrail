@@ -3,30 +3,20 @@ import { dirname } from "node:path";
 
 import type { MessageCategory, Provider } from "@codetrail/core";
 
-export type ThemeMode = "light" | "dark";
-export type MonoFontFamily = "current" | "droid_sans_mono";
-export type RegularFontFamily = "current" | "inter";
-export type MonoFontSize =
-  | "10px"
-  | "11px"
-  | "12px"
-  | "13px"
-  | "14px"
-  | "15px"
-  | "16px"
-  | "17px"
-  | "18px";
-export type RegularFontSize =
-  | "11px"
-  | "12px"
-  | "13px"
-  | "13.5px"
-  | "14px"
-  | "15px"
-  | "16px"
-  | "17px"
-  | "18px"
-  | "20px";
+import {
+  type MonoFontFamily,
+  type MonoFontSize,
+  type RegularFontFamily,
+  type RegularFontSize,
+  type ThemeMode,
+  UI_MESSAGE_CATEGORY_VALUES,
+  UI_MONO_FONT_SIZE_VALUES,
+  UI_MONO_FONT_VALUES,
+  UI_PROVIDER_VALUES,
+  UI_REGULAR_FONT_SIZE_VALUES,
+  UI_REGULAR_FONT_VALUES,
+  UI_THEME_VALUES,
+} from "../shared/uiPreferences";
 
 export type PaneState = {
   projectPaneWidth: number;
@@ -68,42 +58,13 @@ const SCROLL_TOP_MIN = 0;
 const SCROLL_TOP_MAX = 10_000_000;
 const WINDOW_MIN = 320;
 const WINDOW_MAX = 6000;
-const PROVIDER_VALUES: Provider[] = ["claude", "codex", "gemini"];
-const CATEGORY_VALUES: MessageCategory[] = [
-  "user",
-  "assistant",
-  "tool_edit",
-  "tool_use",
-  "tool_result",
-  "thinking",
-  "system",
-];
-const THEME_VALUES: ThemeMode[] = ["light", "dark"];
-const MONO_FONT_VALUES: MonoFontFamily[] = ["current", "droid_sans_mono"];
-const REGULAR_FONT_VALUES: RegularFontFamily[] = ["current", "inter"];
-const MONO_FONT_SIZE_VALUES: MonoFontSize[] = [
-  "10px",
-  "11px",
-  "12px",
-  "13px",
-  "14px",
-  "15px",
-  "16px",
-  "17px",
-  "18px",
-];
-const REGULAR_FONT_SIZE_VALUES: RegularFontSize[] = [
-  "11px",
-  "12px",
-  "13px",
-  "13.5px",
-  "14px",
-  "15px",
-  "16px",
-  "17px",
-  "18px",
-  "20px",
-];
+const PROVIDER_VALUES: Provider[] = [...UI_PROVIDER_VALUES];
+const CATEGORY_VALUES: MessageCategory[] = [...UI_MESSAGE_CATEGORY_VALUES];
+const THEME_VALUES: ThemeMode[] = [...UI_THEME_VALUES];
+const MONO_FONT_VALUES: MonoFontFamily[] = [...UI_MONO_FONT_VALUES];
+const REGULAR_FONT_VALUES: RegularFontFamily[] = [...UI_REGULAR_FONT_VALUES];
+const MONO_FONT_SIZE_VALUES: MonoFontSize[] = [...UI_MONO_FONT_SIZE_VALUES];
+const REGULAR_FONT_SIZE_VALUES: RegularFontSize[] = [...UI_REGULAR_FONT_SIZE_VALUES];
 
 export class AppStateStore {
   private readonly filePath: string;

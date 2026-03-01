@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, type ReactNode } from "react";
+import { Children, type ReactNode, cloneElement, isValidElement } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -63,30 +63,57 @@ export function looksLikeMarkdown(value: string): boolean {
   return /(^|[^\\])(`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_)/m.test(value);
 }
 
-const TEXT_PATH_PATTERN = /(file:\/\/[^\s)\],;!?"'`]+|[A-Za-z]:[\\/][^\s)\],;!?"'`]+|\/[^\s)\],;!?"'`]+)/g;
+const TEXT_PATH_PATTERN =
+  /(file:\/\/[^\s)\],;!?"'`]+|[A-Za-z]:[\\/][^\s)\],;!?"'`]+|\/[^\s)\],;!?"'`]+)/g;
 
 function buildMarkdownComponents(pathRoots: string[], query: string): Components {
   return {
     h1({ children }) {
-      return <h3 className="md-h1">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h1")}</h3>;
+      return (
+        <h3 className="md-h1">
+          {renderChildrenWithLocalPathLinks(children, query, pathRoots, "h1")}
+        </h3>
+      );
     },
     h2({ children }) {
-      return <h4 className="md-h2">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h2")}</h4>;
+      return (
+        <h4 className="md-h2">
+          {renderChildrenWithLocalPathLinks(children, query, pathRoots, "h2")}
+        </h4>
+      );
     },
     h3({ children }) {
-      return <h5 className="md-h3">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h3")}</h5>;
+      return (
+        <h5 className="md-h3">
+          {renderChildrenWithLocalPathLinks(children, query, pathRoots, "h3")}
+        </h5>
+      );
     },
     h4({ children }) {
-      return <h5 className="md-h3">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h4")}</h5>;
+      return (
+        <h5 className="md-h3">
+          {renderChildrenWithLocalPathLinks(children, query, pathRoots, "h4")}
+        </h5>
+      );
     },
     h5({ children }) {
-      return <h5 className="md-h3">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h5")}</h5>;
+      return (
+        <h5 className="md-h3">
+          {renderChildrenWithLocalPathLinks(children, query, pathRoots, "h5")}
+        </h5>
+      );
     },
     h6({ children }) {
-      return <h5 className="md-h3">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "h6")}</h5>;
+      return (
+        <h5 className="md-h3">
+          {renderChildrenWithLocalPathLinks(children, query, pathRoots, "h6")}
+        </h5>
+      );
     },
     p({ children }) {
-      return <p className="md-p">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "p")}</p>;
+      return (
+        <p className="md-p">{renderChildrenWithLocalPathLinks(children, query, pathRoots, "p")}</p>
+      );
     },
     li({ children }) {
       return <li>{renderChildrenWithLocalPathLinks(children, query, pathRoots, "li")}</li>;
@@ -108,8 +135,9 @@ function buildMarkdownComponents(pathRoots: string[], query: string): Components
       const language = languageMatch?.[1] ?? "";
       const rawValue = String(children ?? "");
       const codeValue = rawValue.replace(/\n$/, "");
-      const position = (node as { position?: { start?: { line?: number }; end?: { line?: number } } })
-        ?.position;
+      const position = (
+        node as { position?: { start?: { line?: number }; end?: { line?: number } } }
+      )?.position;
       const spansMultipleLines =
         typeof position?.start?.line === "number" &&
         typeof position?.end?.line === "number" &&
@@ -136,7 +164,7 @@ function buildMarkdownComponents(pathRoots: string[], query: string): Components
       return <CodeBlock language={language} codeValue={codeValue} />;
     },
     a({ href, children }) {
-      const parsedHref = parseMarkdownHref(href ?? "");
+      const parsedHref = parseMarkdownHref(href ?? "", pathRoots);
       if (parsedHref.kind === "external") {
         return (
           <a className="md-link" href={parsedHref.href} target="_blank" rel="noreferrer">
@@ -157,7 +185,9 @@ function buildMarkdownComponents(pathRoots: string[], query: string): Components
           </button>
         );
       }
-      return <span>{renderChildrenWithLocalPathLinks(children, query, pathRoots, "unsafe-link")}</span>;
+      return (
+        <span>{renderChildrenWithLocalPathLinks(children, query, pathRoots, "unsafe-link")}</span>
+      );
     },
   };
 }
@@ -173,7 +203,11 @@ function normalizeMarkdownInput(value: string): string {
   );
 }
 
-function formatLocalLinkLabel(children: ReactNode, localPath: string, pathRoots: string[]): ReactNode {
+function formatLocalLinkLabel(
+  children: ReactNode,
+  localPath: string,
+  pathRoots: string[],
+): ReactNode {
   const text = flattenText(children).trim();
   const parsedLabelPath = toLocalPath(text);
   if (parsedLabelPath) {
@@ -230,7 +264,9 @@ function renderChildrenWithLocalPathLinks(
   for (const [index, child] of Children.toArray(children).entries()) {
     const childKey = `${keyPrefix}:${index}`;
     if (typeof child === "string" || typeof child === "number") {
-      mapped.push(...renderTextWithLocalPathLinks(String(child), query, `${childKey}:text`, pathRoots));
+      mapped.push(
+        ...renderTextWithLocalPathLinks(String(child), query, `${childKey}:text`, pathRoots),
+      );
       continue;
     }
 
@@ -245,7 +281,12 @@ function renderChildrenWithLocalPathLinks(
     }
 
     const elementType = child.type;
-    if (elementType === "code" || elementType === "a" || elementType === "button" || elementType === "pre") {
+    if (
+      elementType === "code" ||
+      elementType === "a" ||
+      elementType === "button" ||
+      elementType === "pre"
+    ) {
       mapped.push(child);
       continue;
     }
@@ -320,7 +361,9 @@ function renderTextWithLocalPathLinks(
   }
 
   if (cursor < value.length) {
-    nodes.push(...buildHighlightedTextNodes(value.slice(cursor), query, `${keyPrefix}:${cursor}:tail`));
+    nodes.push(
+      ...buildHighlightedTextNodes(value.slice(cursor), query, `${keyPrefix}:${cursor}:tail`),
+    );
   }
 
   if (nodes.length === 0) {
@@ -359,12 +402,25 @@ function isPathUnderProjectRoots(path: string, pathRoots: string[]): boolean {
   if (pathRoots.length === 0) {
     return false;
   }
-  const normalizedPath = path.replace(/\\/g, "/");
+
+  const normalizedPath = normalizePathForComparison(path);
+  if (!normalizedPath) {
+    return false;
+  }
+
   for (const root of pathRoots) {
-    const normalizedRoot = root.replace(/\\/g, "/").replace(/\/+$/, "");
+    const normalizedRoot = normalizePathForComparison(root);
     if (!normalizedRoot) {
       continue;
     }
+
+    if (normalizedRoot === "/" || /^[a-z]:\/$/.test(normalizedRoot)) {
+      if (normalizedPath.startsWith(normalizedRoot)) {
+        return true;
+      }
+      continue;
+    }
+
     if (normalizedPath === normalizedRoot || normalizedPath.startsWith(`${normalizedRoot}/`)) {
       return true;
     }
@@ -386,7 +442,12 @@ function stripWrappingPunctuation(value: string): string {
   ) {
     trimmed = trimmed.slice(0, -1);
   }
-  while (trimmed.startsWith("(") || trimmed.startsWith("[") || trimmed.startsWith("'") || trimmed.startsWith('"')) {
+  while (
+    trimmed.startsWith("(") ||
+    trimmed.startsWith("[") ||
+    trimmed.startsWith("'") ||
+    trimmed.startsWith('"')
+  ) {
     trimmed = trimmed.slice(1);
   }
   return trimmed;
@@ -401,12 +462,13 @@ function looksLikePathLabel(value: string): boolean {
 
 function parseMarkdownHref(
   href: string,
+  pathRoots: string[],
 ): { kind: "external"; href: string } | { kind: "local"; path: string } | { kind: "invalid" } {
   const normalized = href.trim();
   if (normalized.length === 0) {
     return { kind: "invalid" };
   }
-  if (/[\u0000-\u001f\u007f]/.test(normalized)) {
+  if (containsAsciiControlChars(normalized)) {
     return { kind: "invalid" };
   }
 
@@ -419,7 +481,7 @@ function parseMarkdownHref(
   }
 
   const localPath = toLocalPath(normalized);
-  if (localPath) {
+  if (localPath && isPathUnderProjectRoots(localPath, pathRoots)) {
     return { kind: "local", path: localPath };
   }
   return { kind: "invalid" };
@@ -448,7 +510,7 @@ function toLocalPath(href: string): string | null {
   if (value.length === 0) {
     return null;
   }
-  if (/[\u0000-\u001f\u007f]/.test(value)) {
+  if (containsAsciiControlChars(value)) {
     return null;
   }
   if (value.startsWith("//")) {
@@ -461,7 +523,7 @@ function toLocalPath(href: string): string | null {
     return null;
   }
 
-  return stripLineColumnSuffix(value);
+  return normalizeAbsolutePath(stripLineColumnSuffix(value));
 }
 
 function stripLineColumnSuffix(pathValue: string): string {
@@ -1018,6 +1080,63 @@ export function renderMarkedSnippet(value: string): ReactNode {
 
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containsAsciiControlChars(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if ((code >= 0 && code <= 31) || code === 127) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function normalizeAbsolutePath(value: string): string | null {
+  const normalized = value.replace(/\\/g, "/");
+  const windowsPrefix = /^([A-Za-z]):\//.exec(normalized);
+
+  if (!windowsPrefix && !normalized.startsWith("/")) {
+    return null;
+  }
+
+  const rootPrefix = windowsPrefix ? `${windowsPrefix[1] ?? ""}:` : "/";
+  const suffix = windowsPrefix ? normalized.slice(2) : normalized;
+  const parts: string[] = [];
+
+  for (const part of suffix.split("/")) {
+    if (part.length === 0 || part === ".") {
+      continue;
+    }
+    if (part === "..") {
+      parts.pop();
+      continue;
+    }
+    parts.push(part);
+  }
+
+  if (windowsPrefix) {
+    return parts.length > 0 ? `${rootPrefix}/${parts.join("/")}` : `${rootPrefix}/`;
+  }
+
+  return parts.length > 0 ? `/${parts.join("/")}` : "/";
+}
+
+function normalizePathForComparison(value: string): string | null {
+  const normalizedAbsolute = normalizeAbsolutePath(value);
+  if (!normalizedAbsolute) {
+    return null;
+  }
+
+  const trimmedPath = trimTrailingSeparators(normalizedAbsolute);
+  return /^[A-Za-z]:\//.test(trimmedPath) ? trimmedPath.toLowerCase() : trimmedPath;
+}
+
+function trimTrailingSeparators(value: string): string {
+  if (value === "/" || /^[A-Za-z]:\/$/.test(value)) {
+    return value;
+  }
+  return value.replace(/\/+$/, "");
 }
 
 export function tryFormatJson(value: string): string {

@@ -647,7 +647,7 @@ function parseToolCallContent(content: string): {
     return {
       toolName,
       argsJson: JSON.stringify(args),
-      resultJson: result ? JSON.stringify(result) : null,
+      resultJson: result === undefined || result === null ? null : JSON.stringify(result),
     };
   } catch {
     return {

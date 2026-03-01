@@ -51,7 +51,7 @@ function discoverClaudeFiles(config: DiscoveryConfig): DiscoveredSessionFile[] {
 
   const discovered: DiscoveredSessionFile[] = [];
 
-  for (const projectEntry of readdirSync(config.claudeRoot, { withFileTypes: true })) {
+  for (const projectEntry of safeReadDir(config.claudeRoot)) {
     if (!projectEntry.isDirectory()) {
       continue;
     }
@@ -59,14 +59,17 @@ function discoverClaudeFiles(config: DiscoveryConfig): DiscoveredSessionFile[] {
     const projectDir = join(config.claudeRoot, projectEntry.name);
     const sessionsIndexById = readClaudeSessionsIndex(projectDir);
 
-    for (const entry of readdirSync(projectDir, { withFileTypes: true })) {
+    for (const entry of safeReadDir(projectDir)) {
       if (!entry.isFile() || extname(entry.name) !== ".jsonl") {
         continue;
       }
 
       const filePath = join(projectDir, entry.name);
       const sessionIdentity = entry.name.slice(0, -".jsonl".length);
-      const fileStat = statSync(filePath);
+      const fileStat = safeStat(filePath);
+      if (!fileStat) {
+        continue;
+      }
       const fileMeta = readClaudeJsonlMeta(filePath);
       const sessionIndexEntry = sessionsIndexById.get(sessionIdentity);
       const projectPath =
@@ -95,23 +98,26 @@ function discoverClaudeFiles(config: DiscoveryConfig): DiscoveredSessionFile[] {
       continue;
     }
 
-    for (const sessionDir of readdirSync(projectDir, { withFileTypes: true })) {
+    for (const sessionDir of safeReadDir(projectDir)) {
       if (!sessionDir.isDirectory()) {
         continue;
       }
 
       const subagentsDir = join(projectDir, sessionDir.name, "subagents");
-      if (!existsSync(subagentsDir) || !lstatSync(subagentsDir).isDirectory()) {
+      if (!safeIsDirectory(subagentsDir)) {
         continue;
       }
 
-      for (const fileEntry of readdirSync(subagentsDir, { withFileTypes: true })) {
+      for (const fileEntry of safeReadDir(subagentsDir)) {
         if (!fileEntry.isFile() || extname(fileEntry.name) !== ".jsonl") {
           continue;
         }
 
         const filePath = join(subagentsDir, fileEntry.name);
-        const fileStat = statSync(filePath);
+        const fileStat = safeStat(filePath);
+        if (!fileStat) {
+          continue;
+        }
         const fileMeta = readClaudeJsonlMeta(filePath);
         const parentSessionId = sessionDir.name;
         const subagentName = fileEntry.name.slice(0, -".jsonl".length);
@@ -157,7 +163,10 @@ function discoverCodexFiles(config: DiscoveryConfig): DiscoveredSessionFile[] {
       continue;
     }
 
-    const fileStat = statSync(filePath);
+    const fileStat = safeStat(filePath);
+    if (!fileStat) {
+      continue;
+    }
     const meta = readCodexJsonlMeta(filePath);
     const sourceSessionId = meta.sessionId ?? basename(filePath, ".jsonl");
     const sessionIdentity = providerSessionIdentity("codex", sourceSessionId, filePath);
@@ -205,7 +214,10 @@ function discoverGeminiFiles(
       continue;
     }
 
-    const fileStat = statSync(filePath);
+    const fileStat = safeStat(filePath);
+    if (!fileStat) {
+      continue;
+    }
     const content = parseJsonFile<Record<string, unknown>>(filePath);
     if (!content) {
       continue;
@@ -219,7 +231,7 @@ function discoverGeminiFiles(
     if (!resolvedProjectPath) {
       const projectRootPath = join(containerDir, ".project_root");
       if (existsSync(projectRootPath)) {
-        const fallbackPath = readFileSync(projectRootPath, "utf8").trim();
+        const fallbackPath = (safeReadUtf8File(projectRootPath) ?? "").trim();
         if (fallbackPath.length > 0) {
           resolvedProjectPath = fallbackPath;
           if (projectHash) {
@@ -263,7 +275,7 @@ function buildGeminiProjectResolution(config: DiscoveryConfig): GeminiProjectRes
       continue;
     }
 
-    for (const dirEntry of readdirSync(rootPath, { withFileTypes: true })) {
+    for (const dirEntry of safeReadDir(rootPath)) {
       if (!dirEntry.isDirectory()) {
         continue;
       }
@@ -273,7 +285,7 @@ function buildGeminiProjectResolution(config: DiscoveryConfig): GeminiProjectRes
         continue;
       }
 
-      const rootPathValue = readFileSync(projectRootFile, "utf8").trim();
+      const rootPathValue = (safeReadUtf8File(projectRootFile) ?? "").trim();
       if (!rootPathValue) {
         continue;
       }
@@ -461,7 +473,7 @@ function walkFiles(root: string): string[] {
       continue;
     }
 
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
+    for (const entry of safeReadDir(current)) {
       const entryPath = join(current, entry.name);
       if (entry.isDirectory()) {
         stack.push(entryPath);
@@ -476,6 +488,38 @@ function walkFiles(root: string): string[] {
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function safeReadDir(path: string) {
+  try {
+    return readdirSync(path, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+
+function safeReadUtf8File(path: string): string | null {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function safeStat(path: string) {
+  try {
+    return statSync(path);
+  } catch {
+    return null;
+  }
+}
+
+function safeIsDirectory(path: string): boolean {
+  try {
+    return existsSync(path) && lstatSync(path).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function geminiContainerDir(filePath: string): string {

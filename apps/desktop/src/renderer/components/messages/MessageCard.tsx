@@ -1,6 +1,7 @@
 import type { MessageCategory } from "@codetrail/core";
 import type { KeyboardEvent, MouseEvent, Ref } from "react";
 
+import { copyTextToClipboard } from "../../lib/clipboard";
 import { formatDate, prettyCategory } from "../../lib/viewUtils";
 
 import { MessageContent } from "./MessageContent";
@@ -316,7 +317,9 @@ function formatToolResultBodyForClipboard(content: string): string {
 
   if (output) {
     const outputJson = tryParseJsonRecord(output);
-    sections.push(outputJson ? `Output:\n${JSON.stringify(outputJson, null, 2)}` : `Output:\n${output}`);
+    sections.push(
+      outputJson ? `Output:\n${JSON.stringify(outputJson, null, 2)}` : `Output:\n${output}`,
+    );
   } else {
     sections.push(JSON.stringify(parsed, null, 2));
   }
@@ -329,22 +332,5 @@ function formatJsonIfParsable(value: string): string {
     return JSON.stringify(JSON.parse(value), null, 2);
   } catch {
     return value;
-  }
-}
-
-async function copyTextToClipboard(value: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(value);
-    return;
-  } catch {
-    const fallback = document.createElement("textarea");
-    fallback.value = value;
-    fallback.setAttribute("readonly", "");
-    fallback.style.position = "fixed";
-    fallback.style.left = "-9999px";
-    document.body.appendChild(fallback);
-    fallback.select();
-    document.execCommand("copy");
-    document.body.removeChild(fallback);
   }
 }

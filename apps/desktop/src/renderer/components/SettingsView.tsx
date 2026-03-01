@@ -1,71 +1,44 @@
 import type { MessageCategory } from "@codetrail/core";
 import type { IpcResponse } from "@codetrail/core";
 
+import {
+  type MonoFontFamily,
+  type MonoFontSize,
+  type RegularFontFamily,
+  type RegularFontSize,
+  UI_MESSAGE_CATEGORY_VALUES,
+  UI_MONO_FONT_SIZE_VALUES,
+  UI_MONO_FONT_VALUES,
+  UI_REGULAR_FONT_SIZE_VALUES,
+  UI_REGULAR_FONT_VALUES,
+} from "../../shared/uiPreferences";
+import { copyTextToClipboard } from "../lib/clipboard";
 import { openPath } from "../lib/pathActions";
 import { prettyCategory } from "../lib/viewUtils";
 import { ToolbarIcon } from "./ToolbarIcon";
 
 type SettingsInfo = IpcResponse<"app:getSettingsInfo">;
 type DiscoveryProvider = "claude" | "codex" | "gemini";
-type MonoFontFamily = "current" | "droid_sans_mono";
-type RegularFontFamily = "current" | "inter";
-type MonoFontSize = "10px" | "11px" | "12px" | "13px" | "14px" | "15px" | "16px" | "17px" | "18px";
-type RegularFontSize =
-  | "11px"
-  | "12px"
-  | "13px"
-  | "13.5px"
-  | "14px"
-  | "15px"
-  | "16px"
-  | "17px"
-  | "18px"
-  | "20px";
-
-const SETTINGS_MESSAGE_CATEGORIES: MessageCategory[] = [
-  "user",
-  "assistant",
-  "tool_edit",
-  "tool_use",
-  "tool_result",
-  "thinking",
-  "system",
-];
 
 const MONO_FONT_OPTIONS: Array<{ value: MonoFontFamily; label: string }> = [
-  { value: "current", label: "JetBrains Mono" },
-  { value: "droid_sans_mono", label: "Droid Sans Mono" },
+  ...UI_MONO_FONT_VALUES.map((value) => ({
+    value,
+    label: value === "current" ? "JetBrains Mono" : "Droid Sans Mono",
+  })),
 ];
 
 const REGULAR_FONT_OPTIONS: Array<{ value: RegularFontFamily; label: string }> = [
-  { value: "current", label: "Plus Jakarta Sans" },
-  { value: "inter", label: "Inter" },
+  ...UI_REGULAR_FONT_VALUES.map((value) => ({
+    value,
+    label: value === "current" ? "Plus Jakarta Sans" : "Inter",
+  })),
 ];
 
-const MONO_FONT_SIZE_OPTIONS: Array<{ value: MonoFontSize; label: string }> = [
-  { value: "10px", label: "10px" },
-  { value: "11px", label: "11px" },
-  { value: "12px", label: "12px" },
-  { value: "13px", label: "13px" },
-  { value: "14px", label: "14px" },
-  { value: "15px", label: "15px" },
-  { value: "16px", label: "16px" },
-  { value: "17px", label: "17px" },
-  { value: "18px", label: "18px" },
-];
+const MONO_FONT_SIZE_OPTIONS: Array<{ value: MonoFontSize; label: string }> =
+  UI_MONO_FONT_SIZE_VALUES.map((value) => ({ value, label: value }));
 
-const REGULAR_FONT_SIZE_OPTIONS: Array<{ value: RegularFontSize; label: string }> = [
-  { value: "11px", label: "11px" },
-  { value: "12px", label: "12px" },
-  { value: "13px", label: "13px" },
-  { value: "13.5px", label: "13.5px" },
-  { value: "14px", label: "14px" },
-  { value: "15px", label: "15px" },
-  { value: "16px", label: "16px" },
-  { value: "17px", label: "17px" },
-  { value: "18px", label: "18px" },
-  { value: "20px", label: "20px" },
-];
+const REGULAR_FONT_SIZE_OPTIONS: Array<{ value: RegularFontSize; label: string }> =
+  UI_REGULAR_FONT_SIZE_VALUES.map((value) => ({ value, label: value }));
 
 export function SettingsView({
   info,
@@ -224,7 +197,7 @@ export function SettingsView({
           </div>
           <div className="settings-section-body">
             <div className="settings-category-row">
-              {SETTINGS_MESSAGE_CATEGORIES.map((category) => {
+              {UI_MESSAGE_CATEGORY_VALUES.map((category) => {
                 const active = expandedByDefaultCategories.includes(category);
                 return (
                   <button
@@ -359,18 +332,5 @@ async function openInFileManager(path: string): Promise<void> {
 }
 
 async function copyText(value: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(value);
-    return;
-  } catch {
-    const fallback = document.createElement("textarea");
-    fallback.value = value;
-    fallback.setAttribute("readonly", "");
-    fallback.style.position = "fixed";
-    fallback.style.left = "-9999px";
-    document.body.appendChild(fallback);
-    fallback.select();
-    document.execCommand("copy");
-    document.body.removeChild(fallback);
-  }
+  await copyTextToClipboard(value);
 }

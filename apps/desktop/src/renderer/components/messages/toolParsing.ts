@@ -1,3 +1,5 @@
+import { isLikelyEditOperation } from "@codetrail/core";
+
 export function parseToolInvocationPayload(text: string): {
   record: Record<string, unknown>;
   name: string | null;
@@ -31,7 +33,7 @@ export function parseToolInvocationPayload(text: string): {
     name,
     prettyName: name ? prettyToolName(name) : null,
     inputRecord,
-    isWrite: looksLikeWriteOperation(rawHint),
+    isWrite: isLikelyEditOperation(rawHint),
   };
 }
 
@@ -59,25 +61,6 @@ function prettyToolName(name: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function looksLikeWriteOperation(value: string): boolean {
-  const normalized = value.toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-  return [
-    "edit",
-    "write",
-    "patch",
-    "apply_patch",
-    "replace",
-    "multi_edit",
-    "create_file",
-    "update_file",
-    "delete_file",
-    "str_replace",
-  ].some((hint) => normalized.includes(hint));
 }
 
 export function parseToolEditPayload(text: string): {

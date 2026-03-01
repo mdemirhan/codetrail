@@ -3,23 +3,14 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import type { MessageCategory, Provider } from "@codetrail/core";
 
+import type {
+  MonoFontFamily,
+  MonoFontSize,
+  RegularFontFamily,
+  RegularFontSize,
+  ThemeMode,
+} from "../../shared/uiPreferences";
 import { clamp } from "../lib/viewUtils";
-
-type ThemeMode = "light" | "dark";
-type MonoFontFamily = "current" | "droid_sans_mono";
-type RegularFontFamily = "current" | "inter";
-type MonoFontSize = "10px" | "11px" | "12px" | "13px" | "14px" | "15px" | "16px" | "17px" | "18px";
-type RegularFontSize =
-  | "11px"
-  | "12px"
-  | "13px"
-  | "13.5px"
-  | "14px"
-  | "15px"
-  | "16px"
-  | "17px"
-  | "18px"
-  | "20px";
 
 type RestoredScrollTarget = {
   sessionId: string;
