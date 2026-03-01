@@ -85,6 +85,7 @@ const EMPTY_SYSTEM_MESSAGE_REGEX_RULES: SystemMessageRegexRules = {
   claude: [],
   codex: [],
   gemini: [],
+  cursor: [],
 };
 
 const MONO_FONT_STACKS: Record<MonoFontFamily, string> = {

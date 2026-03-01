@@ -72,7 +72,7 @@ type SessionFileRow = {
 type IndexedMessage = ReturnType<typeof parseSession>["messages"][number];
 
 const MAX_DERIVED_DURATION_MS = 15 * 60 * 1000;
-const PROVIDERS: Provider[] = ["claude", "codex", "gemini"];
+const PROVIDERS: Provider[] = ["claude", "codex", "gemini", "cursor"];
 
 export function runIncrementalIndexing(
   config: IndexingConfig,
@@ -276,6 +276,7 @@ export function runIncrementalIndexing(
         })),
       );
 
+      const fileMtimeIso = new Date(discovered.fileMtimeMs).toISOString();
       const persist = db.transaction(() => {
         deleteSessionDataForFilePath(db, discovered.filePath);
         deleteSessionData(db, sessionDbId);
@@ -296,8 +297,8 @@ export function runIncrementalIndexing(
           discovered.filePath,
           sessionTitle,
           sourceMeta.models.join(","),
-          aggregate.startedAt,
-          aggregate.endedAt,
+          aggregate.startedAt ?? fileMtimeIso,
+          aggregate.endedAt ?? fileMtimeIso,
           aggregate.durationMs,
           sourceMeta.gitBranch ?? discovered.metadata.gitBranch,
           sourceMeta.cwd ?? discovered.metadata.cwd,
@@ -532,6 +533,20 @@ function extractSourceMetadata(
     }
   }
 
+  if (provider === "cursor") {
+    for (const entry of asArray(payload)) {
+      const record = asRecord(entry);
+      if (!record) {
+        continue;
+      }
+      const messageRecord = asRecord(record.message);
+      const model = readString(messageRecord?.model) ?? readString(record.model);
+      if (model) {
+        models.add(model);
+      }
+    }
+  }
+
   return {
     models: [...models].sort(),
     gitBranch,
@@ -640,6 +655,7 @@ function compileSystemMessageRules(overrides?: SystemMessageRegexRuleOverrides):
     claude: [],
     codex: [],
     gemini: [],
+    cursor: [],
   };
 
   let invalidCount = 0;
@@ -705,7 +721,7 @@ function buildSessionAggregate(
 
   const timestamps = messages
     .map((message) => Date.parse(message.createdAt))
-    .filter((value) => Number.isFinite(value));
+    .filter((value) => Number.isFinite(value) && value > 0);
 
   if (timestamps.length === 0) {
     return {

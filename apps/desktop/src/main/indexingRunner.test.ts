@@ -10,6 +10,7 @@ type WorkerRequest = {
     claude?: string[];
     codex?: string[];
     gemini?: string[];
+    cursor?: string[];
   };
 };
 
@@ -133,6 +134,7 @@ describe("WorkerIndexingRunner", () => {
         claude: ["^<command-name>"],
         codex: ["^<environment_context>"],
         gemini: [],
+        cursor: [],
       }),
     });
 
@@ -145,6 +147,7 @@ describe("WorkerIndexingRunner", () => {
         claude: ["^<command-name>"],
         codex: ["^<environment_context>"],
         gemini: [],
+        cursor: [],
       },
     });
     expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");

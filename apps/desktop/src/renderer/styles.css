@@ -671,6 +671,12 @@ body.platform-macos .titlebar-left {
   color: var(--accent-purple);
 }
 
+.tag-cursor,
+.provider-chip.provider-cursor {
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
+}
+
 .tag-codex.active,
 .provider-chip.active.provider-codex {
   background: var(--accent-blue);
@@ -687,6 +693,12 @@ body.platform-macos .titlebar-left {
 .tag-gemini.active,
 .provider-chip.active.provider-gemini {
   background: var(--accent-purple);
+  color: #ffffff;
+}
+
+.tag-cursor.active,
+.provider-chip.active.provider-cursor {
+  background: var(--accent-green);
   color: #ffffff;
 }
 
@@ -804,6 +816,11 @@ body.platform-macos .titlebar-left {
 .meta-tag.gemini {
   background: var(--accent-purple-dim);
   color: var(--accent-purple);
+}
+
+.meta-tag.cursor {
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
 }
 
 .sessions-count {
@@ -1502,6 +1519,10 @@ body.platform-macos .titlebar-left {
   color: var(--accent-purple);
 }
 
+.provider-label.provider-cursor {
+  color: var(--accent-green);
+}
+
 .message-header-actions {
   display: inline-flex;
   align-items: center;
@@ -2109,6 +2130,11 @@ mark {
 .settings-provider-gemini {
   background: var(--accent-purple-dim);
   color: var(--accent-purple);
+}
+
+.settings-provider-cursor {
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
 }
 
 .settings-value {

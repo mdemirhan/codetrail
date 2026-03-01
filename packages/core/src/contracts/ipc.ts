@@ -118,6 +118,7 @@ const systemMessageRegexRulesSchema = z.object({
   claude: z.array(z.string()),
   codex: z.array(z.string()),
   gemini: z.array(z.string()),
+  cursor: z.array(z.string()),
 });
 
 const paneStateSchema = z.object({
@@ -166,6 +167,7 @@ const settingsInfoResponseSchema = z.object({
     geminiRoot: z.string().min(1),
     geminiHistoryRoot: z.string().min(1),
     geminiProjectsPath: z.string().min(1),
+    cursorRoot: z.string().min(1),
   }),
 });
 

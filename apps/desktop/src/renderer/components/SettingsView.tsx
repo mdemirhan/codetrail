@@ -18,8 +18,8 @@ import { prettyCategory } from "../lib/viewUtils";
 import { ToolbarIcon } from "./ToolbarIcon";
 
 type SettingsInfo = IpcResponse<"app:getSettingsInfo">;
-type DiscoveryProvider = "claude" | "codex" | "gemini";
-type RegexRuleProvider = "claude" | "codex" | "gemini";
+type DiscoveryProvider = "claude" | "codex" | "gemini" | "cursor";
+type RegexRuleProvider = "claude" | "codex" | "gemini" | "cursor";
 type SystemMessageRegexRules = Record<RegexRuleProvider, string[]>;
 
 const MONO_FONT_OPTIONS: Array<{ value: MonoFontFamily; label: string }> = [
@@ -111,6 +111,7 @@ export function SettingsView({
           value: info.discovery.geminiProjectsPath,
           provider: "gemini",
         },
+        { label: "Cursor root", value: info.discovery.cursorRoot, provider: "cursor" },
       ]
     : [];
 
@@ -247,7 +248,7 @@ export function SettingsView({
             </p>
           </div>
           <div className="settings-section-body">
-            {(["claude", "codex", "gemini"] as const).map((provider) => {
+            {(["claude", "codex", "gemini", "cursor"] as const).map((provider) => {
               const patterns = systemMessageRegexRules[provider] ?? [];
               const keyedPatterns = patterns.map((pattern) => pattern);
               const seenPatternCounts = new Map<string, number>();

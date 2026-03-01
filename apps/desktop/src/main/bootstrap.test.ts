@@ -74,6 +74,7 @@ vi.mock("@codetrail/core", () => ({
     geminiRoot: "/gemini/root",
     geminiHistoryRoot: null,
     geminiProjectsPath: null,
+    cursorRoot: "/cursor/root",
   },
   initializeDatabase: mockInitializeDatabase,
   resolveSystemMessageRegexRules: mockResolveSystemMessageRegexRules,
@@ -157,6 +158,7 @@ describe("bootstrapMainProcess", () => {
       claude: ["^<command-name>"],
       codex: ["^<environment_context>"],
       gemini: [],
+      cursor: [],
     },
   };
 
@@ -232,6 +234,7 @@ describe("bootstrapMainProcess", () => {
         geminiRoot: string;
         geminiHistoryRoot: string;
         geminiProjectsPath: string;
+        cursorRoot: string;
       };
     };
     expect(settings.storage).toEqual({
@@ -247,6 +250,7 @@ describe("bootstrapMainProcess", () => {
       geminiRoot: "/gemini/root",
       geminiHistoryRoot: "/Users/test/.gemini/history",
       geminiProjectsPath: "/Users/test/.gemini/projects.json",
+      cursorRoot: "/cursor/root",
     });
 
     const projectPayload = { provider: "claude", limit: 5 };
@@ -379,6 +383,7 @@ describe("bootstrapMainProcess", () => {
         claude: ["^<command-name>"],
         codex: ["^<environment_context>"],
         gemini: [],
+        cursor: [],
       },
     });
 

@@ -21,6 +21,7 @@ describe("systemMessageRules", () => {
       claude: ["^custom-claude"],
       codex: [],
       gemini: [],
+      cursor: [],
     });
   });
 
