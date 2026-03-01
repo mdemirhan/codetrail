@@ -18,6 +18,8 @@ type RestoredScrollTarget = {
   scrollTop: number;
 };
 
+type HistoryMode = "session" | "bookmarks";
+
 export function usePaneStateSync(args: {
   logError: (context: string, error: unknown) => void;
   projectPaneWidth: number;
@@ -34,6 +36,7 @@ export function usePaneStateSync(args: {
   useMonospaceForAllMessages: boolean;
   selectedProjectId: string;
   selectedSessionId: string;
+  historyMode: HistoryMode;
   sessionPage: number;
   sessionScrollTop: number;
   setProjectPaneWidth: Dispatch<SetStateAction<number>>;
@@ -50,6 +53,7 @@ export function usePaneStateSync(args: {
   setUseMonospaceForAllMessages: Dispatch<SetStateAction<boolean>>;
   setSelectedProjectId: Dispatch<SetStateAction<string>>;
   setSelectedSessionId: Dispatch<SetStateAction<string>>;
+  setHistoryMode: Dispatch<SetStateAction<HistoryMode>>;
   setSessionPage: Dispatch<SetStateAction<number>>;
   setSessionScrollTop: Dispatch<SetStateAction<number>>;
   sessionScrollTopRef: MutableRefObject<number>;
@@ -71,6 +75,7 @@ export function usePaneStateSync(args: {
     useMonospaceForAllMessages,
     selectedProjectId,
     selectedSessionId,
+    historyMode,
     sessionPage,
     sessionScrollTop,
     setProjectPaneWidth,
@@ -87,6 +92,7 @@ export function usePaneStateSync(args: {
     setUseMonospaceForAllMessages,
     setSelectedProjectId,
     setSelectedSessionId,
+    setHistoryMode,
     setSessionPage,
     setSessionScrollTop,
     sessionScrollTopRef,
@@ -145,6 +151,9 @@ export function usePaneStateSync(args: {
         if (response.selectedSessionId !== null) {
           setSelectedSessionId(response.selectedSessionId);
         }
+        if (response.historyMode !== null) {
+          setHistoryMode(response.historyMode);
+        }
         if (response.sessionPage !== null) {
           setSessionPage(response.sessionPage);
         }
@@ -190,6 +199,7 @@ export function usePaneStateSync(args: {
     setSearchProviders,
     setSelectedProjectId,
     setSelectedSessionId,
+    setHistoryMode,
     setSessionPage,
     setSessionPaneWidth,
     setSessionScrollTop,
@@ -223,6 +233,7 @@ export function usePaneStateSync(args: {
           useMonospaceForAllMessages,
           selectedProjectId,
           selectedSessionId,
+          historyMode,
           sessionPage,
           sessionScrollTop,
         })
@@ -249,6 +260,7 @@ export function usePaneStateSync(args: {
     useMonospaceForAllMessages,
     selectedProjectId,
     selectedSessionId,
+    historyMode,
     sessionPage,
     sessionScrollTop,
     sessionPaneWidth,

@@ -10,14 +10,20 @@ type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
 export function SessionPane({
   sortedSessions,
   selectedSessionId,
+  bookmarksCount,
+  bookmarksSelected,
   collapsed,
   onToggleCollapsed,
+  onSelectBookmarks,
   onSelectSession,
 }: {
   sortedSessions: SessionSummary[];
   selectedSessionId: string;
+  bookmarksCount: number;
+  bookmarksSelected: boolean;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  onSelectBookmarks: () => void;
   onSelectSession: (sessionId: string) => void;
 }) {
   const [selectedSessionElement, setSelectedSessionElement] = useState<HTMLButtonElement | null>(
@@ -53,12 +59,33 @@ export function SessionPane({
         </button>
       </div>
       <div className="list-scroll session-list">
+        {bookmarksCount > 0 ? (
+          <button
+            type="button"
+            className={
+              bookmarksSelected
+                ? "session-item bookmarks-item active"
+                : "session-item bookmarks-item"
+            }
+            onClick={onSelectBookmarks}
+          >
+            <div className="session-preview">Bookmarked messages</div>
+            <div className="session-meta">
+              <span className="msg-count">{bookmarksCount} msgs</span>
+              <span className="session-time">Project-wide</span>
+            </div>
+          </button>
+        ) : null}
         {sortedSessions.map((session) => (
           <button
             key={session.id}
             type="button"
-            ref={session.id === selectedSessionId ? selectedSessionRef : null}
-            className={session.id === selectedSessionId ? "session-item active" : "session-item"}
+            ref={session.id === selectedSessionId && !bookmarksSelected ? selectedSessionRef : null}
+            className={
+              session.id === selectedSessionId && !bookmarksSelected
+                ? "session-item active"
+                : "session-item"
+            }
             onClick={() => onSelectSession(session.id)}
           >
             <div className="session-preview">{deriveSessionTitle(session)}</div>

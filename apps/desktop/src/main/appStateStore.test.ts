@@ -23,6 +23,7 @@ describe("AppStateStore", () => {
       useMonospaceForAllMessages: true,
       selectedProjectId: "project_alpha",
       selectedSessionId: "session_beta",
+      historyMode: "bookmarks",
       sessionPage: 3,
       sessionScrollTop: 672,
     });
@@ -41,6 +42,7 @@ describe("AppStateStore", () => {
       useMonospaceForAllMessages: true,
       selectedProjectId: "project_alpha",
       selectedSessionId: "session_beta",
+      historyMode: "bookmarks",
       sessionPage: 3,
       sessionScrollTop: 672,
     });

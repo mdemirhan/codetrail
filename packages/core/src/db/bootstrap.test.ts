@@ -23,6 +23,7 @@ describe("initializeDatabase", () => {
     expect(result.schemaRebuilt).toBe(false);
     expect(result.tables).toEqual(
       expect.arrayContaining([
+        "bookmarks",
         "indexed_files",
         "message_fts",
         "messages",

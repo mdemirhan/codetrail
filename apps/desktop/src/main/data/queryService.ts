@@ -27,6 +27,21 @@ type SessionSummaryRow = {
   token_output_total: number;
 };
 
+type MessageRow = {
+  id: string;
+  source_id: string;
+  session_id: string;
+  provider: "claude" | "codex" | "gemini";
+  category: string;
+  content: string;
+  created_at: string;
+  token_input: number | null;
+  token_output: number | null;
+  operation_duration_ms: number | null;
+  operation_duration_source: "native" | "derived" | null;
+  operation_duration_confidence: "high" | "low" | null;
+};
+
 const SESSION_TITLE_JOIN_SQL = `
   LEFT JOIN (
     SELECT ranked.session_id, ranked.content
@@ -48,6 +63,10 @@ export type QueryService = {
   getSessionDetail: (
     request: IpcRequest<"sessions:getDetail">,
   ) => IpcResponse<"sessions:getDetail">;
+  listProjectBookmarks: (
+    request: IpcRequest<"bookmarks:listProject">,
+  ) => IpcResponse<"bookmarks:listProject">;
+  toggleBookmark: (request: IpcRequest<"bookmarks:toggle">) => IpcResponse<"bookmarks:toggle">;
   runSearchQuery: (request: IpcRequest<"search:query">) => IpcResponse<"search:query">;
   close: () => void;
 };
@@ -59,6 +78,8 @@ export function createQueryService(dbPath: string): QueryService {
     listProjects: (request) => listProjectsWithDatabase(db, request),
     listSessions: (request) => listSessionsWithDatabase(db, request),
     getSessionDetail: (request) => getSessionDetailWithDatabase(db, request),
+    listProjectBookmarks: (request) => listProjectBookmarksWithDatabase(db, request),
+    toggleBookmark: (request) => toggleBookmarkWithDatabase(db, request),
     runSearchQuery: (request) => runSearchQueryWithDatabase(db, request),
     close: () => {
       db.close();
@@ -85,6 +106,20 @@ export function getSessionDetail(
   request: IpcRequest<"sessions:getDetail">,
 ): IpcResponse<"sessions:getDetail"> {
   return withDatabase(dbPath, (db) => getSessionDetailWithDatabase(db, request));
+}
+
+export function listProjectBookmarks(
+  dbPath: string,
+  request: IpcRequest<"bookmarks:listProject">,
+): IpcResponse<"bookmarks:listProject"> {
+  return withDatabase(dbPath, (db) => listProjectBookmarksWithDatabase(db, request));
+}
+
+export function toggleBookmark(
+  dbPath: string,
+  request: IpcRequest<"bookmarks:toggle">,
+): IpcResponse<"bookmarks:toggle"> {
+  return withDatabase(dbPath, (db) => toggleBookmarkWithDatabase(db, request));
 }
 
 export function runSearchQuery(
@@ -331,20 +366,7 @@ function getSessionDetailWithDatabase(
        ORDER BY m.created_at, m.id
        LIMIT ? OFFSET ?`,
     )
-    .all(...params, pageSize, page * pageSize) as Array<{
-    id: string;
-    source_id: string;
-    session_id: string;
-    provider: "claude" | "codex" | "gemini";
-    category: string;
-    content: string;
-    created_at: string;
-    token_input: number | null;
-    token_output: number | null;
-    operation_duration_ms: number | null;
-    operation_duration_source: "native" | "derived" | null;
-    operation_duration_confidence: "high" | "low" | null;
-  }>;
+    .all(...params, pageSize, page * pageSize) as MessageRow[];
 
   return {
     session: mapSessionSummaryRow(sessionRow),
@@ -353,21 +375,167 @@ function getSessionDetailWithDatabase(
     page,
     pageSize,
     focusIndex,
-    messages: rows.map((row) => ({
-      id: row.id,
-      sourceId: row.source_id,
+    messages: rows.map(mapSessionMessageRow),
+  };
+}
+
+function listProjectBookmarksWithDatabase(
+  db: DatabaseHandle,
+  request: IpcRequest<"bookmarks:listProject">,
+): IpcResponse<"bookmarks:listProject"> {
+  pruneOrphanBookmarks(db);
+
+  const categoryCounts = makeEmptyCategoryCounts();
+  const categoryRows = db
+    .prepare(
+      `SELECT m.category as category, COUNT(*) as cnt
+       FROM bookmarks b
+       JOIN sessions s ON s.id = b.session_id AND s.project_id = b.project_id
+       JOIN messages m ON m.id = b.message_id AND m.session_id = s.id
+       WHERE b.project_id = ?
+       GROUP BY m.category`,
+    )
+    .all(request.projectId) as Array<{ category: string; cnt: number }>;
+
+  for (const row of categoryRows) {
+    categoryCounts[normalizeMessageCategory(row.category)] += Number(row.cnt ?? 0);
+  }
+
+  const totalRow = db
+    .prepare(
+      `SELECT COUNT(*) as cnt
+       FROM bookmarks b
+       JOIN sessions s ON s.id = b.session_id AND s.project_id = b.project_id
+       JOIN messages m ON m.id = b.message_id AND m.session_id = s.id
+       WHERE b.project_id = ?`,
+    )
+    .get(request.projectId) as { cnt: number } | undefined;
+  const totalCount = Number(totalRow?.cnt ?? 0);
+
+  const bookmarkFiltersArgs: {
+    projectId: string;
+    categories?: string[];
+  } = { projectId: request.projectId };
+  if (request.categories !== undefined) {
+    bookmarkFiltersArgs.categories = request.categories;
+  }
+  const bookmarkFilters = buildBookmarkFilters(bookmarkFiltersArgs);
+  const filteredRow = db
+    .prepare(
+      `SELECT COUNT(*) as cnt
+       FROM bookmarks b
+       JOIN sessions s ON s.id = b.session_id AND s.project_id = b.project_id
+       JOIN messages m ON m.id = b.message_id AND m.session_id = s.id
+       WHERE ${bookmarkFilters.whereClause}`,
+    )
+    .get(...bookmarkFilters.params) as { cnt: number } | undefined;
+  const filteredCount = Number(filteredRow?.cnt ?? 0);
+
+  const rows = db
+    .prepare(
+      `SELECT
+         b.project_id,
+         b.session_id,
+         b.created_at as bookmarked_at,
+         COALESCE(first_user.content, '') as session_title,
+         m.id,
+         m.source_id,
+         m.session_id,
+         m.provider,
+         m.category,
+         m.content,
+         m.created_at,
+         m.token_input,
+         m.token_output,
+         m.operation_duration_ms,
+         m.operation_duration_source,
+         m.operation_duration_confidence
+       FROM bookmarks b
+       JOIN sessions s ON s.id = b.session_id AND s.project_id = b.project_id
+       JOIN messages m ON m.id = b.message_id AND m.session_id = s.id
+       ${SESSION_TITLE_JOIN_SQL}
+       WHERE ${bookmarkFilters.whereClause}
+       ORDER BY m.created_at DESC, m.id DESC`,
+    )
+    .all(...bookmarkFilters.params) as Array<
+    {
+      project_id: string;
+      session_id: string;
+      bookmarked_at: string;
+      session_title: string;
+    } & MessageRow
+  >;
+
+  return {
+    projectId: request.projectId,
+    totalCount,
+    filteredCount,
+    categoryCounts,
+    results: rows.map((row) => ({
+      projectId: row.project_id,
       sessionId: row.session_id,
-      provider: row.provider,
-      category: normalizeMessageCategory(row.category),
-      content: row.content,
-      createdAt: row.created_at,
-      tokenInput: row.token_input,
-      tokenOutput: row.token_output,
-      operationDurationMs: row.operation_duration_ms,
-      operationDurationSource: row.operation_duration_source,
-      operationDurationConfidence: row.operation_duration_confidence,
+      sessionTitle: row.session_title,
+      bookmarkedAt: row.bookmarked_at,
+      message: mapSessionMessageRow(row),
     })),
   };
+}
+
+function toggleBookmarkWithDatabase(
+  db: DatabaseHandle,
+  request: IpcRequest<"bookmarks:toggle">,
+): IpcResponse<"bookmarks:toggle"> {
+  pruneOrphanBookmarks(db);
+
+  const existing = db
+    .prepare("SELECT 1 as present FROM bookmarks WHERE project_id = ? AND message_id = ?")
+    .get(request.projectId, request.messageId) as { present: number } | undefined;
+
+  if (existing) {
+    db.prepare("DELETE FROM bookmarks WHERE project_id = ? AND message_id = ?").run(
+      request.projectId,
+      request.messageId,
+    );
+    return { bookmarked: false };
+  }
+
+  const messageRow = db
+    .prepare(
+      `SELECT m.id, m.source_id, m.session_id, s.project_id
+       FROM messages m
+       JOIN sessions s ON s.id = m.session_id
+       WHERE m.id = ?`,
+    )
+    .get(request.messageId) as
+    | {
+        id: string;
+        source_id: string;
+        session_id: string;
+        project_id: string;
+      }
+    | undefined;
+
+  if (
+    !messageRow ||
+    messageRow.project_id !== request.projectId ||
+    messageRow.session_id !== request.sessionId ||
+    messageRow.source_id !== request.messageSourceId
+  ) {
+    return { bookmarked: false };
+  }
+
+  db.prepare(
+    `INSERT INTO bookmarks (project_id, session_id, message_id, message_source_id, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(
+    request.projectId,
+    request.sessionId,
+    request.messageId,
+    request.messageSourceId,
+    new Date().toISOString(),
+  );
+
+  return { bookmarked: true };
 }
 
 function runSearchQueryWithDatabase(
@@ -427,6 +595,63 @@ function buildMessageFilters(args: {
   }
 
   return { whereClause: conditions.join(" AND "), params };
+}
+
+function buildBookmarkFilters(args: {
+  projectId: string;
+  categories?: string[];
+}): { whereClause: string; params: string[] } {
+  const conditions = ["b.project_id = ?"];
+  const params = [args.projectId];
+
+  if (args.categories !== undefined) {
+    const categories = normalizeMessageCategories(args.categories);
+    if (categories.length > 0) {
+      conditions.push(`m.category IN (${categories.map(() => "?").join(",")})`);
+      params.push(...categories);
+    } else {
+      conditions.push("1 = 0");
+    }
+  }
+
+  return { whereClause: conditions.join(" AND "), params };
+}
+
+function pruneOrphanBookmarks(db: DatabaseHandle): void {
+  db.prepare(
+    `DELETE FROM bookmarks
+     WHERE NOT EXISTS (
+         SELECT 1
+         FROM sessions s
+         WHERE s.id = bookmarks.session_id
+           AND s.project_id = bookmarks.project_id
+       )
+       OR NOT EXISTS (
+         SELECT 1
+         FROM messages m
+         WHERE m.id = bookmarks.message_id
+           AND m.session_id = bookmarks.session_id
+       )`,
+  ).run();
+}
+
+function mapSessionMessageRow(
+  row: MessageRow,
+): IpcResponse<"sessions:getDetail">["messages"][number] {
+  return {
+    id: row.id,
+    sourceId: row.source_id,
+    sessionId: row.session_id,
+    provider: row.provider,
+    category: normalizeMessageCategory(row.category),
+    content: row.content,
+    createdAt: row.created_at,
+    tokenInput: row.token_input,
+    tokenOutput: row.token_output,
+    operationDurationMs: row.operation_duration_ms,
+    operationDurationSource: row.operation_duration_source,
+    operationDurationConfidence: row.operation_duration_confidence,
+  };
 }
 
 function mapSessionSummaryRow(

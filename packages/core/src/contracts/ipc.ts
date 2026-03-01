@@ -48,6 +48,14 @@ const sessionMessageSchema = z.object({
   operationDurationConfidence: operationDurationConfidenceSchema.nullable(),
 });
 
+const bookmarkEntrySchema = z.object({
+  projectId: z.string().min(1),
+  sessionId: z.string().min(1),
+  sessionTitle: z.string(),
+  bookmarkedAt: z.string(),
+  message: sessionMessageSchema,
+});
+
 const searchResultSchema = z.object({
   messageId: z.string().min(1),
   messageSourceId: z.string().min(1),
@@ -110,6 +118,7 @@ const paneStateSchema = z.object({
   useMonospaceForAllMessages: z.boolean().nullable(),
   selectedProjectId: z.string().nullable(),
   selectedSessionId: z.string().nullable(),
+  historyMode: z.enum(["session", "bookmarks"]).nullable(),
   sessionPage: z.number().int().nonnegative().nullable(),
   sessionScrollTop: z.number().int().nonnegative().nullable(),
 });
@@ -197,6 +206,30 @@ export const ipcContractSchemas = {
       messages: z.array(sessionMessageSchema),
     }),
   },
+  "bookmarks:listProject": {
+    request: z.object({
+      projectId: z.string().min(1),
+      categories: z.array(z.string().min(1)).optional(),
+    }),
+    response: z.object({
+      projectId: z.string().min(1),
+      totalCount: z.number().int().nonnegative(),
+      filteredCount: z.number().int().nonnegative(),
+      categoryCounts: categoryCountsSchema,
+      results: z.array(bookmarkEntrySchema),
+    }),
+  },
+  "bookmarks:toggle": {
+    request: z.object({
+      projectId: z.string().min(1),
+      sessionId: z.string().min(1),
+      messageId: z.string().min(1),
+      messageSourceId: z.string().min(1),
+    }),
+    response: z.object({
+      bookmarked: z.boolean(),
+    }),
+  },
   "search:query": {
     request: z.object({
       query: z.string().default(""),
@@ -243,6 +276,7 @@ export const ipcContractSchemas = {
       useMonospaceForAllMessages: z.boolean(),
       selectedProjectId: z.string(),
       selectedSessionId: z.string(),
+      historyMode: z.enum(["session", "bookmarks"]),
       sessionPage: z.number().int().nonnegative(),
       sessionScrollTop: z.number().int().nonnegative(),
     }),

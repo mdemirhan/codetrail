@@ -21,9 +21,11 @@ type MessageCardProps = {
   query: string;
   pathRoots: string[];
   isFocused: boolean;
+  isBookmarked?: boolean;
   isExpanded: boolean;
   onToggleExpanded: (messageId: string, category: MessageCategory) => void;
   onToggleFocused: (messageId: string) => void;
+  onToggleBookmark?: (message: SessionMessage) => void;
   onRevealInSession?: (messageId: string, sourceId: string) => void;
   cardRef?: Ref<HTMLDivElement> | null;
 };
@@ -33,9 +35,11 @@ function MessageCardComponent({
   query,
   pathRoots,
   isFocused,
+  isBookmarked = false,
   isExpanded,
   onToggleExpanded,
   onToggleFocused,
+  onToggleBookmark,
   onRevealInSession,
   cardRef,
 }: MessageCardProps) {
@@ -89,6 +93,11 @@ function MessageCardComponent({
   const handleRevealButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onRevealInSession?.(message.id, message.sourceId);
+  };
+
+  const handleBookmarkButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onToggleBookmark?.(message);
   };
 
   return (
@@ -171,6 +180,21 @@ function MessageCardComponent({
               Reveal in Session
             </button>
           ) : null}
+          {onToggleBookmark ? (
+            <button
+              type="button"
+              className={`message-action-button message-bookmark-button${
+                isBookmarked ? " is-active" : ""
+              }`}
+              onClick={handleBookmarkButtonClick}
+              aria-label={
+                isBookmarked ? "Remove bookmark from this message" : "Bookmark this message"
+              }
+              title={isBookmarked ? "Remove bookmark" : "Bookmark message"}
+            >
+              <BookmarkIcon filled={isBookmarked} />
+            </button>
+          ) : null}
         </div>
       </header>
       {isExpanded ? (
@@ -191,6 +215,19 @@ function MessageCardComponent({
 
 export const MessageCard = memo(MessageCardComponent);
 MessageCard.displayName = "MessageCard";
+
+function BookmarkIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg className="message-bookmark-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"
+        fill={filled ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
 
 function formatMessageTypeLabel(category: MessageCategory, content: string): string {
   if (category !== "tool_use" && category !== "tool_edit") {

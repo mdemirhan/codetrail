@@ -75,6 +75,8 @@ export async function bootstrapMainProcess(
     "projects:list": (payload) => queryService.listProjects(payload),
     "sessions:list": (payload) => queryService.listSessions(payload),
     "sessions:getDetail": (payload) => queryService.getSessionDetail(payload),
+    "bookmarks:listProject": (payload) => queryService.listProjectBookmarks(payload),
+    "bookmarks:toggle": (payload) => queryService.toggleBookmark(payload),
     "search:query": (payload) => queryService.runSearchQuery(payload),
     "path:openInFileManager": async (payload) => {
       try {
@@ -110,6 +112,7 @@ export async function bootstrapMainProcess(
         useMonospaceForAllMessages: paneState?.useMonospaceForAllMessages ?? null,
         selectedProjectId: paneState?.selectedProjectId ?? null,
         selectedSessionId: paneState?.selectedSessionId ?? null,
+        historyMode: paneState?.historyMode ?? null,
         sessionPage: paneState?.sessionPage ?? null,
         sessionScrollTop: paneState?.sessionScrollTop ?? null,
       };
@@ -130,6 +133,7 @@ export async function bootstrapMainProcess(
         useMonospaceForAllMessages: payload.useMonospaceForAllMessages,
         selectedProjectId: payload.selectedProjectId,
         selectedSessionId: payload.selectedSessionId,
+        historyMode: payload.historyMode,
         sessionPage: payload.sessionPage,
         sessionScrollTop: payload.sessionScrollTop,
       });

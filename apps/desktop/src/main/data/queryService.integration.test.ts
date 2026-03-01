@@ -5,7 +5,22 @@ import { join } from "node:path";
 import { openDatabase, runIncrementalIndexing } from "@codetrail/core";
 import { describe, expect, it } from "vitest";
 
-import { getSessionDetail, listProjects, listSessions, runSearchQuery } from "./queryService";
+import {
+  getSessionDetail,
+  listProjectBookmarks,
+  listProjects,
+  listSessions,
+  runSearchQuery,
+  toggleBookmark,
+} from "./queryService";
+
+type MessageProjectRow = {
+  id: string;
+  source_id: string;
+  session_id: string;
+  project_id: string;
+  created_at: string;
+};
 
 function setupIndexedDb(): { dbPath: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "codetrail-query-service-"));
@@ -253,6 +268,232 @@ describe("queryService", () => {
     });
     expect(filtered.totalCount).toBeGreaterThanOrEqual(1);
     expect(filtered.categoryCounts).toEqual(all.categoryCounts);
+
+    cleanup();
+  });
+
+  it("toggles and lists project bookmarks with category filtering", () => {
+    const { dbPath, cleanup } = setupIndexedDb();
+
+    const db = openDatabase(dbPath);
+    const target = db
+      .prepare(
+        `SELECT m.id, m.source_id, m.session_id, s.project_id
+         FROM messages m
+         JOIN sessions s ON s.id = m.session_id
+         WHERE m.provider = 'claude' AND m.category = 'assistant'
+         LIMIT 1`,
+      )
+      .get() as
+      | {
+          id: string;
+          source_id: string;
+          session_id: string;
+          project_id: string;
+        }
+      | undefined;
+    db.close();
+
+    if (!target) {
+      cleanup();
+      throw new Error("Missing bookmark target message");
+    }
+
+    const firstToggle = toggleBookmark(dbPath, {
+      projectId: target.project_id,
+      sessionId: target.session_id,
+      messageId: target.id,
+      messageSourceId: target.source_id,
+    });
+    expect(firstToggle.bookmarked).toBe(true);
+
+    const listed = listProjectBookmarks(dbPath, {
+      projectId: target.project_id,
+      categories: undefined,
+    });
+    expect(listed.totalCount).toBe(1);
+    expect(listed.filteredCount).toBe(1);
+    expect(listed.results[0]?.message.id).toBe(target.id);
+
+    const filteredOut = listProjectBookmarks(dbPath, {
+      projectId: target.project_id,
+      categories: ["tool_use"],
+    });
+    expect(filteredOut.totalCount).toBe(1);
+    expect(filteredOut.filteredCount).toBe(0);
+    expect(filteredOut.results).toEqual([]);
+
+    const secondToggle = toggleBookmark(dbPath, {
+      projectId: target.project_id,
+      sessionId: target.session_id,
+      messageId: target.id,
+      messageSourceId: target.source_id,
+    });
+    expect(secondToggle.bookmarked).toBe(false);
+
+    const afterDelete = listProjectBookmarks(dbPath, {
+      projectId: target.project_id,
+      categories: undefined,
+    });
+    expect(afterDelete.totalCount).toBe(0);
+    expect(afterDelete.filteredCount).toBe(0);
+    expect(afterDelete.results).toEqual([]);
+
+    cleanup();
+  });
+
+  it("orders project bookmarks by message created_at descending", () => {
+    const { dbPath, cleanup } = setupIndexedDb();
+
+    const db = openDatabase(dbPath);
+    const rows = db
+      .prepare(
+        `SELECT m.id, m.source_id, m.session_id, s.project_id, m.created_at
+         FROM messages m
+         JOIN sessions s ON s.id = m.session_id
+         WHERE s.provider = 'claude'
+         ORDER BY m.created_at ASC, m.id ASC
+         LIMIT 2`,
+      )
+      .all() as MessageProjectRow[];
+    db.close();
+
+    if (rows.length < 2) {
+      cleanup();
+      throw new Error("Missing bookmark ordering test rows");
+    }
+
+    const older = rows[0];
+    const newer = rows[1];
+    if (!older || !newer) {
+      cleanup();
+      throw new Error("Missing bookmark ordering rows");
+    }
+
+    const first = toggleBookmark(dbPath, {
+      projectId: newer.project_id,
+      sessionId: newer.session_id,
+      messageId: newer.id,
+      messageSourceId: newer.source_id,
+    });
+    expect(first.bookmarked).toBe(true);
+
+    const second = toggleBookmark(dbPath, {
+      projectId: older.project_id,
+      sessionId: older.session_id,
+      messageId: older.id,
+      messageSourceId: older.source_id,
+    });
+    expect(second.bookmarked).toBe(true);
+
+    const listed = listProjectBookmarks(dbPath, {
+      projectId: older.project_id,
+      categories: undefined,
+    });
+    expect(listed.totalCount).toBe(2);
+    expect(listed.results[0]?.message.id).toBe(newer.id);
+    expect(listed.results[1]?.message.id).toBe(older.id);
+
+    cleanup();
+  });
+
+  it("refuses bookmark toggle when payload does not match message identity", () => {
+    const { dbPath, cleanup } = setupIndexedDb();
+
+    const db = openDatabase(dbPath);
+    const target = db
+      .prepare(
+        `SELECT m.id, m.source_id, m.session_id, s.project_id, m.created_at
+         FROM messages m
+         JOIN sessions s ON s.id = m.session_id
+         ORDER BY m.created_at ASC, m.id ASC
+         LIMIT 1`,
+      )
+      .get() as MessageProjectRow | undefined;
+    const alternateProject = db
+      .prepare("SELECT id FROM projects WHERE id != ? LIMIT 1")
+      .get(target?.project_id ?? "") as { id: string } | undefined;
+    db.close();
+
+    if (!target || !alternateProject) {
+      cleanup();
+      throw new Error("Missing toggle validation rows");
+    }
+
+    const wrongProject = toggleBookmark(dbPath, {
+      projectId: alternateProject.id,
+      sessionId: target.session_id,
+      messageId: target.id,
+      messageSourceId: target.source_id,
+    });
+    expect(wrongProject.bookmarked).toBe(false);
+
+    const wrongSource = toggleBookmark(dbPath, {
+      projectId: target.project_id,
+      sessionId: target.session_id,
+      messageId: target.id,
+      messageSourceId: `${target.source_id}-bad`,
+    });
+    expect(wrongSource.bookmarked).toBe(false);
+
+    const listed = listProjectBookmarks(dbPath, {
+      projectId: target.project_id,
+      categories: undefined,
+    });
+    expect(listed.totalCount).toBe(0);
+
+    cleanup();
+  });
+
+  it("auto-removes stale bookmarks when backing messages disappear", () => {
+    const { dbPath, cleanup } = setupIndexedDb();
+
+    const db = openDatabase(dbPath);
+    const target = db
+      .prepare(
+        `SELECT m.id, m.source_id, m.session_id, s.project_id, m.created_at
+         FROM messages m
+         JOIN sessions s ON s.id = m.session_id
+         WHERE s.provider = 'claude'
+         ORDER BY m.created_at DESC, m.id DESC
+         LIMIT 1`,
+      )
+      .get() as MessageProjectRow | undefined;
+    db.close();
+
+    if (!target) {
+      cleanup();
+      throw new Error("Missing stale bookmark target");
+    }
+
+    const toggled = toggleBookmark(dbPath, {
+      projectId: target.project_id,
+      sessionId: target.session_id,
+      messageId: target.id,
+      messageSourceId: target.source_id,
+    });
+    expect(toggled.bookmarked).toBe(true);
+
+    const dbMutate = openDatabase(dbPath);
+    dbMutate.pragma("foreign_keys = OFF");
+    dbMutate.prepare("DELETE FROM message_fts WHERE message_id = ?").run(target.id);
+    dbMutate.prepare("DELETE FROM messages WHERE id = ?").run(target.id);
+    dbMutate.close();
+
+    const listed = listProjectBookmarks(dbPath, {
+      projectId: target.project_id,
+      categories: undefined,
+    });
+    expect(listed.totalCount).toBe(0);
+    expect(listed.filteredCount).toBe(0);
+    expect(listed.results).toEqual([]);
+
+    const dbVerify = openDatabase(dbPath);
+    const remaining = dbVerify
+      .prepare("SELECT COUNT(*) as count FROM bookmarks WHERE project_id = ?")
+      .get(target.project_id) as { count: number };
+    dbVerify.close();
+    expect(remaining.count).toBe(0);
 
     cleanup();
   });

@@ -50,6 +50,24 @@ describe("registerIpcHandlers", () => {
           focusIndex: null,
           messages: [],
         }),
+        "bookmarks:listProject": () => ({
+          projectId: "project_1",
+          totalCount: 0,
+          filteredCount: 0,
+          categoryCounts: {
+            user: 0,
+            assistant: 0,
+            tool_use: 0,
+            tool_edit: 0,
+            tool_result: 0,
+            thinking: 0,
+            system: 0,
+          },
+          results: [],
+        }),
+        "bookmarks:toggle": () => ({
+          bookmarked: true,
+        }),
         "search:query": (payload) => ({
           query: payload.query,
           totalCount: 0,
@@ -83,6 +101,7 @@ describe("registerIpcHandlers", () => {
           useMonospaceForAllMessages: null,
           selectedProjectId: null,
           selectedSessionId: null,
+          historyMode: null,
           sessionPage: null,
           sessionScrollTop: null,
         }),

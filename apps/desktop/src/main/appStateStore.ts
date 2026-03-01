@@ -33,6 +33,7 @@ export type PaneState = {
   useMonospaceForAllMessages?: boolean;
   selectedProjectId?: string;
   selectedSessionId?: string;
+  historyMode?: "session" | "bookmarks";
   sessionPage?: number;
   sessionScrollTop?: number;
 };
@@ -65,6 +66,7 @@ const MONO_FONT_VALUES: MonoFontFamily[] = [...UI_MONO_FONT_VALUES];
 const REGULAR_FONT_VALUES: RegularFontFamily[] = [...UI_REGULAR_FONT_VALUES];
 const MONO_FONT_SIZE_VALUES: MonoFontSize[] = [...UI_MONO_FONT_SIZE_VALUES];
 const REGULAR_FONT_SIZE_VALUES: RegularFontSize[] = [...UI_REGULAR_FONT_SIZE_VALUES];
+const HISTORY_MODE_VALUES = ["session", "bookmarks"] as const;
 
 export class AppStateStore {
   private readonly filePath: string;
@@ -195,6 +197,7 @@ function sanitizePaneState(value: unknown): PaneState | null {
   const useMonospaceForAllMessages = sanitizeOptionalBoolean(record.useMonospaceForAllMessages);
   const selectedProjectId = sanitizeOptionalNonEmptyString(record.selectedProjectId);
   const selectedSessionId = sanitizeOptionalNonEmptyString(record.selectedSessionId);
+  const historyMode = sanitizeStringValue(record.historyMode, HISTORY_MODE_VALUES);
   const sessionPage = sanitizeOptionalInt(record.sessionPage, PAGE_MIN, PAGE_MAX);
   const sessionScrollTop = sanitizeOptionalInt(
     record.sessionScrollTop,
@@ -217,6 +220,7 @@ function sanitizePaneState(value: unknown): PaneState | null {
     ...(useMonospaceForAllMessages === null ? {} : { useMonospaceForAllMessages }),
     ...(selectedProjectId ? { selectedProjectId } : {}),
     ...(selectedSessionId ? { selectedSessionId } : {}),
+    ...(historyMode ? { historyMode } : {}),
     ...(sessionPage === null ? {} : { sessionPage }),
     ...(sessionScrollTop === null ? {} : { sessionScrollTop }),
   };

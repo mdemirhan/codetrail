@@ -43,6 +43,8 @@ import {
 type ProjectSummary = IpcResponse<"projects:list">["projects"][number];
 type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
 type SessionDetail = IpcResponse<"sessions:getDetail">;
+type SessionMessage = SessionDetail["messages"][number];
+type BookmarkListResponse = IpcResponse<"bookmarks:listProject">;
 type SearchQueryResponse = IpcResponse<"search:query">;
 type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
 
@@ -63,7 +65,16 @@ const EMPTY_CATEGORY_COUNTS = {
 };
 
 type MainView = "history" | "search" | "settings";
+type HistoryMode = "session" | "bookmarks";
 type BulkExpandScope = "all" | MessageCategory;
+
+const EMPTY_BOOKMARKS_RESPONSE: BookmarkListResponse = {
+  projectId: "",
+  totalCount: 0,
+  filteredCount: 0,
+  categoryCounts: EMPTY_CATEGORY_COUNTS,
+  results: [],
+};
 
 const MONO_FONT_STACKS: Record<MonoFontFamily, string> = {
   current: '"JetBrains Mono", "IBM Plex Mono", monospace',
@@ -116,8 +127,12 @@ export function App() {
 
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoadedProjectId, setSessionsLoadedProjectId] = useState<string | null>(null);
+  const [bookmarksLoadedProjectId, setBookmarksLoadedProjectId] = useState<string | null>(null);
+  const [historyMode, setHistoryMode] = useState<HistoryMode>("session");
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [bookmarksResponse, setBookmarksResponse] =
+    useState<BookmarkListResponse>(EMPTY_BOOKMARKS_RESPONSE);
   const [sessionPage, setSessionPage] = useState(0);
   const [sessionScrollTop, setSessionScrollTop] = useState(0);
   const [sessionQueryInput, setSessionQueryInput] = useState("");
@@ -175,6 +190,7 @@ export function App() {
     sessionPage: number;
     scrollTop: number;
   } | null>(null);
+  const bookmarksLoadTokenRef = useRef(0);
   const sessionScrollTopRef = useRef(0);
   const sessionScrollSyncTimerRef = useRef<number | null>(null);
   const {
@@ -237,6 +253,30 @@ export function App() {
     setSessionsLoadedProjectId(selectedProjectId);
   }, [selectedProjectId]);
 
+  const loadBookmarks = useCallback(async () => {
+    const requestToken = bookmarksLoadTokenRef.current + 1;
+    bookmarksLoadTokenRef.current = requestToken;
+    if (!selectedProjectId) {
+      if (requestToken !== bookmarksLoadTokenRef.current) {
+        return;
+      }
+      setBookmarksResponse(EMPTY_BOOKMARKS_RESPONSE);
+      setBookmarksLoadedProjectId("");
+      return;
+    }
+    setBookmarksLoadedProjectId(null);
+    const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
+    const response = await window.codetrail.invoke("bookmarks:listProject", {
+      projectId: selectedProjectId,
+      categories: isAllHistoryCategoriesSelected ? undefined : historyCategories,
+    });
+    if (requestToken !== bookmarksLoadTokenRef.current) {
+      return;
+    }
+    setBookmarksResponse(response);
+    setBookmarksLoadedProjectId(selectedProjectId);
+  }, [historyCategories, selectedProjectId]);
+
   const loadSearch = useCallback(async () => {
     const trimmed = searchQuery.trim();
     const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
@@ -291,6 +331,7 @@ export function App() {
     useMonospaceForAllMessages,
     selectedProjectId,
     selectedSessionId,
+    historyMode,
     sessionPage,
     sessionScrollTop,
     setProjectPaneWidth,
@@ -307,6 +348,7 @@ export function App() {
     setUseMonospaceForAllMessages,
     setSelectedProjectId,
     setSelectedSessionId,
+    setHistoryMode,
     setSessionPage,
     setSessionScrollTop,
     sessionScrollTopRef,
@@ -431,11 +473,23 @@ export function App() {
   }, [loadSessions, logError]);
 
   useEffect(() => {
+    let cancelled = false;
+    void loadBookmarks().catch((error: unknown) => {
+      if (!cancelled) {
+        logError("Failed loading bookmarks", error);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadBookmarks, logError]);
+
+  useEffect(() => {
     const decision = decideSessionSelectionAfterLoad({
       paneStateHydrated,
       sessionsLoadedProjectId,
       selectedProjectId,
-      hasPendingSearchNavigation: pendingSearchNavigation !== null,
+      hasPendingSearchNavigation: pendingSearchNavigation !== null || historyMode === "bookmarks",
       selectedSessionId,
       sortedSessions,
     });
@@ -448,6 +502,7 @@ export function App() {
       setSessionPage(0);
     }
   }, [
+    historyMode,
     paneStateHydrated,
     pendingSearchNavigation,
     selectedProjectId,
@@ -479,9 +534,23 @@ export function App() {
       sourceId: pendingSearchNavigation.sourceId,
       messageId: pendingSearchNavigation.messageId,
     });
+    setHistoryMode("session");
     setPendingSearchNavigation(null);
     setMainView("history");
   }, [pendingSearchNavigation, selectedProjectId, sortedSessions]);
+
+  useEffect(() => {
+    if (historyMode !== "bookmarks") {
+      return;
+    }
+    if (bookmarksLoadedProjectId !== selectedProjectId) {
+      return;
+    }
+    if (bookmarksResponse.totalCount > 0) {
+      return;
+    }
+    setHistoryMode("session");
+  }, [bookmarksLoadedProjectId, bookmarksResponse.totalCount, historyMode, selectedProjectId]);
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -556,23 +625,40 @@ export function App() {
     void loadSettingsInfo();
   }, [loadSettingsInfo, mainView, settingsInfo, settingsLoading]);
 
+  const bookmarkMessages = useMemo(
+    () => bookmarksResponse.results.map((entry) => entry.message),
+    [bookmarksResponse.results],
+  );
+  const bookmarkedMessageIds = useMemo(
+    () => new Set(bookmarksResponse.results.map((entry) => entry.message.id)),
+    [bookmarksResponse.results],
+  );
+  const activeHistoryMessages =
+    historyMode === "bookmarks" ? bookmarkMessages : (sessionDetail?.messages ?? []);
+
   const visibleFocusedMessageId = useMemo(() => {
-    if (!focusMessageId || !sessionDetail?.messages) {
+    if (!focusMessageId) {
       return "";
     }
-    return sessionDetail.messages.some((message) => message.id === focusMessageId)
+    return activeHistoryMessages.some((message) => message.id === focusMessageId)
       ? focusMessageId
       : "";
-  }, [focusMessageId, sessionDetail?.messages]);
+  }, [activeHistoryMessages, focusMessageId]);
   const focusedMessagePosition = useMemo(() => {
-    if (!focusMessageId || !sessionDetail?.messages) {
+    if (!focusMessageId) {
       return -1;
     }
-    return sessionDetail.messages.findIndex((message) => message.id === focusMessageId);
-  }, [focusMessageId, sessionDetail?.messages]);
+    return activeHistoryMessages.findIndex((message) => message.id === focusMessageId);
+  }, [activeHistoryMessages, focusMessageId]);
 
   useEffect(() => {
     if (!messageListRef.current) {
+      return;
+    }
+    if (historyMode === "bookmarks") {
+      messageListRef.current.scrollTop = 0;
+      sessionScrollTopRef.current = 0;
+      setSessionScrollTop(0);
       return;
     }
     if (!selectedSessionId || sessionPage < 0) {
@@ -601,7 +687,7 @@ export function App() {
     messageListRef.current.scrollTop = 0;
     sessionScrollTopRef.current = 0;
     setSessionScrollTop(0);
-  }, [selectedSessionId, sessionPage]);
+  }, [historyMode, selectedSessionId, sessionPage]);
 
   useEffect(() => {
     if (
@@ -629,14 +715,14 @@ export function App() {
       setRefreshing(true);
       try {
         await window.codetrail.invoke("indexer:refresh", { force });
-        await Promise.all([loadProjects(), loadSessions(), loadSearch()]);
+        await Promise.all([loadProjects(), loadSessions(), loadBookmarks(), loadSearch()]);
       } catch (error) {
         logError("Refresh failed", error);
       } finally {
         setRefreshing(false);
       }
     },
-    [loadProjects, loadSearch, loadSessions, logError],
+    [loadBookmarks, loadProjects, loadSearch, loadSessions, logError],
   );
 
   const handleIncrementalRefresh = useCallback(async () => {
@@ -704,6 +790,7 @@ export function App() {
 
   const focusSessionSearch = useCallback(() => {
     setMainView("history");
+    setHistoryMode("session");
     window.setTimeout(() => {
       sessionSearchInputRef.current?.focus();
       sessionSearchInputRef.current?.select();
@@ -749,8 +836,11 @@ export function App() {
 
   const canZoomIn = zoomPercent < 500;
   const canZoomOut = zoomPercent > 25;
-  const historyCategoryCounts = sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS;
-  const sessionMessages = sessionDetail?.messages ?? [];
+  const historyCategoryCounts =
+    historyMode === "bookmarks"
+      ? bookmarksResponse.categoryCounts
+      : (sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS);
+  const sessionMessages = activeHistoryMessages;
   const isExpandedByDefault = useCallback(
     (category: MessageCategory) => expandedByDefaultCategories.includes(category),
     [expandedByDefaultCategories],
@@ -831,11 +921,54 @@ export function App() {
     setFocusMessageId((value) => (value === messageId ? "" : messageId));
   }, []);
 
-  const handleRevealInSession = useCallback((messageId: string, sourceId: string) => {
-    setSessionQueryInput("");
-    setFocusMessageId(messageId);
-    setPendingRevealTarget({ messageId, sourceId });
-  }, []);
+  const handleRevealInSession = useCallback(
+    (messageId: string, sourceId: string) => {
+      if (historyMode === "bookmarks") {
+        const bookmarked = bookmarksResponse.results.find(
+          (entry) => entry.message.id === messageId,
+        );
+        if (!bookmarked) {
+          return;
+        }
+        setPendingSearchNavigation({
+          projectId: bookmarked.projectId,
+          sessionId: bookmarked.sessionId,
+          messageId,
+          sourceId,
+          historyCategories: [...historyCategories],
+        });
+        setSelectedProjectId(bookmarked.projectId);
+        setHistoryMode("session");
+        setMainView("history");
+        return;
+      }
+
+      setSessionQueryInput("");
+      setFocusMessageId(messageId);
+      setPendingRevealTarget({ messageId, sourceId });
+    },
+    [bookmarksResponse.results, historyCategories, historyMode],
+  );
+
+  const handleToggleBookmark = useCallback(
+    async (message: SessionMessage) => {
+      if (!selectedProjectId) {
+        return;
+      }
+      try {
+        await window.codetrail.invoke("bookmarks:toggle", {
+          projectId: selectedProjectId,
+          sessionId: message.sessionId,
+          messageId: message.id,
+          messageSourceId: message.sourceId,
+        });
+        await loadBookmarks();
+      } catch (error) {
+        logError("Failed toggling bookmark", error);
+      }
+    },
+    [loadBookmarks, logError, selectedProjectId],
+  );
 
   const handleMessageListScroll = useCallback((event: ReactUIEvent<HTMLDivElement>) => {
     sessionScrollTopRef.current = Math.max(0, Math.round(event.currentTarget.scrollTop));
@@ -872,7 +1005,7 @@ export function App() {
         refreshing={refreshing}
         focusMode={focusMode}
         focusDisabled={mainView !== "history"}
-        copyDisabled={!selectedSession || mainView !== "history"}
+        copyDisabled={!selectedSession || historyMode !== "session" || mainView !== "history"}
         onToggleSearchView={() =>
           setMainView((value) => (value === "search" ? "history" : "search"))
         }
@@ -923,7 +1056,7 @@ export function App() {
                   }
                 });
               }}
-              canOpenSessionLocation={!!selectedSession}
+              canOpenSessionLocation={historyMode === "session" && !!selectedSession}
               onOpenSessionLocation={() => {
                 if (!selectedSession) {
                   return;
@@ -941,11 +1074,23 @@ export function App() {
             <SessionPane
               sortedSessions={sortedSessions}
               selectedSessionId={selectedSessionId}
+              bookmarksCount={bookmarksResponse.totalCount}
+              bookmarksSelected={historyMode === "bookmarks"}
               collapsed={sessionPaneCollapsed}
               onToggleCollapsed={() => setSessionPaneCollapsed((value) => !value)}
+              onSelectBookmarks={() => {
+                setPendingSearchNavigation(null);
+                setHistoryMode("bookmarks");
+                setSelectedSessionId("");
+                setSessionPage(0);
+                setFocusMessageId("");
+                setPendingRevealTarget(null);
+                setMainView("history");
+              }}
               onSelectSession={(sessionId) => {
                 setPendingSearchNavigation(null);
                 setSelectedSessionId(sessionId);
+                setHistoryMode("session");
                 setSessionPage(0);
                 setFocusMessageId("");
                 setPendingRevealTarget(null);
@@ -963,7 +1108,11 @@ export function App() {
               <div className="msg-header">
                 <div className="msg-header-top">
                   <div className="msg-header-title">
-                    {selectedSession ? deriveSessionTitle(selectedSession) : "Session Detail"}
+                    {historyMode === "bookmarks"
+                      ? "Bookmarks"
+                      : selectedSession
+                        ? deriveSessionTitle(selectedSession)
+                        : "Session Detail"}
                   </div>
                   <div className="msg-toolbar">
                     <div className="expand-scope-control">
@@ -1029,9 +1178,19 @@ export function App() {
                 </div>
                 <div className="msg-header-info">
                   <span className="provider">
-                    {selectedSession ? prettyProvider(selectedSession.provider) : "-"}
+                    {historyMode === "session"
+                      ? selectedSession
+                        ? prettyProvider(selectedSession.provider)
+                        : "-"
+                      : selectedProject
+                        ? prettyProvider(selectedProject.provider)
+                        : "-"}
                   </span>
-                  <span>{selectedSession?.messageCount ?? 0} messages</span>
+                  <span>
+                    {historyMode === "bookmarks"
+                      ? `${bookmarksResponse.filteredCount} of ${bookmarksResponse.totalCount} bookmarked messages`
+                      : `${sessionDetail?.totalCount ?? 0} messages`}
+                  </span>
                 </div>
               </div>
 
@@ -1056,71 +1215,82 @@ export function App() {
                 ))}
               </div>
 
-              <div className="msg-search">
-                <div className="search-box">
-                  <ToolbarIcon name="search" />
-                  <input
-                    ref={sessionSearchInputRef}
-                    className="search-input"
-                    value={sessionQueryInput}
-                    onKeyDown={handleSessionSearchKeyDown}
-                    onChange={(event) => {
-                      setSessionQueryInput(event.target.value);
-                      setSessionPage(0);
-                    }}
-                    placeholder="Search in session..."
-                  />
+              {historyMode === "session" ? (
+                <div className="msg-search">
+                  <div className="search-box">
+                    <ToolbarIcon name="search" />
+                    <input
+                      ref={sessionSearchInputRef}
+                      className="search-input"
+                      value={sessionQueryInput}
+                      onKeyDown={handleSessionSearchKeyDown}
+                      onChange={(event) => {
+                        setSessionQueryInput(event.target.value);
+                        setSessionPage(0);
+                      }}
+                      placeholder="Search in session..."
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div
                 className="msg-scroll message-list"
                 ref={messageListRef}
                 onScroll={handleMessageListScroll}
               >
-                {sessionDetail?.messages.length ? (
-                  sessionDetail.messages.map((message) => (
+                {sessionMessages.length ? (
+                  sessionMessages.map((message) => (
                     <MessageCard
                       key={message.id}
                       message={message}
-                      query={effectiveSessionQuery}
+                      query={historyMode === "session" ? effectiveSessionQuery : ""}
                       pathRoots={messagePathRoots}
                       isFocused={message.id === focusMessageId}
+                      isBookmarked={bookmarkedMessageIds.has(message.id)}
                       isExpanded={
                         messageExpanded[message.id] ?? isExpandedByDefault(message.category)
                       }
                       onToggleExpanded={handleToggleMessageExpanded}
                       onToggleFocused={handleToggleMessageFocused}
+                      onToggleBookmark={handleToggleBookmark}
                       onRevealInSession={handleRevealInSession}
                       cardRef={focusMessageId === message.id ? focusedMessageRef : null}
                     />
                   ))
                 ) : (
-                  <p className="empty-state">No messages match current filters.</p>
+                  <p className="empty-state">
+                    {historyMode === "bookmarks"
+                      ? "No bookmarked messages match current filters."
+                      : "No messages match current filters."}
+                  </p>
                 )}
               </div>
 
-              <div className="msg-pagination pagination-row">
-                <button
-                  type="button"
-                  className="page-btn"
-                  onClick={() => setSessionPage((value) => Math.max(0, value - 1))}
-                  disabled={sessionPage <= 0}
-                >
-                  Previous
-                </button>
-                <span className="page-info">
-                  Page {sessionPage + 1} / {totalPages} ({sessionDetail?.totalCount ?? 0} messages)
-                </span>
-                <button
-                  type="button"
-                  className="page-btn"
-                  onClick={() => setSessionPage((value) => Math.min(totalPages - 1, value + 1))}
-                  disabled={sessionPage + 1 >= totalPages}
-                >
-                  Next
-                </button>
-              </div>
+              {historyMode === "session" ? (
+                <div className="msg-pagination pagination-row">
+                  <button
+                    type="button"
+                    className="page-btn"
+                    onClick={() => setSessionPage((value) => Math.max(0, value - 1))}
+                    disabled={sessionPage <= 0}
+                  >
+                    Previous
+                  </button>
+                  <span className="page-info">
+                    Page {sessionPage + 1} / {totalPages} ({sessionDetail?.totalCount ?? 0}{" "}
+                    messages)
+                  </span>
+                  <button
+                    type="button"
+                    className="page-btn"
+                    onClick={() => setSessionPage((value) => Math.min(totalPages - 1, value + 1))}
+                    disabled={sessionPage + 1 >= totalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : mainView === "search" ? (
             <div className="search-view">
@@ -1199,6 +1369,7 @@ export function App() {
                       onClick={() => {
                         setProjectProviders([...PROVIDERS]);
                         setProjectQueryInput("");
+                        setHistoryMode("session");
                         setPendingSearchNavigation({
                           projectId: result.projectId,
                           sessionId: result.sessionId,
