@@ -1584,6 +1584,30 @@ body.platform-macos .titlebar-left {
   min-height: 6px;
 }
 
+.rich-block table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  font-size: calc(var(--message-font-size) - 0.5px);
+}
+
+.rich-block thead {
+  background: var(--bg-elevated);
+}
+
+.rich-block th,
+.rich-block td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  vertical-align: top;
+}
+
+.rich-block th {
+  text-align: left;
+  color: var(--text-primary);
+  font-weight: 620;
+}
+
 .rich-block code {
   border: 1px solid var(--border);
   border-radius: 4px;
