@@ -47,6 +47,7 @@ function materializeForPackage(packagePath) {
     }
 
     const targetPath = join(nestedNodeModulesPath, depName);
+    mkdirSync(dirname(targetPath), { recursive: true });
     if (!existsSync(targetPath)) {
       symlinkSync(sourcePath, targetPath);
     }
