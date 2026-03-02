@@ -268,15 +268,20 @@ export function runIncrementalIndexing(
         compiledSystemMessageRules.compiledByProvider[discovered.provider],
       );
       const messagesWithDuration = deriveOperationDurations(normalizedMessages);
-      const sessionTitle = deriveSessionTitle(messagesWithDuration);
+      const fileMtimeIso = new Date(discovered.fileMtimeMs).toISOString();
+      const messagesWithTimestamps = messagesWithDuration.map((message) => {
+        if (Date.parse(message.createdAt) <= 0) {
+          return { ...message, createdAt: fileMtimeIso };
+        }
+        return message;
+      });
+      const sessionTitle = deriveSessionTitle(messagesWithTimestamps);
       const aggregate = buildSessionAggregate(
-        messagesWithDuration.map((message) => ({
+        messagesWithTimestamps.map((message) => ({
           ...message,
           id: makeMessageId(sessionDbId, message.id),
         })),
       );
-
-      const fileMtimeIso = new Date(discovered.fileMtimeMs).toISOString();
       const persist = db.transaction(() => {
         deleteSessionDataForFilePath(db, discovered.filePath);
         deleteSessionData(db, sessionDbId);
@@ -307,7 +312,7 @@ export function runIncrementalIndexing(
           aggregate.tokenOutputTotal,
         );
 
-        for (const message of messagesWithDuration) {
+        for (const message of messagesWithTimestamps) {
           const messageId = makeMessageId(sessionDbId, message.id);
 
           insertMessage.run(
