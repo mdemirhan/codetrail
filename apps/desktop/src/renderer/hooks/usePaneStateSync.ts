@@ -24,6 +24,7 @@ type SystemMessageRegexRules = Record<Provider, string[]>;
 type SortDirection = "asc" | "desc";
 
 export function usePaneStateSync(args: {
+  initialPaneStateHydrated?: boolean;
   logError: (context: string, error: unknown) => void;
   projectPaneWidth: number;
   sessionPaneWidth: number;
@@ -79,6 +80,7 @@ export function usePaneStateSync(args: {
   pendingRestoredSessionScrollRef: MutableRefObject<RestoredScrollTarget | null>;
 }): { paneStateHydrated: boolean } {
   const {
+    initialPaneStateHydrated = false,
     logError,
     projectPaneWidth,
     sessionPaneWidth,
@@ -134,10 +136,26 @@ export function usePaneStateSync(args: {
     pendingRestoredSessionScrollRef,
   } = args;
   const codetrail = useCodetrailClient();
-  const [paneStateHydrated, setPaneStateHydrated] = useState(false);
+  const [paneStateHydrated, setPaneStateHydrated] = useState(initialPaneStateHydrated);
 
   useEffect(() => {
+    if (initialPaneStateHydrated) {
+      return;
+    }
+
     let cancelled = false;
+    let hydrationRafId: number | null = null;
+    const finishHydration = () => {
+      if (cancelled || hydrationRafId !== null) {
+        return;
+      }
+      hydrationRafId = window.requestAnimationFrame(() => {
+        hydrationRafId = null;
+        if (!cancelled) {
+          setPaneStateHydrated(true);
+        }
+      });
+    };
     void codetrail
       .invoke("ui:getState", {})
       .then((response) => {
@@ -233,23 +251,25 @@ export function usePaneStateSync(args: {
             scrollTop: response.sessionScrollTop,
           };
         }
+
+        finishHydration();
       })
       .catch((error: unknown) => {
         if (!cancelled) {
           logError("Failed loading UI state", error);
         }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setPaneStateHydrated(true);
-        }
+        finishHydration();
       });
 
     return () => {
       cancelled = true;
+      if (hydrationRafId !== null) {
+        window.cancelAnimationFrame(hydrationRafId);
+      }
     };
   }, [
     codetrail,
+    initialPaneStateHydrated,
     logError,
     pendingRestoredSessionScrollRef,
     sessionScrollTopRef,

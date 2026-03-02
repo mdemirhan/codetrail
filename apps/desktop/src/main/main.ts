@@ -54,10 +54,15 @@ function writeDebugLog(message: string, details?: unknown): void {
 function createWindow(appStateStore: AppStateStore): BrowserWindow {
   const preloadPath = resolvePreloadPath();
   const iconPath = resolveAppIconPath();
+  const persistedPaneState = appStateStore.getPaneState();
   const persistedWindowState = appStateStore.getWindowState();
   const isMac = process.platform === "darwin";
+  const windowBackgroundColor =
+    persistedPaneState?.theme === "dark" ? "#1e2028" : "#f5f5f7";
 
   const windowOptions = {
+    show: false,
+    backgroundColor: windowBackgroundColor,
     width: persistedWindowState?.width ?? 1400,
     height: persistedWindowState?.height ?? 900,
     minWidth: 1120,
@@ -80,6 +85,9 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
   } satisfies BrowserWindowConstructorOptions;
 
   const mainWindow = new BrowserWindow(windowOptions);
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+  });
   if (verboseLoggingEnabled) {
     const logRenderer = (message: string, details?: unknown) => {
       writeDebugLog(message, details);
