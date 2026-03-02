@@ -3,7 +3,7 @@ import type { Provider } from "../contracts/canonical";
 export type SystemMessageRegexRules = Record<Provider, string[]>;
 export type SystemMessageRegexRuleOverrides = Partial<Record<Provider, string[]>>;
 
-const PROVIDERS: Provider[] = ["claude", "codex", "gemini"];
+const PROVIDERS: Provider[] = ["claude", "codex", "gemini", "cursor"];
 
 export const DEFAULT_SYSTEM_MESSAGE_REGEX_RULES: SystemMessageRegexRules = {
   claude: ["^<command-name>", "^<local-command-stdout>", "^<local-command-caveat>"],
@@ -12,6 +12,7 @@ export const DEFAULT_SYSTEM_MESSAGE_REGEX_RULES: SystemMessageRegexRules = {
     "^\\s*<environment_context>",
   ],
   gemini: [],
+  cursor: [],
 };
 
 export function resolveSystemMessageRegexRules(
@@ -21,6 +22,7 @@ export function resolveSystemMessageRegexRules(
     claude: [...DEFAULT_SYSTEM_MESSAGE_REGEX_RULES.claude],
     codex: [...DEFAULT_SYSTEM_MESSAGE_REGEX_RULES.codex],
     gemini: [...DEFAULT_SYSTEM_MESSAGE_REGEX_RULES.gemini],
+    cursor: [...DEFAULT_SYSTEM_MESSAGE_REGEX_RULES.cursor],
   };
 
   if (!overrides) {

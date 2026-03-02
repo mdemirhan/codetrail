@@ -71,6 +71,7 @@ export const DEFAULT_DISCOVERY_CONFIG: DiscoveryConfig = {
   geminiRoot: join(homedir(), ".gemini", "tmp"),
   geminiHistoryRoot: join(homedir(), ".gemini", "history"),
   geminiProjectsPath: join(homedir(), ".gemini", "projects.json"),
+  cursorRoot: join(homedir(), ".cursor", "projects"),
   includeClaudeSubagents: false,
 };
 
@@ -85,6 +86,7 @@ export function discoverSessionFiles(
     ...discoverClaudeFiles(config, resolvedDependencies),
     ...discoverCodexFiles(config, resolvedDependencies),
     ...discoverGeminiFiles(config, geminiResolution, resolvedDependencies),
+    ...discoverCursorFiles(config, resolvedDependencies),
   ].sort((left, right) => {
     const byMtime = right.fileMtimeMs - left.fileMtimeMs;
     if (byMtime !== 0) {
@@ -323,6 +325,103 @@ function discoverGeminiFiles(
   }
 
   return discovered;
+}
+
+function discoverCursorFiles(
+  config: DiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): DiscoveredSessionFile[] {
+  if (!dependencies.fs.existsSync(config.cursorRoot)) {
+    return [];
+  }
+
+  const discovered: DiscoveredSessionFile[] = [];
+
+  for (const projectEntry of safeReadDir(config.cursorRoot, dependencies)) {
+    if (!projectEntry.isDirectory()) {
+      continue;
+    }
+
+    const projectDir = join(config.cursorRoot, projectEntry.name);
+    const transcriptsDir = join(projectDir, "agent-transcripts");
+    if (!safeIsDirectory(transcriptsDir, dependencies)) {
+      continue;
+    }
+
+    const projectPath = decodeCursorProjectPath(projectDir, projectEntry.name, dependencies);
+
+    for (const sessionDir of safeReadDir(transcriptsDir, dependencies)) {
+      if (!sessionDir.isDirectory()) {
+        continue;
+      }
+
+      const sessionUuid = sessionDir.name;
+      const jsonlPath = join(transcriptsDir, sessionUuid, `${sessionUuid}.jsonl`);
+      if (!dependencies.fs.existsSync(jsonlPath)) {
+        continue;
+      }
+
+      const fileStat = safeStat(jsonlPath, dependencies);
+      if (!fileStat) {
+        continue;
+      }
+
+      const sessionIdentity = `cursor:${sessionUuid}`;
+
+      discovered.push({
+        provider: "cursor",
+        projectPath,
+        projectName: projectNameFromPath(projectPath),
+        sessionIdentity,
+        sourceSessionId: sessionUuid,
+        filePath: jsonlPath,
+        fileSize: fileStat.size,
+        fileMtimeMs: Math.trunc(fileStat.mtimeMs),
+        metadata: {
+          includeInHistory: true,
+          isSubagent: false,
+          unresolvedProject: false,
+          gitBranch: null,
+          cwd: projectPath || null,
+        },
+      });
+    }
+  }
+
+  return discovered;
+}
+
+function decodeCursorProjectPath(
+  projectDir: string,
+  encodedName: string,
+  dependencies: ResolvedDiscoveryDependencies,
+): string {
+  const terminalsDir = join(projectDir, "terminals");
+  if (safeIsDirectory(terminalsDir, dependencies)) {
+    for (const entry of safeReadDir(terminalsDir, dependencies)) {
+      if (!entry.isFile()) {
+        continue;
+      }
+      const content = safeReadUtf8File(join(terminalsDir, entry.name), dependencies);
+      if (!content) {
+        continue;
+      }
+      const cwdMatch = content.match(/^cwd:\s*(.+)$/m);
+      if (cwdMatch?.[1]) {
+        const cwd = cwdMatch[1].trim();
+        if (cwd.length > 0) {
+          return cwd;
+        }
+      }
+    }
+  }
+
+  const naive = `/${encodedName.replaceAll("-", "/")}`;
+  if (dependencies.fs.existsSync(naive) && safeIsDirectory(naive, dependencies)) {
+    return naive;
+  }
+
+  return naive;
 }
 
 function buildGeminiProjectResolution(
@@ -646,7 +745,7 @@ function projectNameFromPath(projectPath: string): string {
 }
 
 function providerSessionIdentity(
-  provider: "codex" | "gemini",
+  provider: "codex" | "gemini" | "cursor",
   sourceSessionId: string,
   filePath: string,
 ): string {

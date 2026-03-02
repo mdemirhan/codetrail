@@ -53,6 +53,7 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     claude: [],
     codex: [],
     gemini: [],
+    cursor: [],
   });
   const sessionScrollTopRef = useRef(0);
   const pendingRestoredSessionScrollRef = useRef<{
@@ -161,6 +162,7 @@ describe("usePaneStateSync", () => {
             claude: ["^<command-name>"],
             codex: ["^<environment_context>"],
             gemini: [],
+            cursor: [],
           },
         };
       }
@@ -188,6 +190,7 @@ describe("usePaneStateSync", () => {
         claude: ["^<command-name>"],
         codex: ["^<environment_context>"],
         gemini: [],
+        cursor: [],
       },
     });
     expect(logError).not.toHaveBeenCalled();

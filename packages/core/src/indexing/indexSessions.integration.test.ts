@@ -131,6 +131,7 @@ describe("runIncrementalIndexing", () => {
       geminiRoot,
       geminiHistoryRoot,
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
       includeClaudeSubagents: false,
     };
 
@@ -322,6 +323,7 @@ describe("runIncrementalIndexing", () => {
         geminiRoot: join(dir, ".gemini", "tmp"),
         geminiHistoryRoot: join(dir, ".gemini", "history"),
         geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+        cursorRoot: join(dir, ".cursor", "projects"),
         includeClaudeSubagents: false,
       },
     });
@@ -394,6 +396,7 @@ describe("runIncrementalIndexing", () => {
       geminiRoot: join(dir, ".gemini", "tmp"),
       geminiHistoryRoot: join(dir, ".gemini", "history"),
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
       includeClaudeSubagents: false,
     };
 

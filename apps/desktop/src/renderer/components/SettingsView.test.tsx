@@ -34,6 +34,7 @@ const info = {
     geminiRoot: "/Users/test/.gemini/tmp",
     geminiHistoryRoot: "/Users/test/.gemini/history",
     geminiProjectsPath: "/Users/test/.gemini/projects.json",
+    cursorRoot: "/Users/test/.cursor/projects",
   },
 };
 
@@ -55,6 +56,7 @@ function createBaseProps() {
       claude: ["^<command-name>"],
       codex: ["^<environment_context>"],
       gemini: [],
+      cursor: [],
     },
     onAddSystemMessageRegexRule: vi.fn(),
     onUpdateSystemMessageRegexRule: vi.fn(),

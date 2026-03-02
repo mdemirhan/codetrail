@@ -80,6 +80,7 @@ describe("AppStateStore", () => {
         claude: ["^<command-name>"],
         codex: ["^<environment_context>"],
         gemini: [],
+        cursor: [],
       },
     });
     store.setWindowState({ width: 1440, height: 920, x: 48, y: 72, isMaximized: false });
@@ -109,6 +110,7 @@ describe("AppStateStore", () => {
         claude: ["^<command-name>"],
         codex: ["^<environment_context>"],
         gemini: [],
+        cursor: [],
       },
     });
     expect(reloaded.getWindowState()).toEqual({

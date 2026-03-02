@@ -100,6 +100,7 @@ function setupIndexedDb(): { dbPath: string; cleanup: () => void } {
       geminiRoot: join(dir, ".gemini", "tmp"),
       geminiHistoryRoot: join(dir, ".gemini", "history"),
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
       includeClaudeSubagents: false,
     },
   });

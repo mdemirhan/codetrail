@@ -95,6 +95,7 @@ describe("discoverSessionFiles", () => {
       geminiRoot,
       geminiHistoryRoot,
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
       includeClaudeSubagents: true,
     });
 
@@ -122,6 +123,7 @@ describe("discoverSessionFiles", () => {
       geminiRoot,
       geminiHistoryRoot,
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
       includeClaudeSubagents: false,
     });
 

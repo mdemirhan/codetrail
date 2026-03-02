@@ -13,6 +13,7 @@ describe("discoverSessionFiles python fixtures", () => {
       geminiRoot: join(fixturesRoot, "gemini", "tmp"),
       geminiHistoryRoot: join(fixturesRoot, "gemini", "history"),
       geminiProjectsPath: join(fixturesRoot, "gemini", "projects.json"),
+      cursorRoot: join(fixturesRoot, "cursor", "projects"),
       includeClaudeSubagents: false,
     });
 

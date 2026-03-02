@@ -309,6 +309,7 @@ function createAppClient() {
           geminiRoot: "/Users/test/.gemini/tmp",
           geminiHistoryRoot: "/Users/test/.gemini/history",
           geminiProjectsPath: "/Users/test/.gemini/projects.json",
+          cursorRoot: "/Users/test/.cursor/projects",
         },
       };
     }
@@ -589,6 +590,7 @@ function createBookmarksSearchClient() {
           geminiRoot: "/Users/test/.gemini/tmp",
           geminiHistoryRoot: "/Users/test/.gemini/history",
           geminiProjectsPath: "/Users/test/.gemini/projects.json",
+          cursorRoot: "/Users/test/.cursor/projects",
         },
       };
     }

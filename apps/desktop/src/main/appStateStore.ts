@@ -241,13 +241,17 @@ function sanitizePaneState(value: unknown): PaneState | null {
   }
   const projectPaneCollapsed = sanitizeOptionalBoolean(record.projectPaneCollapsed);
   const sessionPaneCollapsed = sanitizeOptionalBoolean(record.sessionPaneCollapsed);
-  const projectProviders = sanitizeStringArray(record.projectProviders, PROVIDER_VALUES);
+  const projectProviders = addMissingProviders(
+    sanitizeStringArray(record.projectProviders, PROVIDER_VALUES),
+  );
   const historyCategories = sanitizeStringArray(record.historyCategories, CATEGORY_VALUES);
   const expandedByDefaultCategories = sanitizeStringArray(
     record.expandedByDefaultCategories,
     CATEGORY_VALUES,
   );
-  const searchProviders = sanitizeStringArray(record.searchProviders, PROVIDER_VALUES);
+  const searchProviders = addMissingProviders(
+    sanitizeStringArray(record.searchProviders, PROVIDER_VALUES),
+  );
   const theme = sanitizeStringValue(record.theme, THEME_VALUES);
   const monoFontFamily = sanitizeStringValue(record.monoFontFamily, MONO_FONT_VALUES);
   const regularFontFamily = sanitizeStringValue(record.regularFontFamily, REGULAR_FONT_VALUES);
@@ -348,6 +352,19 @@ function sanitizeOptionalInt(value: unknown, min: number, max: number): number |
   return sanitizeInt(value, min, max);
 }
 
+function addMissingProviders(providers: Provider[] | null): Provider[] | null {
+  if (providers === null) {
+    return null;
+  }
+  const result = [...providers];
+  for (const provider of PROVIDER_VALUES) {
+    if (!result.includes(provider)) {
+      result.push(provider);
+    }
+  }
+  return result;
+}
+
 function sanitizeStringArray<T extends string>(value: unknown, universe: readonly T[]): T[] | null {
   if (!Array.isArray(value)) {
     return null;
@@ -404,6 +421,7 @@ function sanitizeSystemMessageRegexRules(value: unknown): Record<Provider, strin
     claude: [],
     codex: [],
     gemini: [],
+    cursor: [],
   };
 
   for (const provider of PROVIDER_VALUES) {

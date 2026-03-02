@@ -72,6 +72,7 @@ export async function bootstrapMainProcess(
         geminiProjectsPath:
           DEFAULT_DISCOVERY_CONFIG.geminiProjectsPath ??
           join(app.getPath("home"), ".gemini", "projects.json"),
+        cursorRoot: DEFAULT_DISCOVERY_CONFIG.cursorRoot,
       },
     }),
     "db:getSchemaVersion": () => ({
