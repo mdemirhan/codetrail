@@ -42,7 +42,7 @@ export function TopBar({
           aria-label="Global Search"
           title={
             mainView === "search"
-              ? "Return to history view (Cmd/Ctrl+1)"
+              ? "Return to history view (Esc)"
               : "Open global search (Cmd/Ctrl+Shift+F)"
           }
         >
@@ -77,7 +77,11 @@ export function TopBar({
           onClick={onToggleFocus}
           disabled={focusDisabled}
           aria-label={focusMode ? "Exit focus mode" : "Enter focus mode"}
-          title={focusMode ? "Exit focus mode" : "Focus mode"}
+          title={
+            focusMode
+              ? "Exit focus mode (Cmd/Ctrl+Shift+M)"
+              : "Enter focus mode (Cmd/Ctrl+Shift+M)"
+          }
         >
           <ToolbarIcon name={focusMode ? "closeFocus" : "focus"} />
           Focus
@@ -132,7 +136,7 @@ export function TopBar({
           className={mainView === "settings" ? "tb-btn tb-btn-icon active" : "tb-btn tb-btn-icon"}
           onClick={onToggleSettings}
           aria-label={mainView === "settings" ? "Return to history view" : "Open settings"}
-          title={mainView === "settings" ? "Return to history view" : "Open settings"}
+          title={mainView === "settings" ? "Return to history view (Esc)" : "Open settings"}
         >
           <ToolbarIcon name="settings" />
         </button>

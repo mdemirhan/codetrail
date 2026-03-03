@@ -65,6 +65,10 @@ describe("ProjectPane", () => {
 
     expect(screen.getByText("Project One")).toBeInTheDocument();
     expect(screen.getByText("Project Two")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse Projects pane" })).toHaveAttribute(
+      "title",
+      "Collapse Projects (Cmd/Ctrl+B)",
+    );
 
     await user.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
     await user.click(screen.getByRole("button", { name: "Sort projects ascending" }));
@@ -107,6 +111,10 @@ describe("ProjectPane", () => {
     );
 
     expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand Projects pane" })).toHaveAttribute(
+      "title",
+      "Expand Projects (Cmd/Ctrl+B)",
+    );
     expect(screen.queryByRole("button", { name: "Sort projects descending" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Copy project details" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Open project folder" })).toBeNull();

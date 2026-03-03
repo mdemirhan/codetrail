@@ -34,6 +34,15 @@ describe("TopBar", () => {
       />,
     );
 
+    expect(screen.getByRole("button", { name: "Global Search" })).toHaveAttribute(
+      "title",
+      "Open global search (Cmd/Ctrl+Shift+F)",
+    );
+    expect(screen.getByRole("button", { name: "Enter focus mode" })).toHaveAttribute(
+      "title",
+      "Enter focus mode (Cmd/Ctrl+Shift+M)",
+    );
+
     await user.click(screen.getByRole("button", { name: "Global Search" }));
     await user.click(screen.getByRole("button", { name: "Refresh index" }));
     await user.click(screen.getByRole("button", { name: "Force reindex" }));
@@ -69,6 +78,14 @@ describe("TopBar", () => {
       />,
     );
 
+    expect(screen.getByRole("button", { name: "Global Search" })).toHaveAttribute(
+      "title",
+      "Return to history view (Esc)",
+    );
+    expect(screen.getByRole("button", { name: "Exit focus mode" })).toHaveAttribute(
+      "title",
+      "Exit focus mode (Cmd/Ctrl+Shift+M)",
+    );
     expect(screen.getByRole("button", { name: "Refreshing index" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Force reindex" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Exit focus mode" })).toBeDisabled();

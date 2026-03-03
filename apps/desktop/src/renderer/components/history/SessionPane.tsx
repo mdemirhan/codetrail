@@ -113,7 +113,11 @@ export function SessionPane({
             className="collapse-btn pane-collapse-btn"
             onClick={onToggleCollapsed}
             aria-label={collapsed ? "Expand Sessions pane" : "Collapse Sessions pane"}
-            title={collapsed ? "Expand Sessions" : "Collapse Sessions"}
+            title={
+              collapsed
+                ? "Expand Sessions (Cmd/Ctrl+Shift+B)"
+                : "Collapse Sessions (Cmd/Ctrl+Shift+B)"
+            }
           >
             <ToolbarIcon name="chevronLeft" />
           </button>
