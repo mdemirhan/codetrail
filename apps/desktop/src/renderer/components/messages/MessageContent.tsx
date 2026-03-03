@@ -58,7 +58,10 @@ export function MessageContent({
     return <div className="rich-block">{content}</div>;
   }
 
-  return <div className="rich-block">{renderRichText(text, query, "msg", pathRoots)}</div>;
+  const content = looksLikeMarkdown(text)
+    ? renderRichText(text, query, "msg-md", pathRoots)
+    : renderPlainText(text, query, "msg-txt", pathRoots);
+  return <div className="rich-block">{content}</div>;
 }
 
 function ToolUseContent({

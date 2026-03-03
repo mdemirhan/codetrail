@@ -59,6 +59,15 @@ const COLLAPSED_PANE_WIDTH = 48;
 const PROVIDERS: Provider[] = [...UI_PROVIDER_VALUES];
 const CATEGORIES: MessageCategory[] = [...UI_MESSAGE_CATEGORY_VALUES];
 const DEFAULT_MESSAGE_CATEGORIES: MessageCategory[] = ["user", "assistant"];
+const HISTORY_CATEGORY_SHORTCUTS: Record<MessageCategory, string> = {
+  user: "Cmd/Ctrl+1",
+  assistant: "Cmd/Ctrl+2",
+  tool_edit: "Cmd/Ctrl+3",
+  tool_use: "Cmd/Ctrl+4",
+  tool_result: "Cmd/Ctrl+5",
+  thinking: "Cmd/Ctrl+6",
+  system: "Cmd/Ctrl+7",
+};
 const EMPTY_CATEGORY_COUNTS = {
   user: 0,
   assistant: 0,
@@ -1453,7 +1462,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                         onClick={handleToggleScopedMessagesExpanded}
                         disabled={scopedMessages.length === 0}
                         aria-label={scopedExpandCollapseLabel}
-                        title={scopedExpandCollapseLabel}
+                        title={`${scopedExpandCollapseLabel} (Cmd/Ctrl+E)`}
                       >
                         <ToolbarIcon
                           name={areScopedMessagesExpanded ? "collapseAll" : "expandAll"}
@@ -1487,11 +1496,11 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                         onClick={() => void applyZoomAction("out")}
                         disabled={!canZoomOut}
                         aria-label="Zoom out"
-                        title="Zoom out"
+                        title="Zoom out (Cmd/Ctrl+-)"
                       >
                         <ToolbarIcon name="zoomOut" />
                       </button>
-                      <span className="zoom-level" title="Current zoom level">
+                      <span className="zoom-level" title="Current zoom level (Cmd/Ctrl+0 resets)">
                         {zoomPercent}%
                       </span>
                       <button
@@ -1500,7 +1509,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                         onClick={() => void applyZoomAction("in")}
                         disabled={!canZoomIn}
                         aria-label="Zoom in"
-                        title="Zoom in"
+                        title="Zoom in (Cmd/Ctrl++)"
                       >
                         <ToolbarIcon name="zoomIn" />
                       </button>
@@ -1535,6 +1544,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                     className={`msg-filter ${category}-filter${
                       historyCategories.includes(category) ? " active" : ""
                     }`}
+                    title={`${prettyCategory(category)} messages (${HISTORY_CATEGORY_SHORTCUTS[category]})`}
                     onClick={() => {
                       setHistoryCategories((value) =>
                         toggleValue<MessageCategory>(value, category),

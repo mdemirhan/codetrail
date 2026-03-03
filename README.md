@@ -13,9 +13,6 @@ Code Trail discovers session files from each provider's local directory, parses 
 - **Project and session browser** — Navigate sessions grouped by project, with deep links to individual messages.
 - **Category filters** — Filter by User, Assistant, Tool Use, Write (edits), Tool Result, Thinking, and System messages.
 - **Incremental indexing** — Only re-indexes files that changed (based on size + mtime).
-- **Customizable typography** — Configurable font family and size for both regular and monospace text.
-- **Persistent UI state** — Pane widths, filters, scroll position, theme, and selected session are all remembered across restarts.
-- **Open source locations** — Jump to the original session file or project directory from the UI.
 
 ## Prerequisites
 

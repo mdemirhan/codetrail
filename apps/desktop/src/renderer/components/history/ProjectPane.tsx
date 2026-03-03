@@ -106,7 +106,11 @@ export function ProjectPane({
             className="collapse-btn pane-collapse-btn"
             onClick={onToggleCollapsed}
             aria-label={collapsed ? "Expand Projects pane" : "Collapse Projects pane"}
-            title={collapsed ? "Expand Projects" : "Collapse Projects"}
+            title={
+              collapsed
+                ? "Expand Projects (Cmd/Ctrl+B)"
+                : "Collapse Projects (Cmd/Ctrl+B)"
+            }
           >
             <ToolbarIcon name="chevronLeft" />
           </button>

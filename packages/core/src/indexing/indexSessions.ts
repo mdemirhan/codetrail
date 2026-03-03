@@ -275,7 +275,6 @@ export function runIncrementalIndexing(
         }
         return message;
       });
-      const sessionTitle = deriveSessionTitle(messagesWithTimestamps);
       const aggregate = buildSessionAggregate(
         messagesWithTimestamps.map((message) => ({
           ...message,
@@ -300,7 +299,9 @@ export function runIncrementalIndexing(
           projectId,
           discovered.provider,
           discovered.filePath,
-          sessionTitle,
+          // We no longer use session title. Rather than deleting it from the schema,
+          // remove generating it for the time being.
+          "",
           sourceMeta.models.join(","),
           aggregate.startedAt ?? fileMtimeIso,
           aggregate.endedAt ?? fileMtimeIso,
@@ -788,50 +789,4 @@ function parseToolCallContent(content: string): {
       resultJson: null,
     };
   }
-}
-
-function deriveSessionTitle(messages: IndexedMessage[]): string {
-  if (messages.length === 0) {
-    return "";
-  }
-
-  const categoryPriority = (category: MessageCategory): number => {
-    if (category === "user") {
-      return 0;
-    }
-    if (category === "assistant") {
-      return 1;
-    }
-    return 2;
-  };
-
-  let selected = messages[0];
-  if (!selected) {
-    return "";
-  }
-  for (let index = 1; index < messages.length; index += 1) {
-    const candidate = messages[index];
-    if (!candidate || !selected) {
-      continue;
-    }
-
-    const selectedPriority = categoryPriority(selected.category);
-    const candidatePriority = categoryPriority(candidate.category);
-    if (candidatePriority < selectedPriority) {
-      selected = candidate;
-      continue;
-    }
-    if (candidatePriority > selectedPriority) {
-      continue;
-    }
-    if (candidate.createdAt < selected.createdAt) {
-      selected = candidate;
-      continue;
-    }
-    if (candidate.createdAt === selected.createdAt && candidate.id < selected.id) {
-      selected = candidate;
-    }
-  }
-
-  return selected.content;
 }

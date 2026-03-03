@@ -63,6 +63,10 @@ describe("SessionPane", () => {
       />,
     );
 
+    expect(screen.getByRole("button", { name: "Collapse Sessions pane" })).toHaveAttribute(
+      "title",
+      "Collapse Sessions (Cmd/Ctrl+Shift+B)",
+    );
     await user.click(screen.getByRole("button", { name: "Collapse Sessions pane" }));
     await user.click(screen.getByRole("button", { name: "Sort sessions ascending" }));
     await user.click(screen.getByRole("button", { name: "Copy session details" }));
@@ -118,5 +122,9 @@ describe("SessionPane", () => {
     expect(screen.getByText("All Sessions")).toBeInTheDocument();
     expect(screen.queryByText("Bookmarked Messages")).toBeNull();
     expect(screen.getByRole("button", { name: "Expand Sessions pane" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand Sessions pane" })).toHaveAttribute(
+      "title",
+      "Expand Sessions (Cmd/Ctrl+Shift+B)",
+    );
   });
 });

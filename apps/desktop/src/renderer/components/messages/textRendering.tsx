@@ -604,8 +604,7 @@ export function DiffBlock({
       const inlineDiff = diffInlineSegments(line.slice(1), nextLine.slice(1));
       rows.push(
         <div key={`${lineKey}:remove`} className="diff-row diff-remove">
-          <span className="diff-ln old">{oldLineNumber}</span>
-          <span className="diff-ln new"> </span>
+          <span className="diff-ln"> </span>
           <span className="diff-code">
             {(() => {
               let leftCursor = 0;
@@ -624,8 +623,7 @@ export function DiffBlock({
       );
       rows.push(
         <div key={`${lineKey}:add`} className="diff-row diff-add">
-          <span className="diff-ln old"> </span>
-          <span className="diff-ln new">{newLineNumber}</span>
+          <span className="diff-ln">{newLineNumber}</span>
           <span className="diff-code">
             {(() => {
               let rightCursor = 0;
@@ -653,8 +651,7 @@ export function DiffBlock({
     if (isAddedDiffLine(line)) {
       rows.push(
         <div key={`${lineKey}:add-only`} className="diff-row diff-add">
-          <span className="diff-ln old"> </span>
-          <span className="diff-ln new">{newLineNumber}</span>
+          <span className="diff-ln">{newLineNumber}</span>
           <span className="diff-code">{line.slice(1)}</span>
         </div>,
       );
@@ -663,8 +660,7 @@ export function DiffBlock({
     } else if (isRemovedDiffLine(line)) {
       rows.push(
         <div key={`${lineKey}:remove-only`} className="diff-row diff-remove">
-          <span className="diff-ln old">{oldLineNumber}</span>
-          <span className="diff-ln new"> </span>
+          <span className="diff-ln"> </span>
           <span className="diff-code">{line.slice(1)}</span>
         </div>,
       );
@@ -681,8 +677,7 @@ export function DiffBlock({
     } else {
       rows.push(
         <div key={`${lineKey}:context`} className="diff-row diff-context">
-          <span className="diff-ln old">{oldLineNumber}</span>
-          <span className="diff-ln new">{newLineNumber}</span>
+          <span className="diff-ln">{newLineNumber}</span>
           <span className="diff-code">{line.startsWith(" ") ? line.slice(1) : line}</span>
         </div>,
       );

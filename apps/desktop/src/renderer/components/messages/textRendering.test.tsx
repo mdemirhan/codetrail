@@ -138,6 +138,9 @@ describe("renderRichText", () => {
     expect(html).toContain('class="diff-row diff-add"');
     expect(html).toContain('class="diff-word-remove"');
     expect(html).toContain('class="diff-word-add"');
+    expect(html).toContain('class="diff-ln"> </span>');
+    expect(html).not.toContain('class="diff-ln old"');
+    expect(html).not.toContain('class="diff-ln new"');
     expect(html).toContain(">a.ts<");
     expect(html).toContain(">+1<");
     expect(html).toContain(">-1<");

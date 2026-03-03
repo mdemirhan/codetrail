@@ -94,4 +94,14 @@ describe("MessageContent", () => {
     rerender(<MessageContent text="plain system text" category="system" query="" />);
     expect(screen.getByText("plain system text")).toBeInTheDocument();
   });
+
+  it("preserves single-line breaks for plain user/system content", () => {
+    render(<MessageContent text={"line one\nline two\nline three"} category="user" query="" />);
+
+    const paragraphs = document.querySelectorAll(".rich-block .md-p");
+    expect(paragraphs).toHaveLength(3);
+    expect(screen.getByText("line one")).toBeInTheDocument();
+    expect(screen.getByText("line two")).toBeInTheDocument();
+    expect(screen.getByText("line three")).toBeInTheDocument();
+  });
 });

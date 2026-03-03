@@ -1836,7 +1836,7 @@ body.platform-macos .titlebar-left {
 
 .diff-row {
   display: grid;
-  grid-template-columns: 48px 48px minmax(0, 1fr);
+  grid-template-columns: 48px minmax(0, 1fr);
   align-items: stretch;
 }
 
