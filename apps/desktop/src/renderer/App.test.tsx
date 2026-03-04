@@ -694,6 +694,22 @@ describe("App", () => {
     });
   });
 
+  it("shows generic pagination shortcuts in help dialog", async () => {
+    const user = userEvent.setup();
+    const client = createAppClient();
+
+    renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(screen.getByText("Project One")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Show keyboard shortcuts" }));
+
+    expect(screen.getByText("Previous page")).toBeInTheDocument();
+    expect(screen.getByText("Next page")).toBeInTheDocument();
+  });
+
   it("passes per-mode message sort direction to detail requests and toggles on click", async () => {
     const user = userEvent.setup();
     const client = createAppClient();
