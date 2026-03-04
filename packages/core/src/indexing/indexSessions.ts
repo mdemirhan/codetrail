@@ -268,14 +268,13 @@ export function runIncrementalIndexing(
         compiledSystemMessageRules.compiledByProvider[discovered.provider],
       );
       const messagesWithDuration = deriveOperationDurations(normalizedMessages);
-      const fileMtimeIso = new Date(discovered.fileMtimeMs).toISOString();
-      const messagesWithTimestamps = messagesWithDuration.map((message) => {
-        const createdAtMs = Date.parse(message.createdAt);
-        if (!Number.isFinite(createdAtMs) || createdAtMs <= 0) {
-          return { ...message, createdAt: fileMtimeIso };
-        }
-        return message;
-      });
+      const messagesWithTimestamps = normalizeMessageTimestamps(
+        messagesWithDuration,
+        discovered.provider,
+        discovered.fileMtimeMs,
+      );
+      const sessionTitle = deriveSessionTitle(messagesWithTimestamps);
+      const modelNames = sourceMeta.models.join(",");
       const aggregate = buildSessionAggregate(
         messagesWithTimestamps.map((message) => ({
           ...message,
@@ -300,12 +299,10 @@ export function runIncrementalIndexing(
           projectId,
           discovered.provider,
           discovered.filePath,
-          // We no longer use session title. Rather than deleting it from the schema,
-          // remove generating it for the time being.
-          "",
-          sourceMeta.models.join(","),
-          aggregate.startedAt ?? fileMtimeIso,
-          aggregate.endedAt ?? fileMtimeIso,
+          sessionTitle || modelNames,
+          modelNames,
+          aggregate.startedAt ?? new Date(discovered.fileMtimeMs).toISOString(),
+          aggregate.endedAt ?? new Date(discovered.fileMtimeMs).toISOString(),
           aggregate.durationMs,
           sourceMeta.gitBranch ?? discovered.metadata.gitBranch,
           sourceMeta.cwd ?? discovered.metadata.cwd,
@@ -554,9 +551,7 @@ function extractSourceMetadata(
         models.add(model);
       }
       cwd ??=
-        readString(record.cwd) ??
-        readString(messageRecord?.cwd) ??
-        readString(metadataRecord?.cwd);
+        readString(record.cwd) ?? readString(messageRecord?.cwd) ?? readString(metadataRecord?.cwd);
       gitBranch ??=
         readString(gitRecord?.branch) ?? readString(record.gitBranch) ?? readString(record.branch);
     }
@@ -601,6 +596,38 @@ function deriveOperationDurations(messages: IndexedMessage[]): IndexedMessage[] 
       operationDurationSource: "derived",
       operationDurationConfidence: "high",
     };
+  });
+}
+
+function normalizeMessageTimestamps(
+  messages: IndexedMessage[],
+  provider: Provider,
+  fileMtimeMs: number,
+): IndexedMessage[] {
+  const fallbackBaseMs = Number.isFinite(fileMtimeMs) && fileMtimeMs > 0 ? fileMtimeMs : Date.now();
+  if (provider !== "cursor") {
+    const fallbackIso = new Date(fallbackBaseMs).toISOString();
+    return messages.map((message) => {
+      const createdAtMs = Date.parse(message.createdAt);
+      if (!Number.isFinite(createdAtMs) || createdAtMs <= 0) {
+        return { ...message, createdAt: fallbackIso };
+      }
+      return message;
+    });
+  }
+
+  let previousMs = Number.NEGATIVE_INFINITY;
+  return messages.map((message, index) => {
+    const parsedMs = Date.parse(message.createdAt);
+    let nextMs = Number.isFinite(parsedMs) && parsedMs > 0 ? parsedMs : fallbackBaseMs + index;
+    if (!Number.isFinite(nextMs) || nextMs <= 0) {
+      nextMs = fallbackBaseMs + index;
+    }
+    if (nextMs <= previousMs) {
+      nextMs = previousMs + 1;
+    }
+    previousMs = nextMs;
+    return { ...message, createdAt: new Date(nextMs).toISOString() };
   });
 }
 
@@ -659,6 +686,46 @@ function selectDerivedBaseline(
 
 function splitMessageRoot(id: string): string {
   return id.replace(/#\d+$/, "");
+}
+
+function deriveSessionTitle(messages: IndexedMessage[]): string {
+  const preferredCategories: MessageCategory[] = [
+    "user",
+    "assistant",
+    "thinking",
+    "system",
+    "tool_result",
+  ];
+
+  for (const category of preferredCategories) {
+    for (const message of messages) {
+      if (message.category !== category) {
+        continue;
+      }
+      const title = normalizeSessionTitleText(message.content);
+      if (title.length > 0) {
+        return title;
+      }
+    }
+  }
+
+  for (const message of messages) {
+    const title = normalizeSessionTitleText(message.content);
+    if (title.length > 0) {
+      return title;
+    }
+  }
+
+  return "";
+}
+
+function normalizeSessionTitleText(value: string): string {
+  const singleLine = value.replace(/\s+/g, " ").trim();
+  if (singleLine.length === 0) {
+    return "";
+  }
+  const maxLength = 180;
+  return singleLine.length <= maxLength ? singleLine : `${singleLine.slice(0, maxLength - 1)}…`;
 }
 
 function compileSystemMessageRules(overrides?: SystemMessageRegexRuleOverrides): {

@@ -160,10 +160,11 @@ describe("runIncrementalIndexing", () => {
     const claudeSessionId = makeSessionId("claude", "claude-session-1");
     const claudeAggregate = dbAfterFirst
       .prepare(
-        `SELECT message_count, token_input_total, token_output_total, model_names, git_branch, cwd
+        `SELECT title, message_count, token_input_total, token_output_total, model_names, git_branch, cwd
          FROM sessions WHERE id = ?`,
       )
       .get(claudeSessionId) as {
+      title: string;
       message_count: number;
       token_input_total: number;
       token_output_total: number;
@@ -188,6 +189,7 @@ describe("runIncrementalIndexing", () => {
     expect(countsAfterFirst.sessions).toBe(3);
     expect(countsAfterFirst.messages).toBeGreaterThan(0);
     expect(countsAfterFirst.indexed).toBe(3);
+    expect(claudeAggregate.title).toBe("Hello Claude");
     expect(claudeAggregate.message_count).toBeGreaterThanOrEqual(3);
     expect(claudeAggregate.token_input_total).toBe(10);
     expect(claudeAggregate.token_output_total).toBe(7);
@@ -521,12 +523,13 @@ describe("runIncrementalIndexing", () => {
     const db = openDatabase(dbPath);
     const session = db
       .prepare(
-        "SELECT started_at, ended_at, cwd FROM sessions WHERE provider = 'cursor' AND file_path = ?",
+        "SELECT started_at, ended_at, cwd, title FROM sessions WHERE provider = 'cursor' AND file_path = ?",
       )
       .get(transcriptPath) as {
       started_at: string;
       ended_at: string;
       cwd: string;
+      title: string;
     };
     const fallbackMessage = db
       .prepare("SELECT created_at FROM messages WHERE source_id = ?")
@@ -537,14 +540,19 @@ describe("runIncrementalIndexing", () => {
     const validMessage = db
       .prepare("SELECT created_at FROM messages WHERE source_id = ?")
       .get("cur-a-2") as { created_at: string };
+    const orderedSourceIds = db
+      .prepare("SELECT source_id FROM messages ORDER BY created_at ASC, id ASC")
+      .all() as Array<{ source_id: string }>;
     db.close();
 
     expect(session.cwd).toBe(actualProjectPath);
+    expect(session.title).toBe("Check timestamps");
     expect(session.started_at).toBe("2026-03-04T10:00:00.000Z");
     expect(session.ended_at).toBe("2026-03-04T10:00:05.000Z");
     expect(fallbackMessage.created_at).toBe("2026-03-04T10:00:00.000Z");
-    expect(nestedFallbackMessage.created_at).toBe("2026-03-04T10:00:00.000Z");
+    expect(nestedFallbackMessage.created_at).toBe("2026-03-04T10:00:00.001Z");
     expect(validMessage.created_at).toBe("2026-03-04T10:00:05.000Z");
+    expect(orderedSourceIds.map((row) => row.source_id)).toEqual(["cur-u-1", "cur-a-1", "cur-a-2"]);
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -618,7 +626,9 @@ describe("runIncrementalIndexing", () => {
       .prepare("SELECT COUNT(*) as c FROM sessions WHERE provider = 'cursor'")
       .get() as { c: number };
     const identities = db
-      .prepare("SELECT id, file_path FROM sessions WHERE provider = 'cursor' ORDER BY file_path ASC")
+      .prepare(
+        "SELECT id, file_path FROM sessions WHERE provider = 'cursor' ORDER BY file_path ASC",
+      )
       .all() as Array<{ id: string; file_path: string }>;
     db.close();
 
