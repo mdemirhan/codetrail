@@ -21,8 +21,10 @@ describe("useKeyboardShortcuts", () => {
     const toggleHistoryCategory = vi.fn();
     const toggleProjectPaneCollapsed = vi.fn();
     const toggleSessionPaneCollapsed = vi.fn();
-    const goToPreviousPage = vi.fn();
-    const goToNextPage = vi.fn();
+    const goToPreviousHistoryPage = vi.fn();
+    const goToNextHistoryPage = vi.fn();
+    const goToPreviousSearchPage = vi.fn();
+    const goToNextSearchPage = vi.fn();
     const applyZoomAction = vi.fn(async () => undefined);
 
     render(
@@ -40,8 +42,10 @@ describe("useKeyboardShortcuts", () => {
         toggleHistoryCategory={toggleHistoryCategory}
         toggleProjectPaneCollapsed={toggleProjectPaneCollapsed}
         toggleSessionPaneCollapsed={toggleSessionPaneCollapsed}
-        goToPreviousPage={goToPreviousPage}
-        goToNextPage={goToNextPage}
+        goToPreviousHistoryPage={goToPreviousHistoryPage}
+        goToNextHistoryPage={goToNextHistoryPage}
+        goToPreviousSearchPage={goToPreviousSearchPage}
+        goToNextSearchPage={goToNextSearchPage}
         applyZoomAction={applyZoomAction}
       />,
     );
@@ -65,10 +69,50 @@ describe("useKeyboardShortcuts", () => {
     expect(toggleHistoryCategory).toHaveBeenCalledWith("user");
     expect(toggleProjectPaneCollapsed).toHaveBeenCalledTimes(1);
     expect(toggleSessionPaneCollapsed).toHaveBeenCalledTimes(1);
-    expect(goToPreviousPage).toHaveBeenCalledTimes(1);
-    expect(goToNextPage).toHaveBeenCalledTimes(1);
+    expect(goToPreviousHistoryPage).toHaveBeenCalledTimes(1);
+    expect(goToNextHistoryPage).toHaveBeenCalledTimes(1);
+    expect(goToPreviousSearchPage).not.toHaveBeenCalled();
+    expect(goToNextSearchPage).not.toHaveBeenCalled();
     expect(setMainView).not.toHaveBeenCalledWith("history");
     expect(setShowShortcuts).not.toHaveBeenCalledWith(false);
+  });
+
+  it("routes page shortcuts to global search pagination in search view", () => {
+    const goToPreviousHistoryPage = vi.fn();
+    const goToNextHistoryPage = vi.fn();
+    const goToPreviousSearchPage = vi.fn();
+    const goToNextSearchPage = vi.fn();
+
+    render(
+      <Harness
+        mainView="search"
+        showShortcuts={false}
+        hasFocusedHistoryMessage={false}
+        setMainView={vi.fn()}
+        setShowShortcuts={vi.fn()}
+        clearFocusedHistoryMessage={vi.fn()}
+        focusGlobalSearch={vi.fn()}
+        focusSessionSearch={vi.fn()}
+        toggleFocusMode={vi.fn()}
+        toggleScopedMessagesExpanded={vi.fn()}
+        toggleHistoryCategory={vi.fn()}
+        toggleProjectPaneCollapsed={vi.fn()}
+        toggleSessionPaneCollapsed={vi.fn()}
+        goToPreviousHistoryPage={goToPreviousHistoryPage}
+        goToNextHistoryPage={goToNextHistoryPage}
+        goToPreviousSearchPage={goToPreviousSearchPage}
+        goToNextSearchPage={goToNextSearchPage}
+        applyZoomAction={vi.fn(async () => undefined)}
+      />,
+    );
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", metaKey: true }));
+
+    expect(goToPreviousSearchPage).toHaveBeenCalledTimes(1);
+    expect(goToNextSearchPage).toHaveBeenCalledTimes(1);
+    expect(goToPreviousHistoryPage).not.toHaveBeenCalled();
+    expect(goToNextHistoryPage).not.toHaveBeenCalled();
   });
 
   it("handles escape and shortcut-help interactions", () => {
@@ -90,8 +134,10 @@ describe("useKeyboardShortcuts", () => {
         toggleHistoryCategory={vi.fn()}
         toggleProjectPaneCollapsed={vi.fn()}
         toggleSessionPaneCollapsed={vi.fn()}
-        goToPreviousPage={vi.fn()}
-        goToNextPage={vi.fn()}
+        goToPreviousHistoryPage={vi.fn()}
+        goToNextHistoryPage={vi.fn()}
+        goToPreviousSearchPage={vi.fn()}
+        goToNextSearchPage={vi.fn()}
         applyZoomAction={vi.fn(async () => undefined)}
       />,
     );
@@ -114,8 +160,10 @@ describe("useKeyboardShortcuts", () => {
         toggleHistoryCategory={vi.fn()}
         toggleProjectPaneCollapsed={vi.fn()}
         toggleSessionPaneCollapsed={vi.fn()}
-        goToPreviousPage={vi.fn()}
-        goToNextPage={vi.fn()}
+        goToPreviousHistoryPage={vi.fn()}
+        goToNextHistoryPage={vi.fn()}
+        goToPreviousSearchPage={vi.fn()}
+        goToNextSearchPage={vi.fn()}
         applyZoomAction={vi.fn(async () => undefined)}
       />,
     );
@@ -145,8 +193,10 @@ describe("useKeyboardShortcuts", () => {
         toggleHistoryCategory={vi.fn()}
         toggleProjectPaneCollapsed={vi.fn()}
         toggleSessionPaneCollapsed={vi.fn()}
-        goToPreviousPage={vi.fn()}
-        goToNextPage={vi.fn()}
+        goToPreviousHistoryPage={vi.fn()}
+        goToNextHistoryPage={vi.fn()}
+        goToPreviousSearchPage={vi.fn()}
+        goToNextSearchPage={vi.fn()}
         applyZoomAction={vi.fn(async () => undefined)}
       />,
     );

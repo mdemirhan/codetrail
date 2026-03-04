@@ -17,8 +17,10 @@ export function useKeyboardShortcuts(args: {
   toggleHistoryCategory: (category: MessageCategory) => void;
   toggleProjectPaneCollapsed: () => void;
   toggleSessionPaneCollapsed: () => void;
-  goToPreviousPage: () => void;
-  goToNextPage: () => void;
+  goToPreviousHistoryPage: () => void;
+  goToNextHistoryPage: () => void;
+  goToPreviousSearchPage: () => void;
+  goToNextSearchPage: () => void;
   applyZoomAction: (action: "in" | "out" | "reset") => Promise<void>;
 }): void {
   const {
@@ -35,8 +37,10 @@ export function useKeyboardShortcuts(args: {
     toggleHistoryCategory,
     toggleProjectPaneCollapsed,
     toggleSessionPaneCollapsed,
-    goToPreviousPage,
-    goToNextPage,
+    goToPreviousHistoryPage,
+    goToNextHistoryPage,
+    goToPreviousSearchPage,
+    goToNextSearchPage,
     applyZoomAction,
   } = args;
 
@@ -77,25 +81,33 @@ export function useKeyboardShortcuts(args: {
         event.preventDefault();
         void applyZoomAction("reset");
       } else if (
-        mainView === "history" &&
         command &&
         !shift &&
         !event.altKey &&
         event.key === "ArrowLeft" &&
         !isEditableTarget(event.target)
       ) {
-        event.preventDefault();
-        goToPreviousPage();
+        if (mainView === "history") {
+          event.preventDefault();
+          goToPreviousHistoryPage();
+        } else if (mainView === "search") {
+          event.preventDefault();
+          goToPreviousSearchPage();
+        }
       } else if (
-        mainView === "history" &&
         command &&
         !shift &&
         !event.altKey &&
         event.key === "ArrowRight" &&
         !isEditableTarget(event.target)
       ) {
-        event.preventDefault();
-        goToNextPage();
+        if (mainView === "history") {
+          event.preventDefault();
+          goToNextHistoryPage();
+        } else if (mainView === "search") {
+          event.preventDefault();
+          goToNextSearchPage();
+        }
       } else if (mainView === "history" && command && shift && key === "m") {
         event.preventDefault();
         toggleFocusMode();
@@ -146,8 +158,10 @@ export function useKeyboardShortcuts(args: {
     setMainView,
     setShowShortcuts,
     showShortcuts,
-    goToNextPage,
-    goToPreviousPage,
+    goToNextHistoryPage,
+    goToPreviousHistoryPage,
+    goToNextSearchPage,
+    goToPreviousSearchPage,
     toggleFocusMode,
     toggleHistoryCategory,
     toggleProjectPaneCollapsed,

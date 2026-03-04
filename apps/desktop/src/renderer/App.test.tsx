@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -91,19 +91,21 @@ function createAppClient() {
     }
 
     if (channel === "projects:getCombinedDetail") {
+      const requestedPage = Number(request.page ?? 0);
+      const page = Number.isFinite(requestedPage) && requestedPage >= 0 ? requestedPage : 0;
       return {
         projectId: "project_1",
-        totalCount: 2,
+        totalCount: 250,
         categoryCounts: {
-          user: 1,
-          assistant: 1,
+          user: 125,
+          assistant: 125,
           tool_use: 0,
           tool_edit: 0,
           tool_result: 0,
           thinking: 0,
           system: 0,
         },
-        page: 0,
+        page,
         pageSize: 100,
         focusIndex: null,
         messages: [
@@ -252,32 +254,46 @@ function createAppClient() {
         };
       }
 
+      const totalCount = 250;
+      const requestedOffset = Number(request.offset ?? 0);
+      const offset = Number.isFinite(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0;
+      const page = Math.floor(offset / 100);
+      const snippet =
+        page === 0
+          ? "markdown table rendering"
+          : page === 1
+            ? "markdown table rendering page 2"
+            : "markdown table rendering page 3";
+
       return {
         query,
-        totalCount: 1,
+        totalCount,
         categoryCounts: {
           user: 0,
-          assistant: 1,
+          assistant: totalCount,
           tool_use: 0,
           tool_edit: 0,
           tool_result: 0,
           thinking: 0,
           system: 0,
         },
-        results: [
-          {
-            messageId: "m2",
-            messageSourceId: "src2",
-            sessionId: "session_1",
-            projectId: "project_1",
-            provider: "claude",
-            category: "assistant",
-            createdAt: "2026-03-01T10:00:05.000Z",
-            snippet: "markdown table rendering",
-            projectName: "Project One",
-            projectPath: "/workspace/project-one",
-          },
-        ],
+        results:
+          offset >= totalCount
+            ? []
+            : [
+                {
+                  messageId: "m2",
+                  messageSourceId: "src2",
+                  sessionId: "session_1",
+                  projectId: "project_1",
+                  provider: "claude",
+                  category: "assistant",
+                  createdAt: "2026-03-01T10:00:05.000Z",
+                  snippet,
+                  projectName: "Project One",
+                  projectPath: "/workspace/project-one",
+                },
+              ],
       };
     }
 
@@ -636,6 +652,45 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Open settings" }));
     await waitFor(() => {
       expect(screen.getByText("Discovery Roots")).toBeInTheDocument();
+    });
+  });
+
+  it("routes Cmd/Ctrl+Left/Right to history and global search pagination", async () => {
+    const user = userEvent.setup();
+    const client = createAppClient();
+
+    renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(screen.getByText("Page 1 / 3 (250 messages)")).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByText("Page 2 / 3 (250 messages)")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Global Search" }));
+    await user.type(screen.getByPlaceholderText("Search all message text"), "markdown");
+    await waitFor(() => {
+      expect(screen.getByText("Page 1 / 3 (250 matches)")).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByText("Page 2 / 3 (250 matches)")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      const calls = client.invoke.mock.calls.filter(([channel]) => channel === "search:query");
+      expect(
+        calls.some(([, payload]) => (payload as { offset?: number }).offset === 100),
+      ).toBe(true);
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowLeft", ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByText("Page 1 / 3 (250 matches)")).toBeInTheDocument();
     });
   });
 

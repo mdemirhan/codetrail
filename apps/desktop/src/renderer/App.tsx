@@ -52,6 +52,7 @@ type SearchQueryResponse = IpcResponse<"search:query">;
 type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
 
 const PAGE_SIZE = 100;
+const SEARCH_PAGE_SIZE = 100;
 const COLLAPSED_PANE_WIDTH = 48;
 
 const PROVIDERS: Provider[] = [...UI_PROVIDER_VALUES];
@@ -234,6 +235,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     initialPaneState?.searchProviders ?? [],
   );
   const [searchProjectId, setSearchProjectId] = useState("");
+  const [searchPage, setSearchPage] = useState(0);
   const [searchResponse, setSearchResponse] = useState<SearchQueryResponse>({
     query: "",
     totalCount: 0,
@@ -405,8 +407,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
       providers: searchProviders.length > 0 ? searchProviders : undefined,
       projectIds: searchProjectId ? [searchProjectId] : undefined,
       projectQuery: searchProjectQuery,
-      limit: 100,
-      offset: 0,
+      limit: SEARCH_PAGE_SIZE,
+      offset: searchPage * SEARCH_PAGE_SIZE,
     });
     if (requestToken !== searchLoadTokenRef.current) {
       return;
@@ -416,6 +418,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     codetrail,
     historyCategories,
     searchProjectId,
+    searchPage,
     searchProjectQuery,
     searchProviders,
     searchQuery,
@@ -1088,22 +1091,43 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     return Math.ceil(totalCount / PAGE_SIZE);
   }, [historyMode, projectCombinedDetail?.totalCount, sessionDetail?.totalCount]);
   const canNavigatePages = historyMode !== "bookmarks";
-  const canGoToPreviousPage = canNavigatePages && sessionPage > 0;
-  const canGoToNextPage = canNavigatePages && sessionPage + 1 < totalPages;
+  const canGoToPreviousHistoryPage = canNavigatePages && sessionPage > 0;
+  const canGoToNextHistoryPage = canNavigatePages && sessionPage + 1 < totalPages;
+  const hasActiveSearchQuery = searchQuery.trim().length > 0;
+  const searchTotalPages = useMemo(() => {
+    if (searchResponse.totalCount === 0) {
+      return 1;
+    }
+    return Math.ceil(searchResponse.totalCount / SEARCH_PAGE_SIZE);
+  }, [searchResponse.totalCount]);
+  const canGoToPreviousSearchPage = hasActiveSearchQuery && searchPage > 0;
+  const canGoToNextSearchPage = hasActiveSearchQuery && searchPage + 1 < searchTotalPages;
 
-  const goToPreviousPage = useCallback(() => {
+  const goToPreviousHistoryPage = useCallback(() => {
     if (!canNavigatePages) {
       return;
     }
     setSessionPage((value) => Math.max(0, value - 1));
   }, [canNavigatePages]);
 
-  const goToNextPage = useCallback(() => {
+  const goToNextHistoryPage = useCallback(() => {
     if (!canNavigatePages) {
       return;
     }
     setSessionPage((value) => Math.min(totalPages - 1, value + 1));
   }, [canNavigatePages, totalPages]);
+
+  const goToPreviousSearchPage = useCallback(() => {
+    setSearchPage((value) => Math.max(0, value - 1));
+  }, []);
+
+  const goToNextSearchPage = useCallback(() => {
+    setSearchPage((value) => Math.min(searchTotalPages - 1, value + 1));
+  }, [searchTotalPages]);
+
+  useEffect(() => {
+    setSearchPage((value) => Math.min(value, searchTotalPages - 1));
+  }, [searchTotalPages]);
 
   const canZoomIn = zoomPercent < 500;
   const canZoomOut = zoomPercent > 25;
@@ -1163,8 +1187,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
       { shortcut: "Cmd/Ctrl+5", description: "Toggle Tool Result button on session messages" },
       { shortcut: "Cmd/Ctrl+6", description: "Toggle Thinking button on session messages" },
       { shortcut: "Cmd/Ctrl+7", description: "Toggle System button on session messages" },
-      { shortcut: "Cmd/Ctrl+Left", description: "Previous page" },
-      { shortcut: "Cmd/Ctrl+Right", description: "Next page" },
+      { shortcut: "Cmd/Ctrl+Left", description: "Previous page (history/global search)" },
+      { shortcut: "Cmd/Ctrl+Right", description: "Next page (history/global search)" },
       { shortcut: "Cmd/Ctrl+B", description: "Expand/collapse Projects pane" },
       { shortcut: "Cmd/Ctrl+Shift+B", description: "Expand/collapse Sessions pane" },
       { shortcut: "?", description: "Shortcut help" },
@@ -1314,8 +1338,10 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     toggleHistoryCategory: handleToggleHistoryCategoryShortcut,
     toggleProjectPaneCollapsed: () => setProjectPaneCollapsed((value) => !value),
     toggleSessionPaneCollapsed: () => setSessionPaneCollapsed((value) => !value),
-    goToPreviousPage,
-    goToNextPage,
+    goToPreviousHistoryPage,
+    goToNextHistoryPage,
+    goToPreviousSearchPage,
+    goToNextSearchPage,
     applyZoomAction,
   });
 
@@ -1682,8 +1708,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                   <button
                     type="button"
                     className="page-btn"
-                    onClick={goToPreviousPage}
-                    disabled={!canGoToPreviousPage}
+                    onClick={goToPreviousHistoryPage}
+                    disabled={!canGoToPreviousHistoryPage}
                     title="Previous page (Cmd/Ctrl+Left)"
                     aria-label="Previous page"
                   >
@@ -1699,8 +1725,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                   <button
                     type="button"
                     className="page-btn"
-                    onClick={goToNextPage}
-                    disabled={!canGoToNextPage}
+                    onClick={goToNextHistoryPage}
+                    disabled={!canGoToNextHistoryPage}
                     title="Next page (Cmd/Ctrl+Right)"
                     aria-label="Next page"
                   >
@@ -1719,18 +1745,27 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                 <input
                   ref={globalSearchInputRef}
                   value={searchQueryInput}
-                  onChange={(event) => setSearchQueryInput(event.target.value)}
+                  onChange={(event) => {
+                    setSearchQueryInput(event.target.value);
+                    setSearchPage(0);
+                  }}
                   placeholder="Search all message text"
                 />
                 <input
                   value={searchProjectQueryInput}
-                  onChange={(event) => setSearchProjectQueryInput(event.target.value)}
+                  onChange={(event) => {
+                    setSearchProjectQueryInput(event.target.value);
+                    setSearchPage(0);
+                  }}
                   placeholder="Filter by project text"
                 />
                 <select
                   className="search-select"
                   value={searchProjectId}
-                  onChange={(event) => setSearchProjectId(event.target.value)}
+                  onChange={(event) => {
+                    setSearchProjectId(event.target.value);
+                    setSearchPage(0);
+                  }}
                 >
                   <option value="">All projects</option>
                   {sortedProjects.map((project) => (
@@ -1748,7 +1783,10 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                       className={`chip provider-chip provider-${provider}${
                         searchProviders.includes(provider) ? " active" : ""
                       }`}
-                      onClick={() => setSearchProviders((value) => toggleValue(value, provider))}
+                      onClick={() => {
+                        setSearchProviders((value) => toggleValue(value, provider));
+                        setSearchPage(0);
+                      }}
                     >
                       {prettyProvider(provider)} ({searchProviderCounts[provider]})
                     </button>
@@ -1762,11 +1800,12 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                       className={`chip category-chip category-${category}${
                         historyCategories.includes(category) ? " active" : ""
                       }`}
-                      onClick={() =>
+                      onClick={() => {
                         setHistoryCategories((value) =>
                           toggleValue<MessageCategory>(value, category),
-                        )
-                      }
+                        );
+                        setSearchPage(0);
+                      }}
                     >
                       {prettyCategory(category)} ({searchResponse.categoryCounts[category]})
                     </button>
@@ -1821,6 +1860,34 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                   ))
                 )}
               </div>
+
+              {hasActiveSearchQuery ? (
+                <div className="pagination-row">
+                  <button
+                    type="button"
+                    className="page-btn"
+                    onClick={goToPreviousSearchPage}
+                    disabled={!canGoToPreviousSearchPage}
+                    title="Previous page (Cmd/Ctrl+Left)"
+                    aria-label="Previous search page"
+                  >
+                    Previous
+                  </button>
+                  <span className="page-info">
+                    Page {searchPage + 1} / {searchTotalPages} ({searchResponse.totalCount} matches)
+                  </span>
+                  <button
+                    type="button"
+                    className="page-btn"
+                    onClick={goToNextSearchPage}
+                    disabled={!canGoToNextSearchPage}
+                    title="Next page (Cmd/Ctrl+Right)"
+                    aria-label="Next search page"
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <SettingsView
