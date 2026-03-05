@@ -253,9 +253,9 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const projectQuery = useDebouncedValue(projectQueryInput, 180);
-  const sessionQuery = useDebouncedValue(sessionQueryInput, 180);
-  const bookmarkQuery = useDebouncedValue(bookmarkQueryInput, 180);
-  const searchQuery = useDebouncedValue(searchQueryInput, 220);
+  const sessionQuery = useDebouncedValue(sessionQueryInput, 400);
+  const bookmarkQuery = useDebouncedValue(bookmarkQueryInput, 400);
+  const searchQuery = useDebouncedValue(searchQueryInput, 500);
   const searchProjectQuery = useDebouncedValue(searchProjectQueryInput, 180);
   const searchMode: SearchMode = advancedSearchEnabled ? "advanced" : "simple";
   const effectiveSessionQuery = sessionQueryInput.trim().length === 0 ? "" : sessionQuery;
@@ -1772,30 +1772,32 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
               </div>
 
               <div className="msg-search">
-                <div className="search-box">
-                  <ToolbarIcon name="search" />
-                  <input
-                    ref={sessionSearchInputRef}
-                    className={historyQueryError ? "search-input invalid" : "search-input"}
-                    value={historyMode === "bookmarks" ? bookmarkQueryInput : sessionQueryInput}
-                    onKeyDown={handleHistorySearchKeyDown}
-                    onChange={(event) => {
-                      if (historyMode === "bookmarks") {
-                        setBookmarkQueryInput(event.target.value);
-                        return;
+                <div className={historyQueryError ? "search-box invalid" : "search-box"}>
+                  <div className="search-input-shell">
+                    <ToolbarIcon name="search" />
+                    <input
+                      ref={sessionSearchInputRef}
+                      className="search-input"
+                      value={historyMode === "bookmarks" ? bookmarkQueryInput : sessionQueryInput}
+                      onKeyDown={handleHistorySearchKeyDown}
+                      onChange={(event) => {
+                        if (historyMode === "bookmarks") {
+                          setBookmarkQueryInput(event.target.value);
+                          return;
+                        }
+                        setSessionQueryInput(event.target.value);
+                        setSessionPage(0);
+                      }}
+                      placeholder={
+                        historyMode === "bookmarks"
+                          ? SEARCH_PLACEHOLDERS.historyBookmarks
+                          : historyMode === "project_all"
+                            ? SEARCH_PLACEHOLDERS.historyProjectSessions
+                            : SEARCH_PLACEHOLDERS.historySession
                       }
-                      setSessionQueryInput(event.target.value);
-                      setSessionPage(0);
-                    }}
-                    placeholder={
-                      historyMode === "bookmarks"
-                        ? SEARCH_PLACEHOLDERS.historyBookmarks
-                        : historyMode === "project_all"
-                          ? SEARCH_PLACEHOLDERS.historyProjectSessions
-                          : SEARCH_PLACEHOLDERS.historySession
-                    }
-                    title={historyQueryError ?? undefined}
-                  />
+                      title={historyQueryError ?? undefined}
+                    />
+                  </div>
                   <button
                     type="button"
                     className={`search-mode-icon-btn${advancedSearchEnabled ? " active" : ""}`}
@@ -1913,19 +1915,21 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                 <p>{searchResponse.totalCount} matches</p>
               </div>
               <div className="search-controls">
-                <div className="search-box">
-                  <ToolbarIcon name="search" />
-                  <input
-                    ref={globalSearchInputRef}
-                    className={searchResponse.queryError ? "search-input invalid" : "search-input"}
-                    value={searchQueryInput}
-                    onChange={(event) => {
-                      setSearchQueryInput(event.target.value);
-                      setSearchPage(0);
-                    }}
-                    placeholder={SEARCH_PLACEHOLDERS.globalMessages}
-                    title={searchResponse.queryError ?? undefined}
-                  />
+                <div className={searchResponse.queryError ? "search-box invalid" : "search-box"}>
+                  <div className="search-input-shell">
+                    <ToolbarIcon name="search" />
+                    <input
+                      ref={globalSearchInputRef}
+                      className="search-input"
+                      value={searchQueryInput}
+                      onChange={(event) => {
+                        setSearchQueryInput(event.target.value);
+                        setSearchPage(0);
+                      }}
+                      placeholder={SEARCH_PLACEHOLDERS.globalMessages}
+                      title={searchResponse.queryError ?? undefined}
+                    />
+                  </div>
                   <button
                     type="button"
                     className={`search-mode-icon-btn${advancedSearchEnabled ? " active" : ""}`}

@@ -228,6 +228,19 @@ describe("queryService", () => {
     });
     expect(wildcardFiltered.totalCount).toBe(0);
 
+    const wildcardOnlyFiltered = getSessionDetail(dbPath, {
+      sessionId: claudeSessionIdRow.id,
+      page: 0,
+      pageSize: 100,
+      sortDirection: "asc",
+      categories: undefined,
+      query: "***",
+      focusMessageId: undefined,
+      focusSourceId: undefined,
+    });
+    expect(wildcardOnlyFiltered.totalCount).toBe(0);
+    expect(wildcardOnlyFiltered.messages).toEqual([]);
+
     const noCategoriesSelected = getSessionDetail(dbPath, {
       sessionId: claudeSessionIdRow.id,
       page: 0,
@@ -391,6 +404,16 @@ describe("queryService", () => {
     expect(queryMiss.filteredCount).toBe(0);
     expect(queryMiss.categoryCounts.assistant).toBe(0);
     expect(queryMiss.results).toEqual([]);
+
+    const wildcardOnly = listProjectBookmarks(dbPath, {
+      projectId: target.project_id,
+      query: "***",
+      categories: undefined,
+    });
+    expect(wildcardOnly.totalCount).toBe(1);
+    expect(wildcardOnly.filteredCount).toBe(0);
+    expect(wildcardOnly.categoryCounts.assistant).toBe(0);
+    expect(wildcardOnly.results).toEqual([]);
 
     const filteredOut = listProjectBookmarks(dbPath, {
       projectId: target.project_id,

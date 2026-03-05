@@ -168,7 +168,7 @@ export function createBookmarkStore(bookmarksDbPath: string): BookmarkStore {
         return [];
       }
       if (!queryPlan.hasTerms) {
-        return listStmt.all(projectId) as StoredBookmark[];
+        return [];
       }
 
       const conditions = ["b.project_id = ?"];

@@ -621,10 +621,18 @@ body.platform-macos .titlebar-left {
 }
 
 .search-box {
-  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  gap: 6px;
 }
 
-.search-box .toolbar-icon {
+.search-input-shell {
+  position: relative;
+  flex: 1 1 auto;
+}
+
+.search-input-shell .toolbar-icon {
   position: absolute;
   left: 10px;
   top: 50%;
@@ -633,10 +641,6 @@ body.platform-macos .titlebar-left {
   width: 15px;
   height: 15px;
   stroke-width: 2;
-}
-
-.search-box .search-input {
-  padding-right: 44px;
 }
 
 .search-input,
@@ -656,46 +660,69 @@ body.platform-macos .titlebar-left {
   color: var(--text-tertiary);
 }
 
-.search-input:focus,
+.search-box .search-input {
+  border-radius: var(--radius-md);
+}
+
+.search-input-shell:focus-within .search-input,
 .search-select:focus {
   background: var(--bg-surface);
   border-color: var(--accent-blue);
+}
+
+.search-input-shell:focus-within .search-input {
   box-shadow: 0 0 0 3px var(--accent-blue-dim);
 }
 
-.search-input.invalid,
+.search-select:focus {
+  box-shadow: 0 0 0 3px var(--accent-blue-dim);
+}
+
+.search-box.invalid .search-input,
 .search-controls > input.invalid {
   border-color: var(--accent-red);
+}
+
+.search-box.invalid .search-input {
+  box-shadow: 0 0 0 3px var(--accent-red-dim);
+}
+
+.search-input-shell:focus-within .search-input {
+  position: relative;
+  z-index: 1;
+}
+
+.search-box.invalid .search-input-shell:focus-within .search-input {
   box-shadow: 0 0 0 3px var(--accent-red-dim);
 }
 
 .search-mode-icon-btn {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  min-width: 36px;
   border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
   color: var(--text-tertiary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  flex: 0 0 auto;
+  transition: all 0.2s;
 }
 
 .search-mode-icon-btn:hover {
+  background: var(--bg-hover);
   border-color: var(--border-active);
   color: var(--text-secondary);
 }
 
 .search-mode-icon-btn.active {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: var(--accent-blue-dim);
+  border-color: rgba(37, 99, 235, 0.55);
+  background: rgba(37, 99, 235, 0.22);
   color: var(--accent-blue);
 }
+
 
 .search-mode-glyph {
   width: 14px;

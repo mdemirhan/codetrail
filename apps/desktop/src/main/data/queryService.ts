@@ -351,6 +351,7 @@ function getProjectCombinedDetailWithDatabase(
        )`;
   const pageSize = request.pageSize;
   let page = request.page;
+  const normalizedQuery = request.query.trim();
   const queryPlan = buildSearchQueryPlan(request.query, request.searchMode ?? "simple");
   const messageFilters: {
     projectId: string;
@@ -373,6 +374,19 @@ function getProjectCombinedDetailWithDatabase(
       pageSize,
       focusIndex: null,
       queryError: queryPlan.error,
+      highlightPatterns: [],
+      messages: [],
+    };
+  }
+  if (normalizedQuery.length > 0 && !queryPlan.hasTerms) {
+    return {
+      projectId: request.projectId,
+      totalCount: 0,
+      categoryCounts: makeEmptyCategoryCounts(),
+      page: 0,
+      pageSize,
+      focusIndex: null,
+      queryError: null,
       highlightPatterns: [],
       messages: [],
     };
@@ -565,6 +579,7 @@ function getSessionDetailWithDatabase(
 
   const pageSize = request.pageSize;
   let page = request.page;
+  const normalizedQuery = request.query.trim();
   const queryPlan = buildSearchQueryPlan(request.query, request.searchMode ?? "simple");
   const messageFilters: {
     sessionId: string;
@@ -587,6 +602,19 @@ function getSessionDetailWithDatabase(
       pageSize,
       focusIndex: null,
       queryError: queryPlan.error,
+      highlightPatterns: [],
+      messages: [],
+    };
+  }
+  if (normalizedQuery.length > 0 && !queryPlan.hasTerms) {
+    return {
+      session: mapSessionSummaryRow(sessionRow),
+      totalCount: 0,
+      categoryCounts: makeEmptyCategoryCounts(),
+      page: 0,
+      pageSize,
+      focusIndex: null,
+      queryError: null,
       highlightPatterns: [],
       messages: [],
     };
