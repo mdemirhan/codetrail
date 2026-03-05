@@ -3,7 +3,7 @@ import type { UIEvent as ReactUIEvent } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import type { MessageCategory, Provider } from "@codetrail/core";
-import type { IpcResponse } from "@codetrail/core";
+import type { IpcRequest, IpcResponse } from "@codetrail/core";
 
 import {
   type MonoFontFamily,
@@ -139,13 +139,13 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     initialPaneState?.monoFontFamily ?? "droid_sans_mono",
   );
   const [regularFontFamily, setRegularFontFamily] = useState<RegularFontFamily>(
-    initialPaneState?.regularFontFamily ?? "current",
+    initialPaneState?.regularFontFamily ?? "inter",
   );
   const [monoFontSize, setMonoFontSize] = useState<MonoFontSize>(
-    initialPaneState?.monoFontSize ?? "12px",
+    initialPaneState?.monoFontSize ?? "13px",
   );
   const [regularFontSize, setRegularFontSize] = useState<RegularFontSize>(
-    initialPaneState?.regularFontSize ?? "13.5px",
+    initialPaneState?.regularFontSize ?? "14px",
   );
   const [useMonospaceForAllMessages, setUseMonospaceForAllMessages] = useState(
     initialPaneState?.useMonospaceForAllMessages ?? false,
@@ -437,34 +437,67 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     }
   }, [codetrail]);
 
+  const paneStateForSync = useMemo<IpcRequest<"ui:setState">>(
+    () => ({
+      projectPaneWidth,
+      sessionPaneWidth,
+      projectPaneCollapsed,
+      sessionPaneCollapsed,
+      projectProviders,
+      historyCategories,
+      expandedByDefaultCategories,
+      searchProviders,
+      theme,
+      monoFontFamily,
+      regularFontFamily,
+      monoFontSize,
+      regularFontSize,
+      useMonospaceForAllMessages,
+      selectedProjectId,
+      selectedSessionId,
+      historyMode,
+      projectSortDirection,
+      sessionSortDirection,
+      messageSortDirection,
+      bookmarkSortDirection,
+      projectAllSortDirection,
+      sessionPage,
+      sessionScrollTop,
+      systemMessageRegexRules,
+    }),
+    [
+      projectPaneWidth,
+      sessionPaneWidth,
+      projectPaneCollapsed,
+      sessionPaneCollapsed,
+      projectProviders,
+      historyCategories,
+      expandedByDefaultCategories,
+      searchProviders,
+      theme,
+      monoFontFamily,
+      regularFontFamily,
+      monoFontSize,
+      regularFontSize,
+      useMonospaceForAllMessages,
+      selectedProjectId,
+      selectedSessionId,
+      historyMode,
+      projectSortDirection,
+      sessionSortDirection,
+      messageSortDirection,
+      bookmarkSortDirection,
+      projectAllSortDirection,
+      sessionPage,
+      sessionScrollTop,
+      systemMessageRegexRules,
+    ],
+  );
+
   const { paneStateHydrated } = usePaneStateSync({
     initialPaneStateHydrated: initialPaneState !== null,
     logError,
-    projectPaneWidth,
-    sessionPaneWidth,
-    projectPaneCollapsed,
-    sessionPaneCollapsed,
-    projectProviders,
-    historyCategories,
-    expandedByDefaultCategories,
-    searchProviders,
-    theme,
-    monoFontFamily,
-    regularFontFamily,
-    monoFontSize,
-    regularFontSize,
-    useMonospaceForAllMessages,
-    selectedProjectId,
-    selectedSessionId,
-    historyMode,
-    projectSortDirection,
-    sessionSortDirection,
-    messageSortDirection,
-    bookmarkSortDirection,
-    projectAllSortDirection,
-    sessionPage,
-    sessionScrollTop,
-    systemMessageRegexRules,
+    paneState: paneStateForSync,
     setProjectPaneWidth,
     setSessionPaneWidth,
     setProjectPaneCollapsed,
@@ -1324,6 +1357,41 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     focusTarget?.focus();
   }, []);
 
+  const resetHistorySelectionState = useCallback(() => {
+    setPendingSearchNavigation(null);
+    setSessionPage(0);
+    setFocusMessageId("");
+    setPendingRevealTarget(null);
+  }, []);
+
+  const selectProjectAllMessages = useCallback(
+    (projectId: string) => {
+      resetHistorySelectionState();
+      setSelectedProjectId(projectId);
+      setHistoryMode("project_all");
+      setSelectedSessionId("");
+      setMainView("history");
+    },
+    [resetHistorySelectionState],
+  );
+
+  const selectBookmarksView = useCallback(() => {
+    resetHistorySelectionState();
+    setHistoryMode("bookmarks");
+    setSelectedSessionId("");
+    setMainView("history");
+  }, [resetHistorySelectionState]);
+
+  const selectSessionView = useCallback(
+    (sessionId: string) => {
+      resetHistorySelectionState();
+      setSelectedSessionId(sessionId);
+      setHistoryMode("session");
+      setMainView("history");
+    },
+    [resetHistorySelectionState],
+  );
+
   useKeyboardShortcuts({
     mainView,
     showShortcuts,
@@ -1407,13 +1475,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
               }
               onCopyProjectDetails={() => void handleCopyProjectDetails()}
               onSelectProject={(projectId) => {
-                setPendingSearchNavigation(null);
-                setSelectedProjectId(projectId);
-                setHistoryMode("project_all");
-                setSelectedSessionId("");
-                setSessionPage(0);
-                setFocusMessageId("");
-                setPendingRevealTarget(null);
+                selectProjectAllMessages(projectId);
               }}
               onOpenProjectLocation={() => {
                 if (!selectedProject?.path?.trim()) {
@@ -1460,31 +1522,13 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                 });
               }}
               onSelectAllSessions={() => {
-                setPendingSearchNavigation(null);
-                setHistoryMode("project_all");
-                setSelectedSessionId("");
-                setSessionPage(0);
-                setFocusMessageId("");
-                setPendingRevealTarget(null);
-                setMainView("history");
+                selectProjectAllMessages(selectedProjectId);
               }}
               onSelectBookmarks={() => {
-                setPendingSearchNavigation(null);
-                setHistoryMode("bookmarks");
-                setSelectedSessionId("");
-                setSessionPage(0);
-                setFocusMessageId("");
-                setPendingRevealTarget(null);
-                setMainView("history");
+                selectBookmarksView();
               }}
               onSelectSession={(sessionId) => {
-                setPendingSearchNavigation(null);
-                setSelectedSessionId(sessionId);
-                setHistoryMode("session");
-                setSessionPage(0);
-                setFocusMessageId("");
-                setPendingRevealTarget(null);
-                setMainView("history");
+                selectSessionView(sessionId);
               }}
             />
 

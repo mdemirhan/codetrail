@@ -157,6 +157,19 @@ describe("queryService in-memory", () => {
     });
     expect(detailDesc.messages.map((message) => message.id)).toEqual(["message_2", "message_1"]);
 
+    const detailWildcard = service.getSessionDetail({
+      sessionId: "session_1",
+      page: 0,
+      pageSize: 100,
+      sortDirection: "asc",
+      categories: undefined,
+      query: "stab*",
+      focusMessageId: undefined,
+      focusSourceId: undefined,
+    });
+    expect(detailWildcard.totalCount).toBe(1);
+    expect(detailWildcard.messages.map((message) => message.id)).toEqual(["message_2"]);
+
     const bookmarked = service.toggleBookmark({
       projectId: "project_1",
       sessionId: "session_1",
@@ -575,6 +588,111 @@ describe("queryService in-memory", () => {
       focusSourceId: undefined,
     });
     expect(ascPage0.messages[0]?.id).toBe("message_offset");
+  });
+
+  it("resolves focusSourceId deterministically to the earliest matching session message", () => {
+    const db = createInMemoryDatabase();
+    const now = "2026-03-01T10:00:00.000Z";
+
+    db.prepare(
+      `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run("project_1", "claude", "Project One", "/workspace/project-one", now, now);
+
+    db.prepare(
+      `INSERT INTO sessions (
+        id,
+        project_id,
+        provider,
+        file_path,
+        title,
+        model_names,
+        started_at,
+        ended_at,
+        duration_ms,
+        git_branch,
+        cwd,
+        message_count,
+        token_input_total,
+        token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "session_1",
+      "project_1",
+      "claude",
+      "/workspace/project-one/session-1.jsonl",
+      "Session",
+      "claude-opus-4-1",
+      now,
+      "2026-03-01T10:00:10.000Z",
+      10_000,
+      "main",
+      "/workspace/project-one",
+      2,
+      0,
+      0,
+    );
+
+    const insertMessage = db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    insertMessage.run(
+      "message_early",
+      "duplicate_source",
+      "session_1",
+      "claude",
+      "assistant",
+      "earliest",
+      "2026-03-01T10:00:01.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "message_late",
+      "duplicate_source",
+      "session_1",
+      "claude",
+      "assistant",
+      "latest",
+      "2026-03-01T10:00:09.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+
+    const service = createQueryServiceFromDb(db);
+    const detail = service.getSessionDetail({
+      sessionId: "session_1",
+      page: 1,
+      pageSize: 1,
+      sortDirection: "asc",
+      categories: undefined,
+      query: "",
+      focusMessageId: undefined,
+      focusSourceId: "duplicate_source",
+    });
+
+    expect(detail.page).toBe(0);
+    expect(detail.focusIndex).toBe(0);
+    expect(detail.messages[0]?.id).toBe("message_early");
   });
 
   it("returns persisted session titles from sessions table", () => {

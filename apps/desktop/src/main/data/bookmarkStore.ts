@@ -94,26 +94,29 @@ export function createBookmarkStore(bookmarksDbPath: string): BookmarkStore {
      WHERE project_id = ?
      ORDER BY message_created_at DESC, message_id DESC`,
   );
-  const listByQueryStmt = db.prepare(
+  const listByFtsQueryStmt = db.prepare(
     `SELECT
-       project_id,
-       session_id,
-       message_id,
-       message_source_id,
-       provider,
-       session_title,
-       message_category,
-       message_content,
-       message_created_at,
-       bookmarked_at,
-       is_orphaned,
-       orphaned_at,
-       snapshot_version,
-       snapshot_json
-     FROM bookmarks
-     WHERE project_id = ?
-       AND LOWER(message_content) LIKE ?
-     ORDER BY message_created_at DESC, message_id DESC`,
+       b.project_id,
+       b.session_id,
+       b.message_id,
+       b.message_source_id,
+       b.provider,
+       b.session_title,
+       b.message_category,
+       b.message_content,
+       b.message_created_at,
+       b.bookmarked_at,
+       b.is_orphaned,
+       b.orphaned_at,
+       b.snapshot_version,
+       b.snapshot_json
+     FROM bookmarks b
+     JOIN bookmarks_fts
+       ON bookmarks_fts.project_id = b.project_id
+      AND bookmarks_fts.message_id = b.message_id
+     WHERE b.project_id = ?
+       AND bookmarks_fts MATCH ?
+     ORDER BY b.message_created_at DESC, b.message_id DESC`,
   );
 
   const getStmt = db.prepare(
@@ -169,14 +172,20 @@ export function createBookmarkStore(bookmarksDbPath: string): BookmarkStore {
   );
 
   const removeStmt = db.prepare("DELETE FROM bookmarks WHERE project_id = ? AND message_id = ?");
+  const deleteFtsRowStmt = db.prepare(
+    "DELETE FROM bookmarks_fts WHERE project_id = ? AND message_id = ?",
+  );
+  const insertFtsRowStmt = db.prepare(
+    "INSERT INTO bookmarks_fts (project_id, message_id, message_content) VALUES (?, ?, ?)",
+  );
 
   return {
     listProjectBookmarks: (projectId, query) => {
-      const normalizedQuery = query?.trim().toLowerCase() ?? "";
+      const normalizedQuery = query?.trim() ?? "";
       if (normalizedQuery.length === 0) {
         return listStmt.all(projectId) as StoredBookmark[];
       }
-      return listByQueryStmt.all(projectId, `%${normalizedQuery}%`) as StoredBookmark[];
+      return listByFtsQueryStmt.all(projectId, escapeFtsQuery(normalizedQuery)) as StoredBookmark[];
     },
     getBookmark: (projectId, messageId) => {
       const row = getStmt.get(projectId, messageId) as StoredBookmark | undefined;
@@ -208,9 +217,18 @@ export function createBookmarkStore(bookmarksDbPath: string): BookmarkStore {
         SNAPSHOT_VERSION,
         snapshotJson,
       );
+      deleteFtsRowStmt.run(snapshotInput.projectId, snapshotInput.messageId);
+      insertFtsRowStmt.run(
+        snapshotInput.projectId,
+        snapshotInput.messageId,
+        snapshotInput.messageContent,
+      );
     },
     removeBookmark: (projectId, messageId) => {
       const info = removeStmt.run(projectId, messageId);
+      if (info.changes > 0) {
+        deleteFtsRowStmt.run(projectId, messageId);
+      }
       return info.changes > 0;
     },
     reconcileWithIndexedData: (indexedDbPath) => reconcileBookmarks(db, indexedDbPath),
@@ -257,11 +275,48 @@ function ensureBookmarkSchema(db: DatabaseHandle): void {
   );
   db.exec("CREATE INDEX IF NOT EXISTS idx_bookmarks_session_id ON bookmarks(session_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_bookmarks_orphaned ON bookmarks(is_orphaned)");
+  db.exec(
+    `CREATE VIRTUAL TABLE IF NOT EXISTS bookmarks_fts USING fts5(
+       project_id UNINDEXED,
+       message_id UNINDEXED,
+       message_content
+     )`,
+  );
+  db.exec("DELETE FROM bookmarks_fts");
+  db.exec(
+    `INSERT INTO bookmarks_fts (project_id, message_id, message_content)
+     SELECT project_id, message_id, message_content
+     FROM bookmarks`,
+  );
 
   db.prepare(
     `INSERT INTO meta (key, value) VALUES ('schema_version', ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
   ).run(String(BOOKMARKS_DB_SCHEMA_VERSION));
+}
+
+function escapeFtsQuery(query: string): string {
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .filter((term) => term.length > 0);
+  const escapedTerms = terms
+    .map((term) => {
+      const supportsPrefix = term.length > 1 && term.endsWith("*");
+      const base = supportsPrefix ? term.slice(0, -1) : term;
+      const normalized = base.trim();
+      if (normalized.length === 0) {
+        return null;
+      }
+      return `"${normalized.replaceAll('"', '""')}"${supportsPrefix ? "*" : ""}`;
+    })
+    .filter((value) => value !== null);
+
+  if (escapedTerms.length === 0) {
+    return '""';
+  }
+
+  return escapedTerms.join(" ");
 }
 
 function reconcileBookmarks(

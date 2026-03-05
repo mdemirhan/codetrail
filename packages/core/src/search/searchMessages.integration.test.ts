@@ -165,6 +165,9 @@ describe("searchMessages", () => {
     const quoted = searchMessages(db, { query: 'bug"' });
     expect(quoted.totalCount).toBeGreaterThanOrEqual(0);
 
+    const wildcard = searchMessages(db, { query: "pars*" });
+    expect(wildcard.totalCount).toBeGreaterThanOrEqual(1);
+
     db.close();
     cleanup();
   });

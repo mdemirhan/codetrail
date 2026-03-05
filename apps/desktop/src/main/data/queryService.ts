@@ -593,7 +593,9 @@ function getSessionDetailWithDatabase(
             }
           | undefined) ?? undefined)
       : ((db
-          .prepare("SELECT id, created_at FROM messages WHERE session_id = ? AND source_id = ?")
+          .prepare(
+            "SELECT id, created_at FROM messages WHERE session_id = ? AND source_id = ? ORDER BY created_at ASC, id ASC LIMIT 1",
+          )
           .get(request.sessionId, request.focusSourceId) as
           | {
               id: string;
@@ -879,10 +881,12 @@ function buildMessageFilters(args: {
     }
   }
 
-  const query = args.query.trim().toLowerCase();
+  const query = args.query.trim();
   if (query.length > 0) {
-    conditions.push("LOWER(m.content) LIKE ?");
-    params.push(`%${query}%`);
+    conditions.push(
+      "EXISTS (SELECT 1 FROM message_fts WHERE message_fts.message_id = m.id AND message_fts MATCH ?)",
+    );
+    params.push(escapeFtsQuery(query));
   }
 
   return { whereClause: conditions.join(" AND "), params };
@@ -906,10 +910,12 @@ function buildProjectMessageFilters(args: {
     }
   }
 
-  const query = args.query.trim().toLowerCase();
+  const query = args.query.trim();
   if (query.length > 0) {
-    conditions.push("LOWER(m.content) LIKE ?");
-    params.push(`%${query}%`);
+    conditions.push(
+      "EXISTS (SELECT 1 FROM message_fts WHERE message_fts.message_id = m.id AND message_fts MATCH ?)",
+    );
+    params.push(escapeFtsQuery(query));
   }
 
   return { whereClause: conditions.join(" AND "), params };
@@ -1018,4 +1024,28 @@ function withDatabaseAndBookmarkStore<T>(
       bookmarkStore.close();
     }
   }
+}
+
+function escapeFtsQuery(query: string): string {
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .filter((term) => term.length > 0);
+  const escapedTerms = terms
+    .map((term) => {
+      const supportsPrefix = term.length > 1 && term.endsWith("*");
+      const base = supportsPrefix ? term.slice(0, -1) : term;
+      const normalized = base.trim();
+      if (normalized.length === 0) {
+        return null;
+      }
+      return `"${normalized.replaceAll('"', '""')}"${supportsPrefix ? "*" : ""}`;
+    })
+    .filter((value) => value !== null);
+
+  if (escapedTerms.length === 0) {
+    return '""';
+  }
+
+  return escapedTerms.join(" ");
 }

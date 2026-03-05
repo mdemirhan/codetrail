@@ -225,9 +225,21 @@ function escapeFtsQuery(query: string): string {
     .trim()
     .split(/\s+/)
     .filter((term) => term.length > 0);
-  if (terms.length === 0) {
+  const escapedTerms = terms
+    .map((term) => {
+      const supportsPrefix = term.length > 1 && term.endsWith("*");
+      const base = supportsPrefix ? term.slice(0, -1) : term;
+      const normalized = base.trim();
+      if (normalized.length === 0) {
+        return null;
+      }
+      return `"${normalized.replaceAll('"', '""')}"${supportsPrefix ? "*" : ""}`;
+    })
+    .filter((value) => value !== null);
+
+  if (escapedTerms.length === 0) {
     return '""';
   }
 
-  return terms.map((term) => `"${term.replaceAll('"', '""')}"`).join(" ");
+  return escapedTerms.join(" ");
 }

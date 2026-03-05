@@ -98,10 +98,10 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
-  --font-sans: "Plus Jakarta Sans", -apple-system, sans-serif;
+  --font-sans: "Inter", -apple-system, sans-serif;
   --font-mono: "Droid Sans Mono", "JetBrains Mono", "IBM Plex Mono", monospace;
-  --message-font-size: 13.5px;
-  --message-mono-font-size: 12px;
+  --message-font-size: 14px;
+  --message-mono-font-size: 13px;
   --tl-inset: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12);
   --noise-opacity: 0;
   --row-hover: rgba(0, 0, 0, 0.02);

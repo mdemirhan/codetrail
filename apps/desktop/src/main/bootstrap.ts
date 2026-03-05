@@ -54,6 +54,27 @@ export async function bootstrapMainProcess(
   }
   const queryService = createQueryService(dbPath, { bookmarksDbPath });
   activeQueryService = queryService;
+  let allowedRootsCache: { roots: string[]; expiresAt: number } | null = null;
+  const readAllowedRoots = (): string[] => {
+    const now = Date.now();
+    if (!allowedRootsCache || allowedRootsCache.expiresAt <= now) {
+      allowedRootsCache = {
+        roots: getAllowedOpenInFileManagerRoots({
+          dbPath,
+          bookmarksDbPath,
+          settingsFilePath,
+          queryService,
+          geminiHistoryRoot,
+          geminiProjectsPath,
+        }),
+        expiresAt: now + 5_000,
+      };
+    }
+    return allowedRootsCache.roots;
+  };
+  const invalidateAllowedRootsCache = () => {
+    allowedRootsCache = null;
+  };
 
   registerIpcHandlers(ipcMain, {
     "app:getHealth": () => ({
@@ -81,6 +102,7 @@ export async function bootstrapMainProcess(
       schemaVersion: dbBootstrap.schemaVersion,
     }),
     "indexer:refresh": async (payload) => {
+      invalidateAllowedRootsCache();
       const job = await indexingRunner.enqueue({ force: payload.force });
       return { jobId: job.jobId };
     },
@@ -96,14 +118,7 @@ export async function bootstrapMainProcess(
         return { ok: false, error: "Path must be absolute." };
       }
       const targetPath = await resolveCanonicalPath(payload.path);
-      const allowedRoots = getAllowedOpenInFileManagerRoots({
-        dbPath,
-        bookmarksDbPath,
-        settingsFilePath,
-        queryService,
-        geminiHistoryRoot,
-        geminiProjectsPath,
-      });
+      const allowedRoots = readAllowedRoots();
       if (!isPathAllowedByRoots(targetPath, allowedRoots)) {
         return {
           ok: false,

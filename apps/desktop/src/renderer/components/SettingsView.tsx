@@ -250,8 +250,6 @@ export function SettingsView({
           <div className="settings-section-body">
             {(["claude", "codex", "gemini", "cursor"] as const).map((provider) => {
               const patterns = systemMessageRegexRules[provider] ?? [];
-              const keyedPatterns = patterns.map((pattern) => pattern);
-              const seenPatternCounts = new Map<string, number>();
               return (
                 <div key={provider} className="settings-rule-group">
                   <div className="settings-rule-group-header">
@@ -272,12 +270,9 @@ export function SettingsView({
                     <p className="settings-rule-empty">No regex rules configured.</p>
                   ) : (
                     <div className="settings-rule-list">
-                      {keyedPatterns.map((pattern, index) => {
-                        const nextCount = (seenPatternCounts.get(pattern) ?? 0) + 1;
-                        seenPatternCounts.set(pattern, nextCount);
-                        const ruleKey = `${provider}-rule-${pattern}-${nextCount}`;
+                      {patterns.map((pattern, index) => {
                         return (
-                          <div key={ruleKey} className="settings-rule-row">
+                          <div key={`${provider}-rule-${index}`} className="settings-rule-row">
                             <input
                               className="settings-rule-input"
                               type="text"
@@ -382,7 +377,11 @@ function SettingsInfoRow({
           type="button"
           className="settings-action-button"
           onClick={() => {
-            void copyText(value);
+            void copyTextToClipboard(value).then((copied) => {
+              if (!copied) {
+                console.error(`[codetrail] failed copying settings value for '${label}'`);
+              }
+            });
           }}
           aria-label={`Copy ${label}`}
           title={`Copy ${label}`}
@@ -393,7 +392,11 @@ function SettingsInfoRow({
           type="button"
           className="settings-action-button"
           onClick={() => {
-            void openInFileManager(value);
+            void openPath(value).then((result) => {
+              if (!result.ok) {
+                console.error(`[codetrail] failed opening settings path '${label}': ${result.error}`);
+              }
+            });
           }}
           aria-label={`Open ${label}`}
           title={`Open ${label}`}
@@ -408,15 +411,4 @@ function SettingsInfoRow({
       </div>
     </div>
   );
-}
-
-async function openInFileManager(path: string): Promise<void> {
-  const result = await openPath(path);
-  if (!result.ok) {
-    return;
-  }
-}
-
-async function copyText(value: string): Promise<void> {
-  await copyTextToClipboard(value);
 }

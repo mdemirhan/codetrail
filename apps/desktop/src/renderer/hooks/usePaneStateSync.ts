@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
-import type { MessageCategory, Provider } from "@codetrail/core";
+import type { IpcRequest, IpcResponse, MessageCategory, Provider } from "@codetrail/core";
 
 import type {
   MonoFontFamily,
@@ -22,35 +22,14 @@ type RestoredScrollTarget = {
 type HistoryMode = "session" | "bookmarks" | "project_all";
 type SystemMessageRegexRules = Record<Provider, string[]>;
 type SortDirection = "asc" | "desc";
+type PaneStateSnapshot = IpcResponse<"ui:getState">;
+type PaneStatePersistRequest = IpcRequest<"ui:setState">;
+type HydratableKey = Exclude<keyof PaneStateSnapshot, "projectPaneWidth" | "sessionPaneWidth">;
 
 export function usePaneStateSync(args: {
   initialPaneStateHydrated?: boolean;
   logError: (context: string, error: unknown) => void;
-  projectPaneWidth: number;
-  sessionPaneWidth: number;
-  projectPaneCollapsed: boolean;
-  sessionPaneCollapsed: boolean;
-  projectProviders: Provider[];
-  historyCategories: MessageCategory[];
-  expandedByDefaultCategories: MessageCategory[];
-  searchProviders: Provider[];
-  theme: ThemeMode;
-  monoFontFamily: MonoFontFamily;
-  regularFontFamily: RegularFontFamily;
-  monoFontSize: MonoFontSize;
-  regularFontSize: RegularFontSize;
-  useMonospaceForAllMessages: boolean;
-  selectedProjectId: string;
-  selectedSessionId: string;
-  historyMode: HistoryMode;
-  projectSortDirection: SortDirection;
-  sessionSortDirection: SortDirection;
-  messageSortDirection: SortDirection;
-  bookmarkSortDirection: SortDirection;
-  projectAllSortDirection: SortDirection;
-  sessionPage: number;
-  sessionScrollTop: number;
-  systemMessageRegexRules: SystemMessageRegexRules;
+  paneState: PaneStatePersistRequest;
   setProjectPaneWidth: Dispatch<SetStateAction<number>>;
   setSessionPaneWidth: Dispatch<SetStateAction<number>>;
   setProjectPaneCollapsed: Dispatch<SetStateAction<boolean>>;
@@ -82,31 +61,7 @@ export function usePaneStateSync(args: {
   const {
     initialPaneStateHydrated = false,
     logError,
-    projectPaneWidth,
-    sessionPaneWidth,
-    projectPaneCollapsed,
-    sessionPaneCollapsed,
-    projectProviders,
-    historyCategories,
-    expandedByDefaultCategories,
-    searchProviders,
-    theme,
-    monoFontFamily,
-    regularFontFamily,
-    monoFontSize,
-    regularFontSize,
-    useMonospaceForAllMessages,
-    selectedProjectId,
-    selectedSessionId,
-    historyMode,
-    projectSortDirection,
-    sessionSortDirection,
-    messageSortDirection,
-    bookmarkSortDirection,
-    projectAllSortDirection,
-    sessionPage,
-    sessionScrollTop,
-    systemMessageRegexRules,
+    paneState,
     setProjectPaneWidth,
     setSessionPaneWidth,
     setProjectPaneCollapsed,
@@ -169,75 +124,45 @@ export function usePaneStateSync(args: {
         if (response.sessionPaneWidth !== null) {
           setSessionPaneWidth(clamp(response.sessionPaneWidth, 250, 620));
         }
-        if (response.projectPaneCollapsed !== null) {
-          setProjectPaneCollapsed(response.projectPaneCollapsed);
-        }
-        if (response.sessionPaneCollapsed !== null) {
-          setSessionPaneCollapsed(response.sessionPaneCollapsed);
-        }
-        if (response.projectProviders !== null) {
-          setProjectProviders(response.projectProviders);
-        }
-        if (response.historyCategories !== null) {
-          setHistoryCategories(response.historyCategories);
-        }
-        if (response.expandedByDefaultCategories !== null) {
-          setExpandedByDefaultCategories(response.expandedByDefaultCategories);
-        }
-        if (response.searchProviders !== null) {
-          setSearchProviders(response.searchProviders);
-        }
-        if (response.theme !== null) {
-          setTheme(response.theme);
-        }
-        if (response.monoFontFamily !== null) {
-          setMonoFontFamily(response.monoFontFamily);
-        }
-        if (response.regularFontFamily !== null) {
-          setRegularFontFamily(response.regularFontFamily);
-        }
-        if (response.monoFontSize !== null) {
-          setMonoFontSize(response.monoFontSize);
-        }
-        if (response.regularFontSize !== null) {
-          setRegularFontSize(response.regularFontSize);
-        }
-        if (response.useMonospaceForAllMessages !== null) {
-          setUseMonospaceForAllMessages(response.useMonospaceForAllMessages);
-        }
-        if (response.selectedProjectId !== null) {
-          setSelectedProjectId(response.selectedProjectId);
-        }
-        if (response.selectedSessionId !== null) {
-          setSelectedSessionId(response.selectedSessionId);
-        }
-        if (response.historyMode !== null) {
-          setHistoryMode(response.historyMode);
-        }
-        if (response.projectSortDirection !== null) {
-          setProjectSortDirection(response.projectSortDirection);
-        }
-        if (response.sessionSortDirection !== null) {
-          setSessionSortDirection(response.sessionSortDirection);
-        }
-        if (response.messageSortDirection !== null) {
-          setMessageSortDirection(response.messageSortDirection);
-        }
-        if (response.bookmarkSortDirection !== null) {
-          setBookmarkSortDirection(response.bookmarkSortDirection);
-        }
-        if (response.projectAllSortDirection !== null) {
-          setProjectAllSortDirection(response.projectAllSortDirection);
-        }
-        if (response.sessionPage !== null) {
-          setSessionPage(response.sessionPage);
-        }
-        if (response.sessionScrollTop !== null) {
-          sessionScrollTopRef.current = response.sessionScrollTop;
-          setSessionScrollTop(response.sessionScrollTop);
-        }
-        if (response.systemMessageRegexRules !== null) {
-          setSystemMessageRegexRules(response.systemMessageRegexRules);
+
+        const setters: {
+          [K in HydratableKey]?: (value: Exclude<PaneStateSnapshot[K], null>) => void;
+        } = {
+          projectPaneCollapsed: setProjectPaneCollapsed,
+          sessionPaneCollapsed: setSessionPaneCollapsed,
+          projectProviders: setProjectProviders,
+          historyCategories: setHistoryCategories,
+          expandedByDefaultCategories: setExpandedByDefaultCategories,
+          searchProviders: setSearchProviders,
+          theme: setTheme,
+          monoFontFamily: setMonoFontFamily,
+          regularFontFamily: setRegularFontFamily,
+          monoFontSize: setMonoFontSize,
+          regularFontSize: setRegularFontSize,
+          useMonospaceForAllMessages: setUseMonospaceForAllMessages,
+          selectedProjectId: setSelectedProjectId,
+          selectedSessionId: setSelectedSessionId,
+          historyMode: setHistoryMode,
+          projectSortDirection: setProjectSortDirection,
+          sessionSortDirection: setSessionSortDirection,
+          messageSortDirection: setMessageSortDirection,
+          bookmarkSortDirection: setBookmarkSortDirection,
+          projectAllSortDirection: setProjectAllSortDirection,
+          sessionPage: setSessionPage,
+          sessionScrollTop: (value) => {
+            sessionScrollTopRef.current = value;
+            setSessionScrollTop(value);
+          },
+          systemMessageRegexRules: setSystemMessageRegexRules,
+        };
+
+        for (const [key, setter] of Object.entries(setters) as Array<
+          [HydratableKey, (value: Exclude<PaneStateSnapshot[HydratableKey], null>) => void]
+        >) {
+          const value = response[key];
+          if (value !== null) {
+            setter(value as Exclude<PaneStateSnapshot[HydratableKey], null>);
+          }
         }
         if (
           response.selectedSessionId !== null &&
@@ -300,78 +225,31 @@ export function usePaneStateSync(args: {
     setUseMonospaceForAllMessages,
   ]);
 
+  const paneStateToPersist = useMemo<PaneStatePersistRequest>(
+    () => ({
+      ...paneState,
+      projectPaneWidth: Math.round(paneState.projectPaneWidth),
+      sessionPaneWidth: Math.round(paneState.sessionPaneWidth),
+      sessionScrollTop: Math.round(paneState.sessionScrollTop),
+    }),
+    [paneState],
+  );
+
   useEffect(() => {
     if (!paneStateHydrated) {
       return;
     }
 
     const timer = window.setTimeout(() => {
-      void codetrail
-        .invoke("ui:setState", {
-          projectPaneWidth: Math.round(projectPaneWidth),
-          sessionPaneWidth: Math.round(sessionPaneWidth),
-          projectPaneCollapsed,
-          sessionPaneCollapsed,
-          projectProviders,
-          historyCategories,
-          expandedByDefaultCategories,
-          searchProviders,
-          theme,
-          monoFontFamily,
-          regularFontFamily,
-          monoFontSize,
-          regularFontSize,
-          useMonospaceForAllMessages,
-          selectedProjectId,
-          selectedSessionId,
-          historyMode,
-          projectSortDirection,
-          sessionSortDirection,
-          messageSortDirection,
-          bookmarkSortDirection,
-          projectAllSortDirection,
-          sessionPage,
-          sessionScrollTop,
-          systemMessageRegexRules,
-        })
-        .catch((error: unknown) => {
-          logError("Failed saving UI state", error);
-        });
+      void codetrail.invoke("ui:setState", paneStateToPersist).catch((error: unknown) => {
+        logError("Failed saving UI state", error);
+      });
     }, 180);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [
-    codetrail,
-    historyCategories,
-    logError,
-    paneStateHydrated,
-    projectPaneWidth,
-    projectPaneCollapsed,
-    projectProviders,
-    expandedByDefaultCategories,
-    searchProviders,
-    monoFontFamily,
-    regularFontFamily,
-    monoFontSize,
-    regularFontSize,
-    useMonospaceForAllMessages,
-    selectedProjectId,
-    selectedSessionId,
-    historyMode,
-    projectSortDirection,
-    sessionSortDirection,
-    messageSortDirection,
-    bookmarkSortDirection,
-    projectAllSortDirection,
-    sessionPage,
-    sessionScrollTop,
-    systemMessageRegexRules,
-    sessionPaneWidth,
-    sessionPaneCollapsed,
-    theme,
-  ]);
+  }, [codetrail, logError, paneStateHydrated, paneStateToPersist]);
 
   return { paneStateHydrated };
 }

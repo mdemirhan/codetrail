@@ -146,6 +146,10 @@ describe("bookmarkStore", () => {
     expect(parserMatches).toHaveLength(1);
     expect(parserMatches[0]?.message_id).toBe("m1");
 
+    const wildcardParserMatches = store.listProjectBookmarks("p1", "pars*");
+    expect(wildcardParserMatches).toHaveLength(1);
+    expect(wildcardParserMatches[0]?.message_id).toBe("m1");
+
     const uppercaseMatches = store.listProjectBookmarks("p1", "FORMATTING");
     expect(uppercaseMatches).toHaveLength(1);
     expect(uppercaseMatches[0]?.message_id).toBe("m2");
