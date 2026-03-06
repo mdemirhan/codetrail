@@ -16,6 +16,8 @@ import type {
   RegularFontSize,
   ThemeMode,
 } from "../../shared/uiPreferences";
+import { createHistorySelection } from "../app/historySelection";
+import type { HistorySelection } from "../app/types";
 import { useCodetrailClient } from "../lib/codetrailClient";
 import { clamp } from "../lib/viewUtils";
 
@@ -49,6 +51,7 @@ export function usePaneStateSync(args: {
   setMonoFontSize: Dispatch<SetStateAction<MonoFontSize>>;
   setRegularFontSize: Dispatch<SetStateAction<RegularFontSize>>;
   setUseMonospaceForAllMessages: Dispatch<SetStateAction<boolean>>;
+  setHistorySelection?: Dispatch<SetStateAction<HistorySelection>>;
   setSelectedProjectId: Dispatch<SetStateAction<string>>;
   setSelectedSessionId: Dispatch<SetStateAction<string>>;
   setHistoryMode: Dispatch<SetStateAction<HistoryMode>>;
@@ -81,6 +84,7 @@ export function usePaneStateSync(args: {
     setMonoFontSize,
     setRegularFontSize,
     setUseMonospaceForAllMessages,
+    setHistorySelection,
     setSelectedProjectId,
     setSelectedSessionId,
     setHistoryMode,
@@ -145,9 +149,6 @@ export function usePaneStateSync(args: {
           monoFontSize: setMonoFontSize,
           regularFontSize: setRegularFontSize,
           useMonospaceForAllMessages: setUseMonospaceForAllMessages,
-          selectedProjectId: setSelectedProjectId,
-          selectedSessionId: setSelectedSessionId,
-          historyMode: setHistoryMode,
           projectSortDirection: setProjectSortDirection,
           sessionSortDirection: setSessionSortDirection,
           messageSortDirection: setMessageSortDirection,
@@ -167,6 +168,25 @@ export function usePaneStateSync(args: {
           const value = response[key];
           if (value !== null) {
             setter(value as Exclude<PaneStateSnapshot[HydratableKey], null>);
+          }
+        }
+        if (setHistorySelection) {
+          setHistorySelection(
+            createHistorySelection(
+              response.historyMode ?? "project_all",
+              response.selectedProjectId ?? "",
+              response.selectedSessionId ?? "",
+            ),
+          );
+        } else {
+          if (response.selectedProjectId !== null) {
+            setSelectedProjectId(response.selectedProjectId);
+          }
+          if (response.selectedSessionId !== null) {
+            setSelectedSessionId(response.selectedSessionId);
+          }
+          if (response.historyMode !== null) {
+            setHistoryMode(response.historyMode);
           }
         }
         if (
@@ -228,6 +248,7 @@ export function usePaneStateSync(args: {
     setMonoFontSize,
     setRegularFontSize,
     setUseMonospaceForAllMessages,
+    setHistorySelection,
   ]);
 
   const paneStateToPersist = useMemo<PaneStatePersistRequest>(

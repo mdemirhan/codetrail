@@ -1,1205 +1,102 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { UIEvent as ReactUIEvent } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import type {
-  IpcRequest,
-  IpcResponse,
-  MessageCategory,
-  Provider,
-  SearchMode,
-  SystemMessageRegexRules,
-} from "@codetrail/core";
+import type { MessageCategory, Provider, SearchMode } from "@codetrail/core";
 
-import {
-  type MonoFontFamily,
-  type MonoFontSize,
-  type RegularFontFamily,
-  type RegularFontSize,
-  type ThemeMode,
-  UI_MESSAGE_CATEGORY_VALUES,
-  UI_PROVIDER_VALUES,
-} from "../shared/uiPreferences";
-import { SettingsView } from "./components/SettingsView";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
-import { ToolbarIcon } from "./components/ToolbarIcon";
+import { SettingsView } from "./components/SettingsView";
 import { TopBar } from "./components/TopBar";
-import { ProjectPane } from "./components/history/ProjectPane";
-import { SessionPane } from "./components/history/SessionPane";
-import { HighlightedText, MessageCard } from "./components/messages/MessagePresentation";
-import { useDebouncedValue } from "./hooks/useDebouncedValue";
-import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import { usePaneStateSync } from "./hooks/usePaneStateSync";
-import { useResizablePanes } from "./hooks/useResizablePanes";
-import { copyTextToClipboard } from "./lib/clipboard";
+import {
+  ADVANCED_SYNTAX_ITEMS,
+  COMMON_SYNTAX_ITEMS,
+  PROVIDERS,
+  SHORTCUT_ITEMS,
+} from "./app/constants";
+import type { MainView, PaneStateSnapshot } from "./app/types";
 import { isMissingCodetrailClient, useCodetrailClient } from "./lib/codetrailClient";
-import {
-  type Direction,
-  getAdjacentItemId,
-  getEdgeItemId,
-  getFirstVisibleMessageId,
-} from "./lib/historyNavigation";
-import { openInFileManager, openPath } from "./lib/pathActions";
-import { SEARCH_PLACEHOLDERS } from "./lib/searchPlaceholders";
-import { decideSessionSelectionAfterLoad } from "./lib/sessionSelection";
-import {
-  clamp,
-  compareRecent,
-  countProviders,
-  deriveSessionTitle,
-  formatDate,
-  prettyCategory,
-  prettyProvider,
-  sessionActivityOf,
-  toErrorMessage,
-  toggleValue,
-} from "./lib/viewUtils";
-
-type ProjectSummary = IpcResponse<"projects:list">["projects"][number];
-type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
-type SessionDetail = IpcResponse<"sessions:getDetail">;
-type ProjectCombinedDetail = IpcResponse<"projects:getCombinedDetail">;
-type HistoryMessage = SessionDetail["messages"][number] | ProjectCombinedDetail["messages"][number];
-type BookmarkListResponse = IpcResponse<"bookmarks:listProject">;
-type SearchQueryResponse = IpcResponse<"search:query">;
-type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
-
-const PAGE_SIZE = 100;
-const SEARCH_PAGE_SIZE = 100;
-const COLLAPSED_PANE_WIDTH = 48;
-
-const PROVIDERS: Provider[] = [...UI_PROVIDER_VALUES];
-const CATEGORIES: MessageCategory[] = [...UI_MESSAGE_CATEGORY_VALUES];
-const DEFAULT_MESSAGE_CATEGORIES: MessageCategory[] = ["user", "assistant"];
-const HISTORY_CATEGORY_SHORTCUTS: Record<MessageCategory, string> = {
-  user: "Cmd/Ctrl+1",
-  assistant: "Cmd/Ctrl+2",
-  tool_edit: "Cmd/Ctrl+3",
-  tool_use: "Cmd/Ctrl+4",
-  tool_result: "Cmd/Ctrl+5",
-  thinking: "Cmd/Ctrl+6",
-  system: "Cmd/Ctrl+7",
-};
-const EMPTY_CATEGORY_COUNTS = {
-  user: 0,
-  assistant: 0,
-  tool_use: 0,
-  tool_edit: 0,
-  tool_result: 0,
-  thinking: 0,
-  system: 0,
-};
-
-type MainView = "history" | "search" | "settings" | "help";
-type HistoryMode = "session" | "bookmarks" | "project_all";
-type BulkExpandScope = "all" | MessageCategory;
-type SortDirection = "asc" | "desc";
-type PaneStateSnapshot = IpcResponse<"ui:getState">;
-type SessionPaneNavigationItem =
-  | { id: "__project_all__"; kind: "project_all" }
-  | { id: "__bookmarks__"; kind: "bookmarks" }
-  | { id: string; kind: "session"; sessionId: string };
-
-const EMPTY_BOOKMARKS_RESPONSE: BookmarkListResponse = {
-  projectId: "",
-  totalCount: 0,
-  filteredCount: 0,
-  categoryCounts: EMPTY_CATEGORY_COUNTS,
-  queryError: null,
-  highlightPatterns: [],
-  results: [],
-};
-const EMPTY_SYSTEM_MESSAGE_REGEX_RULES: SystemMessageRegexRules = {
-  claude: [],
-  codex: [],
-  gemini: [],
-  cursor: [],
-};
-const PROJECT_ALL_NAV_ID = "__project_all__";
-const BOOKMARKS_NAV_ID = "__bookmarks__";
-const SHORTCUT_ITEMS = [
-  { group: "Search & Navigation", shortcut: "Cmd/Ctrl+F", description: "Search messages" },
-  {
-    group: "Search & Navigation",
-    shortcut: "Cmd/Ctrl+Shift+F",
-    description: "Open global search",
-  },
-  { group: "Search & Navigation", shortcut: "Cmd/Ctrl+Left", description: "Previous page" },
-  { group: "Search & Navigation", shortcut: "Cmd/Ctrl+Right", description: "Next page" },
-  { group: "Search & Navigation", shortcut: "Cmd+Up", description: "Focus previous message" },
-  { group: "Search & Navigation", shortcut: "Cmd+Down", description: "Focus next message" },
-  { group: "Search & Navigation", shortcut: "Option+Up", description: "Select previous session" },
-  { group: "Search & Navigation", shortcut: "Option+Down", description: "Select next session" },
-  { group: "Search & Navigation", shortcut: "Ctrl+Up", description: "Select previous project" },
-  { group: "Search & Navigation", shortcut: "Ctrl+Down", description: "Select next project" },
-  { group: "Panels", shortcut: "Cmd/Ctrl+B", description: "Expand/collapse Projects pane" },
-  {
-    group: "Panels",
-    shortcut: "Cmd/Ctrl+Shift+B",
-    description: "Expand/collapse Sessions pane",
-  },
-  { group: "Panels", shortcut: "Cmd/Ctrl+E", description: "Expand/collapse session messages" },
-  { group: "Panels", shortcut: "Cmd/Ctrl+Shift+M", description: "Toggle focus mode" },
-  {
-    group: "Message Filters",
-    shortcut: "Cmd/Ctrl+1",
-    description: "Toggle User button on session messages",
-  },
-  {
-    group: "Message Filters",
-    shortcut: "Cmd/Ctrl+2",
-    description: "Toggle Assistant button on session messages",
-  },
-  {
-    group: "Message Filters",
-    shortcut: "Cmd/Ctrl+3",
-    description: "Toggle Write button on session messages",
-  },
-  {
-    group: "Message Filters",
-    shortcut: "Cmd/Ctrl+4",
-    description: "Toggle Tool Use button on session messages",
-  },
-  {
-    group: "Message Filters",
-    shortcut: "Cmd/Ctrl+5",
-    description: "Toggle Tool Result button on session messages",
-  },
-  {
-    group: "Message Filters",
-    shortcut: "Cmd/Ctrl+6",
-    description: "Toggle Thinking button on session messages",
-  },
-  {
-    group: "Message Filters",
-    shortcut: "Cmd/Ctrl+7",
-    description: "Toggle System button on session messages",
-  },
-  { group: "System", shortcut: "Cmd/Ctrl++", description: "Zoom in" },
-  { group: "System", shortcut: "Cmd/Ctrl+-", description: "Zoom out" },
-  { group: "System", shortcut: "Cmd/Ctrl+0", description: "Reset zoom" },
-  { group: "System", shortcut: "?", description: "Open help page" },
-  { group: "System", shortcut: "Esc", description: "Close help / clear focused message" },
-];
-const COMMON_SYNTAX_ITEMS = [
-  { syntax: "term", description: "Match term token" },
-  { syntax: "term*", description: "Prefix wildcard", note: "Postfix only" },
-  { syntax: "focus+on", description: "Punctuation like '+' can still match tokenized text" },
-  { syntax: "focus-on", description: "Punctuation like '-' can still match tokenized text" },
-  { syntax: "focus+on+something", description: "Multiple separators are supported in a token" },
-];
-const ADVANCED_SYNTAX_ITEMS = [
-  { syntax: '"exact phrase"', description: "Match exact phrase" },
-  { syntax: "A OR B", description: "Either side may match (advanced mode)" },
-  { syntax: "A NOT B", description: "Exclude B from A matches (advanced mode)" },
-  {
-    syntax: '"and" / "or" / "not"',
-    description: "Use quotes for literal words",
-    note: "Unquoted AND / OR / NOT are operators",
-  },
-  { syntax: "(A OR B) C", description: "Use parentheses to group expressions" },
-];
-
-const MONO_FONT_STACKS: Record<MonoFontFamily, string> = {
-  current: '"JetBrains Mono", "IBM Plex Mono", monospace',
-  droid_sans_mono: '"Droid Sans Mono", "JetBrains Mono", "IBM Plex Mono", monospace',
-};
-
-const REGULAR_FONT_STACKS: Record<RegularFontFamily, string> = {
-  current: '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  inter: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-};
-
-function formatDuration(durationMs: number | null): string {
-  if (durationMs === null || !Number.isFinite(durationMs) || durationMs <= 0) {
-    return "-";
-  }
-  const totalSeconds = Math.floor(durationMs / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-  return `${seconds}s`;
-}
-
-function scrollFocusedHistoryMessageIntoView(
-  container: HTMLDivElement,
-  messageElement: HTMLDivElement,
-): void {
-  const containerRect = container.getBoundingClientRect();
-  const messageRect = messageElement.getBoundingClientRect();
-  const containerHeight = container.clientHeight || containerRect.height;
-  const messageHeight = messageRect.height;
-
-  if (containerHeight > 0 && messageHeight > containerHeight) {
-    const nextScrollTop = Math.max(0, container.scrollTop + (messageRect.top - containerRect.top));
-    if (typeof container.scrollTo === "function") {
-      container.scrollTo({ top: nextScrollTop, behavior: "smooth" });
-      return;
-    }
-    container.scrollTop = nextScrollTop;
-    return;
-  }
-
-  messageElement.scrollIntoView({
-    block: "center",
-    behavior: "smooth",
-  });
-}
-
-function focusHistoryList(container: HTMLDivElement | null): void {
-  window.setTimeout(() => {
-    container?.focus({ preventScroll: true });
-  }, 0);
-}
+import { toErrorMessage, toggleValue } from "./lib/viewUtils";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { HistoryDetailPane } from "./features/HistoryDetailPane";
+import { HistoryLayout } from "./features/HistoryLayout";
+import { SearchView } from "./features/SearchView";
+import { useAppearanceController } from "./features/useAppearanceController";
+import { useHistoryController } from "./features/useHistoryController";
+import { useSearchController } from "./features/useSearchController";
 
 export function App({ initialPaneState = null }: { initialPaneState?: PaneStateSnapshot | null }) {
   const codetrail = useCodetrailClient();
   const preloadUnavailable = isMissingCodetrailClient(codetrail);
-  const initialProjectPaneWidth = clamp(initialPaneState?.projectPaneWidth ?? 300, 230, 520);
-  const initialSessionPaneWidth = clamp(initialPaneState?.sessionPaneWidth ?? 320, 250, 620);
-  const initialSessionScrollTop = initialPaneState?.sessionScrollTop ?? 0;
   const [refreshing, setRefreshing] = useState(false);
-
   const [mainView, setMainView] = useState<MainView>("history");
-  const [theme, setTheme] = useState<ThemeMode>(initialPaneState?.theme ?? "light");
-  const [monoFontFamily, setMonoFontFamily] = useState<MonoFontFamily>(
-    initialPaneState?.monoFontFamily ?? "droid_sans_mono",
-  );
-  const [regularFontFamily, setRegularFontFamily] = useState<RegularFontFamily>(
-    initialPaneState?.regularFontFamily ?? "inter",
-  );
-  const [monoFontSize, setMonoFontSize] = useState<MonoFontSize>(
-    initialPaneState?.monoFontSize ?? "13px",
-  );
-  const [regularFontSize, setRegularFontSize] = useState<RegularFontSize>(
-    initialPaneState?.regularFontSize ?? "14px",
-  );
-  const [useMonospaceForAllMessages, setUseMonospaceForAllMessages] = useState(
-    initialPaneState?.useMonospaceForAllMessages ?? false,
-  );
   const [focusMode, setFocusMode] = useState(false);
-  const [projectPaneCollapsed, setProjectPaneCollapsed] = useState(
-    initialPaneState?.projectPaneCollapsed ?? false,
-  );
-  const [sessionPaneCollapsed, setSessionPaneCollapsed] = useState(
-    initialPaneState?.sessionPaneCollapsed ?? false,
-  );
-  const isHistoryLayout = mainView === "history" && !focusMode;
-
-  const [projectQueryInput, setProjectQueryInput] = useState("");
-  const [projectProviders, setProjectProviders] = useState<Provider[]>(
-    initialPaneState?.projectProviders ?? [...PROVIDERS],
-  );
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [projectsLoaded, setProjectsLoaded] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState(
-    initialPaneState?.selectedProjectId ?? "",
-  );
-
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [sessionsLoadedProjectId, setSessionsLoadedProjectId] = useState<string | null>(null);
-  const [bookmarksLoadedProjectId, setBookmarksLoadedProjectId] = useState<string | null>(null);
-  const [sessionPaneStableProjectId, setSessionPaneStableProjectId] = useState<string | null>(
-    initialPaneState?.selectedProjectId ?? null,
-  );
-  const [historyMode, setHistoryMode] = useState<HistoryMode>(
-    initialPaneState?.historyMode ?? "project_all",
-  );
-  const [selectedSessionId, setSelectedSessionId] = useState(
-    initialPaneState?.selectedSessionId ?? "",
-  );
-  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
-  const [projectCombinedDetail, setProjectCombinedDetail] = useState<ProjectCombinedDetail | null>(
-    null,
-  );
-  const [bookmarksResponse, setBookmarksResponse] =
-    useState<BookmarkListResponse>(EMPTY_BOOKMARKS_RESPONSE);
-  const [sessionPage, setSessionPage] = useState(initialPaneState?.sessionPage ?? 0);
-  const [sessionScrollTop, setSessionScrollTop] = useState(initialSessionScrollTop);
-  const [systemMessageRegexRules, setSystemMessageRegexRules] = useState<SystemMessageRegexRules>(
-    initialPaneState?.systemMessageRegexRules ?? EMPTY_SYSTEM_MESSAGE_REGEX_RULES,
-  );
-  const [projectSortDirection, setProjectSortDirection] = useState<SortDirection>(
-    initialPaneState?.projectSortDirection ?? "desc",
-  );
-  const [sessionSortDirection, setSessionSortDirection] = useState<SortDirection>(
-    initialPaneState?.sessionSortDirection ?? "desc",
-  );
-  const [messageSortDirection, setMessageSortDirection] = useState<SortDirection>(
-    initialPaneState?.messageSortDirection ?? "asc",
-  );
-  const [bookmarkSortDirection, setBookmarkSortDirection] = useState<SortDirection>(
-    initialPaneState?.bookmarkSortDirection ?? "asc",
-  );
-  const [projectAllSortDirection, setProjectAllSortDirection] = useState<SortDirection>(
-    initialPaneState?.projectAllSortDirection ?? "desc",
-  );
-  const [sessionQueryInput, setSessionQueryInput] = useState("");
-  const [bookmarkQueryInput, setBookmarkQueryInput] = useState("");
-  const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>(
-    initialPaneState?.historyCategories ?? [...DEFAULT_MESSAGE_CATEGORIES],
-  );
-  const [expandedByDefaultCategories, setExpandedByDefaultCategories] = useState<MessageCategory[]>(
-    initialPaneState?.expandedByDefaultCategories ?? [...DEFAULT_MESSAGE_CATEGORIES],
-  );
-  const [bulkExpandScope, setBulkExpandScope] = useState<BulkExpandScope>("all");
-  const [messageExpanded, setMessageExpanded] = useState<Record<string, boolean>>({});
-  const [zoomPercent, setZoomPercent] = useState(100);
-  const [focusMessageId, setFocusMessageId] = useState("");
-  const [pendingRevealTarget, setPendingRevealTarget] = useState<{
-    sourceId: string;
-    messageId: string;
-  } | null>(null);
-  const [pendingMessageAreaFocus, setPendingMessageAreaFocus] = useState(false);
-  const [pendingMessagePageNavigation, setPendingMessagePageNavigation] = useState<{
-    direction: Direction;
-    targetPage: number;
-  } | null>(null);
-  const [pendingSearchNavigation, setPendingSearchNavigation] = useState<{
-    projectId: string;
-    sessionId: string;
-    messageId: string;
-    sourceId: string;
-    historyCategories: MessageCategory[];
-  } | null>(null);
-
-  const [searchQueryInput, setSearchQueryInput] = useState("");
   const [advancedSearchEnabled, setAdvancedSearchEnabled] = useState(false);
-  const [searchProjectQueryInput, setSearchProjectQueryInput] = useState("");
   const [searchProviders, setSearchProviders] = useState<Provider[]>(
     initialPaneState?.searchProviders ?? [],
   );
-  const [searchProjectId, setSearchProjectId] = useState("");
-  const [searchPage, setSearchPage] = useState(0);
-  const [searchResponse, setSearchResponse] = useState<SearchQueryResponse>({
-    query: "",
-    queryError: null,
-    highlightPatterns: [],
-    totalCount: 0,
-    categoryCounts: EMPTY_CATEGORY_COUNTS,
-    results: [],
-  });
-  const [settingsInfo, setSettingsInfo] = useState<SettingsInfoResponse | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
 
-  const projectQuery = useDebouncedValue(projectQueryInput, 180);
-  const sessionQuery = useDebouncedValue(sessionQueryInput, 400);
-  const bookmarkQuery = useDebouncedValue(bookmarkQueryInput, 400);
-  const searchQuery = useDebouncedValue(searchQueryInput, 500);
-  const searchProjectQuery = useDebouncedValue(searchProjectQueryInput, 180);
+  const isHistoryLayout = mainView === "history" && !focusMode;
   const searchMode: SearchMode = advancedSearchEnabled ? "advanced" : "simple";
-  const effectiveSessionQuery = sessionQueryInput.trim().length === 0 ? "" : sessionQuery;
-  const effectiveBookmarkQuery = bookmarkQueryInput.trim().length === 0 ? "" : bookmarkQuery;
   const logError = useCallback((context: string, error: unknown) => {
     console.error(`[codetrail] ${context}: ${toErrorMessage(error)}`);
   }, []);
 
-  const focusedMessageRef = useRef<HTMLDivElement | null>(null);
-  const messageListRef = useRef<HTMLDivElement | null>(null);
-  const sessionListRef = useRef<HTMLDivElement | null>(null);
-  const projectListRef = useRef<HTMLDivElement | null>(null);
-  const sessionSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const globalSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const pendingRestoredSessionScrollRef = useRef<{
-    sessionId: string;
-    sessionPage: number;
-    scrollTop: number;
-  } | null>(
-    initialPaneState?.selectedSessionId &&
-      typeof initialPaneState?.sessionPage === "number" &&
-      typeof initialPaneState?.sessionScrollTop === "number" &&
-      initialPaneState.sessionScrollTop > 0
-      ? {
-          sessionId: initialPaneState.selectedSessionId,
-          sessionPage: initialPaneState.sessionPage,
-          scrollTop: initialPaneState.sessionScrollTop,
-        }
-      : null,
-  );
-  const projectsLoadTokenRef = useRef(0);
-  const sessionsLoadTokenRef = useRef(0);
-  const bookmarksLoadTokenRef = useRef(0);
-  const searchLoadTokenRef = useRef(0);
-  const sessionScrollTopRef = useRef(initialSessionScrollTop);
-  const sessionScrollSyncTimerRef = useRef<number | null>(null);
-  const {
-    projectPaneWidth,
-    setProjectPaneWidth,
-    sessionPaneWidth,
-    setSessionPaneWidth,
-    beginResize,
-  } = useResizablePanes({
+  const appearance = useAppearanceController({
+    initialPaneState,
+    logError,
+  });
+  const history = useHistoryController({
+    initialPaneState,
     isHistoryLayout,
-    projectMin: 230,
-    projectMax: 520,
-    sessionMin: 250,
-    sessionMax: 620,
-    initialProjectPaneWidth,
-    initialSessionPaneWidth,
-  });
-  const sortedProjects = useMemo(() => {
-    const next = [...projects];
-    next.sort((left, right) => {
-      const byRecent =
-        compareRecent(right.lastActivity, left.lastActivity) || left.name.localeCompare(right.name);
-      return projectSortDirection === "desc" ? byRecent : -byRecent;
-    });
-    return next;
-  }, [projectSortDirection, projects]);
-
-  const sortedSessions = useMemo(() => {
-    const next = [...sessions];
-    next.sort((left, right) => {
-      const byRecent =
-        compareRecent(sessionActivityOf(right), sessionActivityOf(left)) ||
-        right.messageCount - left.messageCount;
-      return sessionSortDirection === "desc" ? byRecent : -byRecent;
-    });
-    return next;
-  }, [sessionSortDirection, sessions]);
-
-  const loadProjects = useCallback(async () => {
-    const requestToken = projectsLoadTokenRef.current + 1;
-    projectsLoadTokenRef.current = requestToken;
-    setProjectsLoaded(false);
-    const response = await codetrail.invoke("projects:list", {
-      providers: projectProviders,
-      query: projectQuery,
-    });
-    if (requestToken !== projectsLoadTokenRef.current) {
-      return;
-    }
-    setProjects(response.projects);
-    setProjectsLoaded(true);
-  }, [codetrail, projectProviders, projectQuery]);
-
-  const loadSessions = useCallback(async () => {
-    const requestToken = sessionsLoadTokenRef.current + 1;
-    sessionsLoadTokenRef.current = requestToken;
-    if (!selectedProjectId) {
-      if (requestToken !== sessionsLoadTokenRef.current) {
-        return;
-      }
-      setSessions([]);
-      setSessionsLoadedProjectId("");
-      setSelectedSessionId("");
-      return;
-    }
-
-    setSessionsLoadedProjectId(null);
-    const response = await codetrail.invoke("sessions:list", {
-      projectId: selectedProjectId,
-    });
-    if (requestToken !== sessionsLoadTokenRef.current) {
-      return;
-    }
-    setSessions(response.sessions);
-    setSessionsLoadedProjectId(selectedProjectId);
-  }, [codetrail, selectedProjectId]);
-
-  const loadBookmarks = useCallback(async () => {
-    const requestToken = bookmarksLoadTokenRef.current + 1;
-    bookmarksLoadTokenRef.current = requestToken;
-    if (!selectedProjectId) {
-      if (requestToken !== bookmarksLoadTokenRef.current) {
-        return;
-      }
-      setBookmarksResponse(EMPTY_BOOKMARKS_RESPONSE);
-      setBookmarksLoadedProjectId("");
-      return;
-    }
-    setBookmarksLoadedProjectId(null);
-    const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
-    const response = await codetrail.invoke("bookmarks:listProject", {
-      projectId: selectedProjectId,
-      query: effectiveBookmarkQuery,
-      searchMode,
-      categories: isAllHistoryCategoriesSelected ? undefined : historyCategories,
-    });
-    if (requestToken !== bookmarksLoadTokenRef.current) {
-      return;
-    }
-    setBookmarksResponse(response);
-    setBookmarksLoadedProjectId(selectedProjectId);
-  }, [codetrail, effectiveBookmarkQuery, historyCategories, searchMode, selectedProjectId]);
-
-  const loadSearch = useCallback(async () => {
-    const requestToken = searchLoadTokenRef.current + 1;
-    searchLoadTokenRef.current = requestToken;
-    const trimmed = searchQuery.trim();
-    const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
-    if (trimmed.length === 0) {
-      if (requestToken !== searchLoadTokenRef.current) {
-        return;
-      }
-      setSearchResponse({
-        query: searchQuery,
-        totalCount: 0,
-        categoryCounts: EMPTY_CATEGORY_COUNTS,
-        highlightPatterns: [],
-        queryError: null,
-        results: [],
-      });
-      return;
-    }
-
-    const response = await codetrail.invoke("search:query", {
-      query: searchQuery,
-      searchMode,
-      categories: isAllHistoryCategoriesSelected ? undefined : historyCategories,
-      providers: searchProviders.length > 0 ? searchProviders : undefined,
-      projectIds: searchProjectId ? [searchProjectId] : undefined,
-      projectQuery: searchProjectQuery,
-      limit: SEARCH_PAGE_SIZE,
-      offset: searchPage * SEARCH_PAGE_SIZE,
-    });
-    if (requestToken !== searchLoadTokenRef.current) {
-      return;
-    }
-    setSearchResponse(response);
-  }, [
-    codetrail,
-    historyCategories,
-    searchProjectId,
-    searchPage,
-    searchProjectQuery,
+    searchMode,
     searchProviders,
-    searchQuery,
-    searchMode,
-  ]);
-
-  const loadSettingsInfo = useCallback(async () => {
-    setSettingsLoading(true);
-    setSettingsError(null);
-    try {
-      const response = await codetrail.invoke("app:getSettingsInfo", {});
-      setSettingsInfo(response);
-    } catch (error) {
-      setSettingsError(toErrorMessage(error));
-    } finally {
-      setSettingsLoading(false);
-    }
-  }, [codetrail]);
-
-  const paneStateForSync = useMemo<IpcRequest<"ui:setState">>(
-    () => ({
-      projectPaneWidth,
-      sessionPaneWidth,
-      projectPaneCollapsed,
-      sessionPaneCollapsed,
-      projectProviders,
-      historyCategories,
-      expandedByDefaultCategories,
-      searchProviders,
-      theme,
-      monoFontFamily,
-      regularFontFamily,
-      monoFontSize,
-      regularFontSize,
-      useMonospaceForAllMessages,
-      selectedProjectId,
-      selectedSessionId,
-      historyMode,
-      projectSortDirection,
-      sessionSortDirection,
-      messageSortDirection,
-      bookmarkSortDirection,
-      projectAllSortDirection,
-      sessionPage,
-      sessionScrollTop,
-      systemMessageRegexRules,
-    }),
-    [
-      projectPaneWidth,
-      sessionPaneWidth,
-      projectPaneCollapsed,
-      sessionPaneCollapsed,
-      projectProviders,
-      historyCategories,
-      expandedByDefaultCategories,
-      searchProviders,
-      theme,
-      monoFontFamily,
-      regularFontFamily,
-      monoFontSize,
-      regularFontSize,
-      useMonospaceForAllMessages,
-      selectedProjectId,
-      selectedSessionId,
-      historyMode,
-      projectSortDirection,
-      sessionSortDirection,
-      messageSortDirection,
-      bookmarkSortDirection,
-      projectAllSortDirection,
-      sessionPage,
-      sessionScrollTop,
-      systemMessageRegexRules,
-    ],
-  );
-
-  const { paneStateHydrated } = usePaneStateSync({
-    initialPaneStateHydrated: initialPaneState !== null,
-    logError,
-    paneState: paneStateForSync,
-    setProjectPaneWidth,
-    setSessionPaneWidth,
-    setProjectPaneCollapsed,
-    setSessionPaneCollapsed,
-    setProjectProviders,
-    setHistoryCategories,
-    setExpandedByDefaultCategories,
     setSearchProviders,
-    setTheme,
-    setMonoFontFamily,
-    setRegularFontFamily,
-    setMonoFontSize,
-    setRegularFontSize,
-    setUseMonospaceForAllMessages,
-    setSelectedProjectId,
-    setSelectedSessionId,
-    setHistoryMode,
-    setProjectSortDirection,
-    setSessionSortDirection,
-    setMessageSortDirection,
-    setBookmarkSortDirection,
-    setProjectAllSortDirection,
-    setSessionPage,
-    setSessionScrollTop,
-    setSystemMessageRegexRules,
-    sessionScrollTopRef,
-    pendingRestoredSessionScrollRef,
+    appearance,
+    logError,
+  });
+  const search = useSearchController({
+    searchMode,
+    searchProviders,
+    setSearchProviders,
+    historyCategories: history.historyCategories,
+    setHistoryCategories: history.setHistoryCategories,
+    logError,
   });
 
   useEffect(() => {
-    let cancelled = false;
-    void codetrail
-      .invoke("ui:getZoom", {})
-      .then((response) => {
-        if (!cancelled) {
-          setZoomPercent(response.percent);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          logError("Failed loading zoom state", error);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [codetrail, logError]);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    try {
-      window.localStorage.setItem("codetrail-theme", theme);
-    } catch {
-      // Ignore storage errors when persisting the last selected theme.
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    document.documentElement.style.setProperty("--font-mono", MONO_FONT_STACKS[monoFontFamily]);
-  }, [monoFontFamily]);
-
-  useEffect(() => {
-    document.documentElement.style.setProperty(
-      "--font-sans",
-      REGULAR_FONT_STACKS[regularFontFamily],
-    );
-  }, [regularFontFamily]);
-
-  useEffect(() => {
-    document.documentElement.style.setProperty("--message-mono-font-size", monoFontSize);
-  }, [monoFontSize]);
-
-  useEffect(() => {
-    document.documentElement.style.setProperty("--message-font-size", regularFontSize);
-  }, [regularFontSize]);
-
-  useEffect(() => {
-    document.documentElement.dataset.useMonospaceMessages = useMonospaceForAllMessages
-      ? "true"
-      : "false";
-  }, [useMonospaceForAllMessages]);
-
-  useEffect(() => {
-    return () => {
-      if (sessionScrollSyncTimerRef.current !== null) {
-        window.clearTimeout(sessionScrollSyncTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadProjects().catch((error: unknown) => {
-      if (!cancelled) {
-        logError("Failed loading projects", error);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [loadProjects, logError]);
-
-  useEffect(() => {
-    if (!paneStateHydrated) {
+    if (mainView !== "settings" || appearance.settingsInfo || appearance.settingsLoading) {
       return;
     }
-
-    if (!projectsLoaded) {
-      return;
-    }
-
-    if (sortedProjects.length === 0) {
-      if (!pendingSearchNavigation) {
-        setSelectedProjectId("");
-      }
-      setSearchProjectId("");
-      return;
-    }
-
-    if (
-      !pendingSearchNavigation &&
-      !sortedProjects.some((project) => project.id === selectedProjectId)
-    ) {
-      setSelectedProjectId(sortedProjects[0]?.id ?? "");
-    }
-
-    if (searchProjectId && !sortedProjects.some((project) => project.id === searchProjectId)) {
-      setSearchProjectId("");
-    }
-  }, [
-    paneStateHydrated,
-    pendingSearchNavigation,
-    projectsLoaded,
-    searchProjectId,
-    selectedProjectId,
-    sortedProjects,
-  ]);
+    void appearance.loadSettingsInfo();
+  }, [appearance.loadSettingsInfo, appearance.settingsInfo, appearance.settingsLoading, mainView]);
 
   useEffect(() => {
-    let cancelled = false;
-    void loadSessions().catch((error: unknown) => {
-      if (!cancelled) {
-        logError("Failed loading sessions", error);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [loadSessions, logError]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadBookmarks().catch((error: unknown) => {
-      if (!cancelled) {
-        logError("Failed loading bookmarks", error);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [loadBookmarks, logError]);
-
-  useEffect(() => {
-    const decision = decideSessionSelectionAfterLoad({
-      paneStateHydrated,
-      sessionsLoadedProjectId,
-      selectedProjectId,
-      hasPendingSearchNavigation:
-        pendingSearchNavigation !== null ||
-        historyMode === "bookmarks" ||
-        historyMode === "project_all",
-      selectedSessionId,
-      sortedSessions,
-    });
-    if (!decision) {
-      return;
+    if (search.searchProjectId && !history.sortedProjects.some((project) => project.id === search.searchProjectId)) {
+      search.setSearchProjectId("");
     }
+  }, [history.sortedProjects, search]);
 
-    setSelectedSessionId(decision.nextSelectedSessionId);
-    if (decision.resetPage) {
-      setSessionPage(0);
-    }
-  }, [
-    historyMode,
-    paneStateHydrated,
-    pendingSearchNavigation,
-    selectedProjectId,
-    selectedSessionId,
-    sessionsLoadedProjectId,
-    sortedSessions,
-  ]);
-
-  useEffect(() => {
-    if (!pendingSearchNavigation) {
-      return;
-    }
-
-    if (pendingSearchNavigation.projectId !== selectedProjectId) {
-      setSelectedProjectId(pendingSearchNavigation.projectId);
-      return;
-    }
-
-    if (!sortedSessions.some((session) => session.id === pendingSearchNavigation.sessionId)) {
-      return;
-    }
-
-    setSelectedSessionId(pendingSearchNavigation.sessionId);
-    setSessionQueryInput("");
-    setHistoryCategories([...pendingSearchNavigation.historyCategories]);
-    setSessionPage(0);
-    setFocusMessageId(pendingSearchNavigation.messageId);
-    setPendingRevealTarget({
-      sourceId: pendingSearchNavigation.sourceId,
-      messageId: pendingSearchNavigation.messageId,
-    });
-    setHistoryMode("session");
-    setPendingSearchNavigation(null);
+  const focusSessionSearch = useCallback(() => {
     setMainView("history");
-  }, [pendingSearchNavigation, selectedProjectId, sortedSessions]);
+    history.focusSessionSearch();
+  }, [history]);
 
-  useEffect(() => {
-    if (historyMode !== "bookmarks") {
-      return;
-    }
-    if (bookmarksLoadedProjectId !== selectedProjectId) {
-      return;
-    }
-    if (bookmarksResponse.totalCount > 0) {
-      return;
-    }
-    setHistoryMode("project_all");
-  }, [bookmarksLoadedProjectId, bookmarksResponse.totalCount, historyMode, selectedProjectId]);
-
-  useEffect(() => {
-    if (historyMode !== "session" || !selectedSessionId) {
-      setSessionDetail(null);
-      return;
-    }
-
-    let cancelled = false;
-    const isRevealing = pendingRevealTarget !== null;
-    const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
-    const effectiveCategories = isAllHistoryCategoriesSelected ? undefined : historyCategories;
-    const effectiveQuery = isRevealing ? "" : effectiveSessionQuery;
-    void codetrail
-      .invoke("sessions:getDetail", {
-        sessionId: selectedSessionId,
-        page: sessionPage,
-        pageSize: PAGE_SIZE,
-        categories: effectiveCategories,
-        query: effectiveQuery,
-        searchMode,
-        sortDirection: messageSortDirection,
-        focusMessageId: pendingRevealTarget?.messageId || undefined,
-        focusSourceId: pendingRevealTarget?.sourceId || undefined,
-      })
-      .then((response) => {
-        if (cancelled) {
-          return;
-        }
-        setSessionDetail(response);
-        if (pendingRevealTarget !== null) {
-          setPendingRevealTarget(null);
-        }
-        if (response.page !== sessionPage) {
-          setSessionPage(response.page);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          logError("Failed loading session detail", error);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    codetrail,
-    historyMode,
-    selectedSessionId,
-    sessionPage,
-    messageSortDirection,
-    historyCategories,
-    effectiveSessionQuery,
-    searchMode,
-    pendingRevealTarget,
-    logError,
-  ]);
-
-  useEffect(() => {
-    if (historyMode !== "project_all" || !selectedProjectId) {
-      setProjectCombinedDetail(null);
-      return;
-    }
-
-    let cancelled = false;
-    const isRevealing = pendingRevealTarget !== null;
-    const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
-    const effectiveCategories = isAllHistoryCategoriesSelected ? undefined : historyCategories;
-    const effectiveQuery = isRevealing ? "" : effectiveSessionQuery;
-    void codetrail
-      .invoke("projects:getCombinedDetail", {
-        projectId: selectedProjectId,
-        page: sessionPage,
-        pageSize: PAGE_SIZE,
-        categories: effectiveCategories,
-        query: effectiveQuery,
-        searchMode,
-        sortDirection: projectAllSortDirection,
-        focusMessageId: pendingRevealTarget?.messageId || undefined,
-        focusSourceId: pendingRevealTarget?.sourceId || undefined,
-      })
-      .then((response) => {
-        if (cancelled) {
-          return;
-        }
-        setProjectCombinedDetail(response);
-        if (pendingRevealTarget !== null) {
-          setPendingRevealTarget(null);
-        }
-        if (response.page !== sessionPage) {
-          setSessionPage(response.page);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          logError("Failed loading project combined detail", error);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    codetrail,
-    historyMode,
-    selectedProjectId,
-    sessionPage,
-    projectAllSortDirection,
-    historyCategories,
-    effectiveSessionQuery,
-    searchMode,
-    pendingRevealTarget,
-    logError,
-  ]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadSearch().catch((error: unknown) => {
-      if (!cancelled) {
-        logError("Search failed", error);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [loadSearch, logError]);
-
-  useEffect(() => {
-    if (mainView !== "settings") {
-      return;
-    }
-    if (settingsInfo || settingsLoading) {
-      return;
-    }
-    void loadSettingsInfo();
-  }, [loadSettingsInfo, mainView, settingsInfo, settingsLoading]);
-
-  const bookmarkMessages = useMemo(() => {
-    const next = bookmarksResponse.results.map((entry) => entry.message);
-    next.sort((left, right) => {
-      const byTime =
-        compareRecent(left.createdAt, right.createdAt) || left.id.localeCompare(right.id);
-      return bookmarkSortDirection === "asc" ? byTime : -byTime;
-    });
-    return next;
-  }, [bookmarksResponse.results, bookmarkSortDirection]);
-
-  const activeMessageSortDirection: SortDirection =
-    historyMode === "project_all"
-      ? projectAllSortDirection
-      : historyMode === "bookmarks"
-        ? bookmarkSortDirection
-        : messageSortDirection;
-  const messageSortScopeLabel =
-    historyMode === "project_all"
-      ? "All Sessions messages"
-      : historyMode === "bookmarks"
-        ? "bookmarked messages"
-        : "session messages";
-  const messageSortTooltip =
-    activeMessageSortDirection === "asc"
-      ? `${messageSortScopeLabel}: oldest to newest. Click to switch to newest first.`
-      : `${messageSortScopeLabel}: newest to oldest. Click to switch to oldest first.`;
-  const bookmarkOrphanedByMessageId = useMemo(
-    () =>
-      new Map(
-        bookmarksResponse.results.map((entry) => [entry.message.id, entry.isOrphaned] as const),
-      ),
-    [bookmarksResponse.results],
-  );
-  const bookmarkedMessageIds = useMemo(
-    () => new Set(bookmarksResponse.results.map((entry) => entry.message.id)),
-    [bookmarksResponse.results],
-  );
-  const activeHistoryMessages: HistoryMessage[] = useMemo(() => {
-    if (historyMode === "bookmarks") {
-      return bookmarkMessages;
-    }
-    if (historyMode === "project_all") {
-      return projectCombinedDetail?.messages ?? [];
-    }
-    return sessionDetail?.messages ?? [];
-  }, [bookmarkMessages, historyMode, projectCombinedDetail?.messages, sessionDetail?.messages]);
-
-  const visibleFocusedMessageId = useMemo(() => {
-    if (!focusMessageId) {
-      return "";
-    }
-    return activeHistoryMessages.some((message) => message.id === focusMessageId)
-      ? focusMessageId
-      : "";
-  }, [activeHistoryMessages, focusMessageId]);
-  const focusedMessagePosition = useMemo(() => {
-    if (!focusMessageId) {
-      return -1;
-    }
-    return activeHistoryMessages.findIndex((message) => message.id === focusMessageId);
-  }, [activeHistoryMessages, focusMessageId]);
-  const loadedHistoryPage =
-    historyMode === "project_all" ? (projectCombinedDetail?.page ?? 0) : (sessionDetail?.page ?? 0);
-
-  useEffect(() => {
-    if (!messageListRef.current) {
-      return;
-    }
-    if (historyMode === "bookmarks") {
-      messageListRef.current.scrollTop = 0;
-      sessionScrollTopRef.current = 0;
-      setSessionScrollTop(0);
-      return;
-    }
-    const scrollScopeId = historyMode === "project_all" ? selectedProjectId : selectedSessionId;
-    if (!scrollScopeId || sessionPage < 0) {
-      messageListRef.current.scrollTop = 0;
-      sessionScrollTopRef.current = 0;
-      setSessionScrollTop(0);
-      return;
-    }
-
-    const pendingRestore = pendingRestoredSessionScrollRef.current;
-    if (
-      pendingRestore &&
-      pendingRestore.sessionId === scrollScopeId &&
-      pendingRestore.sessionPage === sessionPage
-    ) {
-      messageListRef.current.scrollTop = pendingRestore.scrollTop;
-      sessionScrollTopRef.current = pendingRestore.scrollTop;
-      setSessionScrollTop(pendingRestore.scrollTop);
-      pendingRestoredSessionScrollRef.current = null;
-      return;
-    }
-
-    if (pendingRestore) {
-      pendingRestoredSessionScrollRef.current = null;
-    }
-    messageListRef.current.scrollTop = 0;
-    sessionScrollTopRef.current = 0;
-    setSessionScrollTop(0);
-  }, [historyMode, selectedProjectId, selectedSessionId, sessionPage]);
-
-  useEffect(() => {
-    if (
-      !focusMessageId ||
-      !visibleFocusedMessageId ||
-      focusedMessagePosition < 0 ||
-      !focusedMessageRef.current ||
-      !messageListRef.current
-    ) {
-      return;
-    }
-
-    const rafId = window.requestAnimationFrame(() => {
-      if (!focusedMessageRef.current || !messageListRef.current) {
-        return;
-      }
-      scrollFocusedHistoryMessageIntoView(messageListRef.current, focusedMessageRef.current);
-    });
-    return () => {
-      window.cancelAnimationFrame(rafId);
-    };
-  }, [focusMessageId, focusedMessagePosition, visibleFocusedMessageId]);
-
-  useEffect(() => {
-    if (!pendingMessageAreaFocus || !visibleFocusedMessageId || !messageListRef.current) {
-      return;
-    }
-
-    messageListRef.current.focus({ preventScroll: true });
-    setPendingMessageAreaFocus(false);
-  }, [pendingMessageAreaFocus, visibleFocusedMessageId]);
-
-  useEffect(() => {
-    if (!pendingMessagePageNavigation) {
-      return;
-    }
-    if (loadedHistoryPage !== pendingMessagePageNavigation.targetPage) {
-      return;
-    }
-
-    const targetMessageId = getEdgeItemId(
-      activeHistoryMessages,
-      pendingMessagePageNavigation.direction,
-    );
-    setPendingMessagePageNavigation(null);
-    if (!targetMessageId) {
-      return;
-    }
-    setFocusMessageId(targetMessageId);
-  }, [activeHistoryMessages, loadedHistoryPage, pendingMessagePageNavigation]);
-
-  useEffect(() => {
-    if (!selectedProjectId) {
-      setSessionPaneStableProjectId(null);
-      return;
-    }
-    if (
-      sessionsLoadedProjectId === selectedProjectId &&
-      bookmarksLoadedProjectId === selectedProjectId
-    ) {
-      setSessionPaneStableProjectId((value) =>
-        value === selectedProjectId ? value : selectedProjectId,
-      );
-    }
-  }, [bookmarksLoadedProjectId, selectedProjectId, sessionsLoadedProjectId]);
+  const focusGlobalSearch = useCallback(() => {
+    setMainView("search");
+    search.focusGlobalSearch();
+  }, [search]);
 
   const handleRefresh = useCallback(
     async (force: boolean) => {
       setRefreshing(true);
       try {
         await codetrail.invoke("indexer:refresh", { force });
-        await Promise.all([loadProjects(), loadSessions(), loadBookmarks(), loadSearch()]);
+        await Promise.all([history.handleRefreshAllData(), search.reloadSearch()]);
       } catch (error) {
         logError("Refresh failed", error);
       } finally {
         setRefreshing(false);
       }
     },
-    [codetrail, loadBookmarks, loadProjects, loadSearch, loadSessions, logError],
+    [codetrail, history, logError, search],
   );
 
   const handleIncrementalRefresh = useCallback(async () => {
@@ -1210,524 +107,29 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     await handleRefresh(true);
   }, [handleRefresh]);
 
-  const selectedProject = useMemo(
-    () => sortedProjects.find((project) => project.id === selectedProjectId) ?? null,
-    [selectedProjectId, sortedProjects],
-  );
-  const selectedSession = useMemo(
-    () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,
-    [selectedSessionId, sortedSessions],
-  );
-  const allSessionsCount = useMemo(
-    () => sortedSessions.reduce((sum, session) => sum + session.messageCount, 0),
-    [sortedSessions],
-  );
-  const isSessionPaneReadyForSelectedProject =
-    !selectedProjectId || sessionPaneStableProjectId === selectedProjectId;
-  const visibleSessionPaneSessions = isSessionPaneReadyForSelectedProject ? sortedSessions : [];
-  const visibleSessionPaneBookmarksCount = isSessionPaneReadyForSelectedProject
-    ? bookmarksResponse.totalCount
-    : 0;
-  const visibleSessionPaneAllSessionsCount = isSessionPaneReadyForSelectedProject
-    ? allSessionsCount
-    : 0;
-  const sessionPaneNavigationItems = useMemo<SessionPaneNavigationItem[]>(() => {
-    const next: SessionPaneNavigationItem[] = [{ id: PROJECT_ALL_NAV_ID, kind: "project_all" }];
-    if (visibleSessionPaneBookmarksCount > 0) {
-      next.push({ id: BOOKMARKS_NAV_ID, kind: "bookmarks" });
-    }
-    next.push(
-      ...visibleSessionPaneSessions.map((session) => ({
-        id: session.id,
-        kind: "session" as const,
-        sessionId: session.id,
-      })),
-    );
-    return next;
-  }, [visibleSessionPaneBookmarksCount, visibleSessionPaneSessions]);
-  const messagePathRoots = useMemo(() => {
-    if (!selectedProject?.path) {
-      return [];
-    }
-    return [selectedProject.path];
-  }, [selectedProject?.path]);
-
-  const applyZoomAction = useCallback(
-    async (action: "in" | "out" | "reset") => {
-      try {
-        const response = await codetrail.invoke("ui:setZoom", { action });
-        setZoomPercent(response.percent);
-      } catch (error) {
-        logError(`Failed applying zoom action '${action}'`, error);
-      }
-    },
-    [codetrail, logError],
-  );
-
-  const handleCopySessionDetails = useCallback(async () => {
-    if (!selectedSession) {
-      return;
-    }
-    const messageCount = sessionDetail?.totalCount ?? selectedSession.messageCount;
-    const pageCount = Math.max(1, Math.ceil(messageCount / PAGE_SIZE));
-    const lines = [
-      `Title: ${deriveSessionTitle(selectedSession)}`,
-      `Provider: ${prettyProvider(selectedSession.provider)}`,
-      `Project: ${selectedProject?.name || selectedProject?.path || "(unknown project)"}`,
-      `Session ID: ${selectedSession.id}`,
-      `File: ${selectedSession.filePath}`,
-      `CWD: ${selectedSession.cwd ?? "-"}`,
-      `Branch: ${selectedSession.gitBranch ?? "-"}`,
-      `Models: ${selectedSession.modelNames || "-"}`,
-      `Started: ${selectedSession.startedAt ?? "-"}`,
-      `Ended: ${selectedSession.endedAt ?? "-"}`,
-      `Duration: ${formatDuration(selectedSession.durationMs)}`,
-      `Messages: ${messageCount}`,
-      `Page: ${sessionPage + 1}/${pageCount}`,
-    ];
-    const sessionDetailsText = lines.join("\n");
-    const copied = await copyTextToClipboard(sessionDetailsText);
-    if (!copied) {
-      logError("Failed copying session details", "Clipboard API unavailable");
-    }
-  }, [logError, selectedProject, selectedSession, sessionDetail?.totalCount, sessionPage]);
-
-  const handleCopyProjectDetails = useCallback(async () => {
-    if (!selectedProject) {
-      return;
-    }
-    const lines = [
-      `Name: ${selectedProject.name || "(untitled project)"}`,
-      `Provider: ${prettyProvider(selectedProject.provider)}`,
-      `Project ID: ${selectedProject.id}`,
-      `Path: ${selectedProject.path || "-"}`,
-      `Sessions: ${selectedProject.sessionCount}`,
-      `Messages: ${allSessionsCount}`,
-      `Last Activity: ${selectedProject.lastActivity ?? "-"}`,
-    ];
-    const projectDetailsText = lines.join("\n");
-    const copied = await copyTextToClipboard(projectDetailsText);
-    if (!copied) {
-      logError("Failed copying project details", "Clipboard API unavailable");
-    }
-  }, [allSessionsCount, logError, selectedProject]);
-
-  const focusSessionSearch = useCallback(() => {
-    setMainView("history");
-    window.setTimeout(() => {
-      sessionSearchInputRef.current?.focus();
-      sessionSearchInputRef.current?.select();
-    }, 0);
-  }, []);
-
-  const focusGlobalSearch = useCallback(() => {
-    setMainView("search");
-    window.setTimeout(() => {
-      globalSearchInputRef.current?.focus();
-      globalSearchInputRef.current?.select();
-    }, 0);
-  }, []);
-
-  const projectProviderCounts = useMemo(
-    () => countProviders(sortedProjects.map((project) => project.provider)),
-    [sortedProjects],
-  );
-  const searchProviderCounts = useMemo(
-    () => countProviders(searchResponse.results.map((result) => result.provider)),
-    [searchResponse.results],
-  );
-
-  const totalPages = useMemo(() => {
-    const totalCount =
-      historyMode === "project_all"
-        ? (projectCombinedDetail?.totalCount ?? 0)
-        : (sessionDetail?.totalCount ?? 0);
-    if (totalCount === 0) {
-      return 1;
-    }
-    return Math.ceil(totalCount / PAGE_SIZE);
-  }, [historyMode, projectCombinedDetail?.totalCount, sessionDetail?.totalCount]);
-  const canNavigatePages = historyMode !== "bookmarks";
-  const canGoToPreviousHistoryPage = canNavigatePages && sessionPage > 0;
-  const canGoToNextHistoryPage = canNavigatePages && sessionPage + 1 < totalPages;
-  const hasActiveSearchQuery = searchQuery.trim().length > 0;
-  const searchTotalPages = useMemo(() => {
-    if (searchResponse.totalCount === 0) {
-      return 1;
-    }
-    return Math.ceil(searchResponse.totalCount / SEARCH_PAGE_SIZE);
-  }, [searchResponse.totalCount]);
-  const canGoToPreviousSearchPage = hasActiveSearchQuery && searchPage > 0;
-  const canGoToNextSearchPage = hasActiveSearchQuery && searchPage + 1 < searchTotalPages;
-
-  const goToPreviousHistoryPage = useCallback(() => {
-    if (!canNavigatePages) {
-      return;
-    }
-    setSessionPage((value) => Math.max(0, value - 1));
-  }, [canNavigatePages]);
-
-  const goToNextHistoryPage = useCallback(() => {
-    if (!canNavigatePages) {
-      return;
-    }
-    setSessionPage((value) => Math.min(totalPages - 1, value + 1));
-  }, [canNavigatePages, totalPages]);
-
-  const focusAdjacentHistoryMessage = useCallback(
-    (direction: Direction) => {
-      if (activeHistoryMessages.length === 0) {
-        return;
-      }
-
-      if (!visibleFocusedMessageId) {
-        const firstVisibleMessageId = getFirstVisibleMessageId(messageListRef.current);
-        if (firstVisibleMessageId) {
-          setPendingMessageAreaFocus(true);
-          setFocusMessageId(firstVisibleMessageId);
-        }
-        return;
-      }
-
-      const adjacentMessageId = getAdjacentItemId(
-        activeHistoryMessages,
-        visibleFocusedMessageId,
-        direction,
-      );
-      if (adjacentMessageId) {
-        setPendingMessageAreaFocus(true);
-        setFocusMessageId(adjacentMessageId);
-        return;
-      }
-
-      const canAdvancePage =
-        direction === "next" ? canGoToNextHistoryPage : canGoToPreviousHistoryPage;
-      if (!canAdvancePage) {
-        return;
-      }
-
-      const targetPage =
-        direction === "next"
-          ? Math.min(totalPages - 1, sessionPage + 1)
-          : Math.max(0, sessionPage - 1);
-      setPendingMessageAreaFocus(true);
-      setPendingMessagePageNavigation({ direction, targetPage });
-      setSessionPage(targetPage);
-    },
-    [
-      activeHistoryMessages,
-      canGoToNextHistoryPage,
-      canGoToPreviousHistoryPage,
-      sessionPage,
-      totalPages,
-      visibleFocusedMessageId,
-    ],
-  );
-
-  const goToPreviousSearchPage = useCallback(() => {
-    setSearchPage((value) => Math.max(0, value - 1));
-  }, []);
-
-  const goToNextSearchPage = useCallback(() => {
-    setSearchPage((value) => Math.min(searchTotalPages - 1, value + 1));
-  }, [searchTotalPages]);
-
-  useEffect(() => {
-    setSearchPage((value) => Math.min(value, searchTotalPages - 1));
-  }, [searchTotalPages]);
-
-  const canZoomIn = zoomPercent < 500;
-  const canZoomOut = zoomPercent > 25;
-  const historyCategoryCounts =
-    historyMode === "bookmarks"
-      ? bookmarksResponse.categoryCounts
-      : historyMode === "project_all"
-        ? (projectCombinedDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS)
-        : (sessionDetail?.categoryCounts ?? EMPTY_CATEGORY_COUNTS);
-  const historyQueryError =
-    historyMode === "bookmarks"
-      ? (bookmarksResponse.queryError ?? null)
-      : historyMode === "project_all"
-        ? (projectCombinedDetail?.queryError ?? null)
-        : (sessionDetail?.queryError ?? null);
-  const historyHighlightPatterns =
-    historyMode === "bookmarks"
-      ? (bookmarksResponse.highlightPatterns ?? [])
-      : historyMode === "project_all"
-        ? (projectCombinedDetail?.highlightPatterns ?? [])
-        : (sessionDetail?.highlightPatterns ?? []);
-  const sessionMessages = activeHistoryMessages;
-  const isExpandedByDefault = useCallback(
-    (category: MessageCategory) => expandedByDefaultCategories.includes(category),
-    [expandedByDefaultCategories],
-  );
-  const scopedMessages = useMemo(
-    () =>
-      bulkExpandScope === "all"
-        ? sessionMessages
-        : sessionMessages.filter((message) => message.category === bulkExpandScope),
-    [bulkExpandScope, sessionMessages],
-  );
-  const areScopedMessagesExpanded = useMemo(
-    () =>
-      scopedMessages.length > 0 &&
-      scopedMessages.every(
-        (message) => messageExpanded[message.id] ?? isExpandedByDefault(message.category),
-      ),
-    [isExpandedByDefault, messageExpanded, scopedMessages],
-  );
-  const bulkScopeLabel = useMemo(
-    () => (bulkExpandScope === "all" ? "All" : prettyCategory(bulkExpandScope)),
-    [bulkExpandScope],
-  );
-  const scopedActionLabel = areScopedMessagesExpanded ? "Collapse" : "Expand";
-  const scopedExpandCollapseLabel = `${scopedActionLabel} ${bulkScopeLabel}`;
-  const workspaceStyle = isHistoryLayout
-    ? {
-        gridTemplateColumns: `${
-          projectPaneCollapsed ? COLLAPSED_PANE_WIDTH : projectPaneWidth
-        }px 1px ${sessionPaneCollapsed ? COLLAPSED_PANE_WIDTH : sessionPaneWidth}px 1px minmax(420px, 1fr)`,
-      }
-    : undefined;
-
-  const handleToggleScopedMessagesExpanded = useCallback(() => {
-    if (scopedMessages.length === 0) {
-      return;
-    }
-    const expanded = !areScopedMessagesExpanded;
-    setMessageExpanded((value) => {
-      const next = { ...value };
-      for (const message of scopedMessages) {
-        next[message.id] = expanded;
-      }
-      return next;
-    });
-  }, [areScopedMessagesExpanded, scopedMessages]);
-
-  const handleToggleHistoryCategoryShortcut = useCallback((category: MessageCategory) => {
-    setHistoryCategories((value) => toggleValue<MessageCategory>(value, category));
-    setSessionPage(0);
-  }, []);
-
-  const handleToggleMessageExpanded = useCallback(
-    (messageId: string, category: MessageCategory) => {
-      setMessageExpanded((value) => ({
-        ...value,
-        [messageId]: !(value[messageId] ?? isExpandedByDefault(category)),
-      }));
-    },
-    [isExpandedByDefault],
-  );
-
-  const handleRevealInSession = useCallback(
-    (messageId: string, sourceId: string) => {
-      if (historyMode === "bookmarks") {
-        const bookmarked = bookmarksResponse.results.find(
-          (entry) => entry.message.id === messageId,
-        );
-        if (!bookmarked) {
-          return;
-        }
-        setPendingSearchNavigation({
-          projectId: bookmarked.projectId,
-          sessionId: bookmarked.sessionId,
-          messageId,
-          sourceId,
-          historyCategories: [...historyCategories],
-        });
-        setSelectedProjectId(bookmarked.projectId);
-        setHistoryMode("session");
-        setMainView("history");
-        return;
-      }
-
-      if (historyMode === "project_all") {
-        const projectMessage = activeHistoryMessages.find((entry) => entry.id === messageId);
-        if (!projectMessage || !selectedProjectId) {
-          return;
-        }
-        setPendingSearchNavigation({
-          projectId: selectedProjectId,
-          sessionId: projectMessage.sessionId,
-          messageId,
-          sourceId,
-          historyCategories: [...historyCategories],
-        });
-        setHistoryMode("session");
-        setMainView("history");
-        return;
-      }
-
-      setSessionQueryInput("");
-      setFocusMessageId(messageId);
-      setPendingRevealTarget({ messageId, sourceId });
-    },
-    [
-      activeHistoryMessages,
-      bookmarksResponse.results,
-      historyCategories,
-      historyMode,
-      selectedProjectId,
-    ],
-  );
-
-  const handleToggleBookmark = useCallback(
-    async (message: HistoryMessage) => {
-      if (!selectedProjectId) {
-        return;
-      }
-      try {
-        await codetrail.invoke("bookmarks:toggle", {
-          projectId: selectedProjectId,
-          sessionId: message.sessionId,
-          messageId: message.id,
-          messageSourceId: message.sourceId,
-        });
-        await loadBookmarks();
-      } catch (error) {
-        logError("Failed toggling bookmark", error);
-      }
-    },
-    [codetrail, loadBookmarks, logError, selectedProjectId],
-  );
-
-  const handleMessageListScroll = useCallback((event: ReactUIEvent<HTMLDivElement>) => {
-    sessionScrollTopRef.current = Math.max(0, Math.round(event.currentTarget.scrollTop));
-    if (sessionScrollSyncTimerRef.current !== null) {
-      return;
-    }
-    sessionScrollSyncTimerRef.current = window.setTimeout(() => {
-      sessionScrollSyncTimerRef.current = null;
-      setSessionScrollTop((value) =>
-        value === sessionScrollTopRef.current ? value : sessionScrollTopRef.current,
-      );
-    }, 120);
-  }, []);
-
-  const handleHistorySearchKeyDown = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Escape") {
-      return;
-    }
-    event.preventDefault();
-    const focusTarget =
-      messageListRef.current?.querySelector<HTMLElement>(
-        ".message.focused .message-toggle-button",
-      ) ??
-      messageListRef.current?.querySelector<HTMLElement>(".message .message-toggle-button") ??
-      messageListRef.current?.querySelector<HTMLElement>(".message .message-header");
-    focusTarget?.focus();
-  }, []);
-
-  const resetHistorySelectionState = useCallback(() => {
-    setPendingSearchNavigation(null);
-    setPendingMessageAreaFocus(false);
-    setPendingMessagePageNavigation(null);
-    setSessionPage(0);
-    setFocusMessageId("");
-    setPendingRevealTarget(null);
-  }, []);
-
-  const selectProjectAllMessages = useCallback(
-    (projectId: string) => {
-      resetHistorySelectionState();
-      setSelectedProjectId(projectId);
-      setHistoryMode("project_all");
-      setSelectedSessionId("");
-      setMainView("history");
-    },
-    [resetHistorySelectionState],
-  );
-
-  const selectBookmarksView = useCallback(() => {
-    resetHistorySelectionState();
-    setHistoryMode("bookmarks");
-    setSelectedSessionId("");
-    setMainView("history");
-  }, [resetHistorySelectionState]);
-
-  const selectSessionView = useCallback(
-    (sessionId: string) => {
-      resetHistorySelectionState();
-      setSelectedSessionId(sessionId);
-      setHistoryMode("session");
-      setMainView("history");
-    },
-    [resetHistorySelectionState],
-  );
-
-  const selectAdjacentSession = useCallback(
-    (direction: Direction) => {
-      const currentNavigationId =
-        historyMode === "project_all"
-          ? PROJECT_ALL_NAV_ID
-          : historyMode === "bookmarks"
-            ? BOOKMARKS_NAV_ID
-            : selectedSessionId;
-      const nextNavigationId = getAdjacentItemId(
-        sessionPaneNavigationItems,
-        currentNavigationId,
-        direction,
-      );
-      if (!nextNavigationId) {
-        return;
-      }
-      focusHistoryList(sessionListRef.current);
-      if (nextNavigationId === PROJECT_ALL_NAV_ID) {
-        selectProjectAllMessages(selectedProjectId);
-        return;
-      }
-      if (nextNavigationId === BOOKMARKS_NAV_ID) {
-        selectBookmarksView();
-        return;
-      }
-      selectSessionView(nextNavigationId);
-    },
-    [
-      historyMode,
-      selectBookmarksView,
-      selectProjectAllMessages,
-      selectSessionView,
-      selectedProjectId,
-      selectedSessionId,
-      sessionPaneNavigationItems,
-    ],
-  );
-
-  const selectAdjacentProject = useCallback(
-    (direction: Direction) => {
-      const nextProjectId = getAdjacentItemId(sortedProjects, selectedProjectId, direction);
-      if (!nextProjectId) {
-        return;
-      }
-      focusHistoryList(projectListRef.current);
-      selectProjectAllMessages(nextProjectId);
-    },
-    [selectProjectAllMessages, selectedProjectId, sortedProjects],
-  );
-
   useKeyboardShortcuts({
     mainView,
-    hasFocusedHistoryMessage: Boolean(visibleFocusedMessageId),
+    hasFocusedHistoryMessage: Boolean(history.visibleFocusedMessageId),
     setMainView,
-    clearFocusedHistoryMessage: () => setFocusMessageId(""),
+    clearFocusedHistoryMessage: () => history.setFocusMessageId(""),
     focusGlobalSearch,
     focusSessionSearch,
     toggleFocusMode: () => setFocusMode((value) => !value),
-    toggleScopedMessagesExpanded: handleToggleScopedMessagesExpanded,
-    toggleHistoryCategory: handleToggleHistoryCategoryShortcut,
-    toggleProjectPaneCollapsed: () => setProjectPaneCollapsed((value) => !value),
-    toggleSessionPaneCollapsed: () => setSessionPaneCollapsed((value) => !value),
-    focusPreviousHistoryMessage: () => focusAdjacentHistoryMessage("previous"),
-    focusNextHistoryMessage: () => focusAdjacentHistoryMessage("next"),
-    selectPreviousSession: () => selectAdjacentSession("previous"),
-    selectNextSession: () => selectAdjacentSession("next"),
-    selectPreviousProject: () => selectAdjacentProject("previous"),
-    selectNextProject: () => selectAdjacentProject("next"),
-    goToPreviousHistoryPage,
-    goToNextHistoryPage,
-    goToPreviousSearchPage,
-    goToNextSearchPage,
-    applyZoomAction,
+    toggleScopedMessagesExpanded: history.handleToggleScopedMessagesExpanded,
+    toggleHistoryCategory: history.handleToggleHistoryCategoryShortcut,
+    toggleProjectPaneCollapsed: () => history.setProjectPaneCollapsed((value) => !value),
+    toggleSessionPaneCollapsed: () => history.setSessionPaneCollapsed((value) => !value),
+    focusPreviousHistoryMessage: () => history.focusAdjacentHistoryMessage("previous"),
+    focusNextHistoryMessage: () => history.focusAdjacentHistoryMessage("next"),
+    selectPreviousSession: () => history.selectAdjacentSession("previous"),
+    selectNextSession: () => history.selectAdjacentSession("next"),
+    selectPreviousProject: () => history.selectAdjacentProject("previous"),
+    selectNextProject: () => history.selectAdjacentProject("next"),
+    goToPreviousHistoryPage: history.goToPreviousHistoryPage,
+    goToNextHistoryPage: history.goToNextHistoryPage,
+    goToPreviousSearchPage: search.goToPreviousSearchPage,
+    goToNextSearchPage: search.goToNextSearchPage,
+    applyZoomAction: appearance.applyZoomAction,
   });
 
   return (
@@ -1743,16 +145,17 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
           </div>
         </section>
       ) : null}
+
       <TopBar
         mainView={mainView}
-        theme={theme}
+        theme={appearance.theme}
         refreshing={refreshing}
         focusMode={focusMode}
         focusDisabled={mainView !== "history"}
         onToggleSearchView={() =>
           setMainView((value) => (value === "search" ? "history" : "search"))
         }
-        onThemeChange={setTheme}
+        onThemeChange={appearance.setTheme}
         onIncrementalRefresh={() => void handleIncrementalRefresh()}
         onForceRefresh={() => void handleForceRefresh()}
         onToggleFocus={() => setFocusMode((value) => !value)}
@@ -1765,607 +168,93 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
       <div
         className={`workspace ${isHistoryLayout ? "history-layout" : "single-layout"} ${
           mainView === "search" ? "search-layout" : ""
-        }${projectPaneCollapsed ? " projects-collapsed" : ""}${
-          sessionPaneCollapsed ? " sessions-collapsed" : ""
-        }${isHistoryLayout && !paneStateHydrated ? " pane-layout-hydrating" : ""}`}
-        style={workspaceStyle}
-        aria-busy={isHistoryLayout && !paneStateHydrated}
+        }${history.projectPaneCollapsed ? " projects-collapsed" : ""}${
+          history.sessionPaneCollapsed ? " sessions-collapsed" : ""
+        }${isHistoryLayout && !history.paneStateHydrated ? " pane-layout-hydrating" : ""}`}
+        style={history.workspaceStyle}
+        aria-busy={isHistoryLayout && !history.paneStateHydrated}
       >
-        {isHistoryLayout ? (
-          <>
-            <ProjectPane
-              sortedProjects={sortedProjects}
-              selectedProjectId={selectedProjectId}
-              listRef={projectListRef}
-              sortDirection={projectSortDirection}
-              collapsed={projectPaneCollapsed}
-              projectQueryInput={projectQueryInput}
-              projectProviders={projectProviders}
-              providers={PROVIDERS}
-              projectProviderCounts={projectProviderCounts}
-              onToggleCollapsed={() => setProjectPaneCollapsed((value) => !value)}
-              onProjectQueryChange={setProjectQueryInput}
-              onToggleProvider={(provider) =>
-                setProjectProviders((value) => toggleValue(value, provider))
-              }
-              onToggleSortDirection={() =>
-                setProjectSortDirection((value) => (value === "asc" ? "desc" : "asc"))
-              }
-              onCopyProjectDetails={() => void handleCopyProjectDetails()}
-              onSelectProject={(projectId) => {
-                selectProjectAllMessages(projectId);
-              }}
-              onOpenProjectLocation={() => {
-                if (!selectedProject?.path?.trim()) {
-                  return;
-                }
-                void openInFileManager(sortedProjects, selectedProjectId).then((result) => {
-                  if (!result.ok) {
-                    logError("Failed opening project location", result.error ?? "Unknown error");
-                  }
-                });
-              }}
-              canCopyProjectDetails={Boolean(selectedProject)}
-              canOpenProjectLocation={Boolean(selectedProject?.path?.trim())}
-            />
-
-            <div className="pane-resizer" onPointerDown={beginResize("project")} />
-
-            <SessionPane
-              sortedSessions={visibleSessionPaneSessions}
-              selectedSessionId={selectedSessionId}
-              listRef={sessionListRef}
-              sortDirection={sessionSortDirection}
-              allSessionsCount={visibleSessionPaneAllSessionsCount}
-              allSessionsSelected={historyMode === "project_all"}
-              bookmarksCount={visibleSessionPaneBookmarksCount}
-              bookmarksSelected={historyMode === "bookmarks"}
-              collapsed={sessionPaneCollapsed}
-              canCopySession={historyMode === "session" && !!selectedSession}
-              canOpenSessionLocation={
-                historyMode === "session" && Boolean(selectedSession?.filePath?.trim())
-              }
-              onToggleCollapsed={() => setSessionPaneCollapsed((value) => !value)}
-              onToggleSortDirection={() =>
-                setSessionSortDirection((value) => (value === "asc" ? "desc" : "asc"))
-              }
-              onCopySession={() => void handleCopySessionDetails()}
-              onOpenSessionLocation={() => {
-                if (!selectedSession?.filePath?.trim()) {
-                  return;
-                }
-                void openPath(selectedSession.filePath).then((result) => {
-                  if (!result.ok) {
-                    logError("Failed opening session location", result.error ?? "Unknown error");
-                  }
-                });
-              }}
-              onSelectAllSessions={() => {
-                selectProjectAllMessages(selectedProjectId);
-              }}
-              onSelectBookmarks={() => {
-                selectBookmarksView();
-              }}
-              onSelectSession={(sessionId) => {
-                selectSessionView(sessionId);
-              }}
-            />
-
-            <div className="pane-resizer" onPointerDown={beginResize("session")} />
-          </>
-        ) : null}
-
-        <section className="pane content-pane">
-          {mainView === "history" ? (
-            <div className="history-view">
-              <div className="msg-header">
-                <div className="msg-header-top">
-                  <div className="msg-header-title">
-                    {historyMode === "bookmarks"
-                      ? "Bookmarks"
-                      : historyMode === "project_all"
-                        ? "All Sessions"
-                        : selectedSession
-                          ? deriveSessionTitle(selectedSession)
-                          : "Session Detail"}
-                  </div>
-                  <div className="msg-toolbar">
-                    <button
-                      type="button"
-                      className="toolbar-btn sort-btn msg-sort-btn"
-                      onClick={() => {
-                        if (historyMode === "project_all") {
-                          setProjectAllSortDirection((value) => (value === "asc" ? "desc" : "asc"));
-                          setSessionPage(0);
-                          return;
-                        }
-                        if (historyMode === "bookmarks") {
-                          setBookmarkSortDirection((value) => (value === "asc" ? "desc" : "asc"));
-                          return;
-                        }
-                        setMessageSortDirection((value) => (value === "asc" ? "desc" : "asc"));
-                        setSessionPage(0);
-                      }}
-                      aria-label={
-                        activeMessageSortDirection === "asc"
-                          ? `Sort ${messageSortScopeLabel} descending`
-                          : `Sort ${messageSortScopeLabel} ascending`
-                      }
-                      title={messageSortTooltip}
-                    >
-                      <ToolbarIcon
-                        name={activeMessageSortDirection === "asc" ? "sortAsc" : "sortDesc"}
-                      />
-                    </button>
-                    <div className="expand-scope-control">
-                      <button
-                        type="button"
-                        className="toolbar-btn expand-scope-action"
-                        onClick={handleToggleScopedMessagesExpanded}
-                        disabled={scopedMessages.length === 0}
-                        aria-label={scopedExpandCollapseLabel}
-                        title={`${scopedExpandCollapseLabel} (Cmd/Ctrl+E)`}
-                      >
-                        <ToolbarIcon
-                          name={areScopedMessagesExpanded ? "collapseAll" : "expandAll"}
-                        />
-                        {scopedActionLabel}
-                      </button>
-                      <select
-                        className="expand-scope-select"
-                        value={bulkExpandScope}
-                        onChange={(event) => {
-                          const nextScope = event.target.value;
-                          setBulkExpandScope(
-                            nextScope === "all" ? "all" : (nextScope as MessageCategory),
-                          );
-                        }}
-                        aria-label="Select expand and collapse scope"
-                        title="Choose which message type expand/collapse applies to"
-                      >
-                        <option value="all">All</option>
-                        {CATEGORIES.map((category) => (
-                          <option key={category} value={category}>
-                            {prettyCategory(category)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="toolbar-zoom-group">
-                      <button
-                        type="button"
-                        className="toolbar-btn zoom-btn"
-                        onClick={() => void applyZoomAction("out")}
-                        disabled={!canZoomOut}
-                        aria-label="Zoom out"
-                        title="Zoom out (Cmd/Ctrl+-)"
-                      >
-                        <ToolbarIcon name="zoomOut" />
-                      </button>
-                      <span className="zoom-level" title="Current zoom level (Cmd/Ctrl+0 resets)">
-                        {zoomPercent}%
-                      </span>
-                      <button
-                        type="button"
-                        className="toolbar-btn zoom-btn"
-                        onClick={() => void applyZoomAction("in")}
-                        disabled={!canZoomIn}
-                        aria-label="Zoom in"
-                        title="Zoom in (Cmd/Ctrl++)"
-                      >
-                        <ToolbarIcon name="zoomIn" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="msg-header-info">
-                  <span className="provider">
-                    {historyMode === "session"
-                      ? selectedSession
-                        ? prettyProvider(selectedSession.provider)
-                        : "-"
-                      : selectedProject
-                        ? prettyProvider(selectedProject.provider)
-                        : "-"}
-                  </span>
-                  <span>
-                    {historyMode === "bookmarks"
-                      ? `${bookmarksResponse.filteredCount} of ${bookmarksResponse.totalCount} bookmarked messages`
-                      : historyMode === "project_all"
-                        ? `${projectCombinedDetail?.totalCount ?? 0} messages`
-                        : `${sessionDetail?.totalCount ?? 0} messages`}
-                  </span>
-                </div>
-              </div>
-
-              <div className="msg-filters">
-                {CATEGORIES.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    className={`msg-filter ${category}-filter${
-                      historyCategories.includes(category) ? " active" : ""
-                    }`}
-                    title={`${prettyCategory(category)} messages (${HISTORY_CATEGORY_SHORTCUTS[category]})`}
-                    onClick={() => {
-                      setHistoryCategories((value) =>
-                        toggleValue<MessageCategory>(value, category),
-                      );
-                      setSessionPage(0);
-                    }}
-                  >
-                    {prettyCategory(category)}
-                    <span className="filter-count">{historyCategoryCounts[category]}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="msg-search">
-                <div className={historyQueryError ? "search-box invalid" : "search-box"}>
-                  <div className="search-input-shell">
-                    <ToolbarIcon name="search" />
-                    <input
-                      ref={sessionSearchInputRef}
-                      className="search-input"
-                      value={historyMode === "bookmarks" ? bookmarkQueryInput : sessionQueryInput}
-                      onKeyDown={handleHistorySearchKeyDown}
-                      onChange={(event) => {
-                        if (historyMode === "bookmarks") {
-                          setBookmarkQueryInput(event.target.value);
-                          return;
-                        }
-                        setSessionQueryInput(event.target.value);
-                        setSessionPage(0);
-                      }}
-                      placeholder={
-                        historyMode === "bookmarks"
-                          ? SEARCH_PLACEHOLDERS.historyBookmarks
-                          : historyMode === "project_all"
-                            ? SEARCH_PLACEHOLDERS.historyProjectSessions
-                            : SEARCH_PLACEHOLDERS.historySession
-                      }
-                      title={historyQueryError ?? undefined}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className={`search-mode-icon-btn${advancedSearchEnabled ? " active" : ""}`}
-                    onClick={() => {
-                      setAdvancedSearchEnabled((value) => !value);
-                      setSessionPage(0);
-                    }}
-                    aria-pressed={advancedSearchEnabled}
-                    aria-label={
-                      advancedSearchEnabled
-                        ? "Disable advanced search syntax"
-                        : "Enable advanced search syntax"
-                    }
-                    title={
-                      advancedSearchEnabled ? "Advanced syntax enabled" : "Advanced syntax disabled"
-                    }
-                  >
-                    <svg
-                      className="search-mode-glyph"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden
-                    >
-                      <path d="M8 8l-4 4l4 4M16 8l4 4l-4 4M13 6l-2 12" />
-                    </svg>
-                  </button>
-                </div>
-                {historyQueryError ? (
-                  <p className="search-error" title={historyQueryError}>
-                    {historyQueryError}
-                  </p>
-                ) : null}
-              </div>
-
-              <div
-                className="msg-scroll message-list"
-                ref={messageListRef}
-                tabIndex={-1}
-                onScroll={handleMessageListScroll}
-              >
-                {sessionMessages.length ? (
-                  sessionMessages.map((message) => (
-                    <MessageCard
-                      key={message.id}
-                      message={message}
-                      query={
-                        historyMode === "bookmarks" ? effectiveBookmarkQuery : effectiveSessionQuery
-                      }
-                      highlightPatterns={historyHighlightPatterns}
-                      pathRoots={messagePathRoots}
-                      isFocused={message.id === focusMessageId}
-                      isBookmarked={bookmarkedMessageIds.has(message.id)}
-                      isOrphaned={
-                        historyMode === "bookmarks"
-                          ? (bookmarkOrphanedByMessageId.get(message.id) ?? false)
-                          : false
-                      }
-                      isExpanded={
-                        messageExpanded[message.id] ?? isExpandedByDefault(message.category)
-                      }
-                      onToggleExpanded={handleToggleMessageExpanded}
-                      onToggleBookmark={handleToggleBookmark}
-                      onRevealInSession={handleRevealInSession}
-                      cardRef={focusMessageId === message.id ? focusedMessageRef : null}
-                    />
-                  ))
-                ) : (
-                  <p className="empty-state">
-                    {historyMode === "bookmarks"
-                      ? "No bookmarked messages match current filters."
-                      : "No messages match current filters."}
-                  </p>
-                )}
-              </div>
-
-              {historyMode !== "bookmarks" ? (
-                <div className="msg-pagination pagination-row">
-                  <button
-                    type="button"
-                    className="page-btn"
-                    onClick={goToPreviousHistoryPage}
-                    disabled={!canGoToPreviousHistoryPage}
-                    title="Previous page (Cmd/Ctrl+Left)"
-                    aria-label="Previous page"
-                  >
-                    Previous
-                  </button>
-                  <span className="page-info">
-                    Page {sessionPage + 1} / {totalPages} (
-                    {historyMode === "project_all"
-                      ? (projectCombinedDetail?.totalCount ?? 0)
-                      : (sessionDetail?.totalCount ?? 0)}{" "}
-                    messages)
-                  </span>
-                  <button
-                    type="button"
-                    className="page-btn"
-                    onClick={goToNextHistoryPage}
-                    disabled={!canGoToNextHistoryPage}
-                    title="Next page (Cmd/Ctrl+Right)"
-                    aria-label="Next page"
-                  >
-                    Next
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : mainView === "search" ? (
-            <div className="search-view">
-              <div className="content-head">
-                <h2>Global Search</h2>
-                <p>{searchResponse.totalCount} matches</p>
-              </div>
-              <div className="search-controls">
-                <div className={searchResponse.queryError ? "search-box invalid" : "search-box"}>
-                  <div className="search-input-shell">
-                    <ToolbarIcon name="search" />
-                    <input
-                      ref={globalSearchInputRef}
-                      className="search-input"
-                      value={searchQueryInput}
-                      onChange={(event) => {
-                        setSearchQueryInput(event.target.value);
-                        setSearchPage(0);
-                      }}
-                      placeholder={SEARCH_PLACEHOLDERS.globalMessages}
-                      title={searchResponse.queryError ?? undefined}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className={`search-mode-icon-btn${advancedSearchEnabled ? " active" : ""}`}
-                    onClick={() => {
-                      setAdvancedSearchEnabled((value) => !value);
-                      setSearchPage(0);
-                    }}
-                    aria-pressed={advancedSearchEnabled}
-                    aria-label={
-                      advancedSearchEnabled
-                        ? "Disable advanced search syntax"
-                        : "Enable advanced search syntax"
-                    }
-                    title={
-                      advancedSearchEnabled ? "Advanced syntax enabled" : "Advanced syntax disabled"
-                    }
-                  >
-                    <svg
-                      className="search-mode-glyph"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden
-                    >
-                      <path d="M8 8l-4 4l4 4M16 8l4 4l-4 4M13 6l-2 12" />
-                    </svg>
-                  </button>
-                </div>
-                {searchResponse.queryError ? (
-                  <p className="search-error" title={searchResponse.queryError}>
-                    {searchResponse.queryError}
-                  </p>
-                ) : null}
-                <input
-                  value={searchProjectQueryInput}
-                  onChange={(event) => {
-                    setSearchProjectQueryInput(event.target.value);
-                    setSearchPage(0);
-                  }}
-                  placeholder={SEARCH_PLACEHOLDERS.globalProjects}
-                />
-                <select
-                  className="search-select"
-                  value={searchProjectId}
-                  onChange={(event) => {
-                    setSearchProjectId(event.target.value);
-                    setSearchPage(0);
-                  }}
-                >
-                  <option value="">All projects</option>
-                  {sortedProjects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {prettyProvider(project.provider)}:{" "}
-                      {project.name || project.path || "(unknown project)"}
-                    </option>
-                  ))}
-                </select>
-                <div className="chip-row">
-                  {PROVIDERS.map((provider) => (
-                    <button
-                      key={provider}
-                      type="button"
-                      className={`chip provider-chip provider-${provider}${
-                        searchProviders.includes(provider) ? " active" : ""
-                      }`}
-                      onClick={() => {
-                        setSearchProviders((value) => toggleValue(value, provider));
-                        setSearchPage(0);
-                      }}
-                    >
-                      {prettyProvider(provider)} ({searchProviderCounts[provider]})
-                    </button>
-                  ))}
-                </div>
-                <div className="chip-row">
-                  {CATEGORIES.map((category) => (
-                    <button
-                      key={category}
-                      type="button"
-                      className={`chip category-chip category-${category}${
-                        historyCategories.includes(category) ? " active" : ""
-                      }`}
-                      onClick={() => {
-                        setHistoryCategories((value) =>
-                          toggleValue<MessageCategory>(value, category),
-                        );
-                        setSearchPage(0);
-                      }}
-                    >
-                      {prettyCategory(category)} ({searchResponse.categoryCounts[category]})
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="search-result-list">
-                {searchResponse.results.length === 0 ? (
-                  <p className="empty-state">No search results.</p>
-                ) : (
-                  searchResponse.results.map((result) => (
-                    <button
-                      type="button"
-                      key={result.messageId}
-                      className={`search-result category-${result.category}`}
-                      onClick={() => {
-                        setProjectProviders([...PROVIDERS]);
-                        setProjectQueryInput("");
-                        setHistoryMode("session");
-                        setPendingSearchNavigation({
-                          projectId: result.projectId,
-                          sessionId: result.sessionId,
-                          messageId: result.messageId,
-                          sourceId: result.messageSourceId,
-                          historyCategories: [...historyCategories],
-                        });
-                        setSelectedProjectId(result.projectId);
-                        setMainView("history");
-                      }}
-                    >
-                      <header>
-                        <span className={`category-badge category-${result.category}`}>
-                          {prettyCategory(result.category)}
-                        </span>
-                        <small>
-                          <span className={`provider-label provider-${result.provider}`}>
-                            {prettyProvider(result.provider)}
-                          </span>{" "}
-                          | {formatDate(result.createdAt)}
-                        </small>
-                      </header>
-                      <p className="snippet">
-                        <HighlightedText text={result.snippet} query="" allowMarks />
-                      </p>
-                      <footer>
-                        <small>
-                          {result.projectName || result.projectPath || "(unknown project)"}
-                        </small>
-                      </footer>
-                    </button>
-                  ))
-                )}
-              </div>
-
-              {hasActiveSearchQuery ? (
-                <div className="pagination-row">
-                  <button
-                    type="button"
-                    className="page-btn"
-                    onClick={goToPreviousSearchPage}
-                    disabled={!canGoToPreviousSearchPage}
-                    title="Previous page (Cmd/Ctrl+Left)"
-                    aria-label="Previous search page"
-                  >
-                    Previous
-                  </button>
-                  <span className="page-info">
-                    Page {searchPage + 1} / {searchTotalPages} ({searchResponse.totalCount} matches)
-                  </span>
-                  <button
-                    type="button"
-                    className="page-btn"
-                    onClick={goToNextSearchPage}
-                    disabled={!canGoToNextSearchPage}
-                    title="Next page (Cmd/Ctrl+Right)"
-                    aria-label="Next search page"
-                  >
-                    Next
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : mainView === "help" ? (
-            <ShortcutsDialog
-              shortcutItems={SHORTCUT_ITEMS}
-              commonSyntaxItems={COMMON_SYNTAX_ITEMS}
-              advancedSyntaxItems={ADVANCED_SYNTAX_ITEMS}
+        {mainView === "history" ? (
+          isHistoryLayout ? (
+            <HistoryLayout
+              history={history}
+              advancedSearchEnabled={advancedSearchEnabled}
+              setAdvancedSearchEnabled={setAdvancedSearchEnabled}
+              zoomPercent={appearance.zoomPercent}
+              canZoomIn={appearance.canZoomIn}
+              canZoomOut={appearance.canZoomOut}
+              applyZoomAction={appearance.applyZoomAction}
+              logError={logError}
             />
           ) : (
+            <section className="pane content-pane">
+              <HistoryDetailPane
+                history={history}
+                advancedSearchEnabled={advancedSearchEnabled}
+                setAdvancedSearchEnabled={setAdvancedSearchEnabled}
+                zoomPercent={appearance.zoomPercent}
+                canZoomIn={appearance.canZoomIn}
+                canZoomOut={appearance.canZoomOut}
+                applyZoomAction={appearance.applyZoomAction}
+              />
+            </section>
+          )
+        ) : mainView === "search" ? (
+          <SearchView
+            search={search}
+            projects={history.sortedProjects}
+            advancedSearchEnabled={advancedSearchEnabled}
+            setAdvancedSearchEnabled={setAdvancedSearchEnabled}
+            onSelectResult={(result) => {
+              history.navigateFromSearchResult({
+                projectId: result.projectId,
+                sessionId: result.sessionId,
+                messageId: result.messageId,
+                sourceId: result.messageSourceId,
+                historyCategories: [...history.historyCategories],
+              });
+              setMainView("history");
+            }}
+          />
+        ) : mainView === "help" ? (
+          <section className="pane content-pane">
+            <ShortcutsDialog
+              shortcutItems={[...SHORTCUT_ITEMS]}
+              commonSyntaxItems={[...COMMON_SYNTAX_ITEMS]}
+              advancedSyntaxItems={[...ADVANCED_SYNTAX_ITEMS]}
+            />
+          </section>
+        ) : (
+          <section className="pane content-pane">
             <SettingsView
-              info={settingsInfo}
-              loading={settingsLoading}
-              error={settingsError}
-              monoFontFamily={monoFontFamily}
-              regularFontFamily={regularFontFamily}
-              monoFontSize={monoFontSize}
-              regularFontSize={regularFontSize}
-              useMonospaceForAllMessages={useMonospaceForAllMessages}
-              onMonoFontFamilyChange={setMonoFontFamily}
-              onRegularFontFamilyChange={setRegularFontFamily}
-              onMonoFontSizeChange={setMonoFontSize}
-              onRegularFontSizeChange={setRegularFontSize}
-              onUseMonospaceForAllMessagesChange={setUseMonospaceForAllMessages}
-              expandedByDefaultCategories={expandedByDefaultCategories}
+              info={appearance.settingsInfo}
+              loading={appearance.settingsLoading}
+              error={appearance.settingsError}
+              monoFontFamily={appearance.monoFontFamily}
+              regularFontFamily={appearance.regularFontFamily}
+              monoFontSize={appearance.monoFontSize}
+              regularFontSize={appearance.regularFontSize}
+              useMonospaceForAllMessages={appearance.useMonospaceForAllMessages}
+              onMonoFontFamilyChange={appearance.setMonoFontFamily}
+              onRegularFontFamilyChange={appearance.setRegularFontFamily}
+              onMonoFontSizeChange={appearance.setMonoFontSize}
+              onRegularFontSizeChange={appearance.setRegularFontSize}
+              onUseMonospaceForAllMessagesChange={appearance.setUseMonospaceForAllMessages}
+              expandedByDefaultCategories={history.expandedByDefaultCategories}
               onToggleExpandedByDefault={(category) =>
-                setExpandedByDefaultCategories((value) =>
+                history.setExpandedByDefaultCategories((value) =>
                   toggleValue<MessageCategory>(value, category),
                 )
               }
-              systemMessageRegexRules={systemMessageRegexRules}
+              systemMessageRegexRules={history.systemMessageRegexRules}
               onAddSystemMessageRegexRule={(provider) =>
-                setSystemMessageRegexRules((value) => ({
+                history.setSystemMessageRegexRules((value) => ({
                   ...value,
                   [provider]: [...value[provider], ""],
                 }))
               }
               onUpdateSystemMessageRegexRule={(provider, index, pattern) =>
-                setSystemMessageRegexRules((value) => {
+                history.setSystemMessageRegexRules((value) => {
                   const current = value[provider] ?? [];
                   if (index < 0 || index >= current.length) {
                     return value;
@@ -2379,7 +268,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                 })
               }
               onRemoveSystemMessageRegexRule={(provider, index) =>
-                setSystemMessageRegexRules((value) => {
+                history.setSystemMessageRegexRules((value) => {
                   const current = value[provider] ?? [];
                   if (index < 0 || index >= current.length) {
                     return value;
@@ -2391,8 +280,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
                 })
               }
             />
-          )}
-        </section>
+          </section>
+        )}
       </div>
     </main>
   );

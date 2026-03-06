@@ -56,7 +56,7 @@ export function ProjectPane({
     if (!selectedProjectId) {
       return;
     }
-    selectedProjectRef.current?.scrollIntoView({ block: "nearest" });
+    selectedProjectRef.current?.scrollIntoView?.({ block: "nearest" });
   }, [selectedProjectId]);
 
   return (

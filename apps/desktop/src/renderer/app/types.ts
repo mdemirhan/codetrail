@@ -1,0 +1,50 @@
+import type { IpcResponse, MessageCategory, Provider } from "@codetrail/core";
+
+export type ProjectSummary = IpcResponse<"projects:list">["projects"][number];
+export type SessionSummary = IpcResponse<"sessions:list">["sessions"][number];
+export type SessionDetail = IpcResponse<"sessions:getDetail">;
+export type ProjectCombinedDetail = IpcResponse<"projects:getCombinedDetail">;
+export type BookmarkListResponse = IpcResponse<"bookmarks:listProject">;
+export type SearchQueryResponse = IpcResponse<"search:query">;
+export type SearchResult = SearchQueryResponse["results"][number];
+export type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
+export type PaneStateSnapshot = IpcResponse<"ui:getState">;
+
+export type HistoryMessage =
+  | SessionDetail["messages"][number]
+  | ProjectCombinedDetail["messages"][number];
+
+export type MainView = "history" | "search" | "settings" | "help";
+export type SortDirection = "asc" | "desc";
+export type BulkExpandScope = "all" | MessageCategory;
+
+export type HistorySelection =
+  | { mode: "project_all"; projectId: string }
+  | { mode: "bookmarks"; projectId: string }
+  | { mode: "session"; projectId: string; sessionId: string };
+
+export type SessionPaneNavigationItem =
+  | { id: "__project_all__"; kind: "project_all" }
+  | { id: "__bookmarks__"; kind: "bookmarks" }
+  | { id: string; kind: "session"; sessionId: string };
+
+export type HistorySelectionMode = HistorySelection["mode"];
+export type HistorySearchNavigation = {
+  projectId: string;
+  sessionId: string;
+  messageId: string;
+  sourceId: string;
+  historyCategories: MessageCategory[];
+};
+
+export type PendingRevealTarget = {
+  sourceId: string;
+  messageId: string;
+};
+
+export type PendingMessagePageNavigation = {
+  direction: "previous" | "next";
+  targetPage: number;
+};
+
+export type ProviderCounts = Record<Provider, number>;

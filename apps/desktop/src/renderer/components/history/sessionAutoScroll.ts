@@ -1,5 +1,5 @@
 type ScrollIntoViewTarget = {
-  scrollIntoView: (options?: ScrollIntoViewOptions) => void;
+  scrollIntoView?: (options?: ScrollIntoViewOptions) => void;
 };
 
 export function scheduleSelectedSessionScroll(args: {
@@ -20,7 +20,7 @@ export function scheduleSelectedSessionScroll(args: {
     args.cancelAnimationFrame ?? window.cancelAnimationFrame.bind(window);
 
   const rafId = scheduleAnimationFrame(() => {
-    selectedSessionElement.scrollIntoView({ block: "nearest" });
+    selectedSessionElement.scrollIntoView?.({ block: "nearest" });
   });
 
   return () => {
