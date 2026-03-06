@@ -102,6 +102,7 @@ function MessageCardComponent({
       className={`message category-${message.category}${isFocused ? " focused" : ""}${
         isExpanded ? " expanded" : " collapsed"
       }`}
+      data-history-message-id={message.id}
       ref={cardRef ?? null}
     >
       <header

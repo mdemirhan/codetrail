@@ -27,6 +27,12 @@ import { usePaneStateSync } from "./hooks/usePaneStateSync";
 import { useResizablePanes } from "./hooks/useResizablePanes";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { isMissingCodetrailClient, useCodetrailClient } from "./lib/codetrailClient";
+import {
+  type Direction,
+  getAdjacentItemId,
+  getEdgeItemId,
+  getFirstVisibleMessageId,
+} from "./lib/historyNavigation";
 import { openInFileManager, openPath } from "./lib/pathActions";
 import { SEARCH_PLACEHOLDERS } from "./lib/searchPlaceholders";
 import { decideSessionSelectionAfterLoad } from "./lib/sessionSelection";
@@ -85,6 +91,10 @@ type SystemMessageRegexRules = Record<Provider, string[]>;
 type SortDirection = "asc" | "desc";
 type SearchMode = "simple" | "advanced";
 type PaneStateSnapshot = IpcResponse<"ui:getState">;
+type SessionPaneNavigationItem =
+  | { id: "__project_all__"; kind: "project_all" }
+  | { id: "__bookmarks__"; kind: "bookmarks" }
+  | { id: string; kind: "session"; sessionId: string };
 
 const EMPTY_BOOKMARKS_RESPONSE: BookmarkListResponse = {
   projectId: "",
@@ -101,6 +111,8 @@ const EMPTY_SYSTEM_MESSAGE_REGEX_RULES: SystemMessageRegexRules = {
   gemini: [],
   cursor: [],
 };
+const PROJECT_ALL_NAV_ID = "__project_all__";
+const BOOKMARKS_NAV_ID = "__bookmarks__";
 
 const MONO_FONT_STACKS: Record<MonoFontFamily, string> = {
   current: '"JetBrains Mono", "IBM Plex Mono", monospace',
@@ -127,6 +139,37 @@ function formatDuration(durationMs: number | null): string {
     return `${minutes}m ${seconds}s`;
   }
   return `${seconds}s`;
+}
+
+function scrollFocusedHistoryMessageIntoView(
+  container: HTMLDivElement,
+  messageElement: HTMLDivElement,
+): void {
+  const containerRect = container.getBoundingClientRect();
+  const messageRect = messageElement.getBoundingClientRect();
+  const containerHeight = container.clientHeight || containerRect.height;
+  const messageHeight = messageRect.height;
+
+  if (containerHeight > 0 && messageHeight > containerHeight) {
+    const nextScrollTop = Math.max(0, container.scrollTop + (messageRect.top - containerRect.top));
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top: nextScrollTop, behavior: "smooth" });
+      return;
+    }
+    container.scrollTop = nextScrollTop;
+    return;
+  }
+
+  messageElement.scrollIntoView({
+    block: "center",
+    behavior: "smooth",
+  });
+}
+
+function focusHistoryList(container: HTMLDivElement | null): void {
+  window.setTimeout(() => {
+    container?.focus({ preventScroll: true });
+  }, 0);
 }
 
 export function App({ initialPaneState = null }: { initialPaneState?: PaneStateSnapshot | null }) {
@@ -224,6 +267,11 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     sourceId: string;
     messageId: string;
   } | null>(null);
+  const [pendingMessageAreaFocus, setPendingMessageAreaFocus] = useState(false);
+  const [pendingMessagePageNavigation, setPendingMessagePageNavigation] = useState<{
+    direction: Direction;
+    targetPage: number;
+  } | null>(null);
   const [pendingSearchNavigation, setPendingSearchNavigation] = useState<{
     projectId: string;
     sessionId: string;
@@ -266,6 +314,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
 
   const focusedMessageRef = useRef<HTMLDivElement | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
+  const sessionListRef = useRef<HTMLDivElement | null>(null);
+  const projectListRef = useRef<HTMLDivElement | null>(null);
   const sessionSearchInputRef = useRef<HTMLInputElement | null>(null);
   const globalSearchInputRef = useRef<HTMLInputElement | null>(null);
   const pendingRestoredSessionScrollRef = useRef<{
@@ -941,6 +991,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     }
     return activeHistoryMessages.findIndex((message) => message.id === focusMessageId);
   }, [activeHistoryMessages, focusMessageId]);
+  const loadedHistoryPage =
+    historyMode === "project_all" ? (projectCombinedDetail?.page ?? 0) : (sessionDetail?.page ?? 0);
 
   useEffect(() => {
     if (!messageListRef.current) {
@@ -986,21 +1038,47 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
       !focusMessageId ||
       !visibleFocusedMessageId ||
       focusedMessagePosition < 0 ||
-      !focusedMessageRef.current
+      !focusedMessageRef.current ||
+      !messageListRef.current
     ) {
       return;
     }
 
     const rafId = window.requestAnimationFrame(() => {
-      focusedMessageRef.current?.scrollIntoView({
-        block: "center",
-        behavior: "smooth",
-      });
+      if (!focusedMessageRef.current || !messageListRef.current) {
+        return;
+      }
+      scrollFocusedHistoryMessageIntoView(messageListRef.current, focusedMessageRef.current);
     });
     return () => {
       window.cancelAnimationFrame(rafId);
     };
   }, [focusMessageId, focusedMessagePosition, visibleFocusedMessageId]);
+
+  useEffect(() => {
+    if (!pendingMessageAreaFocus || !visibleFocusedMessageId || !messageListRef.current) {
+      return;
+    }
+
+    messageListRef.current.focus({ preventScroll: true });
+    setPendingMessageAreaFocus(false);
+  }, [pendingMessageAreaFocus, visibleFocusedMessageId]);
+
+  useEffect(() => {
+    if (!pendingMessagePageNavigation) {
+      return;
+    }
+    if (loadedHistoryPage !== pendingMessagePageNavigation.targetPage) {
+      return;
+    }
+
+    const targetMessageId = getEdgeItemId(activeHistoryMessages, pendingMessagePageNavigation.direction);
+    setPendingMessagePageNavigation(null);
+    if (!targetMessageId) {
+      return;
+    }
+    setFocusMessageId(targetMessageId);
+  }, [activeHistoryMessages, loadedHistoryPage, pendingMessagePageNavigation]);
 
   const handleRefresh = useCallback(
     async (force: boolean) => {
@@ -1033,6 +1111,20 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     () => sortedSessions.find((session) => session.id === selectedSessionId) ?? null,
     [selectedSessionId, sortedSessions],
   );
+  const sessionPaneNavigationItems = useMemo<SessionPaneNavigationItem[]>(() => {
+    const next: SessionPaneNavigationItem[] = [{ id: PROJECT_ALL_NAV_ID, kind: "project_all" }];
+    if (bookmarksResponse.totalCount > 0) {
+      next.push({ id: BOOKMARKS_NAV_ID, kind: "bookmarks" });
+    }
+    next.push(
+      ...sortedSessions.map((session) => ({
+        id: session.id,
+        kind: "session" as const,
+        sessionId: session.id,
+      })),
+    );
+    return next;
+  }, [bookmarksResponse.totalCount, sortedSessions]);
   const allSessionsCount = useMemo(
     () => sortedSessions.reduce((sum, session) => sum + session.messageCount, 0),
     [sortedSessions],
@@ -1166,6 +1258,54 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     setSessionPage((value) => Math.min(totalPages - 1, value + 1));
   }, [canNavigatePages, totalPages]);
 
+  const focusAdjacentHistoryMessage = useCallback(
+    (direction: Direction) => {
+      if (activeHistoryMessages.length === 0) {
+        return;
+      }
+
+      if (!visibleFocusedMessageId) {
+        const firstVisibleMessageId = getFirstVisibleMessageId(messageListRef.current);
+        if (firstVisibleMessageId) {
+          setPendingMessageAreaFocus(true);
+          setFocusMessageId(firstVisibleMessageId);
+        }
+        return;
+      }
+
+      const adjacentMessageId = getAdjacentItemId(
+        activeHistoryMessages,
+        visibleFocusedMessageId,
+        direction,
+      );
+      if (adjacentMessageId) {
+        setPendingMessageAreaFocus(true);
+        setFocusMessageId(adjacentMessageId);
+        return;
+      }
+
+      const canAdvancePage =
+        direction === "next" ? canGoToNextHistoryPage : canGoToPreviousHistoryPage;
+      if (!canAdvancePage) {
+        return;
+      }
+
+      const targetPage =
+        direction === "next" ? Math.min(totalPages - 1, sessionPage + 1) : Math.max(0, sessionPage - 1);
+      setPendingMessageAreaFocus(true);
+      setPendingMessagePageNavigation({ direction, targetPage });
+      setSessionPage(targetPage);
+    },
+    [
+      activeHistoryMessages,
+      canGoToNextHistoryPage,
+      canGoToPreviousHistoryPage,
+      sessionPage,
+      totalPages,
+      visibleFocusedMessageId,
+    ],
+  );
+
   const goToPreviousSearchPage = useCallback(() => {
     setSearchPage((value) => Math.max(0, value - 1));
   }, []);
@@ -1242,6 +1382,36 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
       },
       { group: "Search & Navigation", shortcut: "Cmd/Ctrl+Left", description: "Previous page" },
       { group: "Search & Navigation", shortcut: "Cmd/Ctrl+Right", description: "Next page" },
+      {
+        group: "Search & Navigation",
+        shortcut: "Cmd+Up",
+        description: "Focus previous message",
+      },
+      {
+        group: "Search & Navigation",
+        shortcut: "Cmd+Down",
+        description: "Focus next message",
+      },
+      {
+        group: "Search & Navigation",
+        shortcut: "Option+Up",
+        description: "Select previous session",
+      },
+      {
+        group: "Search & Navigation",
+        shortcut: "Option+Down",
+        description: "Select next session",
+      },
+      {
+        group: "Search & Navigation",
+        shortcut: "Ctrl+Up",
+        description: "Select previous project",
+      },
+      {
+        group: "Search & Navigation",
+        shortcut: "Ctrl+Down",
+        description: "Select next project",
+      },
       { group: "Panels", shortcut: "Cmd/Ctrl+B", description: "Expand/collapse Projects pane" },
       {
         group: "Panels",
@@ -1451,6 +1621,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
 
   const resetHistorySelectionState = useCallback(() => {
     setPendingSearchNavigation(null);
+    setPendingMessageAreaFocus(false);
+    setPendingMessagePageNavigation(null);
     setSessionPage(0);
     setFocusMessageId("");
     setPendingRevealTarget(null);
@@ -1484,6 +1656,56 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     [resetHistorySelectionState],
   );
 
+  const selectAdjacentSession = useCallback(
+    (direction: Direction) => {
+      const currentNavigationId =
+        historyMode === "project_all"
+          ? PROJECT_ALL_NAV_ID
+          : historyMode === "bookmarks"
+            ? BOOKMARKS_NAV_ID
+            : selectedSessionId;
+      const nextNavigationId = getAdjacentItemId(
+        sessionPaneNavigationItems,
+        currentNavigationId,
+        direction,
+      );
+      if (!nextNavigationId) {
+        return;
+      }
+      focusHistoryList(sessionListRef.current);
+      if (nextNavigationId === PROJECT_ALL_NAV_ID) {
+        selectProjectAllMessages(selectedProjectId);
+        return;
+      }
+      if (nextNavigationId === BOOKMARKS_NAV_ID) {
+        selectBookmarksView();
+        return;
+      }
+      selectSessionView(nextNavigationId);
+    },
+    [
+      historyMode,
+      selectBookmarksView,
+      selectProjectAllMessages,
+      selectSessionView,
+      selectedProjectId,
+      selectedSessionId,
+      sessionPaneNavigationItems,
+    ],
+  );
+
+  const selectAdjacentProject = useCallback(
+    (direction: Direction) => {
+      const nextProjectId = getAdjacentItemId(sortedProjects, selectedProjectId, direction);
+      if (!nextProjectId) {
+        return;
+      }
+      focusHistoryList(projectListRef.current);
+      selectProjectAllMessages(nextProjectId);
+    },
+    [selectProjectAllMessages, selectedProjectId, sortedProjects],
+  );
+
   useKeyboardShortcuts({
     mainView,
     hasFocusedHistoryMessage: Boolean(visibleFocusedMessageId),
@@ -1496,6 +1718,12 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     toggleHistoryCategory: handleToggleHistoryCategoryShortcut,
     toggleProjectPaneCollapsed: () => setProjectPaneCollapsed((value) => !value),
     toggleSessionPaneCollapsed: () => setSessionPaneCollapsed((value) => !value),
+    focusPreviousHistoryMessage: () => focusAdjacentHistoryMessage("previous"),
+    focusNextHistoryMessage: () => focusAdjacentHistoryMessage("next"),
+    selectPreviousSession: () => selectAdjacentSession("previous"),
+    selectNextSession: () => selectAdjacentSession("next"),
+    selectPreviousProject: () => selectAdjacentProject("previous"),
+    selectNextProject: () => selectAdjacentProject("next"),
     goToPreviousHistoryPage,
     goToNextHistoryPage,
     goToPreviousSearchPage,
@@ -1549,6 +1777,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
             <ProjectPane
               sortedProjects={sortedProjects}
               selectedProjectId={selectedProjectId}
+              listRef={projectListRef}
               sortDirection={projectSortDirection}
               collapsed={projectPaneCollapsed}
               projectQueryInput={projectQueryInput}
@@ -1586,6 +1815,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
             <SessionPane
               sortedSessions={sortedSessions}
               selectedSessionId={selectedSessionId}
+              listRef={sessionListRef}
               sortDirection={sessionSortDirection}
               allSessionsCount={allSessionsCount}
               allSessionsSelected={historyMode === "project_all"}
@@ -1839,6 +2069,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
               <div
                 className="msg-scroll message-list"
                 ref={messageListRef}
+                tabIndex={-1}
                 onScroll={handleMessageListScroll}
               >
                 {sessionMessages.length ? (

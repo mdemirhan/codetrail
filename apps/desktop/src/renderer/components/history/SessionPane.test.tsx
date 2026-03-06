@@ -127,4 +127,72 @@ describe("SessionPane", () => {
       "Expand Sessions (Cmd/Ctrl+Shift+B)",
     );
   });
+
+  it("scrolls the active All Sessions and Bookmarked Messages rows into view", () => {
+    const scrollIntoView = vi.fn();
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: scrollIntoView,
+      configurable: true,
+    });
+    window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(16);
+      return 1;
+    }) as typeof window.requestAnimationFrame;
+    window.cancelAnimationFrame = vi.fn();
+
+    const { rerender } = render(
+      <SessionPane
+        sortedSessions={sessions}
+        selectedSessionId=""
+        sortDirection="desc"
+        allSessionsCount={7}
+        allSessionsSelected={true}
+        bookmarksCount={2}
+        bookmarksSelected={false}
+        collapsed={false}
+        canCopySession={true}
+        canOpenSessionLocation={true}
+        onToggleCollapsed={vi.fn()}
+        onToggleSortDirection={vi.fn()}
+        onCopySession={vi.fn()}
+        onOpenSessionLocation={vi.fn()}
+        onSelectAllSessions={vi.fn()}
+        onSelectBookmarks={vi.fn()}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+
+    scrollIntoView.mockClear();
+
+    rerender(
+      <SessionPane
+        sortedSessions={sessions}
+        selectedSessionId=""
+        sortDirection="desc"
+        allSessionsCount={7}
+        allSessionsSelected={false}
+        bookmarksCount={2}
+        bookmarksSelected={true}
+        collapsed={false}
+        canCopySession={true}
+        canOpenSessionLocation={true}
+        onToggleCollapsed={vi.fn()}
+        onToggleSortDirection={vi.fn()}
+        onCopySession={vi.fn()}
+        onOpenSessionLocation={vi.fn()}
+        onSelectAllSessions={vi.fn()}
+        onSelectBookmarks={vi.fn()}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+
+    window.requestAnimationFrame = originalRequestAnimationFrame;
+    window.cancelAnimationFrame = originalCancelAnimationFrame;
+  });
 });

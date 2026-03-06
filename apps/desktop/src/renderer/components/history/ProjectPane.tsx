@@ -1,5 +1,5 @@
 import type { IpcResponse, Provider } from "@codetrail/core";
-import { useEffect, useRef } from "react";
+import { type Ref, useEffect, useRef } from "react";
 
 import { SEARCH_PLACEHOLDERS } from "../../lib/searchPlaceholders";
 import { compactPath, formatDate, prettyProvider } from "../../lib/viewUtils";
@@ -25,6 +25,7 @@ export function ProjectPane({
   onOpenProjectLocation,
   canCopyProjectDetails,
   canOpenProjectLocation,
+  listRef,
 }: {
   sortedProjects: ProjectSummary[];
   selectedProjectId: string;
@@ -43,6 +44,7 @@ export function ProjectPane({
   onOpenProjectLocation: () => void;
   canCopyProjectDetails: boolean;
   canOpenProjectLocation: boolean;
+  listRef?: Ref<HTMLDivElement>;
 }) {
   const selectedProjectRef = useRef<HTMLButtonElement | null>(null);
   const sortTooltip =
@@ -135,7 +137,7 @@ export function ProjectPane({
           </button>
         ))}
       </div>
-      <div className="list-scroll project-list">
+      <div className="list-scroll project-list" ref={listRef} tabIndex={-1}>
         {sortedProjects.map((project) => (
           <button
             key={project.id}

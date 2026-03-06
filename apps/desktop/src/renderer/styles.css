@@ -828,6 +828,14 @@ body.platform-macos .titlebar-left {
   padding: 20px 24px;
 }
 
+.msg-scroll:focus,
+.message-list:focus,
+.list-scroll:focus,
+.project-list:focus,
+.session-list:focus {
+  outline: none;
+}
+
 .list-scroll::-webkit-scrollbar,
 .msg-scroll::-webkit-scrollbar,
 .message-list::-webkit-scrollbar,
@@ -2817,7 +2825,7 @@ mark {
 }
 
 .help-card-title-shortcuts {
-  color: var(--help-accent);
+  color: var(--help-success);
 }
 
 .help-card-title-search {
@@ -2835,7 +2843,7 @@ mark {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--help-muted);
+  color: var(--help-accent);
 }
 
 .help-shortcut-list {
@@ -2915,10 +2923,6 @@ mark {
   border-top: 1px solid var(--help-border-subtle);
 }
 
-.help-syntax-block.common .help-group-label {
-  color: var(--help-success);
-}
-
 .help-syntax-block.advanced .help-group-label {
   color: var(--help-accent);
 }
@@ -2941,8 +2945,8 @@ mark {
 }
 
 .help-syntax-tag.common {
-  color: var(--help-success);
-  background: var(--help-success-dim);
+  color: var(--help-accent);
+  background: var(--help-accent-dim);
 }
 
 .help-syntax-tag.advanced {

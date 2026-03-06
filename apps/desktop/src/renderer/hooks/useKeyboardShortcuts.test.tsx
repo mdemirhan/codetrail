@@ -10,42 +10,41 @@ function Harness(args: Parameters<typeof useKeyboardShortcuts>[0]) {
   return <div>shortcuts</div>;
 }
 
+function createProps(
+  overrides: Partial<Parameters<typeof useKeyboardShortcuts>[0]> = {},
+): Parameters<typeof useKeyboardShortcuts>[0] {
+  return {
+    mainView: "history",
+    hasFocusedHistoryMessage: false,
+    setMainView: vi.fn(),
+    clearFocusedHistoryMessage: vi.fn(),
+    focusGlobalSearch: vi.fn(),
+    focusSessionSearch: vi.fn(),
+    toggleFocusMode: vi.fn(),
+    toggleScopedMessagesExpanded: vi.fn(),
+    toggleHistoryCategory: vi.fn(),
+    toggleProjectPaneCollapsed: vi.fn(),
+    toggleSessionPaneCollapsed: vi.fn(),
+    focusPreviousHistoryMessage: vi.fn(),
+    focusNextHistoryMessage: vi.fn(),
+    selectPreviousSession: vi.fn(),
+    selectNextSession: vi.fn(),
+    selectPreviousProject: vi.fn(),
+    selectNextProject: vi.fn(),
+    goToPreviousHistoryPage: vi.fn(),
+    goToNextHistoryPage: vi.fn(),
+    goToPreviousSearchPage: vi.fn(),
+    goToNextSearchPage: vi.fn(),
+    applyZoomAction: vi.fn(async () => undefined),
+    ...overrides,
+  };
+}
+
 describe("useKeyboardShortcuts", () => {
   it("routes search, zoom, and history shortcuts", () => {
-    const setMainView = vi.fn();
-    const focusGlobalSearch = vi.fn();
-    const focusSessionSearch = vi.fn();
-    const toggleFocusMode = vi.fn();
-    const toggleScopedMessagesExpanded = vi.fn();
-    const toggleHistoryCategory = vi.fn();
-    const toggleProjectPaneCollapsed = vi.fn();
-    const toggleSessionPaneCollapsed = vi.fn();
-    const goToPreviousHistoryPage = vi.fn();
-    const goToNextHistoryPage = vi.fn();
-    const goToPreviousSearchPage = vi.fn();
-    const goToNextSearchPage = vi.fn();
-    const applyZoomAction = vi.fn(async () => undefined);
+    const props = createProps();
 
-    render(
-      <Harness
-        mainView="history"
-        hasFocusedHistoryMessage={false}
-        setMainView={setMainView}
-        clearFocusedHistoryMessage={vi.fn()}
-        focusGlobalSearch={focusGlobalSearch}
-        focusSessionSearch={focusSessionSearch}
-        toggleFocusMode={toggleFocusMode}
-        toggleScopedMessagesExpanded={toggleScopedMessagesExpanded}
-        toggleHistoryCategory={toggleHistoryCategory}
-        toggleProjectPaneCollapsed={toggleProjectPaneCollapsed}
-        toggleSessionPaneCollapsed={toggleSessionPaneCollapsed}
-        goToPreviousHistoryPage={goToPreviousHistoryPage}
-        goToNextHistoryPage={goToNextHistoryPage}
-        goToPreviousSearchPage={goToPreviousSearchPage}
-        goToNextSearchPage={goToNextSearchPage}
-        applyZoomAction={applyZoomAction}
-      />,
-    );
+    render(<Harness {...props} />);
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true, shiftKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true }));
@@ -57,142 +56,91 @@ describe("useKeyboardShortcuts", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "b", metaKey: true, shiftKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", altKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", ctrlKey: true }));
 
-    expect(focusGlobalSearch).toHaveBeenCalledTimes(1);
-    expect(focusSessionSearch).toHaveBeenCalledTimes(1);
-    expect(applyZoomAction).toHaveBeenCalledWith("in");
-    expect(toggleFocusMode).toHaveBeenCalledTimes(1);
-    expect(toggleScopedMessagesExpanded).toHaveBeenCalledTimes(1);
-    expect(toggleHistoryCategory).toHaveBeenCalledWith("user");
-    expect(toggleProjectPaneCollapsed).toHaveBeenCalledTimes(1);
-    expect(toggleSessionPaneCollapsed).toHaveBeenCalledTimes(1);
-    expect(goToPreviousHistoryPage).toHaveBeenCalledTimes(1);
-    expect(goToNextHistoryPage).toHaveBeenCalledTimes(1);
-    expect(goToPreviousSearchPage).not.toHaveBeenCalled();
-    expect(goToNextSearchPage).not.toHaveBeenCalled();
-    expect(setMainView).not.toHaveBeenCalledWith("history");
+    expect(props.focusGlobalSearch).toHaveBeenCalledTimes(1);
+    expect(props.focusSessionSearch).toHaveBeenCalledTimes(1);
+    expect(props.applyZoomAction).toHaveBeenCalledWith("in");
+    expect(props.toggleFocusMode).toHaveBeenCalledTimes(1);
+    expect(props.toggleScopedMessagesExpanded).toHaveBeenCalledTimes(1);
+    expect(props.toggleHistoryCategory).toHaveBeenCalledWith("user");
+    expect(props.toggleProjectPaneCollapsed).toHaveBeenCalledTimes(1);
+    expect(props.toggleSessionPaneCollapsed).toHaveBeenCalledTimes(1);
+    expect(props.goToPreviousHistoryPage).toHaveBeenCalledTimes(1);
+    expect(props.goToNextHistoryPage).toHaveBeenCalledTimes(1);
+    expect(props.focusPreviousHistoryMessage).toHaveBeenCalledTimes(1);
+    expect(props.focusNextHistoryMessage).toHaveBeenCalledTimes(1);
+    expect(props.selectPreviousSession).toHaveBeenCalledTimes(1);
+    expect(props.selectNextSession).toHaveBeenCalledTimes(1);
+    expect(props.selectPreviousProject).toHaveBeenCalledTimes(1);
+    expect(props.selectNextProject).toHaveBeenCalledTimes(1);
+    expect(props.goToPreviousSearchPage).not.toHaveBeenCalled();
+    expect(props.goToNextSearchPage).not.toHaveBeenCalled();
+    expect(props.setMainView).not.toHaveBeenCalledWith("history");
   });
 
   it("routes page shortcuts to global search pagination in search view", () => {
-    const goToPreviousHistoryPage = vi.fn();
-    const goToNextHistoryPage = vi.fn();
-    const goToPreviousSearchPage = vi.fn();
-    const goToNextSearchPage = vi.fn();
+    const props = createProps({ mainView: "search" });
 
-    render(
-      <Harness
-        mainView="search"
-        hasFocusedHistoryMessage={false}
-        setMainView={vi.fn()}
-        clearFocusedHistoryMessage={vi.fn()}
-        focusGlobalSearch={vi.fn()}
-        focusSessionSearch={vi.fn()}
-        toggleFocusMode={vi.fn()}
-        toggleScopedMessagesExpanded={vi.fn()}
-        toggleHistoryCategory={vi.fn()}
-        toggleProjectPaneCollapsed={vi.fn()}
-        toggleSessionPaneCollapsed={vi.fn()}
-        goToPreviousHistoryPage={goToPreviousHistoryPage}
-        goToNextHistoryPage={goToNextHistoryPage}
-        goToPreviousSearchPage={goToPreviousSearchPage}
-        goToNextSearchPage={goToNextSearchPage}
-        applyZoomAction={vi.fn(async () => undefined)}
-      />,
-    );
+    render(<Harness {...props} />);
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", metaKey: true }));
 
-    expect(goToPreviousSearchPage).toHaveBeenCalledTimes(1);
-    expect(goToNextSearchPage).toHaveBeenCalledTimes(1);
-    expect(goToPreviousHistoryPage).not.toHaveBeenCalled();
-    expect(goToNextHistoryPage).not.toHaveBeenCalled();
+    expect(props.goToPreviousSearchPage).toHaveBeenCalledTimes(1);
+    expect(props.goToNextSearchPage).toHaveBeenCalledTimes(1);
+    expect(props.goToPreviousHistoryPage).not.toHaveBeenCalled();
+    expect(props.goToNextHistoryPage).not.toHaveBeenCalled();
   });
 
   it("handles escape and question-mark help shortcuts", () => {
     const setMainView = vi.fn();
 
     const { rerender } = render(
-      <Harness
-        mainView="search"
-        hasFocusedHistoryMessage={false}
-        setMainView={setMainView}
-        clearFocusedHistoryMessage={vi.fn()}
-        focusGlobalSearch={vi.fn()}
-        focusSessionSearch={vi.fn()}
-        toggleFocusMode={vi.fn()}
-        toggleScopedMessagesExpanded={vi.fn()}
-        toggleHistoryCategory={vi.fn()}
-        toggleProjectPaneCollapsed={vi.fn()}
-        toggleSessionPaneCollapsed={vi.fn()}
-        goToPreviousHistoryPage={vi.fn()}
-        goToNextHistoryPage={vi.fn()}
-        goToPreviousSearchPage={vi.fn()}
-        goToNextSearchPage={vi.fn()}
-        applyZoomAction={vi.fn(async () => undefined)}
-      />,
+      <Harness {...createProps({ mainView: "search", setMainView })} />,
     );
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(setMainView).toHaveBeenCalledWith("history");
 
-    rerender(
-      <Harness
-        mainView="history"
-        hasFocusedHistoryMessage={false}
-        setMainView={setMainView}
-        clearFocusedHistoryMessage={vi.fn()}
-        focusGlobalSearch={vi.fn()}
-        focusSessionSearch={vi.fn()}
-        toggleFocusMode={vi.fn()}
-        toggleScopedMessagesExpanded={vi.fn()}
-        toggleHistoryCategory={vi.fn()}
-        toggleProjectPaneCollapsed={vi.fn()}
-        toggleSessionPaneCollapsed={vi.fn()}
-        goToPreviousHistoryPage={vi.fn()}
-        goToNextHistoryPage={vi.fn()}
-        goToPreviousSearchPage={vi.fn()}
-        goToNextSearchPage={vi.fn()}
-        applyZoomAction={vi.fn(async () => undefined)}
-      />,
-    );
+    rerender(<Harness {...createProps({ mainView: "history", setMainView })} />);
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
     expect(setMainView).toHaveBeenCalledWith("help");
   });
 
-  it("does not open help when typing '?' in an input", () => {
-    const setMainView = vi.fn();
+  it("does not open help or capture arrow navigation when typing in an input", () => {
+    const props = createProps();
 
     render(
       <div>
         <input id="query-input" />
-        <Harness
-          mainView="history"
-          hasFocusedHistoryMessage={false}
-          setMainView={setMainView}
-          clearFocusedHistoryMessage={vi.fn()}
-          focusGlobalSearch={vi.fn()}
-          focusSessionSearch={vi.fn()}
-          toggleFocusMode={vi.fn()}
-          toggleScopedMessagesExpanded={vi.fn()}
-          toggleHistoryCategory={vi.fn()}
-          toggleProjectPaneCollapsed={vi.fn()}
-          toggleSessionPaneCollapsed={vi.fn()}
-          goToPreviousHistoryPage={vi.fn()}
-          goToNextHistoryPage={vi.fn()}
-          goToPreviousSearchPage={vi.fn()}
-          goToNextSearchPage={vi.fn()}
-          applyZoomAction={vi.fn(async () => undefined)}
-        />
+        <Harness {...props} />
       </div>,
     );
 
     const input = document.getElementById("query-input");
     input?.focus();
     input?.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
+    input?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, metaKey: true }),
+    );
+    input?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, altKey: true }),
+    );
+    input?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, ctrlKey: true }),
+    );
 
-    expect(setMainView).not.toHaveBeenCalledWith("help");
+    expect(props.setMainView).not.toHaveBeenCalledWith("help");
+    expect(props.focusNextHistoryMessage).not.toHaveBeenCalled();
+    expect(props.selectNextSession).not.toHaveBeenCalled();
+    expect(props.selectNextProject).not.toHaveBeenCalled();
   });
 
   it("clears focused history message on escape", () => {
@@ -200,22 +148,10 @@ describe("useKeyboardShortcuts", () => {
 
     render(
       <Harness
-        mainView="history"
-        hasFocusedHistoryMessage={true}
-        setMainView={vi.fn()}
-        clearFocusedHistoryMessage={clearFocusedHistoryMessage}
-        focusGlobalSearch={vi.fn()}
-        focusSessionSearch={vi.fn()}
-        toggleFocusMode={vi.fn()}
-        toggleScopedMessagesExpanded={vi.fn()}
-        toggleHistoryCategory={vi.fn()}
-        toggleProjectPaneCollapsed={vi.fn()}
-        toggleSessionPaneCollapsed={vi.fn()}
-        goToPreviousHistoryPage={vi.fn()}
-        goToNextHistoryPage={vi.fn()}
-        goToPreviousSearchPage={vi.fn()}
-        goToNextSearchPage={vi.fn()}
-        applyZoomAction={vi.fn(async () => undefined)}
+        {...createProps({
+          hasFocusedHistoryMessage: true,
+          clearFocusedHistoryMessage,
+        })}
       />,
     );
 

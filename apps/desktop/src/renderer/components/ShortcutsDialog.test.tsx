@@ -7,7 +7,7 @@ import { ShortcutsDialog } from "./ShortcutsDialog";
 
 describe("ShortcutsDialog", () => {
   it("renders grouped shortcuts and syntax blocks in help view", () => {
-    render(
+    const { container } = render(
       <ShortcutsDialog
         shortcutItems={[
           { group: "Search & Navigation", shortcut: "Cmd/Ctrl+F", description: "Search messages" },
@@ -41,5 +41,7 @@ describe("ShortcutsDialog", () => {
     expect(screen.getByText("Boolean OR")).toBeInTheDocument();
     expect(screen.getAllByText("Advanced mode").length).toBeGreaterThan(0);
     expect(screen.getByText("Built-in Guide")).toBeInTheDocument();
+    expect(container.querySelector(".help-card-icon.success")).toBeInTheDocument();
+    expect(container.querySelector(".help-card-title-shortcuts")).toBeInTheDocument();
   });
 });

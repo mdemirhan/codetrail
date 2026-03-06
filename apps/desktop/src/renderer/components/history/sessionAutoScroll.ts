@@ -3,14 +3,14 @@ type ScrollIntoViewTarget = {
 };
 
 export function scheduleSelectedSessionScroll(args: {
-  selectedSessionId: string;
+  selectedItemId: string;
   collapsed: boolean;
   selectedSessionElement: ScrollIntoViewTarget | null;
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number;
   cancelAnimationFrame?: (id: number) => void;
 }): (() => void) | undefined {
-  const { selectedSessionId, collapsed, selectedSessionElement } = args;
-  if (!selectedSessionId || collapsed || !selectedSessionElement) {
+  const { selectedItemId, collapsed, selectedSessionElement } = args;
+  if (!selectedItemId || collapsed || !selectedSessionElement) {
     return undefined;
   }
 

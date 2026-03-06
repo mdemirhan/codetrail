@@ -36,7 +36,7 @@ export function ShortcutsDialog({
         <div className="help-grid">
           <section className="help-card">
             <div className="help-card-header">
-              <div className="help-card-icon info" aria-hidden>
+              <div className="help-card-icon success" aria-hidden>
                 ⌨
               </div>
               <div>

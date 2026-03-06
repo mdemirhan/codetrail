@@ -12,7 +12,7 @@ describe("scheduleSelectedSessionScroll", () => {
     const cancelAnimationFrame = vi.fn();
 
     const beforeMountCleanup = scheduleSelectedSessionScroll({
-      selectedSessionId: "session_restored",
+      selectedItemId: "session_restored",
       collapsed: false,
       selectedSessionElement: null,
       scheduleAnimationFrame,
@@ -25,7 +25,7 @@ describe("scheduleSelectedSessionScroll", () => {
       scrollIntoView: vi.fn(),
     };
     const afterMountCleanup = scheduleSelectedSessionScroll({
-      selectedSessionId: "session_restored",
+      selectedItemId: "session_restored",
       collapsed: false,
       selectedSessionElement,
       scheduleAnimationFrame,
@@ -48,7 +48,7 @@ describe("scheduleSelectedSessionScroll", () => {
     });
 
     const cleanup = scheduleSelectedSessionScroll({
-      selectedSessionId: "session_restored",
+      selectedItemId: "session_restored",
       collapsed: true,
       selectedSessionElement: { scrollIntoView: vi.fn() },
       scheduleAnimationFrame,

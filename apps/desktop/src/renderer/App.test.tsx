@@ -2,12 +2,16 @@
 
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { SEARCH_PLACEHOLDERS } from "./lib/searchPlaceholders";
 import { createMockCodetrailClient } from "./test/mockCodetrailClient";
 import { renderWithClient } from "./test/renderWithClient";
+
+function getFocusedHistoryMessageId(container: HTMLElement): string | null {
+  return container.querySelector<HTMLElement>(".message.focused")?.dataset.historyMessageId ?? null;
+}
 
 function createAppClient() {
   const client = createMockCodetrailClient();
@@ -618,6 +622,483 @@ function createBookmarksSearchClient() {
   return client;
 }
 
+function createHistoryNavigationClient() {
+  const client = createMockCodetrailClient();
+
+  client.invoke.mockImplementation(async (channel, payload) => {
+    const request = payload as Record<string, unknown>;
+
+    if (channel === "ui:getState") {
+      return {
+        projectPaneWidth: null,
+        sessionPaneWidth: null,
+        projectPaneCollapsed: null,
+        sessionPaneCollapsed: null,
+        projectProviders: null,
+        historyCategories: null,
+        expandedByDefaultCategories: null,
+        searchProviders: null,
+        theme: null,
+        monoFontFamily: null,
+        regularFontFamily: null,
+        monoFontSize: null,
+        regularFontSize: null,
+        useMonospaceForAllMessages: null,
+        selectedProjectId: null,
+        selectedSessionId: null,
+        historyMode: null,
+        projectSortDirection: null,
+        sessionSortDirection: null,
+        messageSortDirection: null,
+        bookmarkSortDirection: null,
+        projectAllSortDirection: null,
+        sessionPage: null,
+        sessionScrollTop: null,
+        systemMessageRegexRules: null,
+      };
+    }
+
+    if (channel === "ui:setState") {
+      return { ok: true };
+    }
+
+    if (channel === "ui:getZoom") {
+      return { percent: 100 };
+    }
+
+    if (channel === "projects:list") {
+      return {
+        projects: [
+          {
+            id: "project_1",
+            provider: "claude",
+            name: "Project One",
+            path: "/workspace/project-one",
+            sessionCount: 2,
+            lastActivity: "2026-03-01T10:00:00.000Z",
+          },
+          {
+            id: "project_2",
+            provider: "codex",
+            name: "Project Two",
+            path: "/workspace/project-two",
+            sessionCount: 1,
+            lastActivity: "2026-03-01T09:00:00.000Z",
+          },
+        ],
+      };
+    }
+
+    if (channel === "sessions:list") {
+      if (request.projectId === "project_2") {
+        return {
+          sessions: [
+            {
+              id: "session_3",
+              projectId: "project_2",
+              provider: "codex",
+              filePath: "/workspace/project-two/session-3.jsonl",
+              title: "Project two session",
+              modelNames: "gpt-5",
+              startedAt: "2026-03-01T09:00:00.000Z",
+              endedAt: "2026-03-01T09:05:00.000Z",
+              durationMs: 300000,
+              gitBranch: "main",
+              cwd: "/workspace/project-two",
+              messageCount: 1,
+              tokenInputTotal: 4,
+              tokenOutputTotal: 5,
+            },
+          ],
+        };
+      }
+
+      return {
+        sessions: [
+          {
+            id: "session_1",
+            projectId: "project_1",
+            provider: "claude",
+            filePath: "/workspace/project-one/session-1.jsonl",
+            title: "Session one",
+            modelNames: "claude-opus-4-1",
+            startedAt: "2026-03-01T10:00:00.000Z",
+            endedAt: "2026-03-01T10:05:00.000Z",
+            durationMs: 300000,
+            gitBranch: "main",
+            cwd: "/workspace/project-one",
+            messageCount: 1,
+            tokenInputTotal: 4,
+            tokenOutputTotal: 5,
+          },
+          {
+            id: "session_2",
+            projectId: "project_1",
+            provider: "claude",
+            filePath: "/workspace/project-one/session-2.jsonl",
+            title: "Session two",
+            modelNames: "claude-opus-4-1",
+            startedAt: "2026-03-01T09:00:00.000Z",
+            endedAt: "2026-03-01T09:05:00.000Z",
+            durationMs: 300000,
+            gitBranch: "main",
+            cwd: "/workspace/project-one",
+            messageCount: 1,
+            tokenInputTotal: 3,
+            tokenOutputTotal: 4,
+          },
+        ],
+      };
+    }
+
+    if (channel === "projects:getCombinedDetail") {
+      if (request.projectId === "project_2") {
+        return {
+          projectId: "project_2",
+          totalCount: 1,
+          categoryCounts: {
+            user: 1,
+            assistant: 0,
+            tool_use: 0,
+            tool_edit: 0,
+            tool_result: 0,
+            thinking: 0,
+            system: 0,
+          },
+          page: 0,
+          pageSize: 100,
+          focusIndex: null,
+          messages: [
+            {
+              id: "project_2_message",
+              sourceId: "project_2_src",
+              sessionId: "session_3",
+              provider: "codex",
+              category: "user",
+              content: "Project two combined message",
+              createdAt: "2026-03-01T09:05:00.000Z",
+              tokenInput: null,
+              tokenOutput: null,
+              operationDurationMs: null,
+              operationDurationSource: null,
+              operationDurationConfidence: null,
+              sessionTitle: "Project two session",
+              sessionActivity: "2026-03-01T09:05:00.000Z",
+              sessionStartedAt: "2026-03-01T09:00:00.000Z",
+              sessionEndedAt: "2026-03-01T09:05:00.000Z",
+              sessionGitBranch: "main",
+              sessionCwd: "/workspace/project-two",
+            },
+          ],
+        };
+      }
+
+      return {
+        projectId: "project_1",
+        totalCount: 2,
+        categoryCounts: {
+          user: 2,
+          assistant: 0,
+          tool_use: 0,
+          tool_edit: 0,
+          tool_result: 0,
+          thinking: 0,
+          system: 0,
+        },
+        page: 0,
+        pageSize: 100,
+        focusIndex: null,
+        messages: [
+          {
+            id: "project_1_message_1",
+            sourceId: "project_1_src_1",
+            sessionId: "session_1",
+            provider: "claude",
+            category: "user",
+            content: "Project one first message",
+            createdAt: "2026-03-01T10:05:00.000Z",
+            tokenInput: null,
+            tokenOutput: null,
+            operationDurationMs: null,
+            operationDurationSource: null,
+            operationDurationConfidence: null,
+            sessionTitle: "Session one",
+            sessionActivity: "2026-03-01T10:05:00.000Z",
+            sessionStartedAt: "2026-03-01T10:00:00.000Z",
+            sessionEndedAt: "2026-03-01T10:05:00.000Z",
+            sessionGitBranch: "main",
+            sessionCwd: "/workspace/project-one",
+          },
+          {
+            id: "project_1_message_2",
+            sourceId: "project_1_src_2",
+            sessionId: "session_2",
+            provider: "claude",
+            category: "user",
+            content: "Project one second message",
+            createdAt: "2026-03-01T09:05:00.000Z",
+            tokenInput: null,
+            tokenOutput: null,
+            operationDurationMs: null,
+            operationDurationSource: null,
+            operationDurationConfidence: null,
+            sessionTitle: "Session two",
+            sessionActivity: "2026-03-01T09:05:00.000Z",
+            sessionStartedAt: "2026-03-01T09:00:00.000Z",
+            sessionEndedAt: "2026-03-01T09:05:00.000Z",
+            sessionGitBranch: "main",
+            sessionCwd: "/workspace/project-one",
+          },
+        ],
+      };
+    }
+
+    if (channel === "sessions:getDetail") {
+      if (request.sessionId === "session_2") {
+        return {
+          session: {
+            id: "session_2",
+            projectId: "project_1",
+            provider: "claude",
+            filePath: "/workspace/project-one/session-2.jsonl",
+            title: "Session two",
+            modelNames: "claude-opus-4-1",
+            startedAt: "2026-03-01T09:00:00.000Z",
+            endedAt: "2026-03-01T09:05:00.000Z",
+            durationMs: 300000,
+            gitBranch: "main",
+            cwd: "/workspace/project-one",
+            messageCount: 1,
+            tokenInputTotal: 3,
+            tokenOutputTotal: 4,
+          },
+          totalCount: 1,
+          categoryCounts: {
+            user: 1,
+            assistant: 0,
+            tool_use: 0,
+            tool_edit: 0,
+            tool_result: 0,
+            thinking: 0,
+            system: 0,
+          },
+          page: 0,
+          pageSize: 100,
+          focusIndex: null,
+          messages: [
+            {
+              id: "session_2_message",
+              sourceId: "session_2_src",
+              sessionId: "session_2",
+              provider: "claude",
+              category: "user",
+              content: "Session two message",
+              createdAt: "2026-03-01T09:05:00.000Z",
+              tokenInput: null,
+              tokenOutput: null,
+              operationDurationMs: null,
+              operationDurationSource: null,
+              operationDurationConfidence: null,
+            },
+          ],
+        };
+      }
+
+      if (request.sessionId === "session_3") {
+        return {
+          session: {
+            id: "session_3",
+            projectId: "project_2",
+            provider: "codex",
+            filePath: "/workspace/project-two/session-3.jsonl",
+            title: "Project two session",
+            modelNames: "gpt-5",
+            startedAt: "2026-03-01T09:00:00.000Z",
+            endedAt: "2026-03-01T09:05:00.000Z",
+            durationMs: 300000,
+            gitBranch: "main",
+            cwd: "/workspace/project-two",
+            messageCount: 1,
+            tokenInputTotal: 4,
+            tokenOutputTotal: 5,
+          },
+          totalCount: 1,
+          categoryCounts: {
+            user: 1,
+            assistant: 0,
+            tool_use: 0,
+            tool_edit: 0,
+            tool_result: 0,
+            thinking: 0,
+            system: 0,
+          },
+          page: 0,
+          pageSize: 100,
+          focusIndex: null,
+          messages: [
+            {
+              id: "session_3_message",
+              sourceId: "session_3_src",
+              sessionId: "session_3",
+              provider: "codex",
+              category: "user",
+              content: "Project two session message",
+              createdAt: "2026-03-01T09:05:00.000Z",
+              tokenInput: null,
+              tokenOutput: null,
+              operationDurationMs: null,
+              operationDurationSource: null,
+              operationDurationConfidence: null,
+            },
+          ],
+        };
+      }
+
+      return {
+        session: {
+          id: "session_1",
+          projectId: "project_1",
+          provider: "claude",
+          filePath: "/workspace/project-one/session-1.jsonl",
+          title: "Session one",
+          modelNames: "claude-opus-4-1",
+          startedAt: "2026-03-01T10:00:00.000Z",
+          endedAt: "2026-03-01T10:05:00.000Z",
+          durationMs: 300000,
+          gitBranch: "main",
+          cwd: "/workspace/project-one",
+          messageCount: 1,
+          tokenInputTotal: 4,
+          tokenOutputTotal: 5,
+        },
+        totalCount: 1,
+        categoryCounts: {
+          user: 1,
+          assistant: 0,
+          tool_use: 0,
+          tool_edit: 0,
+          tool_result: 0,
+          thinking: 0,
+          system: 0,
+        },
+        page: 0,
+        pageSize: 100,
+        focusIndex: null,
+        messages: [
+          {
+            id: "session_1_message",
+            sourceId: "session_1_src",
+            sessionId: "session_1",
+            provider: "claude",
+            category: "user",
+            content: "Session one message",
+            createdAt: "2026-03-01T10:05:00.000Z",
+            tokenInput: null,
+            tokenOutput: null,
+            operationDurationMs: null,
+            operationDurationSource: null,
+            operationDurationConfidence: null,
+          },
+        ],
+      };
+    }
+
+    if (channel === "bookmarks:listProject") {
+      return {
+        projectId: String(request.projectId),
+        totalCount: 1,
+        filteredCount: 1,
+        categoryCounts: {
+          user: 1,
+          assistant: 0,
+          tool_use: 0,
+          tool_edit: 0,
+          tool_result: 0,
+          thinking: 0,
+          system: 0,
+        },
+        results: [
+          {
+            projectId: "project_1",
+            sessionId: "session_1",
+            sessionTitle: "Session one",
+            bookmarkedAt: "2026-03-01T10:06:00.000Z",
+            isOrphaned: false,
+            orphanedAt: null,
+            message: {
+              id: "bookmark_session_1_message",
+              sourceId: "bookmark_session_1_source",
+              sessionId: "session_1",
+              provider: "claude",
+              category: "user",
+              content: "Bookmarked session one message",
+              createdAt: "2026-03-01T10:05:30.000Z",
+              tokenInput: null,
+              tokenOutput: null,
+              operationDurationMs: null,
+              operationDurationSource: null,
+              operationDurationConfidence: null,
+            },
+          },
+        ],
+      };
+    }
+
+    if (channel === "search:query") {
+      return {
+        query: String(request.query ?? ""),
+        totalCount: 0,
+        categoryCounts: {
+          user: 0,
+          assistant: 0,
+          tool_use: 0,
+          tool_edit: 0,
+          tool_result: 0,
+          thinking: 0,
+          system: 0,
+        },
+        results: [],
+      };
+    }
+
+    if (channel === "ui:setZoom") {
+      return { percent: 100 };
+    }
+
+    if (channel === "indexer:refresh") {
+      return { jobId: "refresh-1" };
+    }
+
+    if (channel === "bookmarks:toggle") {
+      return { bookmarked: true };
+    }
+
+    if (channel === "app:getSettingsInfo") {
+      return {
+        storage: {
+          settingsFile: "/tmp/ui-state.json",
+          cacheDir: "/tmp/cache",
+          databaseFile: "/tmp/codetrail.sqlite",
+          bookmarksDatabaseFile: "/tmp/codetrail.bookmarks.sqlite",
+          userDataDir: "/tmp",
+        },
+        discovery: {
+          claudeRoot: "/Users/test/.claude/projects",
+          codexRoot: "/Users/test/.codex/sessions",
+          geminiRoot: "/Users/test/.gemini/tmp",
+          geminiHistoryRoot: "/Users/test/.gemini/history",
+          geminiProjectsPath: "/Users/test/.gemini/projects.json",
+          cursorRoot: "/Users/test/.cursor/projects",
+        },
+      };
+    }
+
+    throw new Error(`Unhandled IPC call: ${channel}`);
+  });
+
+  return client;
+}
+
 describe("App", () => {
   it("loads history, supports global search navigation, and opens settings", async () => {
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -801,5 +1282,238 @@ describe("App", () => {
     });
     expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyBookmarks)).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(SEARCH_PLACEHOLDERS.historySession)).toBeNull();
+  });
+
+  it("focuses visible messages with Cmd+Up/Down", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: () => undefined,
+      configurable: true,
+    });
+
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+    const messageList = () => container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowDown", metaKey: true });
+    await waitFor(() => {
+      expect(getFocusedHistoryMessageId(container)).toBe("m1");
+      expect(document.activeElement).toBe(messageList());
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowDown", metaKey: true });
+    await waitFor(() => {
+      expect(getFocusedHistoryMessageId(container)).toBe("m2");
+      expect(document.activeElement).toBe(messageList());
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowUp", metaKey: true });
+    await waitFor(() => {
+      expect(getFocusedHistoryMessageId(container)).toBe("m1");
+      expect(document.activeElement).toBe(messageList());
+    });
+  });
+
+  it("continues message navigation across history pages", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: () => undefined,
+      configurable: true,
+    });
+
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+    const messageList = () => container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Page 1 / 3 (250 messages)")).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowDown", metaKey: true });
+    fireEvent.keyDown(window, { key: "ArrowDown", metaKey: true });
+    fireEvent.keyDown(window, { key: "ArrowDown", metaKey: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("Page 2 / 3 (250 messages)")).toBeInTheDocument();
+      expect(getFocusedHistoryMessageId(container)).toBe("m1");
+      expect(document.activeElement).toBe(messageList());
+    });
+  });
+
+  it("top-aligns oversized focused messages in the visible area", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: () => undefined,
+      configurable: true,
+    });
+
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+    });
+
+    const messageList = container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+    const messageCards = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-history-message-id]"),
+    );
+    const firstMessage = messageCards[0];
+    const secondMessage = messageCards[1];
+
+    expect(messageList).not.toBeNull();
+    expect(firstMessage).toBeDefined();
+    expect(secondMessage).toBeDefined();
+    if (!messageList || !firstMessage || !secondMessage) {
+      throw new Error("Expected message list and visible messages");
+    }
+
+    const scrollTo = vi.fn(({ top }: { top: number }) => {
+      messageList.scrollTop = top;
+    });
+
+    Object.defineProperty(messageList, "clientHeight", {
+      value: 120,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTop", {
+      value: 40,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTo", {
+      value: scrollTo,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "getBoundingClientRect", {
+      value: () => ({
+        top: 100,
+        bottom: 220,
+        left: 0,
+        right: 400,
+        width: 400,
+        height: 120,
+        x: 0,
+        y: 100,
+        toJSON: () => "",
+      }),
+      configurable: true,
+    });
+    Object.defineProperty(firstMessage, "getBoundingClientRect", {
+      value: () => ({
+        top: 140,
+        bottom: 420,
+        left: 0,
+        right: 400,
+        width: 400,
+        height: 280,
+        x: 0,
+        y: 140,
+        toJSON: () => "",
+      }),
+      configurable: true,
+    });
+    Object.defineProperty(secondMessage, "getBoundingClientRect", {
+      value: () => ({
+        top: 430,
+        bottom: 470,
+        left: 0,
+        right: 400,
+        width: 400,
+        height: 40,
+        x: 0,
+        y: 430,
+        toJSON: () => "",
+      }),
+      configurable: true,
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowDown", metaKey: true });
+
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith({ top: 80, behavior: "smooth" });
+    });
+  });
+
+  it("navigates sessions with Option+Up/Down and projects with Ctrl+Up/Down", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: () => undefined,
+      configurable: true,
+    });
+
+    const user = userEvent.setup();
+    const client = createHistoryNavigationClient();
+    const { container } = renderWithClient(<App />, client);
+    const sessionList = () => container.querySelector<HTMLDivElement>(".list-scroll.session-list");
+    const projectList = () => container.querySelector<HTMLDivElement>(".list-scroll.project-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Project one first message")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Session one"));
+    await waitFor(() => {
+      expect(screen.getByText("Session one message")).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowDown", altKey: true });
+    await waitFor(() => {
+      expect(screen.getByText("Session two message")).toBeInTheDocument();
+      expect(document.activeElement).toBe(sessionList());
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    await waitFor(() => {
+      expect(screen.getByText("Session one message")).toBeInTheDocument();
+      expect(document.activeElement).toBe(sessionList());
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowDown", ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByText("Project two combined message")).toBeInTheDocument();
+      expect(document.activeElement).toBe(projectList());
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowUp", ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByText("Project one first message")).toBeInTheDocument();
+      expect(document.activeElement).toBe(projectList());
+    });
+  });
+
+  it("includes All Sessions and Bookmarked Messages when moving up from the first session", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: () => undefined,
+      configurable: true,
+    });
+
+    const user = userEvent.setup();
+    const client = createHistoryNavigationClient();
+    const { container } = renderWithClient(<App />, client);
+    const sessionList = () => container.querySelector<HTMLDivElement>(".list-scroll.session-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Project one first message")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Session one"));
+    await waitFor(() => {
+      expect(screen.getByText("Session one message")).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyBookmarks)).toBeInTheDocument();
+      expect(document.activeElement).toBe(sessionList());
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    await waitFor(() => {
+      expect(
+        screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyProjectSessions),
+      ).toBeInTheDocument();
+      expect(document.activeElement).toBe(sessionList());
+    });
   });
 });

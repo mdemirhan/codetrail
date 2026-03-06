@@ -1,5 +1,5 @@
 import type { IpcResponse } from "@codetrail/core";
-import { useCallback, useEffect, useState } from "react";
+import { type Ref, useCallback, useEffect, useState } from "react";
 
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
 import { ToolbarIcon } from "../ToolbarIcon";
@@ -25,6 +25,7 @@ export function SessionPane({
   onSelectAllSessions,
   onSelectBookmarks,
   onSelectSession,
+  listRef,
 }: {
   sortedSessions: SessionSummary[];
   selectedSessionId: string;
@@ -43,10 +44,16 @@ export function SessionPane({
   onSelectAllSessions: () => void;
   onSelectBookmarks: () => void;
   onSelectSession: (sessionId: string) => void;
+  listRef?: Ref<HTMLDivElement>;
 }) {
   const [selectedSessionElement, setSelectedSessionElement] = useState<HTMLButtonElement | null>(
     null,
   );
+  const selectedItemId = allSessionsSelected
+    ? "__project_all__"
+    : bookmarksSelected
+      ? "__bookmarks__"
+      : selectedSessionId;
   const sortTooltip =
     sortDirection === "asc"
       ? "Sessions: oldest activity first. Click to show newest activity first."
@@ -57,11 +64,11 @@ export function SessionPane({
 
   useEffect(() => {
     return scheduleSelectedSessionScroll({
-      selectedSessionId,
+      selectedItemId,
       collapsed,
       selectedSessionElement,
     });
-  }, [collapsed, selectedSessionElement, selectedSessionId]);
+  }, [collapsed, selectedItemId, selectedSessionElement]);
 
   return (
     <aside className={`panel session-pane${collapsed ? " collapsed" : ""}`}>
@@ -155,9 +162,10 @@ export function SessionPane({
           ) : null}
         </div>
       ) : null}
-      <div className="list-scroll session-list">
+      <div className="list-scroll session-list" ref={listRef} tabIndex={-1}>
         <button
           type="button"
+          ref={allSessionsSelected ? selectedSessionRef : null}
           className={
             allSessionsSelected ? "session-item all-sessions-item active" : "session-item all-sessions-item"
           }
@@ -172,6 +180,7 @@ export function SessionPane({
         {bookmarksCount > 0 ? (
           <button
             type="button"
+            ref={bookmarksSelected ? selectedSessionRef : null}
             className={
               bookmarksSelected
                 ? "session-item bookmarks-item active"

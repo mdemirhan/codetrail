@@ -15,6 +15,12 @@ export function useKeyboardShortcuts(args: {
   toggleHistoryCategory: (category: MessageCategory) => void;
   toggleProjectPaneCollapsed: () => void;
   toggleSessionPaneCollapsed: () => void;
+  focusPreviousHistoryMessage: () => void;
+  focusNextHistoryMessage: () => void;
+  selectPreviousSession: () => void;
+  selectNextSession: () => void;
+  selectPreviousProject: () => void;
+  selectNextProject: () => void;
   goToPreviousHistoryPage: () => void;
   goToNextHistoryPage: () => void;
   goToPreviousSearchPage: () => void;
@@ -33,6 +39,12 @@ export function useKeyboardShortcuts(args: {
     toggleHistoryCategory,
     toggleProjectPaneCollapsed,
     toggleSessionPaneCollapsed,
+    focusPreviousHistoryMessage,
+    focusNextHistoryMessage,
+    selectPreviousSession,
+    selectNextSession,
+    selectPreviousProject,
+    selectNextProject,
     goToPreviousHistoryPage,
     goToNextHistoryPage,
     goToPreviousSearchPage,
@@ -45,6 +57,7 @@ export function useKeyboardShortcuts(args: {
       const command = event.metaKey || event.ctrlKey;
       const shift = event.shiftKey;
       const key = event.key.toLowerCase();
+      const isHistoryArrowNavigation = mainView === "history" && !shift && !isEditableTarget(event.target);
       if (event.defaultPrevented) {
         return;
       }
@@ -74,6 +87,60 @@ export function useKeyboardShortcuts(args: {
       } else if (command && event.key === "0") {
         event.preventDefault();
         void applyZoomAction("reset");
+      } else if (
+        isHistoryArrowNavigation &&
+        event.metaKey &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        event.key === "ArrowUp"
+      ) {
+        event.preventDefault();
+        focusPreviousHistoryMessage();
+      } else if (
+        isHistoryArrowNavigation &&
+        event.metaKey &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        event.key === "ArrowDown"
+      ) {
+        event.preventDefault();
+        focusNextHistoryMessage();
+      } else if (
+        isHistoryArrowNavigation &&
+        event.altKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        event.key === "ArrowUp"
+      ) {
+        event.preventDefault();
+        selectPreviousSession();
+      } else if (
+        isHistoryArrowNavigation &&
+        event.altKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        event.key === "ArrowDown"
+      ) {
+        event.preventDefault();
+        selectNextSession();
+      } else if (
+        isHistoryArrowNavigation &&
+        event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        event.key === "ArrowUp"
+      ) {
+        event.preventDefault();
+        selectPreviousProject();
+      } else if (
+        isHistoryArrowNavigation &&
+        event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        event.key === "ArrowDown"
+      ) {
+        event.preventDefault();
+        selectNextProject();
       } else if (
         command &&
         !shift &&
@@ -159,6 +226,12 @@ export function useKeyboardShortcuts(args: {
     toggleProjectPaneCollapsed,
     toggleScopedMessagesExpanded,
     toggleSessionPaneCollapsed,
+    focusPreviousHistoryMessage,
+    focusNextHistoryMessage,
+    selectPreviousSession,
+    selectNextSession,
+    selectPreviousProject,
+    selectNextProject,
   ]);
 }
 
