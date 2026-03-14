@@ -1,37 +1,13 @@
+import { paneStateBaseSchema } from "@codetrail/core";
+
 import { createMockCodetrailClient } from "./mockCodetrailClient";
 
 type Request = Record<string, unknown>;
 type ChannelHandler = (request: Request) => Promise<unknown> | unknown;
 
-const EMPTY_UI_STATE = {
-  projectPaneWidth: null,
-  sessionPaneWidth: null,
-  projectPaneCollapsed: null,
-  sessionPaneCollapsed: null,
-  projectProviders: null,
-  historyCategories: null,
-  expandedByDefaultCategories: null,
-  searchProviders: null,
-  theme: null,
-  monoFontFamily: null,
-  regularFontFamily: null,
-  monoFontSize: null,
-  regularFontSize: null,
-  useMonospaceForAllMessages: null,
-  selectedProjectId: null,
-  selectedSessionId: null,
-  historyMode: null,
-  projectSortDirection: null,
-  sessionSortDirection: null,
-  messageSortDirection: null,
-  bookmarkSortDirection: null,
-  projectAllSortDirection: null,
-  sessionPage: null,
-  sessionScrollTop: null,
-  systemMessageRegexRules: null,
-  autoScrollEnabled: null,
-  periodicRefreshInterval: null,
-} as const;
+const EMPTY_UI_STATE = Object.fromEntries(
+  Object.keys(paneStateBaseSchema.shape).map((k) => [k, null]),
+);
 
 const SETTINGS_INFO = {
   storage: {

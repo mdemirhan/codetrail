@@ -269,9 +269,7 @@ describe("runIncrementalIndexing", () => {
       .prepare("SELECT message_count FROM sessions WHERE provider = 'codex' AND file_path = ?")
       .get(codexFile) as { message_count: number };
     const codexCheckpoint = dbAfterThird
-      .prepare(
-        "SELECT last_offset_bytes, file_size FROM index_checkpoints WHERE file_path = ?",
-      )
+      .prepare("SELECT last_offset_bytes, file_size FROM index_checkpoints WHERE file_path = ?")
       .get(codexFile) as { last_offset_bytes: number; file_size: number };
     dbAfterThird.close();
 
@@ -479,15 +477,15 @@ describe("runIncrementalIndexing", () => {
 
     const db = openDatabase(dbPath);
     const messages = db
-      .prepare("SELECT category, content FROM messages WHERE session_id = ? ORDER BY created_at, id")
+      .prepare(
+        "SELECT category, content FROM messages WHERE session_id = ? ORDER BY created_at, id",
+      )
       .all(makeSessionId("codex", "codex:codex-session-resume:test")) as Array<{
       category: string;
       content: string;
     }>;
     const checkpoint = db
-      .prepare(
-        "SELECT last_offset_bytes, file_size FROM index_checkpoints WHERE file_path = ?",
-      )
+      .prepare("SELECT last_offset_bytes, file_size FROM index_checkpoints WHERE file_path = ?")
       .get(codexFile) as { last_offset_bytes: number; file_size: number };
     db.close();
 
@@ -497,9 +495,7 @@ describe("runIncrementalIndexing", () => {
     expect(messages.some((message) => message.category === "tool_result")).toBe(false);
     expect(checkpoint.last_offset_bytes).toBe(checkpoint.file_size);
     expect(notices).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: "parser.invalid_jsonl_line" }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: "parser.invalid_jsonl_line" })]),
     );
 
     rmSync(dir, { recursive: true, force: true });
@@ -566,9 +562,9 @@ describe("runIncrementalIndexing", () => {
     const ftsRow = db.prepare("SELECT content FROM message_fts LIMIT 1").get() as {
       content: string;
     };
-    const toolCallRow = db
-      .prepare("SELECT args_json FROM tool_calls LIMIT 1")
-      .get() as { args_json: string };
+    const toolCallRow = db.prepare("SELECT args_json FROM tool_calls LIMIT 1").get() as {
+      args_json: string;
+    };
     db.close();
 
     expect(Buffer.byteLength(messageRow.content, "utf8")).toBeLessThan(300 * 1024);
@@ -576,10 +572,7 @@ describe("runIncrementalIndexing", () => {
     expect(Buffer.byteLength(ftsRow.content, "utf8")).toBeLessThan(64 * 1024);
     expect(Buffer.byteLength(toolCallRow.args_json, "utf8")).toBeLessThan(80 * 1024);
     expect(notices).toEqual(
-      expect.arrayContaining([
-        "index.message_fts_truncated",
-        "index.tool_call_raw_truncated",
-      ]),
+      expect.arrayContaining(["index.message_fts_truncated", "index.tool_call_raw_truncated"]),
     );
 
     rmSync(dir, { recursive: true, force: true });
@@ -674,7 +667,9 @@ describe("runIncrementalIndexing", () => {
 
     const db = openDatabase(dbPath);
     const sessionCount = db.prepare("SELECT COUNT(*) as c FROM sessions").get() as { c: number };
-    const indexedFileCount = db.prepare("SELECT COUNT(*) as c FROM indexed_files").get() as { c: number };
+    const indexedFileCount = db.prepare("SELECT COUNT(*) as c FROM indexed_files").get() as {
+      c: number;
+    };
     db.close();
 
     expect(sessionCount.c).toBe(1);

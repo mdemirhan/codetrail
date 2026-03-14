@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { type IpcResponse, paneStateBaseSchema } from "@codetrail/core";
+
 import { registerIpcHandlers } from "./ipc";
+
+const allNullPaneState = Object.fromEntries(
+  Object.keys(paneStateBaseSchema.shape).map((k) => [k, null]),
+) as IpcResponse<"ui:getState">;
 
 describe("registerIpcHandlers", () => {
   it("validates request payloads before invoking handlers", async () => {
@@ -106,35 +112,7 @@ describe("registerIpcHandlers", () => {
           ok: true,
           error: null,
         }),
-        "ui:getState": () => ({
-          projectPaneWidth: null,
-          sessionPaneWidth: null,
-          projectPaneCollapsed: null,
-          sessionPaneCollapsed: null,
-          projectProviders: null,
-          historyCategories: null,
-          expandedByDefaultCategories: null,
-          searchProviders: null,
-          theme: null,
-          monoFontFamily: null,
-          regularFontFamily: null,
-          monoFontSize: null,
-          regularFontSize: null,
-          useMonospaceForAllMessages: null,
-          selectedProjectId: null,
-          selectedSessionId: null,
-          historyMode: null,
-          projectSortDirection: null,
-          sessionSortDirection: null,
-          messageSortDirection: null,
-          bookmarkSortDirection: null,
-          projectAllSortDirection: null,
-          sessionPage: null,
-          sessionScrollTop: null,
-          systemMessageRegexRules: null,
-          autoScrollEnabled: null,
-          periodicRefreshInterval: null,
-        }),
+        "ui:getState": () => allNullPaneState,
         "ui:setState": () => ({
           ok: true,
         }),
@@ -252,35 +230,7 @@ describe("registerIpcHandlers", () => {
           results: [],
         }),
         "path:openInFileManager": () => ({ ok: true, error: null }),
-        "ui:getState": () => ({
-          projectPaneWidth: null,
-          sessionPaneWidth: null,
-          projectPaneCollapsed: null,
-          sessionPaneCollapsed: null,
-          projectProviders: null,
-          historyCategories: null,
-          expandedByDefaultCategories: null,
-          searchProviders: null,
-          theme: null,
-          monoFontFamily: null,
-          regularFontFamily: null,
-          monoFontSize: null,
-          regularFontSize: null,
-          useMonospaceForAllMessages: null,
-          selectedProjectId: null,
-          selectedSessionId: null,
-          historyMode: null,
-          projectSortDirection: null,
-          sessionSortDirection: null,
-          messageSortDirection: null,
-          bookmarkSortDirection: null,
-          projectAllSortDirection: null,
-          sessionPage: null,
-          sessionScrollTop: null,
-          systemMessageRegexRules: null,
-          autoScrollEnabled: null,
-          periodicRefreshInterval: null,
-        }),
+        "ui:getState": () => allNullPaneState,
         "ui:setState": () => ({ ok: true }),
         "ui:getZoom": () => ({ percent: 100 }),
         "ui:setZoom": () => ({ percent: 0 }) as never,

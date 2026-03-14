@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { type IpcChannel, ipcChannels, ipcContractSchemas } from "./ipc";
+import { type IpcChannel, ipcChannels, ipcContractSchemas, paneStateBaseSchema } from "./ipc";
+
+const allNullPaneState = Object.fromEntries(
+  Object.keys(paneStateBaseSchema.shape).map((k) => [k, null]),
+);
 
 type ChannelExample = {
   request: unknown;
@@ -174,35 +178,7 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
   },
   "ui:getState": {
     request: {},
-    response: {
-      projectPaneWidth: null,
-      sessionPaneWidth: null,
-      projectPaneCollapsed: null,
-      sessionPaneCollapsed: null,
-      projectProviders: null,
-      historyCategories: null,
-      expandedByDefaultCategories: null,
-      searchProviders: null,
-      theme: null,
-      monoFontFamily: null,
-      regularFontFamily: null,
-      monoFontSize: null,
-      regularFontSize: null,
-      useMonospaceForAllMessages: null,
-      selectedProjectId: null,
-      selectedSessionId: null,
-      historyMode: null,
-      projectSortDirection: null,
-      sessionSortDirection: null,
-      messageSortDirection: null,
-      bookmarkSortDirection: null,
-      projectAllSortDirection: null,
-      sessionPage: null,
-      sessionScrollTop: null,
-      systemMessageRegexRules: null,
-      autoScrollEnabled: null,
-      periodicRefreshInterval: null,
-    },
+    response: allNullPaneState,
   },
   "ui:setState": {
     request: {

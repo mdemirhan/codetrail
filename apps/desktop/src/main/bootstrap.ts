@@ -8,7 +8,9 @@ import {
   DEFAULT_DISCOVERY_CONFIG,
   type IndexingFileIssue,
   type IndexingNotice,
+  type IpcResponse,
   initializeDatabase,
+  paneStateBaseSchema,
   resolveSystemMessageRegexRules,
 } from "@codetrail/core";
 
@@ -155,66 +157,20 @@ export async function bootstrapMainProcess(
     },
     "ui:getState": () => {
       const paneState = options.appStateStore?.getPaneState();
-      return {
-        projectPaneWidth: paneState?.projectPaneWidth ?? null,
-        sessionPaneWidth: paneState?.sessionPaneWidth ?? null,
-        projectPaneCollapsed: paneState?.projectPaneCollapsed ?? null,
-        sessionPaneCollapsed: paneState?.sessionPaneCollapsed ?? null,
-        projectProviders: paneState?.projectProviders ?? null,
-        historyCategories: paneState?.historyCategories ?? null,
-        expandedByDefaultCategories: paneState?.expandedByDefaultCategories ?? null,
-        searchProviders: paneState?.searchProviders ?? null,
-        theme: paneState?.theme ?? null,
-        monoFontFamily: paneState?.monoFontFamily ?? null,
-        regularFontFamily: paneState?.regularFontFamily ?? null,
-        monoFontSize: paneState?.monoFontSize ?? null,
-        regularFontSize: paneState?.regularFontSize ?? null,
-        useMonospaceForAllMessages: paneState?.useMonospaceForAllMessages ?? null,
-        selectedProjectId: paneState?.selectedProjectId ?? null,
-        selectedSessionId: paneState?.selectedSessionId ?? null,
-        historyMode: paneState?.historyMode ?? null,
-        projectSortDirection: paneState?.projectSortDirection ?? null,
-        sessionSortDirection: paneState?.sessionSortDirection ?? null,
-        messageSortDirection: paneState?.messageSortDirection ?? null,
-        bookmarkSortDirection: paneState?.bookmarkSortDirection ?? null,
-        projectAllSortDirection: paneState?.projectAllSortDirection ?? null,
-        sessionPage: paneState?.sessionPage ?? null,
-        sessionScrollTop: paneState?.sessionScrollTop ?? null,
-        systemMessageRegexRules: resolveSystemMessageRegexRules(paneState?.systemMessageRegexRules),
-        autoScrollEnabled: paneState?.autoScrollEnabled ?? null,
-        periodicRefreshInterval: paneState?.periodicRefreshInterval ?? null,
-      };
+      const result = Object.fromEntries(
+        Object.keys(paneStateBaseSchema.shape).map((key) => [
+          key,
+          paneState?.[key as keyof typeof paneState] ?? null,
+        ]),
+      );
+      // systemMessageRegexRules needs special resolution to fill in defaults for new providers.
+      result.systemMessageRegexRules = resolveSystemMessageRegexRules(
+        paneState?.systemMessageRegexRules,
+      );
+      return result as IpcResponse<"ui:getState">;
     },
     "ui:setState": (payload) => {
-      options.appStateStore?.setPaneState({
-        projectPaneWidth: payload.projectPaneWidth,
-        sessionPaneWidth: payload.sessionPaneWidth,
-        projectPaneCollapsed: payload.projectPaneCollapsed,
-        sessionPaneCollapsed: payload.sessionPaneCollapsed,
-        projectProviders: payload.projectProviders,
-        historyCategories: payload.historyCategories,
-        expandedByDefaultCategories: payload.expandedByDefaultCategories,
-        searchProviders: payload.searchProviders,
-        theme: payload.theme,
-        monoFontFamily: payload.monoFontFamily,
-        regularFontFamily: payload.regularFontFamily,
-        monoFontSize: payload.monoFontSize,
-        regularFontSize: payload.regularFontSize,
-        useMonospaceForAllMessages: payload.useMonospaceForAllMessages,
-        selectedProjectId: payload.selectedProjectId,
-        selectedSessionId: payload.selectedSessionId,
-        historyMode: payload.historyMode,
-        projectSortDirection: payload.projectSortDirection,
-        sessionSortDirection: payload.sessionSortDirection,
-        messageSortDirection: payload.messageSortDirection,
-        bookmarkSortDirection: payload.bookmarkSortDirection,
-        projectAllSortDirection: payload.projectAllSortDirection,
-        sessionPage: payload.sessionPage,
-        sessionScrollTop: payload.sessionScrollTop,
-        systemMessageRegexRules: payload.systemMessageRegexRules,
-        autoScrollEnabled: payload.autoScrollEnabled,
-        periodicRefreshInterval: payload.periodicRefreshInterval,
-      });
+      options.appStateStore?.setPaneState(payload);
       return { ok: true };
     },
     "ui:getZoom": (_payload, event) => ({

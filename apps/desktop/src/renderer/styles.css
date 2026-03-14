@@ -497,6 +497,10 @@ body.platform-macos .titlebar-left {
   font-size: 12px;
 }
 
+.tb-dropdown-trigger .toolbar-icon {
+  pointer-events: none;
+}
+
 .tb-dropdown-menu {
   position: absolute;
   top: 100%;

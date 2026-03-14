@@ -205,8 +205,7 @@ export function useHistoryController({
     referenceOffsetTop: number;
   } | null>(null);
   const pendingAutoScrollRef = useRef(false);
-  const messageCountRef = useRef(0);
-  const prevMessageCountRef = useRef(0);
+  const prevMessageIdsRef = useRef("");
 
   const projectsLoadTokenRef = useRef(0);
   const sessionsLoadTokenRef = useRef(0);
@@ -509,10 +508,6 @@ export function useHistoryController({
     sessionPaneWidth,
   });
 
-  // Keep messageCountRef in sync so handleRefreshAllData can snapshot it without
-  // needing activeHistoryMessages.length in its dependency array.
-  messageCountRef.current = activeHistoryMessages.length;
-
   useEffect(() => {
     if (!messageListRef.current) {
       return;
@@ -612,14 +607,18 @@ export function useHistoryController({
 
     if (pendingAutoScrollRef.current) {
       pendingAutoScrollRef.current = false;
-      if (activeHistoryMessages.length !== prevMessageCountRef.current) {
-        if (activeMessageSortDirection === "asc") {
-          container.scrollTop = container.scrollHeight;
-        } else {
-          container.scrollTop = 0;
-        }
+      const currentIds = activeHistoryMessages.map((m) => m.id).join(",");
+      if (currentIds !== prevMessageIdsRef.current) {
+        prevMessageIdsRef.current = currentIds;
+        // Use rAF to ensure the DOM has fully laid out before scrolling.
+        window.requestAnimationFrame(() => {
+          if (activeMessageSortDirection === "asc") {
+            container.scrollTop = container.scrollHeight;
+          } else {
+            container.scrollTop = 0;
+          }
+        });
       }
-      prevMessageCountRef.current = activeHistoryMessages.length;
       return;
     }
 
@@ -830,7 +829,14 @@ export function useHistoryController({
       const container = messageListRef.current;
       if (autoScrollEnabled) {
         pendingAutoScrollRef.current = true;
-        prevMessageCountRef.current = messageCountRef.current;
+        // Snapshot current message IDs from the DOM to detect new messages after refresh.
+        const ids = container
+          ? Array.from(
+              container.querySelectorAll<HTMLElement>("[data-history-message-id]"),
+              (el) => el.getAttribute("data-history-message-id"),
+            ).join(",")
+          : "";
+        prevMessageIdsRef.current = ids;
       } else if (container) {
         const elements = Array.from(
           container.querySelectorAll<HTMLElement>("[data-history-message-id]"),

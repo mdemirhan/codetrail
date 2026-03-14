@@ -441,7 +441,8 @@ export function runIncrementalIndexing(
                 sessionDbId,
                 nowIso,
                 readFileText: resolvedDependencies.readFileText,
-                systemMessageRules: compiledSystemMessageRules.compiledByProvider[discovered.provider],
+                systemMessageRules:
+                  compiledSystemMessageRules.compiledByProvider[discovered.provider],
                 statements,
                 onNotice: resolvedDependencies.onNotice,
               })
@@ -450,7 +451,8 @@ export function runIncrementalIndexing(
                 discovered,
                 sessionDbId,
                 nowIso,
-                systemMessageRules: compiledSystemMessageRules.compiledByProvider[discovered.provider],
+                systemMessageRules:
+                  compiledSystemMessageRules.compiledByProvider[discovered.provider],
                 statements,
                 resumeCheckpoint,
                 onNotice: resolvedDependencies.onNotice,
@@ -525,7 +527,11 @@ function indexMaterializedSessionFile(args: {
     parsePayload: unknown[] | Record<string, unknown>;
   };
   try {
-    const loaded = readProviderSource(args.discovered.provider, args.discovered.filePath, args.readFileText);
+    const loaded = readProviderSource(
+      args.discovered.provider,
+      args.discovered.filePath,
+      args.readFileText,
+    );
     if (!loaded) {
       throw new Error("Unable to read provider source.");
     }
@@ -580,7 +586,9 @@ function indexMaterializedSessionFile(args: {
     const persist = args.db.transaction(() => {
       deleteSessionDataForFilePath(args.db, args.discovered.filePath);
       deleteSessionData(args.db, args.sessionDbId);
-      args.db.prepare("DELETE FROM index_checkpoints WHERE file_path = ?").run(args.discovered.filePath);
+      args.db
+        .prepare("DELETE FROM index_checkpoints WHERE file_path = ?")
+        .run(args.discovered.filePath);
       args.statements.upsertProject.run(
         projectId,
         args.discovered.provider,
@@ -650,7 +658,9 @@ function indexStreamedJsonlSessionFile(args: {
   onNotice: (notice: IndexingNotice) => void;
 }): ParserDiagnostic[] {
   const parserDiagnostics: ParserDiagnostic[] = [];
-  const sourceMetaAccumulator = createSourceMetadataAccumulator(args.resumeCheckpoint?.sourceMetadata);
+  const sourceMetaAccumulator = createSourceMetadataAccumulator(
+    args.resumeCheckpoint?.sourceMetadata,
+  );
   const processingState = createMessageProcessingState(
     args.discovered.provider,
     args.discovered.fileMtimeMs,
@@ -666,7 +676,9 @@ function indexStreamedJsonlSessionFile(args: {
         deleteSessionDataForFilePath(args.db, args.discovered.filePath);
         deleteSessionData(args.db, args.sessionDbId);
       }
-      args.db.prepare("DELETE FROM index_checkpoints WHERE file_path = ?").run(args.discovered.filePath);
+      args.db
+        .prepare("DELETE FROM index_checkpoints WHERE file_path = ?")
+        .run(args.discovered.filePath);
       args.statements.upsertProject.run(
         projectId,
         args.discovered.provider,
@@ -681,7 +693,10 @@ function indexStreamedJsonlSessionFile(args: {
         provider: args.discovered.provider,
         filePath: args.discovered.filePath,
         title: processingState.aggregate.title,
-        modelNames: sourceMetaAccumulator.models.size > 0 ? [...sourceMetaAccumulator.models].sort().join(",") : "",
+        modelNames:
+          sourceMetaAccumulator.models.size > 0
+            ? [...sourceMetaAccumulator.models].sort().join(",")
+            : "",
         aggregate: finalizeSessionAggregate(processingState.aggregate),
         messageCount: processingState.aggregate.messageCount,
         tokenInputTotal: processingState.aggregate.tokenInputTotal,
@@ -874,8 +889,7 @@ function createMessageProcessingState(
     fileMtimeMs,
     systemMessageRules,
     previousMessage: checkpoint?.previousMessage ?? null,
-    previousCursorTimestampMs:
-      checkpoint?.previousCursorTimestampMs ?? Number.NEGATIVE_INFINITY,
+    previousCursorTimestampMs: checkpoint?.previousCursorTimestampMs ?? Number.NEGATIVE_INFINITY,
     assistantThinkingRunRoot: checkpoint?.assistantThinkingRunRoot ?? null,
     assistantThinkingRunBaseline: checkpoint?.assistantThinkingRunBaseline ?? null,
     aggregate: checkpoint?.aggregate ?? {
@@ -1040,7 +1054,9 @@ function updateSessionAggregateState(state: SessionAggregateState, message: Inde
   const timestampMs = Date.parse(message.createdAt);
   if (Number.isFinite(timestampMs) && timestampMs > 0) {
     state.startedAtMs =
-      state.startedAtMs === null || timestampMs < state.startedAtMs ? timestampMs : state.startedAtMs;
+      state.startedAtMs === null || timestampMs < state.startedAtMs
+        ? timestampMs
+        : state.startedAtMs;
     state.endedAtMs =
       state.endedAtMs === null || timestampMs > state.endedAtMs ? timestampMs : state.endedAtMs;
   }
@@ -1414,7 +1430,10 @@ function insertIndexedMessage(
   },
 ): void {
   const messageId = makeMessageId(sessionDbId, message.id);
-  const persistedContent = truncateTextForIndexing(message.content, MAX_INDEXED_MESSAGE_CONTENT_BYTES);
+  const persistedContent = truncateTextForIndexing(
+    message.content,
+    MAX_INDEXED_MESSAGE_CONTENT_BYTES,
+  );
   const persistedContentWasTruncated = persistedContent !== message.content;
   const ftsContent = truncateTextForIndexing(persistedContent, MAX_INDEXED_FTS_CONTENT_BYTES);
   const ftsContentWasTruncated = ftsContent !== persistedContent;
@@ -1648,7 +1667,8 @@ function parseCheckpointMessage(value: unknown): IndexedMessage | null {
     createdAt,
     tokenInput: typeof record.tokenInput === "number" ? record.tokenInput : null,
     tokenOutput: typeof record.tokenOutput === "number" ? record.tokenOutput : null,
-    operationDurationMs: typeof record.operationDurationMs === "number" ? record.operationDurationMs : null,
+    operationDurationMs:
+      typeof record.operationDurationMs === "number" ? record.operationDurationMs : null,
     operationDurationSource:
       record.operationDurationSource === "native" || record.operationDurationSource === "derived"
         ? record.operationDurationSource

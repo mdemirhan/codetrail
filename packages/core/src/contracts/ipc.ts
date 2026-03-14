@@ -122,35 +122,46 @@ const systemMessageRegexRulesSchema = z.object({
   cursor: z.array(z.string()),
 });
 
-const paneStateSchema = z.object({
-  projectPaneWidth: z.number().int().positive().nullable(),
-  sessionPaneWidth: z.number().int().positive().nullable(),
-  projectPaneCollapsed: z.boolean().nullable(),
-  sessionPaneCollapsed: z.boolean().nullable(),
-  projectProviders: z.array(providerSchema).nullable(),
-  historyCategories: z.array(messageCategorySchema).nullable(),
-  expandedByDefaultCategories: z.array(messageCategorySchema).nullable(),
-  searchProviders: z.array(providerSchema).nullable(),
-  theme: z.enum(["light", "dark"]).nullable(),
-  monoFontFamily: z.enum(["current", "droid_sans_mono"]).nullable(),
-  regularFontFamily: z.enum(["current", "inter"]).nullable(),
-  monoFontSize: monoFontSizeSchema.nullable(),
-  regularFontSize: regularFontSizeSchema.nullable(),
-  useMonospaceForAllMessages: z.boolean().nullable(),
-  selectedProjectId: z.string().nullable(),
-  selectedSessionId: z.string().nullable(),
-  historyMode: z.enum(["session", "bookmarks", "project_all"]).nullable(),
-  projectSortDirection: sortDirectionSchema.nullable(),
-  sessionSortDirection: sortDirectionSchema.nullable(),
-  messageSortDirection: sortDirectionSchema.nullable(),
-  bookmarkSortDirection: sortDirectionSchema.nullable(),
-  projectAllSortDirection: sortDirectionSchema.nullable(),
-  sessionPage: z.number().int().nonnegative().nullable(),
-  sessionScrollTop: z.number().int().nonnegative().nullable(),
-  systemMessageRegexRules: systemMessageRegexRulesSchema.nullable(),
-  autoScrollEnabled: z.boolean().nullable(),
-  periodicRefreshInterval: z.number().int().nonnegative().nullable(),
+// Single source of truth for pane state fields. The non-nullable base schema is used
+// directly as the ui:setState request. The nullable variant (for ui:getState responses
+// where persisted values may be absent) is derived automatically.
+export const paneStateBaseSchema = z.object({
+  projectPaneWidth: z.number().int().positive(),
+  sessionPaneWidth: z.number().int().positive(),
+  projectPaneCollapsed: z.boolean(),
+  sessionPaneCollapsed: z.boolean(),
+  projectProviders: z.array(providerSchema),
+  historyCategories: z.array(messageCategorySchema),
+  expandedByDefaultCategories: z.array(messageCategorySchema),
+  searchProviders: z.array(providerSchema),
+  theme: z.enum(["light", "dark"]),
+  monoFontFamily: z.enum(["current", "droid_sans_mono"]),
+  regularFontFamily: z.enum(["current", "inter"]),
+  monoFontSize: monoFontSizeSchema,
+  regularFontSize: regularFontSizeSchema,
+  useMonospaceForAllMessages: z.boolean(),
+  selectedProjectId: z.string(),
+  selectedSessionId: z.string(),
+  historyMode: z.enum(["session", "bookmarks", "project_all"]),
+  projectSortDirection: sortDirectionSchema,
+  sessionSortDirection: sortDirectionSchema,
+  messageSortDirection: sortDirectionSchema,
+  bookmarkSortDirection: sortDirectionSchema,
+  projectAllSortDirection: sortDirectionSchema,
+  sessionPage: z.number().int().nonnegative(),
+  sessionScrollTop: z.number().int().nonnegative(),
+  systemMessageRegexRules: systemMessageRegexRulesSchema,
+  autoScrollEnabled: z.boolean(),
+  periodicRefreshInterval: z.number().int().nonnegative(),
 });
+
+function makeAllNullable<T extends z.ZodRawShape>(shape: T) {
+  return Object.fromEntries(
+    Object.entries(shape).map(([key, value]) => [key, (value as z.ZodTypeAny).nullable()]),
+  ) as { [K in keyof T]: z.ZodNullable<T[K]> };
+}
+
+const paneStateSchema = z.object(makeAllNullable(paneStateBaseSchema.shape));
 
 const uiZoomResponseSchema = z.object({
   percent: z.number().int().positive(),
@@ -337,35 +348,7 @@ export const ipcContractSchemas = {
     response: paneStateSchema,
   },
   "ui:setState": {
-    request: z.object({
-      projectPaneWidth: z.number().int().positive(),
-      sessionPaneWidth: z.number().int().positive(),
-      projectPaneCollapsed: z.boolean(),
-      sessionPaneCollapsed: z.boolean(),
-      projectProviders: z.array(providerSchema),
-      historyCategories: z.array(messageCategorySchema),
-      expandedByDefaultCategories: z.array(messageCategorySchema),
-      searchProviders: z.array(providerSchema),
-      theme: z.enum(["light", "dark"]),
-      monoFontFamily: z.enum(["current", "droid_sans_mono"]),
-      regularFontFamily: z.enum(["current", "inter"]),
-      monoFontSize: monoFontSizeSchema,
-      regularFontSize: regularFontSizeSchema,
-      useMonospaceForAllMessages: z.boolean(),
-      selectedProjectId: z.string(),
-      selectedSessionId: z.string(),
-      historyMode: z.enum(["session", "bookmarks", "project_all"]),
-      projectSortDirection: sortDirectionSchema,
-      sessionSortDirection: sortDirectionSchema,
-      messageSortDirection: sortDirectionSchema,
-      bookmarkSortDirection: sortDirectionSchema,
-      projectAllSortDirection: sortDirectionSchema,
-      sessionPage: z.number().int().nonnegative(),
-      sessionScrollTop: z.number().int().nonnegative(),
-      systemMessageRegexRules: systemMessageRegexRulesSchema,
-      autoScrollEnabled: z.boolean(),
-      periodicRefreshInterval: z.number().int().nonnegative(),
-    }),
+    request: paneStateBaseSchema,
     response: z.object({
       ok: z.literal(true),
     }),

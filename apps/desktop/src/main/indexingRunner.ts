@@ -223,9 +223,8 @@ async function runIndexingJob(args: {
   }
 
   try {
-    const runtime =
-      shouldUseIndexingWorker() ?
-        args.createWorker(args.workerUrl)
+    const runtime = shouldUseIndexingWorker()
+      ? args.createWorker(args.workerUrl)
       : args.createBackgroundProcess(args.workerUrl);
     await runIndexingInBackgroundRuntime(
       runtime,
@@ -285,14 +284,14 @@ function runIndexingInBackgroundRuntime(
       }
       if (!response || response.type !== "result" || response.ok !== true) {
         const error = new Error(
-          response?.type === "result" ? response.message : "Worker returned an invalid indexing response.",
+          response?.type === "result"
+            ? response.message
+            : "Worker returned an invalid indexing response.",
         );
         if (response?.type === "result" && response.stack) {
           error.stack = response.stack;
         }
-        finish(() =>
-          reject(error),
-        );
+        finish(() => reject(error));
         return;
       }
       finish(resolve);
@@ -318,9 +317,7 @@ function resolveIndexingWorkerUrl(): URL | null {
   return existsSync(fileURLToPath(workerUrl)) ? workerUrl : null;
 }
 
-export function shouldUseIndexingWorker(
-  options: IndexingWorkerRuntimeOptions = {},
-): boolean {
+export function shouldUseIndexingWorker(options: IndexingWorkerRuntimeOptions = {}): boolean {
   const enableWorkerOverride =
     options.enableWorkerOverride ?? process.env.CODETRAIL_ENABLE_INDEXING_WORKER;
   if (enableWorkerOverride === "1") {

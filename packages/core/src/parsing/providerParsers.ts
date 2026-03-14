@@ -65,7 +65,8 @@ export type ParseProviderEventResult = {
 // Each provider emits different event shapes, but all parsers normalize into the same stream of
 // split messages so indexing/search can stay provider-agnostic.
 export function parseProviderPayload(args: ParseProviderPayloadArgs): ParsedProviderMessage[] {
-  const events = args.provider === "gemini" ? extractGeminiEvents(args.payload) : extractEvents(args.payload);
+  const events =
+    args.provider === "gemini" ? extractGeminiEvents(args.payload) : extractEvents(args.payload);
   const output: ParsedProviderMessage[] = [];
   let sequence = 0;
 
@@ -123,7 +124,11 @@ function parseClaudeEvent(args: ParseProviderEventArgs): ParseProviderEventResul
   const messageRecord = asRecord(eventRecord.message);
   const normalized = messageRecord ?? eventRecord;
   const sourceType = lowerString(
-    eventRecord.type ?? normalized.role ?? normalized.type ?? normalized.author ?? normalized.sender,
+    eventRecord.type ??
+      normalized.role ??
+      normalized.type ??
+      normalized.author ??
+      normalized.sender,
   );
   if (
     sourceType === "progress" ||

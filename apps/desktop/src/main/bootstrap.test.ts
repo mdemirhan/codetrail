@@ -84,19 +84,23 @@ const {
   mockQueryServiceClose: vi.fn(),
 }));
 
-vi.mock("@codetrail/core", () => ({
-  DATABASE_SCHEMA_VERSION: 42,
-  DEFAULT_DISCOVERY_CONFIG: {
-    claudeRoot: "/claude/root",
-    codexRoot: "/codex/root",
-    geminiRoot: "/gemini/root",
-    geminiHistoryRoot: null,
-    geminiProjectsPath: null,
-    cursorRoot: "/cursor/root",
-  },
-  initializeDatabase: mockInitializeDatabase,
-  resolveSystemMessageRegexRules: mockResolveSystemMessageRegexRules,
-}));
+vi.mock("@codetrail/core", async () => {
+  const actual = await vi.importActual<typeof import("@codetrail/core")>("@codetrail/core");
+  return {
+    ...actual,
+    DATABASE_SCHEMA_VERSION: 42,
+    DEFAULT_DISCOVERY_CONFIG: {
+      claudeRoot: "/claude/root",
+      codexRoot: "/codex/root",
+      geminiRoot: "/gemini/root",
+      geminiHistoryRoot: null,
+      geminiProjectsPath: null,
+      cursorRoot: "/cursor/root",
+    },
+    initializeDatabase: mockInitializeDatabase,
+    resolveSystemMessageRegexRules: mockResolveSystemMessageRegexRules,
+  };
+});
 
 vi.mock("./data/queryService", () => ({
   createQueryService: mockCreateQueryService,
@@ -435,7 +439,7 @@ describe("bootstrapMainProcess", () => {
         cursor: [],
       },
       autoScrollEnabled: true,
-    periodicRefreshInterval: 5000,
+      periodicRefreshInterval: 5000,
     });
 
     const updated = {

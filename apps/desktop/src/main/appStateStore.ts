@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-import type { MessageCategory, Provider } from "@codetrail/core";
+import type { IpcRequest, MessageCategory, Provider } from "@codetrail/core";
 
 import {
   type MonoFontFamily,
@@ -18,35 +18,9 @@ import {
   UI_THEME_VALUES,
 } from "../shared/uiPreferences";
 
-export type PaneState = {
-  projectPaneWidth: number;
-  sessionPaneWidth: number;
-  projectPaneCollapsed?: boolean;
-  sessionPaneCollapsed?: boolean;
-  projectProviders?: Provider[];
-  historyCategories?: MessageCategory[];
-  expandedByDefaultCategories?: MessageCategory[];
-  searchProviders?: Provider[];
-  theme?: ThemeMode;
-  monoFontFamily?: MonoFontFamily;
-  regularFontFamily?: RegularFontFamily;
-  monoFontSize?: MonoFontSize;
-  regularFontSize?: RegularFontSize;
-  useMonospaceForAllMessages?: boolean;
-  selectedProjectId?: string;
-  selectedSessionId?: string;
-  historyMode?: "session" | "bookmarks" | "project_all";
-  projectSortDirection?: "asc" | "desc";
-  sessionSortDirection?: "asc" | "desc";
-  messageSortDirection?: "asc" | "desc";
-  bookmarkSortDirection?: "asc" | "desc";
-  projectAllSortDirection?: "asc" | "desc";
-  sessionPage?: number;
-  sessionScrollTop?: number;
-  systemMessageRegexRules?: Record<Provider, string[]>;
-  autoScrollEnabled?: boolean;
-  periodicRefreshInterval?: number;
-};
+type PaneStateFull = IpcRequest<"ui:setState">;
+export type PaneState = Partial<PaneStateFull> &
+  Pick<PaneStateFull, "projectPaneWidth" | "sessionPaneWidth">;
 
 export type WindowState = {
   width: number;
@@ -323,8 +297,14 @@ function sanitizePaneState(value: unknown): PaneState | null {
     ...(sessionPage === null ? {} : { sessionPage }),
     ...(sessionScrollTop === null ? {} : { sessionScrollTop }),
     ...(systemMessageRegexRules ? { systemMessageRegexRules } : {}),
-    ...(typeof record.autoScrollEnabled === "boolean" ? { autoScrollEnabled: record.autoScrollEnabled } : {}),
-    ...(typeof record.periodicRefreshInterval === "number" && Number.isInteger(record.periodicRefreshInterval) && record.periodicRefreshInterval >= 0 ? { periodicRefreshInterval: record.periodicRefreshInterval } : {}),
+    ...(typeof record.autoScrollEnabled === "boolean"
+      ? { autoScrollEnabled: record.autoScrollEnabled }
+      : {}),
+    ...(typeof record.periodicRefreshInterval === "number" &&
+    Number.isInteger(record.periodicRefreshInterval) &&
+    record.periodicRefreshInterval >= 0
+      ? { periodicRefreshInterval: record.periodicRefreshInterval }
+      : {}),
   };
 }
 
