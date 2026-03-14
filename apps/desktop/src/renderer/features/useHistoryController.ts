@@ -73,6 +73,47 @@ import { useHistoryDataEffects } from "./useHistoryDataEffects";
 import { useHistoryDerivedState } from "./useHistoryDerivedState";
 import { useHistoryInteractions } from "./useHistoryInteractions";
 
+export type RefreshContext = {
+  refreshId: number;
+  originPage: number;
+  scrollPreservation: {
+    scrollTop: number;
+    referenceMessageId: string;
+    referenceOffsetTop: number;
+  } | null;
+  autoScroll: boolean;
+  prevMessageIds: string;
+};
+
+// ── Periodic-refresh scroll policy ──────────────────────────────────────────
+//
+// There is no manual auto-scroll toggle. Instead, auto-scroll is detected
+// automatically based on scroll position at refresh time:
+//
+//   ASC sort → pinned when scrolled to the bottom (within threshold)
+//   DESC sort → pinned when scrolled to the top (within threshold)
+//
+// This follows the same convention as terminal emulators and chat apps:
+// if you're at the edge where new content appears, you stay pinned; if
+// you've scrolled away, new content arrives without disturbing the viewport.
+//
+// Edge-pinned (at newest-messages edge):
+//   Navigate to the page containing the newest messages (last page for ASC,
+//   page 0 for DESC) and scroll to the corresponding edge. If message IDs
+//   haven't changed since the previous tick, skip the scroll entirely.
+//
+// Not edge-pinned (scrolled away):
+//   Re-fetch the *same* sessionPage number. Drift compensation keeps the
+//   viewport pixel-stable via an anchor element. If the page goes out of
+//   range the server clamps to the last valid page.
+//
+// Race protection:
+//   refreshContextRef carries a monotonic refreshId. If a newer refresh
+//   starts, or the user navigates (clearing the ref), stale responses are
+//   discarded. A separate clearing-effect invalidates the ref when user-
+//   driven deps (sort, filter, query) change.
+// ────────────────────────────────────────────────────────────────────────────
+
 // useHistoryController is the stateful coordinator for the history UI. It owns selection, pane
 // layout, persisted UI state, data loading hooks, and keyboard/navigation wiring.
 export function useHistoryController({
@@ -83,8 +124,6 @@ export function useHistoryController({
   setSearchProviders,
   appearance,
   logError,
-  autoScrollEnabled = false,
-  setAutoScrollEnabled,
   periodicRefreshInterval = 0,
   setPeriodicRefreshInterval,
 }: {
@@ -95,8 +134,6 @@ export function useHistoryController({
   setSearchProviders: Dispatch<SetStateAction<Provider[]>>;
   appearance: AppearanceState;
   logError: (context: string, error: unknown) => void;
-  autoScrollEnabled?: boolean;
-  setAutoScrollEnabled: Dispatch<SetStateAction<boolean>>;
   periodicRefreshInterval?: number;
   setPeriodicRefreshInterval: Dispatch<SetStateAction<number>>;
 }) {
@@ -206,6 +243,8 @@ export function useHistoryController({
   } | null>(null);
   const pendingAutoScrollRef = useRef(false);
   const prevMessageIdsRef = useRef("");
+  const refreshContextRef = useRef<RefreshContext | null>(null);
+  const refreshIdCounterRef = useRef(0);
 
   const projectsLoadTokenRef = useRef(0);
   const sessionsLoadTokenRef = useRef(0);
@@ -286,7 +325,6 @@ export function useHistoryController({
       sessionPage,
       sessionScrollTop,
       systemMessageRegexRules,
-      autoScrollEnabled,
       periodicRefreshInterval,
     }),
     [
@@ -313,7 +351,6 @@ export function useHistoryController({
       sessionPaneCollapsed,
       sessionPaneWidth,
       sessionScrollTop,
-      autoScrollEnabled,
       periodicRefreshInterval,
       sessionSortDirection,
       systemMessageRegexRules,
@@ -382,7 +419,6 @@ export function useHistoryController({
     setSessionPage,
     setSessionScrollTop,
     setSystemMessageRegexRules,
-    setAutoScrollEnabled,
     setPeriodicRefreshInterval,
     sessionScrollTopRef,
     pendingRestoredSessionScrollRef,
@@ -433,6 +469,7 @@ export function useHistoryController({
     sessionsLoadTokenRef,
     bookmarksLoadTokenRef,
     refreshCounter,
+    refreshContextRef,
   });
 
   useEffect(() => {
@@ -526,6 +563,17 @@ export function useHistoryController({
       return;
     }
 
+    // Refresh-triggered page change (auto-scroll only): transfer auto-scroll data to the refs
+    // the layout effect consumes, then skip the scroll reset. Scroll-preservation mode never
+    // changes pages — it always re-fetches the same sessionPage — so no cross-page handling needed.
+    const refreshCtx = refreshContextRef.current;
+    if (refreshCtx !== null && refreshCtx.autoScroll) {
+      pendingAutoScrollRef.current = true;
+      prevMessageIdsRef.current = refreshCtx.prevMessageIds;
+      refreshContextRef.current = null;
+      return;
+    }
+
     const pendingRestore = pendingRestoredSessionScrollRef.current;
     if (
       pendingRestore &&
@@ -605,12 +653,41 @@ export function useHistoryController({
     const container = messageListRef.current;
     if (!container) return;
 
+    // Same-page refresh: the scroll-reset effect did not fire (page unchanged), so
+    // refreshContextRef is still populated. Consume it here directly.
+    const refreshCtx = refreshContextRef.current;
+    if (refreshCtx !== null) {
+      refreshContextRef.current = null;
+      if (refreshCtx.autoScroll) {
+        const currentIds = activeHistoryMessages.map((m) => m.id).join(",");
+        if (currentIds !== refreshCtx.prevMessageIds) {
+          window.requestAnimationFrame(() => {
+            container.scrollTop =
+              activeMessageSortDirection === "asc" ? container.scrollHeight : 0;
+          });
+        }
+        return;
+      }
+      if (refreshCtx.scrollPreservation) {
+        const saved = refreshCtx.scrollPreservation;
+        const refEl = container.querySelector<HTMLElement>(
+          `[data-history-message-id="${CSS.escape(saved.referenceMessageId)}"]`,
+        );
+        if (refEl) {
+          container.scrollTop = saved.scrollTop + (refEl.offsetTop - saved.referenceOffsetTop);
+          return;
+        }
+        container.scrollTop = saved.scrollTop;
+        return;
+      }
+    }
+
+    // Cross-page auto-scroll: populated by the scroll-reset effect when page changed.
     if (pendingAutoScrollRef.current) {
       pendingAutoScrollRef.current = false;
       const currentIds = activeHistoryMessages.map((m) => m.id).join(",");
       if (currentIds !== prevMessageIdsRef.current) {
         prevMessageIdsRef.current = currentIds;
-        // Use rAF to ensure the DOM has fully laid out before scrolling.
         window.requestAnimationFrame(() => {
           if (activeMessageSortDirection === "asc") {
             container.scrollTop = container.scrollHeight;
@@ -622,6 +699,7 @@ export function useHistoryController({
       return;
     }
 
+    // Same-page scroll preservation via scrollPreservationRef (drift compensation).
     const saved = scrollPreservationRef.current;
     if (!saved) return;
     scrollPreservationRef.current = null;
@@ -631,8 +709,7 @@ export function useHistoryController({
         `[data-history-message-id="${CSS.escape(saved.referenceMessageId)}"]`,
       );
       if (refEl) {
-        const drift = refEl.offsetTop - saved.referenceOffsetTop;
-        container.scrollTop = saved.scrollTop + drift;
+        container.scrollTop = saved.scrollTop + (refEl.offsetTop - saved.referenceOffsetTop);
         return;
       }
     }
@@ -708,6 +785,7 @@ export function useHistoryController({
     setProjectProviders,
     setProjectQueryInput,
     prettyProvider: formatPrettyProvider,
+    refreshContextRef,
   });
 
   return {
@@ -827,23 +905,46 @@ export function useHistoryController({
     formatDate,
     handleRefreshAllData: useCallback(async () => {
       const container = messageListRef.current;
-      if (autoScrollEnabled) {
-        pendingAutoScrollRef.current = true;
-        // Snapshot current message IDs from the DOM to detect new messages after refresh.
-        const ids = container
+      const id = ++refreshIdCounterRef.current;
+
+      // Detect whether the user is "pinned" to the newest-messages edge.
+      // ASC → newest at bottom → pinned when scrolled to bottom.
+      // DESC → newest at top → pinned when scrolled to top.
+      const sortDir =
+        historyMode === "project_all"
+          ? projectAllSortDirection
+          : historyMode === "bookmarks"
+            ? bookmarkSortDirection
+            : messageSortDirection;
+      const edgeThreshold = 10;
+      const isAtNewestEdge = (() => {
+        if (!container) return false;
+        if (sortDir === "asc") {
+          return (
+            container.scrollTop + container.clientHeight >=
+            container.scrollHeight - edgeThreshold
+          );
+        }
+        return container.scrollTop <= edgeThreshold;
+      })();
+
+      let scrollPreservation: RefreshContext["scrollPreservation"] = null;
+      let prevMessageIds = "";
+
+      if (isAtNewestEdge) {
+        prevMessageIds = container
           ? Array.from(
               container.querySelectorAll<HTMLElement>("[data-history-message-id]"),
               (el) => el.getAttribute("data-history-message-id"),
             ).join(",")
           : "";
-        prevMessageIdsRef.current = ids;
       } else if (container) {
         const elements = Array.from(
           container.querySelectorAll<HTMLElement>("[data-history-message-id]"),
         );
         for (const el of elements) {
           if (el.offsetTop + el.offsetHeight > container.scrollTop) {
-            scrollPreservationRef.current = {
+            scrollPreservation = {
               scrollTop: container.scrollTop,
               referenceMessageId: el.getAttribute("data-history-message-id") ?? "",
               referenceOffsetTop: el.offsetTop,
@@ -852,8 +953,24 @@ export function useHistoryController({
           }
         }
       }
+
+      refreshContextRef.current = {
+        refreshId: id,
+        originPage: sessionPage,
+        scrollPreservation,
+        autoScroll: isAtNewestEdge,
+        prevMessageIds,
+      };
+
       await handleRefresh();
       setRefreshCounter((c) => c + 1);
-    }, [handleRefresh, autoScrollEnabled]),
+    }, [
+      bookmarkSortDirection,
+      handleRefresh,
+      historyMode,
+      messageSortDirection,
+      projectAllSortDirection,
+      sessionPage,
+    ]),
   };
 }

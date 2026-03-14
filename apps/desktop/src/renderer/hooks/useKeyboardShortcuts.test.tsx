@@ -38,7 +38,6 @@ function createProps(
     applyZoomAction: vi.fn(async () => undefined),
     triggerIncrementalRefresh: vi.fn(),
     togglePeriodicRefresh: vi.fn(),
-    toggleAutoScroll: vi.fn(),
     ...overrides,
   };
 }

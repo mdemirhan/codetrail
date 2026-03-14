@@ -82,8 +82,6 @@ export function TopBar({
   onForceRefresh,
   periodicRefreshInterval,
   onPeriodicRefreshIntervalChange,
-  autoScrollEnabled,
-  onToggleAutoScroll,
   onToggleFocus,
   onToggleHelp,
   onToggleSettings,
@@ -99,8 +97,6 @@ export function TopBar({
   onForceRefresh: () => void;
   periodicRefreshInterval: number;
   onPeriodicRefreshIntervalChange: Dispatch<SetStateAction<number>>;
-  autoScrollEnabled: boolean;
-  onToggleAutoScroll: () => void;
   onToggleFocus: () => void;
   onToggleHelp: () => void;
   onToggleSettings: () => void;
@@ -142,19 +138,6 @@ export function TopBar({
           value={periodicRefreshInterval}
           onChange={onPeriodicRefreshIntervalChange}
         />
-        <button
-          type="button"
-          className={`tb-btn auto-scroll-btn${autoScrollEnabled ? " active" : ""}`}
-          onClick={onToggleAutoScroll}
-          aria-label={autoScrollEnabled ? "Disable auto-scroll" : "Enable auto-scroll"}
-          title={
-            autoScrollEnabled
-              ? "Auto-scroll to new messages (on) (Cmd/Ctrl+Shift+A)"
-              : "Auto-scroll to new messages (off) (Cmd/Ctrl+Shift+A)"
-          }
-        >
-          <ToolbarIcon name="autoScroll" />
-        </button>
         <button
           type="button"
           className="tb-btn"

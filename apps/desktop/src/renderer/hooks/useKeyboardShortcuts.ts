@@ -28,7 +28,6 @@ export function useKeyboardShortcuts(args: {
   applyZoomAction: (action: "in" | "out" | "reset") => Promise<void>;
   triggerIncrementalRefresh: () => void;
   togglePeriodicRefresh: () => void;
-  toggleAutoScroll: () => void;
 }): void {
   const latestArgs = useRef(args);
 
@@ -63,7 +62,6 @@ export function useKeyboardShortcuts(args: {
         applyZoomAction,
         triggerIncrementalRefresh,
         togglePeriodicRefresh,
-        toggleAutoScroll,
       } = latestArgs.current;
       const command = event.metaKey || event.ctrlKey;
       const shift = event.shiftKey;
@@ -190,9 +188,6 @@ export function useKeyboardShortcuts(args: {
       } else if (command && shift && key === "r") {
         event.preventDefault();
         togglePeriodicRefresh();
-      } else if (command && shift && key === "a") {
-        event.preventDefault();
-        toggleAutoScroll();
       } else if (mainView === "history" && command && key === "e") {
         event.preventDefault();
         toggleScopedMessagesExpanded();

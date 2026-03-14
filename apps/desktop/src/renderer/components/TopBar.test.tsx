@@ -30,8 +30,7 @@ describe("TopBar", () => {
         onForceRefresh={onForceRefresh}
         periodicRefreshInterval={0}
         onPeriodicRefreshIntervalChange={vi.fn()}
-        autoScrollEnabled={false}
-        onToggleAutoScroll={vi.fn()}
+
         onToggleFocus={onToggleFocus}
         onToggleHelp={onToggleHelp}
         onToggleSettings={onToggleSettings}
@@ -78,8 +77,7 @@ describe("TopBar", () => {
         onForceRefresh={vi.fn()}
         periodicRefreshInterval={0}
         onPeriodicRefreshIntervalChange={vi.fn()}
-        autoScrollEnabled={false}
-        onToggleAutoScroll={vi.fn()}
+
         onToggleFocus={vi.fn()}
         onToggleHelp={vi.fn()}
         onToggleSettings={vi.fn()}

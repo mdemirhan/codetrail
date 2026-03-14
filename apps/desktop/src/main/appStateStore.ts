@@ -297,9 +297,6 @@ function sanitizePaneState(value: unknown): PaneState | null {
     ...(sessionPage === null ? {} : { sessionPage }),
     ...(sessionScrollTop === null ? {} : { sessionScrollTop }),
     ...(systemMessageRegexRules ? { systemMessageRegexRules } : {}),
-    ...(typeof record.autoScrollEnabled === "boolean"
-      ? { autoScrollEnabled: record.autoScrollEnabled }
-      : {}),
     ...(typeof record.periodicRefreshInterval === "number" &&
     Number.isInteger(record.periodicRefreshInterval) &&
     record.periodicRefreshInterval >= 0

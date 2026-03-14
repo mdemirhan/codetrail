@@ -8,6 +8,8 @@ import type {
   SetStateAction,
 } from "react";
 
+import type { RefreshContext } from "./useHistoryController";
+
 import type { MessageCategory } from "@codetrail/core";
 
 import { BOOKMARKS_NAV_ID, PAGE_SIZE, PROJECT_ALL_NAV_ID, PROVIDERS } from "../app/constants";
@@ -81,6 +83,7 @@ export function useHistoryInteractions({
   setProjectProviders,
   setProjectQueryInput,
   prettyProvider,
+  refreshContextRef,
 }: {
   codetrail: {
     invoke: (
@@ -144,6 +147,7 @@ export function useHistoryInteractions({
   setProjectProviders: Dispatch<SetStateAction<("claude" | "codex" | "gemini" | "cursor")[]>>;
   setProjectQueryInput: Dispatch<SetStateAction<string>>;
   prettyProvider: (provider: ProjectSummary["provider"]) => string;
+  refreshContextRef: MutableRefObject<RefreshContext | null>;
 }) {
   const handleToggleScopedMessagesExpanded = useCallback(() => {
     if (scopedMessages.length === 0) {
@@ -287,6 +291,7 @@ export function useHistoryInteractions({
   const resetHistorySelectionState = useCallback(() => {
     // Changing history scope should clear any transient focus/navigation state carried over from a
     // previous scope.
+    refreshContextRef.current = null;
     setPendingSearchNavigation(null);
     setPendingMessageAreaFocus(false);
     setPendingMessagePageNavigation(null);
@@ -294,6 +299,7 @@ export function useHistoryInteractions({
     setFocusMessageId("");
     setPendingRevealTarget(null);
   }, [
+    refreshContextRef,
     setFocusMessageId,
     setPendingMessageAreaFocus,
     setPendingMessagePageNavigation,
@@ -378,15 +384,17 @@ export function useHistoryInteractions({
     if (!canNavigatePages) {
       return;
     }
+    refreshContextRef.current = null;
     setSessionPage((value) => Math.max(0, value - 1));
-  }, [canNavigatePages, setSessionPage]);
+  }, [canNavigatePages, refreshContextRef, setSessionPage]);
 
   const goToNextHistoryPage = useCallback(() => {
     if (!canNavigatePages) {
       return;
     }
+    refreshContextRef.current = null;
     setSessionPage((value) => Math.min(totalPages - 1, value + 1));
-  }, [canNavigatePages, setSessionPage, totalPages]);
+  }, [canNavigatePages, refreshContextRef, setSessionPage, totalPages]);
 
   const focusAdjacentHistoryMessage = useCallback(
     (direction: Direction) => {
@@ -426,6 +434,7 @@ export function useHistoryInteractions({
           : Math.max(0, sessionPage - 1);
       // Crossing a page boundary is deferred until the new page loads, then the controller picks
       // the first/last visible message on that page.
+      refreshContextRef.current = null;
       setPendingMessageAreaFocus(true);
       setPendingMessagePageNavigation({ direction, targetPage });
       setSessionPage(targetPage);
@@ -435,6 +444,7 @@ export function useHistoryInteractions({
       canGoToNextHistoryPage,
       canGoToPreviousHistoryPage,
       messageListRef,
+      refreshContextRef,
       sessionPage,
       setFocusMessageId,
       setPendingMessageAreaFocus,

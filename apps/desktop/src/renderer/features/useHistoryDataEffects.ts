@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from "react";
 
 import type { MessageCategory, Provider, SearchMode } from "@codetrail/core";
 
@@ -22,6 +22,7 @@ import type {
 } from "../app/types";
 import type { CodetrailClient } from "../lib/codetrailClient";
 import { decideSessionSelectionAfterLoad } from "../lib/sessionSelection";
+import type { RefreshContext } from "./useHistoryController";
 
 // This hook owns the async side of history state: loading projects/sessions/details and reconciling
 // in-flight requests with the controller's current selection.
@@ -70,6 +71,7 @@ export function useHistoryDataEffects({
   sessionsLoadTokenRef,
   bookmarksLoadTokenRef,
   refreshCounter,
+  refreshContextRef,
 }: {
   codetrail: CodetrailClient;
   logError: (context: string, error: unknown) => void;
@@ -115,6 +117,7 @@ export function useHistoryDataEffects({
   sessionsLoadTokenRef: MutableRefObject<number>;
   bookmarksLoadTokenRef: MutableRefObject<number>;
   refreshCounter: number;
+  refreshContextRef: MutableRefObject<RefreshContext | null>;
 }) {
   const loadProjects = useCallback(async () => {
     // Monotonic request tokens prevent stale async responses from overwriting newer selections.
@@ -372,6 +375,16 @@ export function useHistoryDataEffects({
     setHistorySelection,
   ]);
 
+  // Invalidate stale refresh context when user-driven state changes (sort direction, category
+  // filters, search query/mode) would cause data effects to re-fire. These deps are disjoint from
+  // refreshCounter, so this effect only fires for user actions, never for refresh ticks. React runs
+  // effects in declaration order, so this clears the ref before the detail effects read it.
+  // Note: bookmarkSortDirection is not included because it only affects in-memory sorting in
+  // useHistoryDerivedState, never triggering a server fetch or consuming refreshContextRef.
+  useEffect(() => {
+    refreshContextRef.current = null;
+  }, [effectiveBookmarkQuery, effectiveSessionQuery, historyCategories, messageSortDirection, projectAllSortDirection, refreshContextRef, searchMode]);
+
   useEffect(() => {
     if (historyMode !== "session" || !selectedSessionId) {
       setSessionDetail(null);
@@ -385,6 +398,11 @@ export function useHistoryDataEffects({
     // When revealing a specific message from bookmarks/search, temporarily ignore the free-text
     // query so pagination can land on the target even if it would otherwise be filtered out.
     const effectiveQuery = isRevealing ? "" : effectiveSessionQuery;
+
+    // Capture refresh context at effect start for race protection.
+    const refreshCtx = refreshContextRef.current;
+    const isRefresh = refreshCtx !== null && !isRevealing;
+
     void codetrail
       .invoke("sessions:getDetail", {
         sessionId: selectedSessionId,
@@ -401,9 +419,25 @@ export function useHistoryDataEffects({
         if (cancelled) {
           return;
         }
+        // Race protection: if a newer refresh started or user navigated, discard.
+        if (isRefresh && refreshContextRef.current?.refreshId !== refreshCtx.refreshId) {
+          return;
+        }
         setSessionDetail(response);
         if (pendingRevealTarget !== null) {
           setPendingRevealTarget(null);
+        }
+        if (isRefresh && refreshCtx.autoScroll) {
+          // Auto-scroll: navigate to the page with newest messages.
+          // ASC → newest on last page; DESC → newest on page 0.
+          const latestPage =
+            messageSortDirection === "desc"
+              ? 0
+              : Math.max(0, Math.ceil(response.totalCount / PAGE_SIZE) - 1);
+          if (sessionPage !== latestPage) {
+            setSessionPage(latestPage);
+            return;
+          }
         }
         if (response.page !== sessionPage) {
           setSessionPage(response.page);
@@ -426,6 +460,7 @@ export function useHistoryDataEffects({
     logError,
     messageSortDirection,
     pendingRevealTarget,
+    refreshContextRef,
     refreshCounter,
     searchMode,
     selectedSessionId,
@@ -446,6 +481,10 @@ export function useHistoryDataEffects({
     const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
     const effectiveCategories = isAllHistoryCategoriesSelected ? undefined : historyCategories;
     const effectiveQuery = isRevealing ? "" : effectiveSessionQuery;
+
+    const refreshCtx = refreshContextRef.current;
+    const isRefresh = refreshCtx !== null && !isRevealing;
+
     void codetrail
       .invoke("projects:getCombinedDetail", {
         projectId: selectedProjectId,
@@ -462,9 +501,22 @@ export function useHistoryDataEffects({
         if (cancelled) {
           return;
         }
+        if (isRefresh && refreshContextRef.current?.refreshId !== refreshCtx.refreshId) {
+          return;
+        }
         setProjectCombinedDetail(response);
         if (pendingRevealTarget !== null) {
           setPendingRevealTarget(null);
+        }
+        if (isRefresh && refreshCtx.autoScroll) {
+          const latestPage =
+            projectAllSortDirection === "desc"
+              ? 0
+              : Math.max(0, Math.ceil(response.totalCount / PAGE_SIZE) - 1);
+          if (sessionPage !== latestPage) {
+            setSessionPage(latestPage);
+            return;
+          }
         }
         if (response.page !== sessionPage) {
           setSessionPage(response.page);
@@ -487,6 +539,7 @@ export function useHistoryDataEffects({
     logError,
     pendingRevealTarget,
     projectAllSortDirection,
+    refreshContextRef,
     refreshCounter,
     searchMode,
     selectedProjectId,

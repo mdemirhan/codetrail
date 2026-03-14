@@ -36,9 +36,6 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
   const [preferredPeriodicInterval, setPreferredPeriodicInterval] = useState(
     (initialPaneState?.periodicRefreshInterval ?? 0) || 10_000,
   );
-  const [autoScrollEnabled, setAutoScrollEnabled] = useState(
-    initialPaneState?.autoScrollEnabled ?? false,
-  );
   const [searchProviders, setSearchProviders] = useState<Provider[]>(
     initialPaneState?.searchProviders ?? [],
   );
@@ -62,8 +59,6 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     setSearchProviders,
     appearance,
     logError,
-    autoScrollEnabled,
-    setAutoScrollEnabled,
     periodicRefreshInterval: preferredPeriodicInterval,
     setPeriodicRefreshInterval: setPreferredPeriodicInterval,
   });
@@ -217,7 +212,6 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     triggerIncrementalRefresh: () => void handleIncrementalRefresh(),
     togglePeriodicRefresh: () =>
       setPeriodicRefreshInterval((v) => (v > 0 ? 0 : preferredPeriodicInterval)),
-    toggleAutoScroll: () => setAutoScrollEnabled((v) => !v),
   });
 
   return (
@@ -248,8 +242,6 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
         onForceRefresh={() => setShowReindexConfirm(true)}
         periodicRefreshInterval={periodicRefreshInterval}
         onPeriodicRefreshIntervalChange={setPeriodicRefreshInterval}
-        autoScrollEnabled={autoScrollEnabled}
-        onToggleAutoScroll={() => setAutoScrollEnabled((v) => !v)}
         onToggleFocus={() => setFocusMode((value) => !value)}
         onToggleHelp={() => setMainView((value) => (value === "help" ? "history" : "help"))}
         onToggleSettings={() =>

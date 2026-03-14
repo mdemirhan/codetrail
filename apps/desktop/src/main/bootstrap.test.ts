@@ -183,7 +183,6 @@ describe("bootstrapMainProcess", () => {
       gemini: [],
       cursor: [],
     },
-    autoScrollEnabled: true,
     periodicRefreshInterval: 5000,
   };
 
@@ -438,7 +437,6 @@ describe("bootstrapMainProcess", () => {
         gemini: [],
         cursor: [],
       },
-      autoScrollEnabled: true,
       periodicRefreshInterval: 5000,
     });
 

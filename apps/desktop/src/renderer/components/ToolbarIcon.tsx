@@ -22,7 +22,7 @@ export function ToolbarIcon({
     | "folderOpen"
     | "sortAsc"
     | "sortDesc"
-    | "autoScroll";
+;
 }) {
   const title = (() => {
     if (name === "closeFocus") {
@@ -54,9 +54,6 @@ export function ToolbarIcon({
     }
     if (name === "sortDesc") {
       return "Sort descending";
-    }
-    if (name === "autoScroll") {
-      return "Auto-scroll";
     }
     return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
   })();
@@ -117,10 +114,6 @@ export function ToolbarIcon({
     }
     if (name === "sortDesc") {
       return "M7 6v11M7 17l-3-3M7 17l3-3M12 17h2M12 13h4M12 9h6M12 5h8";
-    }
-    if (name === "autoScroll") {
-      // Down arrow to line
-      return "M12 3v14M12 17l-5-5M12 17l5-5M5 21h14";
     }
     return "M4 7h16M4 12h16M4 17h10";
   })();

@@ -151,7 +151,6 @@ export const paneStateBaseSchema = z.object({
   sessionPage: z.number().int().nonnegative(),
   sessionScrollTop: z.number().int().nonnegative(),
   systemMessageRegexRules: systemMessageRegexRulesSchema,
-  autoScrollEnabled: z.boolean(),
   periodicRefreshInterval: z.number().int().nonnegative(),
 });
 
