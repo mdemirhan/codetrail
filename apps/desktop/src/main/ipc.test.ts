@@ -39,7 +39,7 @@ describe("registerIpcHandlers", () => {
         }),
         "db:getSchemaVersion": () => ({ schemaVersion: 1 }),
         "indexer:refresh": (payload) => ({ jobId: payload.force ? "force-1" : "normal-1" }),
-        "indexer:getStatus": () => ({ running: false, queuedJobs: 0, activeJobId: null }),
+        "indexer:getStatus": () => ({ running: false, queuedJobs: 0, activeJobId: null, completedJobs: 0 }),
         "projects:list": () => ({ projects: [] }),
         "projects:getCombinedDetail": (payload) => ({
           projectId: payload.projectId,
@@ -122,6 +122,8 @@ describe("registerIpcHandlers", () => {
         "ui:setZoom": () => ({
           percent: 100,
         }),
+        "watcher:start": () => ({ ok: true, watchedRoots: [] }),
+        "watcher:stop": () => ({ ok: true }),
       },
     );
 
@@ -162,7 +164,7 @@ describe("registerIpcHandlers", () => {
         }),
         "db:getSchemaVersion": () => ({ schemaVersion: 1 }),
         "indexer:refresh": () => ({ jobId: "refresh-1" }),
-        "indexer:getStatus": () => ({ running: false, queuedJobs: 0, activeJobId: null }),
+        "indexer:getStatus": () => ({ running: false, queuedJobs: 0, activeJobId: null, completedJobs: 0 }),
         "projects:list": () => ({ projects: [] }),
         "projects:getCombinedDetail": () => ({
           projectId: "project_1",
@@ -234,6 +236,8 @@ describe("registerIpcHandlers", () => {
         "ui:setState": () => ({ ok: true }),
         "ui:getZoom": () => ({ percent: 100 }),
         "ui:setZoom": () => ({ percent: 0 }) as never,
+        "watcher:start": () => ({ ok: true, watchedRoots: [] }),
+        "watcher:stop": () => ({ ok: true }),
       },
     );
 

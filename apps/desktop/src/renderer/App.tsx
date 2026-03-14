@@ -12,7 +12,7 @@ import type { MainView, PaneStateSnapshot } from "./app/types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SettingsView } from "./components/SettingsView";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
-import { TopBar } from "./components/TopBar";
+import { type RefreshStrategy, TopBar } from "./components/TopBar";
 import { HistoryDetailPane } from "./features/HistoryDetailPane";
 import { HistoryLayout } from "./features/HistoryLayout";
 import { SearchView } from "./features/SearchView";
@@ -23,7 +23,27 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { isMissingCodetrailClient, useCodetrailClient } from "./lib/codetrailClient";
 import { toErrorMessage, toggleValue } from "./lib/viewUtils";
 
-export function App({ initialPaneState = null }: { initialPaneState?: PaneStateSnapshot | null }) {
+const STRATEGY_TO_INTERVAL_MS: Record<RefreshStrategy, number> = {
+  off: 0,
+  watch: 0,
+  "5s": 5_000,
+  "10s": 10_000,
+  "30s": 30_000,
+  "1min": 60_000,
+  "5min": 300_000,
+};
+
+// Module-level override for tests — keeps the component API clean
+let _testStrategyIntervalOverrides: Partial<Record<RefreshStrategy, number>> | null = null;
+export function setTestStrategyIntervalOverrides(overrides: Partial<Record<RefreshStrategy, number>> | null): void {
+  _testStrategyIntervalOverrides = overrides;
+}
+
+export function App({
+  initialPaneState = null,
+}: {
+  initialPaneState?: PaneStateSnapshot | null;
+}) {
   const codetrail = useCodetrailClient();
   const preloadUnavailable = isMissingCodetrailClient(codetrail);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,10 +52,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
   const [focusMode, setFocusMode] = useState(false);
   const [advancedSearchEnabled, setAdvancedSearchEnabled] = useState(false);
   const [showReindexConfirm, setShowReindexConfirm] = useState(false);
-  const [periodicRefreshInterval, setPeriodicRefreshInterval] = useState(0);
-  const [preferredPeriodicInterval, setPreferredPeriodicInterval] = useState(
-    (initialPaneState?.periodicRefreshInterval ?? 0) || 10_000,
-  );
+  const [refreshStrategy, setRefreshStrategy] = useState<RefreshStrategy>("off");
+  const [preferredRefreshStrategy, setPreferredRefreshStrategy] = useState<RefreshStrategy>("watch");
   const [searchProviders, setSearchProviders] = useState<Provider[]>(
     initialPaneState?.searchProviders ?? [],
   );
@@ -46,6 +64,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     console.error(`[codetrail] ${context}: ${toErrorMessage(error)}`);
   }, []);
   const wasIndexingRef = useRef(false);
+  const lastCompletedJobsRef = useRef(-1);
 
   const appearance = useAppearanceController({
     initialPaneState,
@@ -59,8 +78,6 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     setSearchProviders,
     appearance,
     logError,
-    periodicRefreshInterval: preferredPeriodicInterval,
-    setPeriodicRefreshInterval: setPreferredPeriodicInterval,
   });
   const search = useSearchController({
     searchMode,
@@ -103,7 +120,14 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
         setIndexingInBackground(status.running);
         const wasIndexing = wasIndexingRef.current;
         wasIndexingRef.current = status.running;
-        if (wasIndexing && !status.running) {
+        // Reload when indexing finishes (transition detection) OR when completedJobs
+        // counter advances (catches fast jobs that complete between polls).
+        const prevCompleted = lastCompletedJobsRef.current;
+        lastCompletedJobsRef.current = status.completedJobs;
+        if (
+          (wasIndexing && !status.running) ||
+          (prevCompleted >= 0 && status.completedJobs > prevCompleted)
+        ) {
           await reloadIndexedData();
         }
       } catch (error) {
@@ -146,7 +170,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
         setRefreshing(false);
       }
     },
-    [codetrail, history, logError, search],
+    [codetrail, logError, reloadIndexedData],
   );
 
   const handleIncrementalRefresh = useCallback(async () => {
@@ -163,28 +187,46 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     refreshingRef.current = indexing;
   }, [indexing]);
 
-  // Keep a stable ref to handleRefresh so the periodic timer effect doesn't need
-  // handleRefresh in its dependency array (handleRefresh has an unstable identity
-  // because its deps include the entire history/search objects).
-  const handleRefreshRef = useRef(handleRefresh);
+  // Periodic polling timer — runs for timed strategies only (watch mode uses the file watcher)
+  const pollingIntervalMs =
+    _testStrategyIntervalOverrides?.[refreshStrategy] ?? STRATEGY_TO_INTERVAL_MS[refreshStrategy] ?? 0;
   useEffect(() => {
-    handleRefreshRef.current = handleRefresh;
-  }, [handleRefresh]);
-
-  useEffect(() => {
-    if (periodicRefreshInterval <= 0) return;
+    if (pollingIntervalMs <= 0) return;
     const id = window.setInterval(() => {
       if (refreshingRef.current) return;
-      void handleRefreshRef.current(false);
-    }, periodicRefreshInterval);
+      void handleRefresh(false);
+    }, pollingIntervalMs);
     return () => window.clearInterval(id);
-  }, [periodicRefreshInterval]);
+  }, [handleRefresh, pollingIntervalMs]);
 
+  // Start/stop file watcher when strategy changes to/from "watch"
   useEffect(() => {
-    if (periodicRefreshInterval > 0) {
-      setPreferredPeriodicInterval(periodicRefreshInterval);
+    if (refreshStrategy !== "watch") return;
+
+    void codetrail
+      .invoke("watcher:start", {})
+      .then((result) => {
+        if (!result.ok) {
+          logError("File watcher started but no roots were watched", new Error("ok=false"));
+        }
+      })
+      .catch((error: unknown) => {
+        logError("Failed to start file watcher", error);
+      });
+
+    return () => {
+      void codetrail.invoke("watcher:stop", {}).catch((error: unknown) => {
+        logError("Failed to stop file watcher", error);
+      });
+    };
+  }, [codetrail, logError, refreshStrategy]);
+
+  // Track the preferred strategy for toggle behavior
+  useEffect(() => {
+    if (refreshStrategy !== "off") {
+      setPreferredRefreshStrategy(refreshStrategy);
     }
-  }, [periodicRefreshInterval]);
+  }, [refreshStrategy]);
 
   useKeyboardShortcuts({
     mainView,
@@ -211,7 +253,7 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
     applyZoomAction: appearance.applyZoomAction,
     triggerIncrementalRefresh: () => void handleIncrementalRefresh(),
     togglePeriodicRefresh: () =>
-      setPeriodicRefreshInterval((v) => (v > 0 ? 0 : preferredPeriodicInterval)),
+      setRefreshStrategy((v) => (v !== "off" ? "off" : preferredRefreshStrategy)),
   });
 
   return (
@@ -240,8 +282,8 @@ export function App({ initialPaneState = null }: { initialPaneState?: PaneStateS
         onThemeChange={appearance.setTheme}
         onIncrementalRefresh={() => void handleIncrementalRefresh()}
         onForceRefresh={() => setShowReindexConfirm(true)}
-        periodicRefreshInterval={periodicRefreshInterval}
-        onPeriodicRefreshIntervalChange={setPeriodicRefreshInterval}
+        refreshStrategy={refreshStrategy}
+        onRefreshStrategyChange={setRefreshStrategy}
         onToggleFocus={() => setFocusMode((value) => !value)}
         onToggleHelp={() => setMainView((value) => (value === "help" ? "history" : "help"))}
         onToggleSettings={() =>

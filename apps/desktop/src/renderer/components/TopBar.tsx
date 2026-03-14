@@ -2,26 +2,29 @@ import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 
 
 import { ToolbarIcon } from "./ToolbarIcon";
 
-const PERIODIC_REFRESH_OPTIONS: { label: string; value: number }[] = [
-  { label: "Off", value: 0 },
-  { label: "3s", value: 3_000 },
-  { label: "5s", value: 5_000 },
-  { label: "10s", value: 10_000 },
-  { label: "30s", value: 30_000 },
-  { label: "1min", value: 60_000 },
-  { label: "5min", value: 300_000 },
+export type RefreshStrategy = "off" | "watch" | "5s" | "10s" | "30s" | "1min" | "5min";
+
+const REFRESH_STRATEGY_OPTIONS: { label: string; value: RefreshStrategy }[] = [
+  { label: "Off", value: "off" },
+  { label: "Watch", value: "watch" },
+  { label: "5s", value: "5s" },
+  { label: "10s", value: "10s" },
+  { label: "30s", value: "30s" },
+  { label: "1min", value: "1min" },
+  { label: "5min", value: "5min" },
 ];
 
-function PeriodicRefreshDropdown({
+function RefreshStrategyDropdown({
   value,
   onChange,
 }: {
-  value: number;
-  onChange: Dispatch<SetStateAction<number>>;
+  value: RefreshStrategy;
+  onChange: Dispatch<SetStateAction<RefreshStrategy>>;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const selectedLabel = PERIODIC_REFRESH_OPTIONS.find((o) => o.value === value)?.label ?? "Off";
+  const selectedLabel =
+    REFRESH_STRATEGY_OPTIONS.find((o) => o.value === value)?.label ?? "Off";
 
   useEffect(() => {
     if (!open) return;
@@ -38,9 +41,9 @@ function PeriodicRefreshDropdown({
     <div className="tb-dropdown" ref={containerRef}>
       <button
         type="button"
-        className={`tb-btn tb-dropdown-trigger${value > 0 ? " active" : ""}`}
+        className={`tb-btn tb-dropdown-trigger${value !== "off" ? " active" : ""}`}
         onClick={() => setOpen((v) => !v)}
-        aria-label="Periodic refresh interval"
+        aria-label="Auto-refresh strategy"
         aria-expanded={open}
         title="Toggle auto-refresh (Cmd/Ctrl+Shift+R)"
       >
@@ -48,8 +51,8 @@ function PeriodicRefreshDropdown({
         {selectedLabel}
       </button>
       {open ? (
-        <div className="tb-dropdown-menu" role="listbox" aria-label="Auto-refresh interval">
-          {PERIODIC_REFRESH_OPTIONS.map((opt) => (
+        <div className="tb-dropdown-menu" role="listbox" aria-label="Auto-refresh strategy">
+          {REFRESH_STRATEGY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
@@ -80,8 +83,8 @@ export function TopBar({
   onThemeChange,
   onIncrementalRefresh,
   onForceRefresh,
-  periodicRefreshInterval,
-  onPeriodicRefreshIntervalChange,
+  refreshStrategy,
+  onRefreshStrategyChange,
   onToggleFocus,
   onToggleHelp,
   onToggleSettings,
@@ -95,8 +98,8 @@ export function TopBar({
   onThemeChange: (theme: "light" | "dark") => void;
   onIncrementalRefresh: () => void;
   onForceRefresh: () => void;
-  periodicRefreshInterval: number;
-  onPeriodicRefreshIntervalChange: Dispatch<SetStateAction<number>>;
+  refreshStrategy: RefreshStrategy;
+  onRefreshStrategyChange: Dispatch<SetStateAction<RefreshStrategy>>;
   onToggleFocus: () => void;
   onToggleHelp: () => void;
   onToggleSettings: () => void;
@@ -134,19 +137,19 @@ export function TopBar({
           <ToolbarIcon name="refresh" />
           {indexing ? "Indexing..." : "Refresh"}
         </button>
-        <PeriodicRefreshDropdown
-          value={periodicRefreshInterval}
-          onChange={onPeriodicRefreshIntervalChange}
+        <RefreshStrategyDropdown
+          value={refreshStrategy}
+          onChange={onRefreshStrategyChange}
         />
         <button
           type="button"
           className="tb-btn"
           onClick={onForceRefresh}
-          disabled={indexing || periodicRefreshInterval > 0}
+          disabled={indexing || refreshStrategy !== "off"}
           aria-label="Force reindex"
           title={
-            periodicRefreshInterval > 0
-              ? "Disable periodic refresh before reindexing"
+            refreshStrategy !== "off"
+              ? "Disable auto-refresh before reindexing"
               : indexing
                 ? "Indexing in progress..."
                 : "Force full reindex"

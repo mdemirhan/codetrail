@@ -90,7 +90,8 @@ cp "${APP_DIR}/package.json" "${RESOURCES_APP}/package.json"
 ditto "${APP_DIR}/dist" "${RESOURCES_APP}/dist"
 
 mkdir -p "${RESOURCES_APP}/node_modules"
-for dep in better-sqlite3 react react-dom; do
+PARCEL_WATCHER_PLATFORM="@parcel/watcher-darwin-${ARCH}"
+for dep in better-sqlite3 @parcel/watcher "${PARCEL_WATCHER_PLATFORM}" react react-dom; do
   if [[ -d "${APP_DIR}/node_modules/${dep}" ]]; then
     rsync -aL "${APP_DIR}/node_modules/${dep}/" "${RESOURCES_APP}/node_modules/${dep}/"
   fi

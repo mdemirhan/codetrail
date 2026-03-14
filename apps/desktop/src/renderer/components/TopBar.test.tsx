@@ -28,9 +28,8 @@ describe("TopBar", () => {
         onThemeChange={onThemeChange}
         onIncrementalRefresh={onIncrementalRefresh}
         onForceRefresh={onForceRefresh}
-        periodicRefreshInterval={0}
-        onPeriodicRefreshIntervalChange={vi.fn()}
-
+        refreshStrategy="off"
+        onRefreshStrategyChange={vi.fn()}
         onToggleFocus={onToggleFocus}
         onToggleHelp={onToggleHelp}
         onToggleSettings={onToggleSettings}
@@ -75,9 +74,8 @@ describe("TopBar", () => {
         onThemeChange={vi.fn()}
         onIncrementalRefresh={vi.fn()}
         onForceRefresh={vi.fn()}
-        periodicRefreshInterval={0}
-        onPeriodicRefreshIntervalChange={vi.fn()}
-
+        refreshStrategy="off"
+        onRefreshStrategyChange={vi.fn()}
         onToggleFocus={vi.fn()}
         onToggleHelp={vi.fn()}
         onToggleSettings={vi.fn()}

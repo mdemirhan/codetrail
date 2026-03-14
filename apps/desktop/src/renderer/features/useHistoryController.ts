@@ -124,8 +124,6 @@ export function useHistoryController({
   setSearchProviders,
   appearance,
   logError,
-  periodicRefreshInterval = 0,
-  setPeriodicRefreshInterval,
 }: {
   initialPaneState?: PaneStateSnapshot | null;
   isHistoryLayout: boolean;
@@ -134,8 +132,6 @@ export function useHistoryController({
   setSearchProviders: Dispatch<SetStateAction<Provider[]>>;
   appearance: AppearanceState;
   logError: (context: string, error: unknown) => void;
-  periodicRefreshInterval?: number;
-  setPeriodicRefreshInterval: Dispatch<SetStateAction<number>>;
 }) {
   const codetrail = useCodetrailClient();
   const initialProjectPaneWidth = clamp(initialPaneState?.projectPaneWidth ?? 300, 230, 520);
@@ -325,7 +321,6 @@ export function useHistoryController({
       sessionPage,
       sessionScrollTop,
       systemMessageRegexRules,
-      periodicRefreshInterval,
     }),
     [
       appearance.monoFontFamily,
@@ -351,7 +346,6 @@ export function useHistoryController({
       sessionPaneCollapsed,
       sessionPaneWidth,
       sessionScrollTop,
-      periodicRefreshInterval,
       sessionSortDirection,
       systemMessageRegexRules,
     ],
@@ -419,7 +413,6 @@ export function useHistoryController({
     setSessionPage,
     setSessionScrollTop,
     setSystemMessageRegexRules,
-    setPeriodicRefreshInterval,
     sessionScrollTopRef,
     pendingRestoredSessionScrollRef,
   });

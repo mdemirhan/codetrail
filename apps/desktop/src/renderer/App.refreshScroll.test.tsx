@@ -4,9 +4,11 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { App } from "./App";
+import { App, setTestStrategyIntervalOverrides } from "./App";
 import { createAppClient } from "./test/appTestFixtures";
 import { renderWithClient } from "./test/renderWithClient";
+
+const FAST_OVERRIDES = { "5s": 100, "10s": 200, "30s": 300, "1min": 400, "5min": 500, watch: 600, off: 0 } as const;
 
 // Helper: generate a session detail response with N messages on a given page.
 function makeSessionDetail({
@@ -121,9 +123,11 @@ function mockScrolledAwayFromTop(container: HTMLElement) {
 describe("App refresh scroll preservation", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    setTestStrategyIntervalOverrides(FAST_OVERRIDES);
   });
 
   afterEach(() => {
+    setTestStrategyIntervalOverrides(null);
     vi.useRealTimers();
   });
 
@@ -152,14 +156,14 @@ describe("App refresh scroll preservation", () => {
     if (messageList) mockScrolledAway(messageList);
 
     // Enable periodic refresh (3s).
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
     const callsBefore = client.invoke.mock.calls.filter(
       ([channel]) => channel === "sessions:getDetail",
     ).length;
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
     await waitFor(() => {
       const callsAfter = client.invoke.mock.calls.filter(
         ([channel]) => channel === "sessions:getDetail",
@@ -208,10 +212,10 @@ describe("App refresh scroll preservation", () => {
     if (messageList) mockScrolledToBottom(messageList);
 
     // Enable periodic refresh.
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
-    await vi.advanceTimersByTimeAsync(3200);
+    await vi.advanceTimersByTimeAsync(110);
 
     // Auto-scroll should navigate to last page: ceil(250/100) - 1 = 2.
     await waitFor(
@@ -222,7 +226,6 @@ describe("App refresh scroll preservation", () => {
         const pages = detailCalls.map(([, p]) => (p as Record<string, unknown>).page);
         expect(pages).toContain(2);
       },
-      { timeout: 3000 },
     );
   });
 
@@ -261,10 +264,10 @@ describe("App refresh scroll preservation", () => {
 
     // In jsdom, scrollTop defaults to 0 which is the top edge — pinned for DESC.
     // Enable periodic refresh.
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     // For DESC, auto-scroll should navigate to page 0 (newest messages).
     await waitFor(() => {
@@ -298,14 +301,14 @@ describe("App refresh scroll preservation", () => {
     });
 
     // Enable periodic refresh.
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
     const detailCallsBefore = client.invoke.mock.calls.filter(
       ([channel]) => channel === "sessions:getDetail",
     ).length;
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     await waitFor(() => {
       const detailCallsAfter = client.invoke.mock.calls.filter(
@@ -347,8 +350,8 @@ describe("App refresh scroll preservation", () => {
     });
 
     // Enable periodic refresh.
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
     // Navigate to page 2, then mock as scrolled away.
     await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -358,7 +361,7 @@ describe("App refresh scroll preservation", () => {
     const messageList = container.querySelector<HTMLElement>(".msg-scroll.message-list");
     if (messageList) mockScrolledAway(messageList);
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     // Should still be on page 2.
     await waitFor(() => {
@@ -387,13 +390,13 @@ describe("App refresh scroll preservation", () => {
     });
 
     // Enable periodic refresh.
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
     // Toggle sort direction — this should invalidate any pending refresh context.
     await user.click(screen.getByRole("button", { name: /Sort .* descending/i }));
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     await waitFor(() => {
       expect(screen.getByText("Sort test message")).toBeInTheDocument();
@@ -433,10 +436,10 @@ describe("App refresh scroll preservation", () => {
     const messageList = container.querySelector<HTMLElement>(".msg-scroll.message-list");
     if (messageList) mockScrolledNearBottom(messageList);
 
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
-    await vi.advanceTimersByTimeAsync(3200);
+    await vi.advanceTimersByTimeAsync(110);
 
     // Should auto-scroll: navigate to latest page (page 2 for 250 messages).
     await waitFor(
@@ -447,7 +450,6 @@ describe("App refresh scroll preservation", () => {
         const pages = detailCalls.map(([, p]) => (p as Record<string, unknown>).page);
         expect(pages).toContain(2);
       },
-      { timeout: 3000 },
     );
   });
 
@@ -471,14 +473,14 @@ describe("App refresh scroll preservation", () => {
     const messageList = container.querySelector<HTMLElement>(".msg-scroll.message-list");
     if (messageList) mockScrolledJustOutsideBottom(messageList);
 
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
     const callsBefore = client.invoke.mock.calls.filter(
       ([channel]) => channel === "sessions:getDetail",
     ).length;
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     await waitFor(() => {
       const callsAfter = client.invoke.mock.calls.filter(
@@ -528,10 +530,10 @@ describe("App refresh scroll preservation", () => {
     const messageList = container.querySelector<HTMLElement>(".msg-scroll.message-list");
     if (messageList) mockScrolledAwayFromTop(messageList);
 
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     // Should stay on page 2, not navigate to page 0.
     await waitFor(() => {
@@ -571,10 +573,10 @@ describe("App refresh scroll preservation", () => {
     const messageList = container.querySelector<HTMLElement>(".msg-scroll.message-list");
     if (messageList) mockScrolledToTop(messageList);
 
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     // Should auto-scroll to page 0.
     await waitFor(() => {
@@ -644,8 +646,8 @@ describe("App refresh scroll preservation", () => {
 
     // The default projectAllSortDirection is "desc", so newest is at top.
     // jsdom scrollTop=0 → pinned for DESC → auto-scroll mode.
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
     // Navigate to page 2 (away from page 0).
     await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -653,7 +655,7 @@ describe("App refresh scroll preservation", () => {
       expect(screen.getByText(/Page 2/)).toBeInTheDocument();
     });
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     // DESC auto-scroll should navigate back to page 0.
     await waitFor(() => {
@@ -706,10 +708,10 @@ describe("App refresh scroll preservation", () => {
     const messageList = container.querySelector<HTMLElement>(".msg-scroll.message-list");
     if (messageList) mockScrolledAway(messageList);
 
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     // Server clamps page 2 → page 0 (only 1 page exists now).
     // The response.page !== sessionPage guard should update the page.
@@ -748,12 +750,12 @@ describe("App refresh scroll preservation", () => {
     const messageList = container.querySelector<HTMLElement>(".msg-scroll.message-list");
     if (messageList) mockScrolledAway(messageList);
 
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
     // Fire 3 refresh ticks.
     for (let tick = 0; tick < 3; tick++) {
-      await vi.advanceTimersByTimeAsync(3100);
+      await vi.advanceTimersByTimeAsync(110);
     }
 
     // Should still be on page 2 after 3 ticks.
@@ -841,8 +843,8 @@ describe("App refresh scroll preservation", () => {
     });
 
     // Enable periodic refresh.
-    await user.click(screen.getByRole("button", { name: "Periodic refresh interval" }));
-    await user.click(screen.getByRole("option", { name: "3s" }));
+    await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
+    await user.click(screen.getByRole("option", { name: "5s" }));
 
     // Switch to Session Beta before the refresh tick fires.
     await user.click(screen.getByText("Session Beta"));
@@ -851,7 +853,7 @@ describe("App refresh scroll preservation", () => {
     });
 
     // Let the refresh tick fire.
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(110);
 
     // Should still show Beta session, not Alpha.
     await waitFor(() => {

@@ -297,11 +297,6 @@ function sanitizePaneState(value: unknown): PaneState | null {
     ...(sessionPage === null ? {} : { sessionPage }),
     ...(sessionScrollTop === null ? {} : { sessionScrollTop }),
     ...(systemMessageRegexRules ? { systemMessageRegexRules } : {}),
-    ...(typeof record.periodicRefreshInterval === "number" &&
-    Number.isInteger(record.periodicRefreshInterval) &&
-    record.periodicRefreshInterval >= 0
-      ? { periodicRefreshInterval: record.periodicRefreshInterval }
-      : {}),
   };
 }
 

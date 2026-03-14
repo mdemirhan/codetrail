@@ -29,8 +29,10 @@ type WorkerMessage =
       };
     };
 type WorkerRequest = {
+  kind?: string;
   dbPath: string;
-  forceReindex: boolean;
+  forceReindex?: boolean;
+  changedFilePaths?: string[];
   systemMessageRegexRules?: {
     claude?: string[];
     codex?: string[];
@@ -197,10 +199,10 @@ describe("WorkerIndexingRunner", () => {
 
     expect(result).toEqual({ jobId: "refresh-1" });
     expect(runIncrementalIndexing).toHaveBeenCalledTimes(1);
-    expect(runIncrementalIndexing).toHaveBeenCalledWith({
-      dbPath: "/tmp/codetrail.db",
-      forceReindex: true,
-    });
+    expect(runIncrementalIndexing).toHaveBeenCalledWith(
+      { dbPath: "/tmp/codetrail.db", forceReindex: true },
+      {},
+    );
     expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
     expect(bookmarkHarness.close).toHaveBeenCalledTimes(1);
   });
@@ -222,16 +224,19 @@ describe("WorkerIndexingRunner", () => {
 
     await runner.enqueue({ force: false });
 
-    expect(runIncrementalIndexing).toHaveBeenCalledWith({
-      dbPath: "/tmp/codetrail.db",
-      forceReindex: false,
-      systemMessageRegexRules: {
-        claude: ["^<command-name>"],
-        codex: ["^<environment_context>"],
-        gemini: [],
-        cursor: [],
+    expect(runIncrementalIndexing).toHaveBeenCalledWith(
+      {
+        dbPath: "/tmp/codetrail.db",
+        forceReindex: false,
+        systemMessageRegexRules: {
+          claude: ["^<command-name>"],
+          codex: ["^<environment_context>"],
+          gemini: [],
+          cursor: [],
+        },
       },
-    });
+      {},
+    );
     expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
   });
 
@@ -254,8 +259,10 @@ describe("WorkerIndexingRunner", () => {
         running: true,
         queuedJobs: 1,
         activeJobId: "refresh-1",
+        completedJobs: 0,
       });
       expect(controller.getLastRequest()).toEqual({
+        kind: "incremental",
         dbPath: "/tmp/codetrail.db",
         forceReindex: false,
       });
@@ -267,6 +274,7 @@ describe("WorkerIndexingRunner", () => {
         running: false,
         queuedJobs: 0,
         activeJobId: null,
+        completedJobs: 1,
       });
       expect(runIncrementalIndexing).not.toHaveBeenCalled();
       expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
@@ -323,6 +331,7 @@ describe("WorkerIndexingRunner", () => {
       const job = runner.enqueue({ force: false });
       await Promise.resolve();
       expect(controller.getLastRequest()).toEqual({
+        kind: "incremental",
         dbPath: "/tmp/codetrail.db",
         forceReindex: false,
       });
@@ -418,10 +427,10 @@ describe("WorkerIndexingRunner", () => {
 
       await expect(job).resolves.toEqual({ jobId: "refresh-1" });
       expect(runIncrementalIndexing).toHaveBeenCalledTimes(1);
-      expect(runIncrementalIndexing).toHaveBeenCalledWith({
-        dbPath: "/tmp/codetrail.db",
-        forceReindex: true,
-      });
+      expect(runIncrementalIndexing).toHaveBeenCalledWith(
+        { dbPath: "/tmp/codetrail.db", forceReindex: true },
+        {},
+      );
       expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
     });
   });
@@ -452,8 +461,10 @@ describe("WorkerIndexingRunner", () => {
         running: true,
         queuedJobs: 2,
         activeJobId: "refresh-1",
+        completedJobs: 0,
       });
       expect(workers[0]?.getLastRequest()).toEqual({
+        kind: "incremental",
         dbPath: "/tmp/codetrail.db",
         forceReindex: false,
       });
@@ -467,8 +478,10 @@ describe("WorkerIndexingRunner", () => {
         running: true,
         queuedJobs: 1,
         activeJobId: "refresh-2",
+        completedJobs: 1,
       });
       expect(workers[1]?.getLastRequest()).toEqual({
+        kind: "incremental",
         dbPath: "/tmp/codetrail.db",
         forceReindex: true,
       });
@@ -479,9 +492,106 @@ describe("WorkerIndexingRunner", () => {
         running: false,
         queuedJobs: 0,
         activeJobId: null,
+        completedJobs: 2,
       });
       expect(runIncrementalIndexing).not.toHaveBeenCalled();
       expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("enqueueChangedFiles runs targeted indexing in-process when worker is unavailable", async () => {
+    const indexChangedFiles = vi.fn(() => makeIndexingResult());
+    const bookmarkHarness = createBookmarkStoreHarness();
+    const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
+      indexChangedFiles,
+      resolveWorkerUrl: () => null,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
+      bookmarksDbPath: "/tmp/codetrail.bookmarks.sqlite",
+    });
+
+    const result = await runner.enqueueChangedFiles(["/tmp/session-1.jsonl", "/tmp/session-2.jsonl"]);
+
+    expect(result).toEqual({ jobId: "changed-1" });
+    expect(indexChangedFiles).toHaveBeenCalledTimes(1);
+    expect(indexChangedFiles).toHaveBeenCalledWith(
+      { dbPath: "/tmp/codetrail.db" },
+      ["/tmp/session-1.jsonl", "/tmp/session-2.jsonl"],
+      {},
+    );
+  });
+
+  it("enqueueChangedFiles with empty paths returns noop without running indexing", async () => {
+    const indexChangedFiles = vi.fn(() => makeIndexingResult());
+    const bookmarkHarness = createBookmarkStoreHarness();
+    const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
+      indexChangedFiles,
+      resolveWorkerUrl: () => null,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
+    });
+
+    const result = await runner.enqueueChangedFiles([]);
+
+    expect(result.jobId).toMatch(/^changed-\d+-noop$/);
+    expect(indexChangedFiles).not.toHaveBeenCalled();
+    expect(bookmarkHarness.reconcileWithIndexedData).not.toHaveBeenCalled();
+  });
+
+  it("enqueueChangedFiles reconciles bookmarks after indexing", async () => {
+    const indexChangedFiles = vi.fn(() => makeIndexingResult());
+    const bookmarkHarness = createBookmarkStoreHarness();
+    const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
+      indexChangedFiles,
+      resolveWorkerUrl: () => null,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
+      bookmarksDbPath: "/tmp/codetrail.bookmarks.sqlite",
+    });
+
+    await runner.enqueueChangedFiles(["/tmp/session-1.jsonl"]);
+
+    expect(bookmarkHarness.reconcileWithIndexedData).toHaveBeenCalledWith("/tmp/codetrail.db");
+    expect(bookmarkHarness.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("enqueueChangedFiles increments completedJobs counter", async () => {
+    const indexChangedFiles = vi.fn(() => makeIndexingResult());
+    const bookmarkHarness = createBookmarkStoreHarness();
+    const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
+      indexChangedFiles,
+      resolveWorkerUrl: () => null,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
+    });
+
+    expect(runner.getStatus().completedJobs).toBe(0);
+    await runner.enqueueChangedFiles(["/tmp/session-1.jsonl"]);
+    expect(runner.getStatus().completedJobs).toBe(1);
+    await runner.enqueueChangedFiles(["/tmp/session-2.jsonl"]);
+    expect(runner.getStatus().completedJobs).toBe(2);
+  });
+
+  it("enqueueChangedFiles serializes with enqueue jobs", async () => {
+    const runIncrementalIndexing = vi.fn(() => makeIndexingResult());
+    const indexChangedFiles = vi.fn(() => makeIndexingResult());
+    const bookmarkHarness = createBookmarkStoreHarness();
+    const runner = new WorkerIndexingRunner("/tmp/codetrail.db", {
+      runIncrementalIndexing,
+      indexChangedFiles,
+      resolveWorkerUrl: () => null,
+      createBookmarkStore: bookmarkHarness.createBookmarkStore,
+    });
+
+    const first = runner.enqueue({ force: false });
+    const second = runner.enqueueChangedFiles(["/tmp/session-1.jsonl"]);
+
+    await first;
+    await second;
+
+    expect(runIncrementalIndexing).toHaveBeenCalledTimes(1);
+    expect(indexChangedFiles).toHaveBeenCalledTimes(1);
+    expect(runner.getStatus()).toEqual({
+      running: false,
+      queuedJobs: 0,
+      activeJobId: null,
+      completedJobs: 2,
     });
   });
 });

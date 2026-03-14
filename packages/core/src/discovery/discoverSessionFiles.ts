@@ -10,7 +10,7 @@ import {
   statSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { basename, extname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 
 import { asRecord, readString } from "../parsing/helpers";
 
@@ -400,6 +400,251 @@ function discoverCursorFiles(
   }
 
   return discovered;
+}
+
+/**
+ * Determines which provider a single file belongs to and constructs a {@link DiscoveredSessionFile}
+ * using the same rules as the per-provider discover functions. Returns `null` if the file is
+ * unrecognised, not statable, or is a subagent transcript.
+ */
+export function discoverSingleFile(
+  filePath: string,
+  config: DiscoveryConfig,
+  dependencies: DiscoveryDependencies = {},
+): DiscoveredSessionFile | null {
+  if (filePath.includes("/subagents/")) {
+    return null;
+  }
+
+  const resolved = resolveDiscoveryDependencies(dependencies);
+
+  if (filePath.startsWith(config.claudeRoot + "/")) {
+    return discoverSingleClaudeFile(filePath, config, resolved);
+  }
+  if (filePath.startsWith(config.codexRoot + "/")) {
+    return discoverSingleCodexFile(filePath, resolved);
+  }
+  if (filePath.startsWith(config.geminiRoot + "/")) {
+    return discoverSingleGeminiFile(filePath, config, resolved);
+  }
+  if (config.geminiHistoryRoot && filePath.startsWith(config.geminiHistoryRoot + "/")) {
+    return discoverSingleGeminiFile(filePath, config, resolved);
+  }
+  if (filePath.startsWith(config.cursorRoot + "/")) {
+    return discoverSingleCursorFile(filePath, config, resolved);
+  }
+
+  return null;
+}
+
+function discoverSingleClaudeFile(
+  filePath: string,
+  config: DiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): DiscoveredSessionFile | null {
+  if (extname(filePath) !== ".jsonl") {
+    return null;
+  }
+
+  const fileStat = safeStat(filePath, dependencies);
+  if (!fileStat) {
+    return null;
+  }
+
+  // Extract projectId: first path segment after claudeRoot.
+  const relative = filePath.slice(config.claudeRoot.length + 1);
+  const segments = relative.split("/");
+  if (segments.length < 2) {
+    return null;
+  }
+
+  const projectId = segments[0]!;
+  const projectDir = join(config.claudeRoot, projectId);
+  const sessionIdentity = basename(filePath, ".jsonl");
+  const sessionsIndexById = readClaudeSessionsIndex(projectDir, dependencies);
+  const sessionIndexEntry = sessionsIndexById.get(sessionIdentity);
+  const projectPath = sessionIndexEntry?.projectPath ?? decodeClaudeProjectId(projectId);
+  const fileMeta = readClaudeJsonlMeta(filePath, dependencies);
+
+  return {
+    provider: "claude",
+    projectPath,
+    projectName: projectNameFromPath(projectPath),
+    sessionIdentity,
+    sourceSessionId: sessionIdentity,
+    filePath,
+    fileSize: fileStat.size,
+    fileMtimeMs: Math.trunc(fileStat.mtimeMs),
+    metadata: {
+      includeInHistory: true,
+      isSubagent: false,
+      unresolvedProject: false,
+      gitBranch: fileMeta.gitBranch,
+      cwd: fileMeta.cwd,
+    },
+  };
+}
+
+function discoverSingleCodexFile(
+  filePath: string,
+  dependencies: ResolvedDiscoveryDependencies,
+): DiscoveredSessionFile | null {
+  if (extname(filePath) !== ".jsonl") {
+    return null;
+  }
+
+  const fileStat = safeStat(filePath, dependencies);
+  if (!fileStat) {
+    return null;
+  }
+
+  const meta = readCodexJsonlMeta(filePath, dependencies);
+  const sourceSessionId = meta.sessionId ?? basename(filePath, ".jsonl");
+  const sessionIdentity = providerSessionIdentity("codex", sourceSessionId, filePath);
+  const projectPath = meta.cwd ?? "";
+
+  return {
+    provider: "codex",
+    projectPath,
+    projectName: projectNameFromPath(projectPath),
+    sessionIdentity,
+    sourceSessionId,
+    filePath,
+    fileSize: fileStat.size,
+    fileMtimeMs: Math.trunc(fileStat.mtimeMs),
+    metadata: {
+      includeInHistory: true,
+      isSubagent: false,
+      unresolvedProject: false,
+      gitBranch: meta.gitBranch,
+      cwd: meta.cwd,
+    },
+  };
+}
+
+function discoverSingleGeminiFile(
+  filePath: string,
+  config: DiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): DiscoveredSessionFile | null {
+  if (extname(filePath) !== ".json") {
+    return null;
+  }
+  if (!basename(filePath).startsWith("session-")) {
+    return null;
+  }
+
+  const fileStat = safeStat(filePath, dependencies);
+  if (!fileStat) {
+    return null;
+  }
+
+  const content = parseJsonFile<Record<string, unknown>>(filePath, dependencies);
+  if (!content) {
+    return null;
+  }
+
+  const sourceSessionId = readString(content.sessionId) ?? basename(filePath, ".json");
+  const sessionIdentity = providerSessionIdentity("gemini", sourceSessionId, filePath);
+  const projectHash = readString(content.projectHash) ?? "";
+  const containerDir = geminiContainerDir(filePath);
+
+  // Build a minimal project resolution for just this file.
+  let resolvedProjectPath: string | null = null;
+
+  // Check if we can resolve from project hash via the global resolution mechanism.
+  if (projectHash) {
+    const resolution = buildGeminiProjectResolution(config, dependencies);
+    resolvedProjectPath = resolution.hashToPath.get(projectHash) ?? null;
+  }
+
+  // Fallback: check for .project_root in the container directory.
+  if (!resolvedProjectPath) {
+    const projectRootPath = join(containerDir, ".project_root");
+    if (dependencies.fs.existsSync(projectRootPath)) {
+      const fallbackPath = (safeReadUtf8File(projectRootPath, dependencies) ?? "").trim();
+      if (fallbackPath.length > 0) {
+        resolvedProjectPath = fallbackPath;
+      }
+    }
+  }
+
+  const projectPath = resolvedProjectPath ?? "";
+  const unresolvedProject = !resolvedProjectPath;
+  const fallbackProjectName = basename(containerDir);
+
+  return {
+    provider: "gemini",
+    projectPath,
+    projectName: unresolvedProject ? fallbackProjectName : projectNameFromPath(projectPath),
+    sessionIdentity,
+    sourceSessionId,
+    filePath,
+    fileSize: fileStat.size,
+    fileMtimeMs: Math.trunc(fileStat.mtimeMs),
+    metadata: {
+      includeInHistory: true,
+      isSubagent: false,
+      unresolvedProject,
+      gitBranch: null,
+      cwd: projectPath || null,
+    },
+  };
+}
+
+function discoverSingleCursorFile(
+  filePath: string,
+  config: DiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): DiscoveredSessionFile | null {
+  if (extname(filePath) !== ".jsonl") {
+    return null;
+  }
+
+  // Expected pattern: {cursorRoot}/{encodedName}/agent-transcripts/{uuid}/{uuid}.jsonl
+  const relative = filePath.slice(config.cursorRoot.length + 1);
+  const segments = relative.split("/");
+  // segments: [encodedName, "agent-transcripts", uuid, "{uuid}.jsonl"]
+  if (segments.length < 4 || segments[1] !== "agent-transcripts") {
+    return null;
+  }
+
+  const encodedName = segments[0]!;
+  const uuid = segments[2]!;
+  const expectedFilename = `${uuid}.jsonl`;
+  if (basename(filePath) !== expectedFilename) {
+    return null;
+  }
+
+  const fileStat = safeStat(filePath, dependencies);
+  if (!fileStat) {
+    return null;
+  }
+
+  const projectDir = join(config.cursorRoot, encodedName);
+  const cursorProject = decodeCursorProjectPath(projectDir, encodedName, dependencies);
+  const projectPath = cursorProject.projectPath;
+  const unresolvedProject = cursorProject.unresolvedProject;
+  const projectName = unresolvedProject ? encodedName : projectNameFromPath(projectPath);
+  const sessionIdentity = providerSessionIdentity("cursor", uuid, filePath);
+
+  return {
+    provider: "cursor",
+    projectPath,
+    projectName,
+    sessionIdentity,
+    sourceSessionId: uuid,
+    filePath,
+    fileSize: fileStat.size,
+    fileMtimeMs: Math.trunc(fileStat.mtimeMs),
+    metadata: {
+      includeInHistory: true,
+      isSubagent: false,
+      unresolvedProject,
+      gitBranch: null,
+      cwd: projectPath || null,
+    },
+  };
 }
 
 function decodeCursorProjectPath(

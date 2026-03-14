@@ -298,10 +298,17 @@ if (hasSingleInstanceLock) {
       return;
     }
 
-    app.on("before-quit", () => {
+    let shuttingDown = false;
+    app.on("before-quit", (event) => {
       writeDebugLog("before-quit");
-      shutdownMainProcess();
       appStateStore.flush();
+      if (!shuttingDown) {
+        shuttingDown = true;
+        event.preventDefault();
+        shutdownMainProcess().finally(() => {
+          app.quit();
+        });
+      }
     });
 
     app.on("activate", () => {

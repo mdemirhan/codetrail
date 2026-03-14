@@ -70,13 +70,19 @@ function createRendererClient(handlers: Record<string, ChannelHandler>) {
       return { jobId: "refresh-1" };
     }
     if (channel === "indexer:getStatus") {
-      return { running: false, queuedJobs: 0, activeJobId: null };
+      return { running: false, queuedJobs: 0, activeJobId: null, completedJobs: 0 };
     }
     if (channel === "bookmarks:toggle") {
       return { bookmarked: true };
     }
     if (channel === "app:getSettingsInfo") {
       return SETTINGS_INFO;
+    }
+    if (channel === "watcher:start") {
+      return { ok: true, watchedRoots: [] };
+    }
+    if (channel === "watcher:stop") {
+      return { ok: true };
     }
 
     throw new Error(`Unhandled IPC call: ${channel}`);

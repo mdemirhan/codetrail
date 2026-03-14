@@ -8,7 +8,12 @@ import {
   ensureDatabaseSchema,
   openDatabase,
 } from "../db/bootstrap";
-import { DEFAULT_DISCOVERY_CONFIG, type DiscoveryConfig, discoverSessionFiles } from "../discovery";
+import {
+  DEFAULT_DISCOVERY_CONFIG,
+  type DiscoveryConfig,
+  discoverSingleFile,
+  discoverSessionFiles,
+} from "../discovery";
 import { type ParserDiagnostic, parseSession, parseSessionEvent } from "../parsing";
 import { asArray, asRecord, readString } from "../parsing/helpers";
 
@@ -264,16 +269,142 @@ export function runIncrementalIndexing(
       }
     }
 
-    const upsertProject = db.prepare(
+    const nowIso = resolvedDependencies.now().toISOString();
+    const statements = createIndexingStatements(db);
+    const lookupExisting = (filePath: string) => ({
+      indexed: existingByFilePath.get(filePath),
+      checkpoint: existingCheckpointByFilePath.get(filePath),
+      sessionId: existingSessionByFilePath.get(filePath),
+    });
+
+    const result = processDiscoveredFiles({
+      db,
+      discoveredFiles,
+      forceSkipUnchanged: !config.forceReindex,
+      lookupExisting,
+      nowIso,
+      compiledSystemMessageRules,
+      statements,
+      resolvedDependencies,
+      diagnostics,
+    });
+    indexedFiles += result.indexedFiles;
+    skippedFiles += result.skippedFiles;
+
+    db.exec("DELETE FROM projects WHERE id NOT IN (SELECT DISTINCT project_id FROM sessions)");
+
+    return {
+      discoveredFiles: discoveredFiles.length,
+      indexedFiles,
+      skippedFiles,
+      removedFiles,
+      schemaRebuilt: schema.schemaRebuilt,
+      diagnostics,
+    };
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Indexes only the given file paths instead of running a full discovery walk. Files that are not
+ * recognisable as provider session files and were previously indexed are cleaned up. No orphan
+ * project pruning is performed.
+ */
+export function indexChangedFiles(
+  config: IndexingConfig,
+  changedFilePaths: string[],
+  dependencies: IndexingDependencies = {},
+): IndexingResult {
+  const resolvedDependencies = resolveIndexingDependencies(dependencies);
+  const discoveryConfig = resolveDiscoveryConfig(config.discoveryConfig);
+
+  const discoveredFiles = changedFilePaths
+    .map((filePath) => discoverSingleFile(filePath, discoveryConfig))
+    .filter((file): file is NonNullable<typeof file> => file !== null);
+
+  const db = resolvedDependencies.openDatabase(config.dbPath);
+  try {
+    const schema = resolvedDependencies.ensureDatabaseSchema(db);
+
+    // Query only the specific rows for the targeted files — no full table scans.
+    const getIndexedFile = db.prepare(
+      "SELECT file_path, provider, session_identity, file_size, file_mtime_ms FROM indexed_files WHERE file_path = ?",
+    );
+    const getCheckpoint = db.prepare(
+      `SELECT file_path, provider, session_id, session_identity, file_size, file_mtime_ms,
+              last_offset_bytes, last_line_number, last_event_index, next_message_sequence,
+              processing_state_json, source_metadata_json, head_hash, tail_hash
+       FROM index_checkpoints WHERE file_path = ?`,
+    );
+    const getSessionByFile = db.prepare("SELECT id, file_path FROM sessions WHERE file_path = ?");
+
+    let indexedFiles = 0;
+    let skippedFiles = 0;
+    let removedFiles = 0;
+    const diagnostics = { warnings: 0, errors: 0 };
+    const compiledSystemMessageRules = compileSystemMessageRules(config.systemMessageRegexRules);
+    diagnostics.warnings += compiledSystemMessageRules.invalidCount;
+
+    // Handle deleted/renamed files — clean up indexed data for paths that can no longer be discovered
+    const discoveredPathSet = new Set(discoveredFiles.map((f) => f.filePath));
+    for (const filePath of changedFilePaths) {
+      if (discoveredPathSet.has(filePath)) continue;
+      const existingSession = getSessionByFile.get(filePath) as SessionFileRow | undefined;
+      if (existingSession) {
+        deleteSessionDataForFilePath(db, filePath);
+        db.prepare("DELETE FROM indexed_files WHERE file_path = ?").run(filePath);
+        db.prepare("DELETE FROM index_checkpoints WHERE file_path = ?").run(filePath);
+        removedFiles += 1;
+      }
+    }
+
+    const nowIso = resolvedDependencies.now().toISOString();
+    const statements = createIndexingStatements(db);
+    const lookupExisting = (filePath: string) => ({
+      indexed: getIndexedFile.get(filePath) as IndexedFileRow | undefined,
+      checkpoint: getCheckpoint.get(filePath) as IndexCheckpointRow | undefined,
+      sessionId: (getSessionByFile.get(filePath) as SessionFileRow | undefined)?.id,
+    });
+
+    const result = processDiscoveredFiles({
+      db,
+      discoveredFiles,
+      forceSkipUnchanged: true,
+      lookupExisting,
+      nowIso,
+      compiledSystemMessageRules,
+      statements,
+      resolvedDependencies,
+      diagnostics,
+    });
+    indexedFiles += result.indexedFiles;
+    skippedFiles += result.skippedFiles;
+
+    return {
+      discoveredFiles: discoveredFiles.length,
+      indexedFiles,
+      skippedFiles,
+      removedFiles,
+      schemaRebuilt: schema.schemaRebuilt,
+      diagnostics,
+    };
+  } finally {
+    db.close();
+  }
+}
+
+function createIndexingStatements(db: SqliteDatabase) {
+  return {
+    upsertProject: db.prepare(
       `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          path = excluded.path,
          updated_at = excluded.updated_at`,
-    );
-
-    const upsertSession = db.prepare(
+    ),
+    upsertSession: db.prepare(
       `INSERT INTO sessions (
          id,
          project_id,
@@ -304,9 +435,8 @@ export function runIncrementalIndexing(
          message_count = excluded.message_count,
          token_input_total = excluded.token_input_total,
          token_output_total = excluded.token_output_total`,
-    );
-
-    const insertMessage = db.prepare(
+    ),
+    insertMessage: db.prepare(
       `INSERT INTO messages (
         id,
         source_id,
@@ -321,14 +451,12 @@ export function runIncrementalIndexing(
         operation_duration_source,
         operation_duration_confidence
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-
-    const insertMessageFts = db.prepare(
+    ),
+    insertMessageFts: db.prepare(
       `INSERT INTO message_fts (message_id, session_id, provider, category, content)
        VALUES (?, ?, ?, ?, ?)`,
-    );
-
-    const insertToolCall = db.prepare(
+    ),
+    insertToolCall: db.prepare(
       `INSERT INTO tool_calls (
         id,
         message_id,
@@ -338,9 +466,8 @@ export function runIncrementalIndexing(
         started_at,
         completed_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    );
-
-    const upsertIndexedFile = db.prepare(
+    ),
+    upsertIndexedFile: db.prepare(
       `INSERT INTO indexed_files (
          file_path,
          provider,
@@ -357,8 +484,8 @@ export function runIncrementalIndexing(
          file_size = excluded.file_size,
          file_mtime_ms = excluded.file_mtime_ms,
          indexed_at = excluded.indexed_at`,
-    );
-    const upsertCheckpoint = db.prepare(
+    ),
+    upsertCheckpoint: db.prepare(
       `INSERT INTO index_checkpoints (
          file_path,
          provider,
@@ -391,103 +518,93 @@ export function runIncrementalIndexing(
          head_hash = excluded.head_hash,
          tail_hash = excluded.tail_hash,
          updated_at = excluded.updated_at`,
-    );
+    ),
+  };
+}
 
-    const nowIso = resolvedDependencies.now().toISOString();
-    const statements = {
-      upsertProject,
-      upsertSession,
-      insertMessage,
-      insertMessageFts,
-      insertToolCall,
-      upsertIndexedFile,
-      upsertCheckpoint,
-    };
+type ExistingFileLookup = (filePath: string) => {
+  indexed: IndexedFileRow | undefined;
+  checkpoint: IndexCheckpointRow | undefined;
+  sessionId: string | undefined;
+};
 
-    for (const discovered of discoveredFiles) {
-      const existing = existingByFilePath.get(discovered.filePath);
-      const checkpoint = existingCheckpointByFilePath.get(discovered.filePath);
-      const sessionDbId = makeSessionId(discovered.provider, discovered.sessionIdentity);
-      const existingSessionId = existingSessionByFilePath.get(discovered.filePath);
-      const unchanged =
-        !config.forceReindex &&
-        !!existing &&
-        existing.file_size === discovered.fileSize &&
-        existing.file_mtime_ms === discovered.fileMtimeMs &&
-        existingSessionId === sessionDbId;
+function processDiscoveredFiles(args: {
+  db: SqliteDatabase;
+  discoveredFiles: ReturnType<typeof discoverSessionFiles>;
+  forceSkipUnchanged: boolean;
+  lookupExisting: ExistingFileLookup;
+  nowIso: string;
+  compiledSystemMessageRules: { compiledByProvider: Record<Provider, RegExp[]> };
+  statements: IndexingStatements;
+  resolvedDependencies: ResolvedIndexingDependencies;
+  diagnostics: { warnings: number; errors: number };
+}): { indexedFiles: number; skippedFiles: number } {
+  let indexedFiles = 0;
+  let skippedFiles = 0;
 
-      // file size + mtime + derived session id is enough for a cheap incremental skip check.
-      if (unchanged) {
-        skippedFiles += 1;
-        continue;
-      }
+  for (const discovered of args.discoveredFiles) {
+    const existing = args.lookupExisting(discovered.filePath);
+    const sessionDbId = makeSessionId(discovered.provider, discovered.sessionIdentity);
+    const unchanged =
+      args.forceSkipUnchanged &&
+      !!existing.indexed &&
+      existing.indexed.file_size === discovered.fileSize &&
+      existing.indexed.file_mtime_ms === discovered.fileMtimeMs &&
+      existing.sessionId === sessionDbId;
 
-      const canResumeFromCheckpoint = shouldResumeFromCheckpoint({
-        discovered,
-        existing,
-        checkpoint,
-        expectedSessionDbId: sessionDbId,
-        existingSessionId,
-      });
-      const resumeCheckpoint =
-        canResumeFromCheckpoint && checkpoint ? deserializeResumeCheckpoint(checkpoint) : null;
-
-      try {
-        const fileDiagnostics =
-          discovered.provider === "gemini"
-            ? indexMaterializedSessionFile({
-                db,
-                discovered,
-                sessionDbId,
-                nowIso,
-                readFileText: resolvedDependencies.readFileText,
-                systemMessageRules:
-                  compiledSystemMessageRules.compiledByProvider[discovered.provider],
-                statements,
-                onNotice: resolvedDependencies.onNotice,
-              })
-            : indexStreamedJsonlSessionFile({
-                db,
-                discovered,
-                sessionDbId,
-                nowIso,
-                systemMessageRules:
-                  compiledSystemMessageRules.compiledByProvider[discovered.provider],
-                statements,
-                resumeCheckpoint,
-                onNotice: resolvedDependencies.onNotice,
-              });
-        accumulateParserDiagnostics(diagnostics, fileDiagnostics);
-      } catch (error) {
-        diagnostics.errors += 1;
-        resolvedDependencies.onFileIssue(resolveIndexingFileIssue(error, discovered));
-        continue;
-      }
-
-      existingSessionByFilePath.set(discovered.filePath, sessionDbId);
-      existingByFilePath.set(discovered.filePath, {
-        file_path: discovered.filePath,
-        provider: discovered.provider,
-        session_identity: discovered.sessionIdentity,
-        file_size: discovered.fileSize,
-        file_mtime_ms: discovered.fileMtimeMs,
-      });
-      indexedFiles += 1;
+    if (unchanged) {
+      skippedFiles += 1;
+      continue;
     }
 
-    db.exec("DELETE FROM projects WHERE id NOT IN (SELECT DISTINCT project_id FROM sessions)");
+    const canResumeFromCheckpoint = shouldResumeFromCheckpoint({
+      discovered,
+      existing: existing.indexed,
+      checkpoint: existing.checkpoint,
+      expectedSessionDbId: sessionDbId,
+      existingSessionId: existing.sessionId,
+    });
+    const resumeCheckpoint =
+      canResumeFromCheckpoint && existing.checkpoint
+        ? deserializeResumeCheckpoint(existing.checkpoint)
+        : null;
 
-    return {
-      discoveredFiles: discoveredFiles.length,
-      indexedFiles,
-      skippedFiles,
-      removedFiles,
-      schemaRebuilt: schema.schemaRebuilt,
-      diagnostics,
-    };
-  } finally {
-    db.close();
+    try {
+      const fileDiagnostics =
+        discovered.provider === "gemini"
+          ? indexMaterializedSessionFile({
+              db: args.db,
+              discovered,
+              sessionDbId,
+              nowIso: args.nowIso,
+              readFileText: args.resolvedDependencies.readFileText,
+              systemMessageRules:
+                args.compiledSystemMessageRules.compiledByProvider[discovered.provider],
+              statements: args.statements,
+              onNotice: args.resolvedDependencies.onNotice,
+            })
+          : indexStreamedJsonlSessionFile({
+              db: args.db,
+              discovered,
+              sessionDbId,
+              nowIso: args.nowIso,
+              systemMessageRules:
+                args.compiledSystemMessageRules.compiledByProvider[discovered.provider],
+              statements: args.statements,
+              resumeCheckpoint,
+              onNotice: args.resolvedDependencies.onNotice,
+            });
+      accumulateParserDiagnostics(args.diagnostics, fileDiagnostics);
+    } catch (error) {
+      args.diagnostics.errors += 1;
+      args.resolvedDependencies.onFileIssue(resolveIndexingFileIssue(error, discovered));
+      continue;
+    }
+
+    indexedFiles += 1;
   }
+
+  return { indexedFiles, skippedFiles };
 }
 
 function resolveDiscoveryConfig(config?: Partial<DiscoveryConfig>): DiscoveryConfig {

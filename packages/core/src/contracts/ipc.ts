@@ -151,7 +151,6 @@ export const paneStateBaseSchema = z.object({
   sessionPage: z.number().int().nonnegative(),
   sessionScrollTop: z.number().int().nonnegative(),
   systemMessageRegexRules: systemMessageRegexRulesSchema,
-  periodicRefreshInterval: z.number().int().nonnegative(),
 });
 
 function makeAllNullable<T extends z.ZodRawShape>(shape: T) {
@@ -188,6 +187,7 @@ const indexerStatusResponseSchema = z.object({
   running: z.boolean(),
   queuedJobs: z.number().int().nonnegative(),
   activeJobId: z.string().min(1).nullable(),
+  completedJobs: z.number().int().nonnegative(),
 });
 
 export const ipcContractSchemas = {
@@ -361,6 +361,19 @@ export const ipcContractSchemas = {
       action: z.enum(["in", "out", "reset"]),
     }),
     response: uiZoomResponseSchema,
+  },
+  "watcher:start": {
+    request: z.object({}),
+    response: z.object({
+      ok: z.boolean(),
+      watchedRoots: z.array(z.string()),
+    }),
+  },
+  "watcher:stop": {
+    request: z.object({}),
+    response: z.object({
+      ok: z.boolean(),
+    }),
   },
 } as const;
 

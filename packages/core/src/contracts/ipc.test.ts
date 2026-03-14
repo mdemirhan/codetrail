@@ -50,6 +50,7 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
       running: false,
       queuedJobs: 0,
       activeJobId: null,
+      completedJobs: 0,
     },
   },
   "projects:list": {
@@ -213,7 +214,6 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
         cursor: [],
       },
       autoScrollEnabled: false,
-      periodicRefreshInterval: 0,
     },
     response: { ok: true },
   },
@@ -224,6 +224,14 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
   "ui:setZoom": {
     request: { action: "reset" },
     response: { percent: 100 },
+  },
+  "watcher:start": {
+    request: {},
+    response: { ok: true, watchedRoots: ["/home/user/.claude/projects"] },
+  },
+  "watcher:stop": {
+    request: {},
+    response: { ok: true },
   },
 };
 

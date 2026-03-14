@@ -31,7 +31,7 @@ async function buildMainAndPreload(): Promise<void> {
     format: "esm",
     sourcemap: "linked",
     minify: false,
-    external: ["electron", "better-sqlite3"],
+    external: ["electron", "better-sqlite3", "@parcel/watcher"],
     naming: {
       entry: "[name].js",
       chunk: "chunks/[name]-[hash].js",

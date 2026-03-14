@@ -17,6 +17,7 @@ import {
 import type { AppStateStore } from "./appStateStore";
 import { initializeBookmarkStore, resolveBookmarksDbPath } from "./data/bookmarkStore";
 import { type QueryService, createQueryService } from "./data/queryService";
+import { FileWatcherService } from "./fileWatcherService";
 import { WorkerIndexingRunner } from "./indexingRunner";
 import { registerIpcHandlers } from "./ipc";
 
@@ -37,6 +38,7 @@ export type BootstrapResult = {
 // The main process owns long-lived resources: databases, IPC handlers, indexing workers, and the
 // path allowlist used by shell integrations.
 let activeQueryService: QueryService | null = null;
+let activeFileWatcher: FileWatcherService | null = null;
 
 export async function bootstrapMainProcess(
   options: BootstrapOptions = {},
@@ -86,6 +88,28 @@ export async function bootstrapMainProcess(
   const invalidateAllowedRootsCache = () => {
     allowedRootsCache = null;
   };
+
+  const watcherRoots = [
+    DEFAULT_DISCOVERY_CONFIG.claudeRoot,
+    DEFAULT_DISCOVERY_CONFIG.codexRoot,
+    DEFAULT_DISCOVERY_CONFIG.geminiRoot,
+    geminiHistoryRoot,
+    DEFAULT_DISCOVERY_CONFIG.cursorRoot,
+  ];
+  if (activeFileWatcher) {
+    await activeFileWatcher.stop();
+  }
+  const fileWatcher = new FileWatcherService(watcherRoots, async (changedPaths) => {
+    invalidateAllowedRootsCache();
+    await indexingRunner.enqueueChangedFiles(changedPaths).catch((error: unknown) => {
+      if (options.onBackgroundError) {
+        options.onBackgroundError("watcher-triggered indexing failed", error);
+        return;
+      }
+      console.error("[codetrail] watcher-triggered indexing failed", error);
+    });
+  });
+  activeFileWatcher = fileWatcher;
 
   registerIpcHandlers(ipcMain, {
     "app:getHealth": () => ({
@@ -190,6 +214,26 @@ export async function bootstrapMainProcess(
         percent: Math.round(event.sender.getZoomFactor() * 100),
       };
     },
+    "watcher:start": async () => {
+      try {
+        await fileWatcher.start();
+        // Run one full incremental scan to bring the DB up to date before relying on events
+        void indexingRunner.enqueue({ force: false }).catch((error: unknown) => {
+          if (options.onBackgroundError) {
+            options.onBackgroundError("watcher initial scan failed", error);
+            return;
+          }
+          console.error("[codetrail] watcher initial scan failed", error);
+        });
+        return { ok: true, watchedRoots: watcherRoots };
+      } catch {
+        return { ok: false, watchedRoots: [] };
+      }
+    },
+    "watcher:stop": async () => {
+      await fileWatcher.stop();
+      return { ok: true };
+    },
   });
 
   if (options.runStartupIndexing ?? true) {
@@ -208,7 +252,11 @@ export async function bootstrapMainProcess(
   };
 }
 
-export function shutdownMainProcess(): void {
+export async function shutdownMainProcess(): Promise<void> {
+  if (activeFileWatcher) {
+    await activeFileWatcher.stop();
+    activeFileWatcher = null;
+  }
   if (!activeQueryService) {
     return;
   }

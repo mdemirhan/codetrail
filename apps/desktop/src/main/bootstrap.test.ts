@@ -55,7 +55,7 @@ const {
   mockWorkerIndexingRunner: vi.fn(),
   mockRegisterIpcHandlers: vi.fn(),
   mockEnqueue: vi.fn(async () => ({ jobId: "job-1" })),
-  mockGetStatus: vi.fn(() => ({ running: false, queuedJobs: 0, activeJobId: null })),
+  mockGetStatus: vi.fn(() => ({ running: false, queuedJobs: 0, activeJobId: null, completedJobs: 0 })),
   mockStat: vi.fn<() => Promise<{ isFile: () => boolean }>>(async () => ({ isFile: () => false })),
   mockRealpath: vi.fn(async (pathValue: string) => pathValue),
   mockOpenPath: vi.fn(async () => ""),
@@ -183,14 +183,13 @@ describe("bootstrapMainProcess", () => {
       gemini: [],
       cursor: [],
     },
-    periodicRefreshInterval: 5000,
   };
 
   beforeEach(() => {
     handlers = {};
     setPaneState = vi.fn();
     vi.clearAllMocks();
-    shutdownMainProcess();
+    void shutdownMainProcess();
 
     mockWorkerIndexingRunner.mockImplementation(() => ({
       enqueue: mockEnqueue,
@@ -351,6 +350,7 @@ describe("bootstrapMainProcess", () => {
       running: false,
       queuedJobs: 0,
       activeJobId: null,
+      completedJobs: 0,
     });
   });
 
@@ -437,8 +437,7 @@ describe("bootstrapMainProcess", () => {
         gemini: [],
         cursor: [],
       },
-      periodicRefreshInterval: 5000,
-    });
+      });
 
     const updated = {
       ...paneState,
@@ -526,9 +525,9 @@ describe("bootstrapMainProcess", () => {
     await bootstrapMainProcess({ dbPath: "/tmp/b.sqlite", runStartupIndexing: false });
     expect(firstClose).toHaveBeenCalledTimes(1);
 
-    shutdownMainProcess();
+    await shutdownMainProcess();
     expect(secondClose).toHaveBeenCalledTimes(1);
-    shutdownMainProcess();
+    await shutdownMainProcess();
     expect(secondClose).toHaveBeenCalledTimes(1);
   });
 
