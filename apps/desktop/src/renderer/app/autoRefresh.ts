@@ -8,7 +8,7 @@ export type ScanRefreshStrategy =
 export type NonOffRefreshStrategy = WatchRefreshStrategy | ScanRefreshStrategy;
 export type RefreshStrategy = "off" | NonOffRefreshStrategy;
 
-export const DEFAULT_PREFERRED_REFRESH_STRATEGY: NonOffRefreshStrategy = "watch-5s";
+export const DEFAULT_PREFERRED_REFRESH_STRATEGY: NonOffRefreshStrategy = "watch-1s";
 
 export const REFRESH_STRATEGY_OPTIONS: ReadonlyArray<{
   label: string;

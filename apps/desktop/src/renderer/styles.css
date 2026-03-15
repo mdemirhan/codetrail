@@ -126,6 +126,8 @@
   --help-success-dim: rgba(13, 148, 136, 0.12);
   --help-warn: #d97706;
   --help-warn-dim: rgba(217, 119, 6, 0.12);
+  --pane-focus-line-idle: rgba(0, 0, 0, 0.08);
+  --pane-focus-line-active: var(--accent-blue);
 }
 
 :root[data-theme="dark"] {
@@ -240,6 +242,8 @@
   --help-success-dim: rgba(93, 216, 168, 0.16);
   --help-warn: #f0b050;
   --help-warn-dim: rgba(240, 176, 80, 0.16);
+  --pane-focus-line-idle: rgba(255, 255, 255, 0.08);
+  --pane-focus-line-active: var(--accent-blue);
 }
 
 :root[data-theme="tomorrow-night"] {
@@ -892,6 +896,27 @@ body.platform-macos .titlebar-left {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-surface);
+}
+
+.history-focus-pane {
+  position: relative;
+}
+
+.history-focus-pane::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--pane-focus-line-idle);
+  transition: background-color 0.16s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.history-focus-pane:focus-within::before {
+  background: var(--pane-focus-line-active);
 }
 
 .content-pane {

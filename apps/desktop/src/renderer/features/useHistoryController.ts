@@ -251,6 +251,7 @@ export function useHistoryController({
   const prevMessageIdsRef = useRef("");
   const refreshContextRef = useRef<RefreshContext | null>(null);
   const refreshIdCounterRef = useRef(0);
+  const initialHistoryPaneFocusAppliedRef = useRef(false);
 
   const projectsLoadTokenRef = useRef(0);
   const sessionsLoadTokenRef = useRef(0);
@@ -485,6 +486,14 @@ export function useHistoryController({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (initialHistoryPaneFocusAppliedRef.current || !isHistoryLayout || !paneStateHydrated) {
+      return;
+    }
+    initialHistoryPaneFocusAppliedRef.current = true;
+    focusHistoryList(messageListRef.current);
+  }, [isHistoryLayout, paneStateHydrated]);
 
   const {
     activeMessageSortDirection,

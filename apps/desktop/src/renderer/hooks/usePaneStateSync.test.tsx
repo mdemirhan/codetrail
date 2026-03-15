@@ -31,7 +31,7 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
   );
   const [searchProviders, setSearchProviders] = useState<Provider[]>(["claude"]);
   const [preferredAutoRefreshStrategy, setPreferredAutoRefreshStrategy] =
-    useState<NonOffRefreshStrategy>("watch-5s");
+    useState<NonOffRefreshStrategy>("watch-1s");
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [monoFontFamily, setMonoFontFamily] = useState<MonoFontFamily>("droid_sans_mono");
   const [regularFontFamily, setRegularFontFamily] = useState<RegularFontFamily>("current");

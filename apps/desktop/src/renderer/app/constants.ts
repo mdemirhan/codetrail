@@ -73,6 +73,14 @@ export const SHORTCUT_ITEMS = [
   { group: "Search & Navigation", shortcut: "Ctrl+Down", description: "Select next project" },
   { group: "Search & Navigation", shortcut: "Ctrl+U", description: "Page message view up" },
   { group: "Search & Navigation", shortcut: "Ctrl+D", description: "Page message view down" },
+  { group: "Search & Navigation", shortcut: "Cmd+Shift+Up", description: "Page message view up" },
+  {
+    group: "Search & Navigation",
+    shortcut: "Cmd+Shift+Down",
+    description: "Page message view down",
+  },
+  { group: "Search & Navigation", shortcut: "Tab", description: "Cycle pane focus forward" },
+  { group: "Search & Navigation", shortcut: "Shift+Tab", description: "Cycle pane focus backward" },
   { group: "Panels", shortcut: "Cmd/Ctrl+B", description: "Expand/collapse Projects pane" },
   {
     group: "Panels",

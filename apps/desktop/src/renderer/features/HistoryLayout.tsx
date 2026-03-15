@@ -113,7 +113,7 @@ export function HistoryLayout({
 
       <div className="pane-resizer" onPointerDown={history.beginResize("session")} />
 
-      <section className="pane content-pane">
+      <section className="pane content-pane history-focus-pane">
         <HistoryDetailPane
           history={history}
           advancedSearchEnabled={advancedSearchEnabled}

@@ -2,12 +2,35 @@
 
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { createRef } from "react";
 
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
 function Harness(args: Parameters<typeof useKeyboardShortcuts>[0]) {
   useKeyboardShortcuts(args);
-  return <div>shortcuts</div>;
+  return (
+    <div>
+      <div className="history-focus-pane">
+        <button type="button">project-toggle</button>
+        <div ref={args.projectListRef} tabIndex={-1}>
+          project
+        </div>
+      </div>
+      <div className="history-focus-pane">
+        <button type="button">session-toggle</button>
+        <div ref={args.sessionListRef} tabIndex={-1}>
+          session
+        </div>
+      </div>
+      <div className="history-focus-pane">
+        <button type="button">message-toggle</button>
+        <div ref={args.messageListRef} tabIndex={-1}>
+          message
+        </div>
+      </div>
+      <div>shortcuts</div>
+    </div>
+  );
 }
 
 function createProps(
@@ -16,6 +39,9 @@ function createProps(
   return {
     mainView: "history",
     hasFocusedHistoryMessage: false,
+    projectListRef: createRef<HTMLDivElement>(),
+    sessionListRef: createRef<HTMLDivElement>(),
+    messageListRef: createRef<HTMLDivElement>(),
     setMainView: vi.fn(),
     clearFocusedHistoryMessage: vi.fn(),
     focusGlobalSearch: vi.fn(),
@@ -68,6 +94,10 @@ describe("useKeyboardShortcuts", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", ctrlKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "u", ctrlKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", metaKey: true, shiftKey: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", metaKey: true, shiftKey: true }),
+    );
 
     expect(props.focusGlobalSearch).toHaveBeenCalledTimes(1);
     expect(props.focusSessionSearch).toHaveBeenCalledTimes(1);
@@ -85,8 +115,8 @@ describe("useKeyboardShortcuts", () => {
     expect(props.selectNextSession).toHaveBeenCalledTimes(1);
     expect(props.selectPreviousProject).toHaveBeenCalledTimes(1);
     expect(props.selectNextProject).toHaveBeenCalledTimes(1);
-    expect(props.pageHistoryMessagesUp).toHaveBeenCalledTimes(1);
-    expect(props.pageHistoryMessagesDown).toHaveBeenCalledTimes(1);
+    expect(props.pageHistoryMessagesUp).toHaveBeenCalledTimes(2);
+    expect(props.pageHistoryMessagesDown).toHaveBeenCalledTimes(2);
     expect(props.goToPreviousSearchPage).not.toHaveBeenCalled();
     expect(props.goToNextSearchPage).not.toHaveBeenCalled();
     expect(props.setMainView).not.toHaveBeenCalledWith("history");
@@ -144,6 +174,22 @@ describe("useKeyboardShortcuts", () => {
     );
     input?.dispatchEvent(new KeyboardEvent("keydown", { key: "u", bubbles: true, ctrlKey: true }));
     input?.dispatchEvent(new KeyboardEvent("keydown", { key: "d", bubbles: true, ctrlKey: true }));
+    input?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowUp",
+        bubbles: true,
+        metaKey: true,
+        shiftKey: true,
+      }),
+    );
+    input?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowDown",
+        bubbles: true,
+        metaKey: true,
+        shiftKey: true,
+      }),
+    );
 
     expect(props.setMainView).not.toHaveBeenCalledWith("help");
     expect(props.focusNextHistoryMessage).not.toHaveBeenCalled();
@@ -151,6 +197,62 @@ describe("useKeyboardShortcuts", () => {
     expect(props.selectNextProject).not.toHaveBeenCalled();
     expect(props.pageHistoryMessagesUp).not.toHaveBeenCalled();
     expect(props.pageHistoryMessagesDown).not.toHaveBeenCalled();
+  });
+
+  it("cycles pane focus with Tab and routes plain Up/Down on focused project and session panes", () => {
+    const props = createProps();
+
+    render(<Harness {...props} />);
+
+    const projectList = props.projectListRef.current;
+    const sessionList = props.sessionListRef.current;
+    const messageList = props.messageListRef.current;
+    if (!projectList || !sessionList || !messageList) {
+      throw new Error("Expected pane refs to be attached");
+    }
+
+    projectList.focus();
+    projectList.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    sessionList.focus();
+    sessionList.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+
+    expect(props.selectNextProject).toHaveBeenCalledTimes(1);
+    expect(props.selectPreviousSession).toHaveBeenCalledTimes(1);
+
+    projectList.focus();
+    projectList.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    expect(document.activeElement).toBe(sessionList);
+
+    sessionList.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", bubbles: true, shiftKey: true }),
+    );
+    expect(document.activeElement).toBe(projectList);
+
+    projectList.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    sessionList.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    expect(document.activeElement).toBe(messageList);
+  });
+
+  it("skips collapsed pane targets when cycling with Tab", () => {
+    const props = createProps();
+
+    render(<Harness {...props} />);
+
+    const projectList = props.projectListRef.current;
+    const sessionList = props.sessionListRef.current;
+    const messageList = props.messageListRef.current;
+    if (!projectList || !sessionList || !messageList) {
+      throw new Error("Expected pane refs to be attached");
+    }
+
+    projectList.style.display = "none";
+
+    sessionList.focus();
+    sessionList.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    expect(document.activeElement).toBe(messageList);
+
+    messageList.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    expect(document.activeElement).toBe(sessionList);
   });
 
   it("clears focused history message on escape", () => {

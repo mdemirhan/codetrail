@@ -71,7 +71,7 @@ export function SessionPane({
   }, [collapsed, selectedItemId, selectedSessionElement]);
 
   return (
-    <aside className={`panel session-pane${collapsed ? " collapsed" : ""}`}>
+    <aside className={`panel history-focus-pane session-pane${collapsed ? " collapsed" : ""}`}>
       <div className="panel-header">
         <div className="panel-header-left">
           <span className="panel-title">Sessions</span>

@@ -1,11 +1,15 @@
 import type { MessageCategory } from "@codetrail/core";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 type MainView = "history" | "search" | "settings" | "help";
+type HistoryPane = "project" | "session" | "message";
 
 export function useKeyboardShortcuts(args: {
   mainView: MainView;
   hasFocusedHistoryMessage: boolean;
+  projectListRef: RefObject<HTMLDivElement | null>;
+  sessionListRef: RefObject<HTMLDivElement | null>;
+  messageListRef: RefObject<HTMLDivElement | null>;
   setMainView: (view: MainView | ((value: MainView) => MainView)) => void;
   clearFocusedHistoryMessage: () => void;
   focusGlobalSearch: () => void;
@@ -42,6 +46,9 @@ export function useKeyboardShortcuts(args: {
       const {
         mainView,
         hasFocusedHistoryMessage,
+        projectListRef,
+        sessionListRef,
+        messageListRef,
         setMainView,
         clearFocusedHistoryMessage,
         focusGlobalSearch,
@@ -67,11 +74,20 @@ export function useKeyboardShortcuts(args: {
         triggerIncrementalRefresh,
         togglePeriodicRefresh,
       } = latestArgs.current;
+      const shortcutTarget = resolveShortcutTarget(event.target);
+      const focusedPane =
+        mainView === "history"
+          ? getFocusedHistoryPane(shortcutTarget, {
+              project: projectListRef.current,
+              session: sessionListRef.current,
+              message: messageListRef.current,
+            })
+          : null;
       const command = event.metaKey || event.ctrlKey;
       const shift = event.shiftKey;
       const key = event.key.toLowerCase();
       const isHistoryArrowNavigation =
-        mainView === "history" && !shift && !isEditableTarget(event.target);
+        mainView === "history" && !shift && !isEditableTarget(shortcutTarget);
       if (event.defaultPrevented) {
         return;
       }
@@ -101,6 +117,71 @@ export function useKeyboardShortcuts(args: {
       } else if (command && event.key === "0") {
         event.preventDefault();
         void applyZoomAction("reset");
+      } else if (
+        mainView === "history" &&
+        !command &&
+        !event.altKey &&
+        !shift &&
+        focusedPane === "project" &&
+        event.key === "ArrowUp"
+      ) {
+        event.preventDefault();
+        selectPreviousProject();
+      } else if (
+        mainView === "history" &&
+        !command &&
+        !event.altKey &&
+        !shift &&
+        focusedPane === "project" &&
+        event.key === "ArrowDown"
+      ) {
+        event.preventDefault();
+        selectNextProject();
+      } else if (
+        mainView === "history" &&
+        !command &&
+        !event.altKey &&
+        !shift &&
+        focusedPane === "session" &&
+        event.key === "ArrowUp"
+      ) {
+        event.preventDefault();
+        selectPreviousSession();
+      } else if (
+        mainView === "history" &&
+        !command &&
+        !event.altKey &&
+        !shift &&
+        focusedPane === "session" &&
+        event.key === "ArrowDown"
+      ) {
+        event.preventDefault();
+        selectNextSession();
+      } else if (
+        mainView === "history" &&
+        event.key === "Tab" &&
+        !isEditableTarget(shortcutTarget)
+      ) {
+        const panes = [
+          projectListRef.current,
+          sessionListRef.current,
+          messageListRef.current,
+        ].filter(isVisiblePaneTarget);
+        if (panes.length === 0) {
+          return;
+        }
+        event.preventDefault();
+        const currentPaneContainer = shortcutTarget?.closest(".history-focus-pane");
+        const currentIndex = currentPaneContainer
+          ? panes.findIndex((pane) => pane.closest(".history-focus-pane") === currentPaneContainer)
+          : -1;
+        const nextIndex =
+          currentIndex === -1
+            ? shift
+              ? panes.length - 1
+              : 0
+            : (currentIndex + (shift ? -1 : 1) + panes.length) % panes.length;
+        panes[nextIndex]?.focus({ preventScroll: true });
       } else if (
         isHistoryArrowNavigation &&
         event.metaKey &&
@@ -174,6 +255,28 @@ export function useKeyboardShortcuts(args: {
         !shift &&
         !isEditableTarget(event.target) &&
         key === "d"
+      ) {
+        event.preventDefault();
+        pageHistoryMessagesDown();
+      } else if (
+        mainView === "history" &&
+        event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        shift &&
+        !isEditableTarget(event.target) &&
+        event.key === "ArrowUp"
+      ) {
+        event.preventDefault();
+        pageHistoryMessagesUp();
+      } else if (
+        mainView === "history" &&
+        event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        shift &&
+        !isEditableTarget(event.target) &&
+        event.key === "ArrowDown"
       ) {
         event.preventDefault();
         pageHistoryMessagesDown();
@@ -263,4 +366,36 @@ function isEditableTarget(target: EventTarget | null): boolean {
   }
   const tagName = target.tagName;
   return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
+}
+
+function resolveShortcutTarget(target: EventTarget | null): HTMLElement | null {
+  if (target instanceof HTMLElement) {
+    return target;
+  }
+  return document.activeElement instanceof HTMLElement ? document.activeElement : null;
+}
+
+function getFocusedHistoryPane(
+  target: HTMLElement | null,
+  panes: Record<HistoryPane, HTMLDivElement | null>,
+): HistoryPane | null {
+  if (!target) {
+    return null;
+  }
+  for (const [paneName, paneElement] of Object.entries(panes) as Array<
+    [HistoryPane, HTMLDivElement | null]
+  >) {
+    if (paneElement && (paneElement === target || paneElement.contains(target))) {
+      return paneName;
+    }
+  }
+  return null;
+}
+
+function isVisiblePaneTarget(pane: HTMLDivElement | null): pane is HTMLDivElement {
+  if (!pane) {
+    return false;
+  }
+  const styles = window.getComputedStyle(pane);
+  return styles.display !== "none" && styles.visibility !== "hidden";
 }

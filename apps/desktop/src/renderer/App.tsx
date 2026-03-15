@@ -277,6 +277,9 @@ export function App({
   useKeyboardShortcuts({
     mainView,
     hasFocusedHistoryMessage: Boolean(history.visibleFocusedMessageId),
+    projectListRef: history.refs.projectListRef,
+    sessionListRef: history.refs.sessionListRef,
+    messageListRef: history.refs.messageListRef,
     setMainView,
     clearFocusedHistoryMessage: () => history.setFocusMessageId(""),
     focusGlobalSearch,

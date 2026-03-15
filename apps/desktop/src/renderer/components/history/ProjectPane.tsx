@@ -60,7 +60,7 @@ export function ProjectPane({
   }, [selectedProjectId]);
 
   return (
-    <aside className={`panel project-pane${collapsed ? " collapsed" : ""}`}>
+    <aside className={`panel history-focus-pane project-pane${collapsed ? " collapsed" : ""}`}>
       <div className="panel-header">
         <div className="panel-header-left">
           <span className="panel-title">Projects</span>

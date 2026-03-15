@@ -57,6 +57,129 @@ describe("App history navigation", () => {
     });
   });
 
+  it("moves between projects and sessions with plain Up/Down when their panes are focused", async () => {
+    installScrollIntoViewMock();
+
+    const user = userEvent.setup();
+    const client = createHistoryNavigationClient();
+    const { container } = renderWithClient(<App />, client);
+    const sessionList = () => container.querySelector<HTMLDivElement>(".list-scroll.session-list");
+    const projectList = () => container.querySelector<HTMLDivElement>(".list-scroll.project-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Project one first message")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Session one"));
+    await waitFor(() => {
+      expect(screen.getByText("Session one message")).toBeInTheDocument();
+    });
+
+    sessionList()?.focus();
+    if (!sessionList()) {
+      throw new Error("Expected session list");
+    }
+    fireEvent.keyDown(sessionList()!, { key: "ArrowUp" });
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyBookmarks)).toBeInTheDocument();
+      expect(document.activeElement).toBe(sessionList());
+    });
+
+    projectList()?.focus();
+    if (!projectList()) {
+      throw new Error("Expected project list");
+    }
+    fireEvent.keyDown(projectList()!, { key: "ArrowDown" });
+    await waitFor(() => {
+      expect(screen.getByText("Project two combined message")).toBeInTheDocument();
+      expect(document.activeElement).toBe(projectList());
+    });
+  });
+
+  it("focuses the messages pane when the app starts in history view", async () => {
+    installScrollIntoViewMock();
+
+    const client = createHistoryNavigationClient();
+    const { container } = renderWithClient(<App />, client);
+    const messageList = () => container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Project one first message")).toBeInTheDocument();
+      expect(document.activeElement).toBe(messageList());
+    });
+  });
+
+  it("cycles pane focus with Tab and Shift+Tab in history view", async () => {
+    installScrollIntoViewMock();
+
+    const client = createHistoryNavigationClient();
+    const { container } = renderWithClient(<App />, client);
+    const sessionList = () => container.querySelector<HTMLDivElement>(".list-scroll.session-list");
+    const projectList = () => container.querySelector<HTMLDivElement>(".list-scroll.project-list");
+    const messageList = () => container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Project one first message")).toBeInTheDocument();
+    });
+
+    const globalSearchButton = screen.getByRole("button", { name: "Global Search" });
+    globalSearchButton.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(projectList());
+    });
+
+    if (!projectList() || !sessionList() || !messageList()) {
+      throw new Error("Expected all history panes");
+    }
+
+    fireEvent.keyDown(window, { key: "Tab" });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(sessionList());
+    });
+
+    fireEvent.keyDown(window, { key: "Tab" });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(messageList());
+    });
+
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(sessionList());
+    });
+  });
+
+  it("skips collapsed panes when cycling focus with Tab", async () => {
+    installScrollIntoViewMock();
+
+    const client = createHistoryNavigationClient();
+    const { container } = renderWithClient(<App />, client);
+    const sessionList = () => container.querySelector<HTMLDivElement>(".list-scroll.session-list");
+    const messageList = () => container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Project one first message")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
+
+    if (!sessionList() || !messageList()) {
+      throw new Error("Expected visible history panes");
+    }
+
+    sessionList()!.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(messageList());
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Sessions pane" }));
+    fireEvent.keyDown(window, { key: "Tab" });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(messageList());
+    });
+  });
+
   it("includes All Sessions and Bookmarked Messages when moving up from the first session", async () => {
     installScrollIntoViewMock();
 
