@@ -732,8 +732,10 @@ body.platform-macos .titlebar-left {
 .tb-refresh-status {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   margin-left: 2px;
   padding: 1px 7px;
+  min-width: 26px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
