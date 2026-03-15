@@ -21,6 +21,8 @@ export function useKeyboardShortcuts(args: {
   selectNextSession: () => void;
   selectPreviousProject: () => void;
   selectNextProject: () => void;
+  pageHistoryMessagesUp: () => void;
+  pageHistoryMessagesDown: () => void;
   goToPreviousHistoryPage: () => void;
   goToNextHistoryPage: () => void;
   goToPreviousSearchPage: () => void;
@@ -55,6 +57,8 @@ export function useKeyboardShortcuts(args: {
         selectNextSession,
         selectPreviousProject,
         selectNextProject,
+        pageHistoryMessagesUp,
+        pageHistoryMessagesDown,
         goToPreviousHistoryPage,
         goToNextHistoryPage,
         goToPreviousSearchPage,
@@ -151,6 +155,28 @@ export function useKeyboardShortcuts(args: {
       ) {
         event.preventDefault();
         selectNextProject();
+      } else if (
+        mainView === "history" &&
+        event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !shift &&
+        !isEditableTarget(event.target) &&
+        key === "u"
+      ) {
+        event.preventDefault();
+        pageHistoryMessagesUp();
+      } else if (
+        mainView === "history" &&
+        event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !shift &&
+        !isEditableTarget(event.target) &&
+        key === "d"
+      ) {
+        event.preventDefault();
+        pageHistoryMessagesDown();
       } else if (
         command &&
         !shift &&

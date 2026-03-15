@@ -31,6 +31,8 @@ function createProps(
     selectNextSession: vi.fn(),
     selectPreviousProject: vi.fn(),
     selectNextProject: vi.fn(),
+    pageHistoryMessagesUp: vi.fn(),
+    pageHistoryMessagesDown: vi.fn(),
     goToPreviousHistoryPage: vi.fn(),
     goToNextHistoryPage: vi.fn(),
     goToPreviousSearchPage: vi.fn(),
@@ -64,6 +66,8 @@ describe("useKeyboardShortcuts", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", ctrlKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "u", ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", ctrlKey: true }));
 
     expect(props.focusGlobalSearch).toHaveBeenCalledTimes(1);
     expect(props.focusSessionSearch).toHaveBeenCalledTimes(1);
@@ -81,6 +85,8 @@ describe("useKeyboardShortcuts", () => {
     expect(props.selectNextSession).toHaveBeenCalledTimes(1);
     expect(props.selectPreviousProject).toHaveBeenCalledTimes(1);
     expect(props.selectNextProject).toHaveBeenCalledTimes(1);
+    expect(props.pageHistoryMessagesUp).toHaveBeenCalledTimes(1);
+    expect(props.pageHistoryMessagesDown).toHaveBeenCalledTimes(1);
     expect(props.goToPreviousSearchPage).not.toHaveBeenCalled();
     expect(props.goToNextSearchPage).not.toHaveBeenCalled();
     expect(props.setMainView).not.toHaveBeenCalledWith("history");
@@ -136,11 +142,15 @@ describe("useKeyboardShortcuts", () => {
     input?.dispatchEvent(
       new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, ctrlKey: true }),
     );
+    input?.dispatchEvent(new KeyboardEvent("keydown", { key: "u", bubbles: true, ctrlKey: true }));
+    input?.dispatchEvent(new KeyboardEvent("keydown", { key: "d", bubbles: true, ctrlKey: true }));
 
     expect(props.setMainView).not.toHaveBeenCalledWith("help");
     expect(props.focusNextHistoryMessage).not.toHaveBeenCalled();
     expect(props.selectNextSession).not.toHaveBeenCalled();
     expect(props.selectNextProject).not.toHaveBeenCalled();
+    expect(props.pageHistoryMessagesUp).not.toHaveBeenCalled();
+    expect(props.pageHistoryMessagesDown).not.toHaveBeenCalled();
   });
 
   it("clears focused history message on escape", () => {

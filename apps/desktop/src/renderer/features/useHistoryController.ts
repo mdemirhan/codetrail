@@ -89,6 +89,8 @@ export type RefreshContext = {
   prevMessageIds: string;
 };
 
+const MESSAGE_PAGE_SCROLL_OVERLAP_PX = 20;
+
 // ── Periodic-refresh scroll policy ──────────────────────────────────────────
 //
 // There is no manual auto-scroll toggle. Instead, auto-scroll is detected
@@ -792,6 +794,31 @@ export function useHistoryController({
     refreshContextRef,
   });
 
+  const pageHistoryMessages = useCallback((direction: "up" | "down") => {
+    const container = messageListRef.current;
+    if (!container) {
+      return;
+    }
+
+    const styles = window.getComputedStyle(container);
+    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+    const visibleContentHeight = container.clientHeight - paddingTop - paddingBottom;
+    const pageSize = Math.max(0, visibleContentHeight - MESSAGE_PAGE_SCROLL_OVERLAP_PX);
+    if (pageSize <= 0) {
+      return;
+    }
+
+    const delta = direction === "down" ? pageSize : -pageSize;
+    const nextScrollTop = Math.max(0, container.scrollTop + delta);
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top: nextScrollTop });
+    } else {
+      container.scrollTop = nextScrollTop;
+    }
+    container.focus({ preventScroll: true });
+  }, []);
+
   return {
     refs: {
       focusedMessageRef,
@@ -892,6 +919,8 @@ export function useHistoryController({
     focusAdjacentHistoryMessage,
     selectAdjacentSession,
     selectAdjacentProject,
+    pageHistoryMessagesUp: () => pageHistoryMessages("up"),
+    pageHistoryMessagesDown: () => pageHistoryMessages("down"),
     selectProjectAllMessages,
     selectBookmarksView,
     selectSessionView,

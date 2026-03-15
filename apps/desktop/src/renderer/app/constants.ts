@@ -71,6 +71,8 @@ export const SHORTCUT_ITEMS = [
   { group: "Search & Navigation", shortcut: "Option+Down", description: "Select next session" },
   { group: "Search & Navigation", shortcut: "Ctrl+Up", description: "Select previous project" },
   { group: "Search & Navigation", shortcut: "Ctrl+Down", description: "Select next project" },
+  { group: "Search & Navigation", shortcut: "Ctrl+U", description: "Page message view up" },
+  { group: "Search & Navigation", shortcut: "Ctrl+D", description: "Page message view down" },
   { group: "Panels", shortcut: "Cmd/Ctrl+B", description: "Expand/collapse Projects pane" },
   {
     group: "Panels",

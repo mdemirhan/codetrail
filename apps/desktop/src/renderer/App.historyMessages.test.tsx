@@ -154,4 +154,47 @@ describe("App history messages", () => {
       expect(scrollTo).toHaveBeenCalledWith({ top: 80, behavior: "smooth" });
     });
   });
+
+  it("pages the message view with Ctrl+U and Ctrl+D", async () => {
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+    });
+
+    const messageList = container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+    expect(messageList).not.toBeNull();
+    if (!messageList) {
+      throw new Error("Expected message list");
+    }
+
+    const scrollTo = vi.fn(({ top }: { top: number }) => {
+      messageList.scrollTop = top;
+    });
+
+    messageList.style.paddingTop = "20px";
+    messageList.style.paddingBottom = "20px";
+    Object.defineProperty(messageList, "clientHeight", {
+      value: 320,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTop", {
+      value: 40,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTo", {
+      value: scrollTo,
+      configurable: true,
+    });
+
+    fireEvent.keyDown(window, { key: "d", ctrlKey: true });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 300 });
+    expect(document.activeElement).toBe(messageList);
+
+    fireEvent.keyDown(window, { key: "u", ctrlKey: true });
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 40 });
+    expect(document.activeElement).toBe(messageList);
+  });
 });

@@ -292,6 +292,8 @@ export function App({
     selectNextSession: () => history.selectAdjacentSession("next"),
     selectPreviousProject: () => history.selectAdjacentProject("previous"),
     selectNextProject: () => history.selectAdjacentProject("next"),
+    pageHistoryMessagesUp: history.pageHistoryMessagesUp,
+    pageHistoryMessagesDown: history.pageHistoryMessagesDown,
     goToPreviousHistoryPage: history.goToPreviousHistoryPage,
     goToNextHistoryPage: history.goToNextHistoryPage,
     goToPreviousSearchPage: search.goToPreviousSearchPage,
