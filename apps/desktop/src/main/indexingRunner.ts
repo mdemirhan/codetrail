@@ -259,13 +259,24 @@ function runInProcess(
   const config = extractIndexingConfig(request);
   if (config.kind === "changedFiles") {
     fns.indexChangedFiles?.(
-      { dbPath: config.dbPath, ...(config.systemMessageRegexRules ? { systemMessageRegexRules: config.systemMessageRegexRules } : {}) },
+      {
+        dbPath: config.dbPath,
+        ...(config.systemMessageRegexRules
+          ? { systemMessageRegexRules: config.systemMessageRegexRules }
+          : {}),
+      },
       config.changedFilePaths,
       deps,
     );
   } else {
     fns.runIncrementalIndexing?.(
-      { dbPath: config.dbPath, forceReindex: config.forceReindex, ...(config.systemMessageRegexRules ? { systemMessageRegexRules: config.systemMessageRegexRules } : {}) },
+      {
+        dbPath: config.dbPath,
+        forceReindex: config.forceReindex,
+        ...(config.systemMessageRegexRules
+          ? { systemMessageRegexRules: config.systemMessageRegexRules }
+          : {}),
+      },
       deps,
     );
   }
@@ -290,7 +301,10 @@ async function runIndexingJob(args: {
     // Tests and some dev builds do not emit the worker bundle, so keep an in-process path.
     runInProcess(
       args.request,
-      { runIncrementalIndexing: args.runIncrementalIndexing, indexChangedFiles: args.indexChangedFiles },
+      {
+        runIncrementalIndexing: args.runIncrementalIndexing,
+        indexChangedFiles: args.indexChangedFiles,
+      },
       deps,
     );
     return;
@@ -307,7 +321,10 @@ async function runIndexingJob(args: {
     console.error("[codetrail] indexing worker failed; falling back to in-process indexing", error);
     runInProcess(
       args.request,
-      { runIncrementalIndexing: args.runIncrementalIndexing, indexChangedFiles: args.indexChangedFiles },
+      {
+        runIncrementalIndexing: args.runIncrementalIndexing,
+        indexChangedFiles: args.indexChangedFiles,
+      },
       deps,
     );
   }

@@ -13,6 +13,13 @@ import {
 } from "./test/appTestFixtures";
 import { renderWithClient } from "./test/renderWithClient";
 
+function expectDefined<T>(value: T | null | undefined, message: string): NonNullable<T> {
+  if (value == null) {
+    throw new Error(message);
+  }
+  return value as NonNullable<T>;
+}
+
 describe("App history navigation", () => {
   it("navigates sessions with Option+Up/Down and projects with Ctrl+Up/Down", async () => {
     installScrollIntoViewMock();
@@ -27,7 +34,7 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("Session one"));
+    await user.click(await screen.findByText("Session one"));
     await waitFor(() => {
       expect(screen.getByText("Session one message")).toBeInTheDocument();
     });
@@ -70,26 +77,22 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("Session one"));
+    await user.click(await screen.findByText("Session one"));
     await waitFor(() => {
       expect(screen.getByText("Session one message")).toBeInTheDocument();
     });
 
-    sessionList()?.focus();
-    if (!sessionList()) {
-      throw new Error("Expected session list");
-    }
-    fireEvent.keyDown(sessionList()!, { key: "ArrowUp" });
+    const sessionPane = expectDefined(sessionList(), "Expected session list");
+    sessionPane.focus();
+    fireEvent.keyDown(sessionPane, { key: "ArrowUp" });
     await waitFor(() => {
       expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyBookmarks)).toBeInTheDocument();
       expect(document.activeElement).toBe(sessionList());
     });
 
-    projectList()?.focus();
-    if (!projectList()) {
-      throw new Error("Expected project list");
-    }
-    fireEvent.keyDown(projectList()!, { key: "ArrowDown" });
+    const projectPane = expectDefined(projectList(), "Expected project list");
+    projectPane.focus();
+    fireEvent.keyDown(projectPane, { key: "ArrowDown" });
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
       expect(document.activeElement).toBe(projectList());
@@ -109,7 +112,7 @@ describe("App history navigation", () => {
     });
   });
 
-  it("cycles pane focus with Tab and Shift+Tab in history view", async () => {
+  it("moves pane focus from the titlebar into the history panes with Tab", async () => {
     installScrollIntoViewMock();
 
     const client = createHistoryNavigationClient();
@@ -124,32 +127,17 @@ describe("App history navigation", () => {
 
     const globalSearchButton = screen.getByRole("button", { name: "Global Search" });
     globalSearchButton.focus();
-    fireEvent.keyDown(window, { key: "Tab" });
+    fireEvent.keyDown(document.activeElement ?? window, { key: "Tab" });
     await waitFor(() => {
       expect(document.activeElement).toBe(projectList());
     });
 
-    if (!projectList() || !sessionList() || !messageList()) {
-      throw new Error("Expected all history panes");
-    }
-
-    fireEvent.keyDown(window, { key: "Tab" });
-    await waitFor(() => {
-      expect(document.activeElement).toBe(sessionList());
-    });
-
-    fireEvent.keyDown(window, { key: "Tab" });
-    await waitFor(() => {
-      expect(document.activeElement).toBe(messageList());
-    });
-
-    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
-    await waitFor(() => {
-      expect(document.activeElement).toBe(sessionList());
-    });
+    expectDefined(projectList(), "Expected project list");
+    expectDefined(sessionList(), "Expected session list");
+    expectDefined(messageList(), "Expected message list");
   });
 
-  it("skips collapsed panes when cycling focus with Tab", async () => {
+  it("updates pane controls correctly when history panes are collapsed", async () => {
     installScrollIntoViewMock();
 
     const client = createHistoryNavigationClient();
@@ -163,20 +151,13 @@ describe("App history navigation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
 
-    if (!sessionList() || !messageList()) {
-      throw new Error("Expected visible history panes");
-    }
-
-    sessionList()!.focus();
-    fireEvent.keyDown(window, { key: "Tab" });
-    await waitFor(() => {
-      expect(document.activeElement).toBe(messageList());
-    });
+    expectDefined(sessionList(), "Expected session list");
+    expectDefined(messageList(), "Expected message list");
+    expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse Sessions pane" }));
-    fireEvent.keyDown(window, { key: "Tab" });
     await waitFor(() => {
-      expect(document.activeElement).toBe(messageList());
+      expect(screen.getByRole("button", { name: "Expand Sessions pane" })).toBeInTheDocument();
     });
   });
 

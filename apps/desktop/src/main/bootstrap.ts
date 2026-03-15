@@ -293,7 +293,9 @@ export async function bootstrapMainProcess(
       }
     },
     "watcher:getStatus": async () => {
-      return activeFileWatcher?.getStatus() ?? { running: false, processing: false, pendingPathCount: 0 };
+      return (
+        activeFileWatcher?.getStatus() ?? { running: false, processing: false, pendingPathCount: 0 }
+      );
     },
     "watcher:stop": async () => {
       if (activeFileWatcher) {

@@ -1,10 +1,7 @@
-import { Fragment, type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
+import { type Dispatch, Fragment, type SetStateAction, useEffect, useRef, useState } from "react";
 
-import { THEME_GROUPS, getThemeLabel, type ThemeMode } from "../../shared/uiPreferences";
-import {
-  REFRESH_STRATEGY_OPTIONS,
-  type RefreshStrategy,
-} from "../app/autoRefresh";
+import { THEME_GROUPS, type ThemeMode, getThemeLabel } from "../../shared/uiPreferences";
+import { REFRESH_STRATEGY_OPTIONS, type RefreshStrategy } from "../app/autoRefresh";
 import { ToolbarIcon } from "./ToolbarIcon";
 
 function RefreshStrategyDropdown({
@@ -22,8 +19,7 @@ function RefreshStrategyDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const selectedLabel =
-    REFRESH_STRATEGY_OPTIONS.find((o) => o.value === value)?.label ?? "Off";
+  const selectedLabel = REFRESH_STRATEGY_OPTIONS.find((o) => o.value === value)?.label ?? "Off";
 
   useEffect(() => {
     if (!open) return;
@@ -43,6 +39,7 @@ function RefreshStrategyDropdown({
         className={`tb-btn tb-dropdown-trigger${value !== "off" ? " active" : ""}`}
         onClick={() => setOpen((v) => !v)}
         aria-label="Auto-refresh strategy"
+        aria-haspopup="menu"
         aria-expanded={open}
         title="Toggle auto-refresh (Cmd/Ctrl+Shift+R)"
       >
@@ -61,15 +58,13 @@ function RefreshStrategyDropdown({
       {open ? (
         <div
           className="tb-dropdown-menu tb-dropdown-menu-auto-refresh"
-          role="listbox"
           aria-label="Auto-refresh strategy"
         >
           {REFRESH_STRATEGY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
-              role="option"
-              aria-selected={opt.value === value}
+              aria-pressed={opt.value === value}
               className={`tb-dropdown-item${opt.value === value ? " selected" : ""}`}
               onClick={() => {
                 onChange(opt.value);
@@ -117,7 +112,7 @@ function ThemeDropdown({
         className={open ? "tb-btn tb-btn-icon active" : "tb-btn tb-btn-icon"}
         onClick={() => setOpen((current) => !current)}
         aria-label="Choose theme"
-        aria-haspopup="listbox"
+        aria-haspopup="menu"
         aria-expanded={open}
         title={`Theme: ${getThemeLabel(value)}`}
       >
@@ -126,7 +121,6 @@ function ThemeDropdown({
       {open ? (
         <div
           className="tb-dropdown-menu tb-dropdown-menu-wide tb-dropdown-menu-right tb-dropdown-menu-scrollable"
-          role="listbox"
           aria-label="Theme"
         >
           {THEME_GROUPS.map((group, groupIndex) => (
@@ -137,8 +131,7 @@ function ThemeDropdown({
                 <button
                   key={option.value}
                   type="button"
-                  role="option"
-                  aria-selected={option.value === value}
+                  aria-pressed={option.value === value}
                   className={`tb-dropdown-item tb-dropdown-item-checkable${
                     option.value === value ? " selected" : ""
                   }`}

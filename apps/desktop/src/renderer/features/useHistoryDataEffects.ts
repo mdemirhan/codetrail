@@ -375,6 +375,15 @@ export function useHistoryDataEffects({
     setHistorySelection,
   ]);
 
+  const refreshInvalidationKey = JSON.stringify([
+    effectiveBookmarkQuery,
+    effectiveSessionQuery,
+    historyCategories,
+    messageSortDirection,
+    projectAllSortDirection,
+    searchMode,
+  ]);
+
   // Invalidate stale refresh context when user-driven state changes (sort direction, category
   // filters, search query/mode) would cause data effects to re-fire. These deps are disjoint from
   // refreshCounter, so this effect only fires for user actions, never for refresh ticks. React runs
@@ -382,10 +391,12 @@ export function useHistoryDataEffects({
   // Note: bookmarkSortDirection is not included because it only affects in-memory sorting in
   // useHistoryDerivedState, never triggering a server fetch or consuming refreshContextRef.
   useEffect(() => {
+    void refreshInvalidationKey;
     refreshContextRef.current = null;
-  }, [effectiveBookmarkQuery, effectiveSessionQuery, historyCategories, messageSortDirection, projectAllSortDirection, refreshContextRef, searchMode]);
+  }, [refreshContextRef, refreshInvalidationKey]);
 
   useEffect(() => {
+    void refreshCounter;
     if (historyMode !== "session" || !selectedSessionId) {
       setSessionDetail(null);
       return;
@@ -471,6 +482,7 @@ export function useHistoryDataEffects({
   ]);
 
   useEffect(() => {
+    void refreshCounter;
     if (historyMode !== "project_all" || !selectedProjectId) {
       setProjectCombinedDetail(null);
       return;

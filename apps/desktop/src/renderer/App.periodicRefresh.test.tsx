@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,9 +42,11 @@ describe("App periodic refresh", () => {
 
     // Select 5s scan (mapped to 100ms via override)
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
-    await vi.advanceTimersByTimeAsync(110);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(110);
+    });
     await waitFor(() => {
       const refreshCalls = client.invoke.mock.calls.filter(
         ([channel]) => channel === "indexer:refresh",
@@ -56,7 +58,9 @@ describe("App periodic refresh", () => {
       ([channel]) => channel === "indexer:refresh",
     ).length;
 
-    await vi.advanceTimersByTimeAsync(110);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(110);
+    });
     await waitFor(() => {
       const refreshCalls = client.invoke.mock.calls.filter(
         ([channel]) => channel === "indexer:refresh",
@@ -75,18 +79,22 @@ describe("App periodic refresh", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
-    await vi.advanceTimersByTimeAsync(110);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(110);
+    });
 
     const refreshCallsBeforeOff = client.invoke.mock.calls.filter(
       ([channel]) => channel === "indexer:refresh",
     ).length;
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "Off" }));
+    await user.click(screen.getByRole("button", { name: "Off" }));
 
-    await vi.advanceTimersByTimeAsync(500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
 
     const refreshCallsAfterOff = client.invoke.mock.calls.filter(
       ([channel]) => channel === "indexer:refresh",

@@ -165,7 +165,7 @@ export function SettingsView({
                 </select>
               </label>
 
-              <label className="settings-field">
+              <div className="settings-field">
                 <span className="settings-field-label">Zoom</span>
                 <ZoomPercentInput
                   value={zoomPercent}
@@ -175,7 +175,7 @@ export function SettingsView({
                   wrapperClassName="settings-zoom-control"
                   inputClassName="settings-zoom-input"
                 />
-              </label>
+              </div>
             </div>
           </div>
         </section>

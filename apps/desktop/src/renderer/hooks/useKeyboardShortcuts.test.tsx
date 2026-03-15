@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
+import { describe, expect, it, vi } from "vitest";
 
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
@@ -94,7 +94,9 @@ describe("useKeyboardShortcuts", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", ctrlKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "u", ctrlKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", ctrlKey: true }));
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", metaKey: true, shiftKey: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowUp", metaKey: true, shiftKey: true }),
+    );
     window.dispatchEvent(
       new KeyboardEvent("keydown", { key: "ArrowDown", metaKey: true, shiftKey: true }),
     );

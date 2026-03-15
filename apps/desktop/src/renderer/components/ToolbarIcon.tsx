@@ -22,8 +22,7 @@ export function ToolbarIcon({
     | "bookmark"
     | "folderOpen"
     | "sortAsc"
-    | "sortDesc"
-;
+    | "sortDesc";
 }) {
   const title = (() => {
     if (name === "closeFocus") {

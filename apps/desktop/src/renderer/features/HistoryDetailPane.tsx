@@ -3,8 +3,8 @@ import type { Dispatch, SetStateAction } from "react";
 import type { MessageCategory } from "@codetrail/core";
 
 import { CATEGORIES } from "../app/constants";
-import { ZoomPercentInput } from "../components/ZoomPercentInput";
 import { ToolbarIcon } from "../components/ToolbarIcon";
+import { ZoomPercentInput } from "../components/ZoomPercentInput";
 import { MessageCard } from "../components/messages/MessagePresentation";
 import { SEARCH_PLACEHOLDERS } from "../lib/searchPlaceholders";
 import { toggleValue } from "../lib/viewUtils";

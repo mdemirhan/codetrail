@@ -19,6 +19,13 @@ function makeConfig(dir: string): DiscoveryConfig {
   };
 }
 
+function expectDefined<T>(value: T | null | undefined, message: string): NonNullable<T> {
+  if (value == null) {
+    throw new Error(message);
+  }
+  return value as NonNullable<T>;
+}
+
 describe("discoverSingleFile", () => {
   it("correctly identifies and extracts metadata for a Claude session file", () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-single-claude-"));
@@ -46,16 +53,16 @@ describe("discoverSingleFile", () => {
 
     const result = discoverSingleFile(join(claudeProject, "s1.jsonl"), config);
 
-    expect(result).not.toBeNull();
-    expect(result!.provider).toBe("claude");
-    expect(result!.sessionIdentity).toBe("s1");
-    expect(result!.sourceSessionId).toBe("s1");
-    expect(result!.projectPath).toBe("/workspace/app");
-    expect(result!.projectName).toBe("app");
-    expect(result!.metadata.cwd).toBe("/workspace/app");
-    expect(result!.metadata.gitBranch).toBe("main");
-    expect(result!.metadata.isSubagent).toBe(false);
-    expect(result!.fileSize).toBeGreaterThan(0);
+    const discovered = expectDefined(result, "Expected Claude session result");
+    expect(discovered.provider).toBe("claude");
+    expect(discovered.sessionIdentity).toBe("s1");
+    expect(discovered.sourceSessionId).toBe("s1");
+    expect(discovered.projectPath).toBe("/workspace/app");
+    expect(discovered.projectName).toBe("app");
+    expect(discovered.metadata.cwd).toBe("/workspace/app");
+    expect(discovered.metadata.gitBranch).toBe("main");
+    expect(discovered.metadata.isSubagent).toBe(false);
+    expect(discovered.fileSize).toBeGreaterThan(0);
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -73,9 +80,9 @@ describe("discoverSingleFile", () => {
 
     const result = discoverSingleFile(join(claudeProject, "s2.jsonl"), config);
 
-    expect(result).not.toBeNull();
-    expect(result!.provider).toBe("claude");
-    expect(result!.projectPath).toBe("workspace/myapp");
+    const discovered = expectDefined(result, "Expected fallback Claude session result");
+    expect(discovered.provider).toBe("claude");
+    expect(discovered.projectPath).toBe("workspace/myapp");
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -100,11 +107,11 @@ describe("discoverSingleFile", () => {
 
     const result = discoverSingleFile(join(codexDir, "rollout-test.jsonl"), config);
 
-    expect(result).not.toBeNull();
-    expect(result!.provider).toBe("codex");
-    expect(result!.sourceSessionId).toBe("codex-1");
-    expect(result!.metadata.cwd).toBe("/workspace/codex");
-    expect(result!.metadata.gitBranch).toBe("dev");
+    const discovered = expectDefined(result, "Expected Codex session result");
+    expect(discovered.provider).toBe("codex");
+    expect(discovered.sourceSessionId).toBe("codex-1");
+    expect(discovered.metadata.cwd).toBe("/workspace/codex");
+    expect(discovered.metadata.gitBranch).toBe("dev");
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -130,16 +137,13 @@ describe("discoverSingleFile", () => {
       `${JSON.stringify({ role: "user", message: { content: [{ type: "text", text: "Hello" }] } })}\n`,
     );
 
-    const result = discoverSingleFile(
-      join(transcriptDir, `${sessionUuid}.jsonl`),
-      config,
-    );
+    const result = discoverSingleFile(join(transcriptDir, `${sessionUuid}.jsonl`), config);
 
-    expect(result).not.toBeNull();
-    expect(result!.provider).toBe("cursor");
-    expect(result!.sourceSessionId).toBe(sessionUuid);
-    expect(result!.projectPath).toBe(actualProjectPath);
-    expect(result!.sessionIdentity).toContain(`cursor:${sessionUuid}:`);
+    const discovered = expectDefined(result, "Expected Cursor session result");
+    expect(discovered.provider).toBe("cursor");
+    expect(discovered.sourceSessionId).toBe(sessionUuid);
+    expect(discovered.projectPath).toBe(actualProjectPath);
+    expect(discovered.sessionIdentity).toContain(`cursor:${sessionUuid}:`);
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -219,11 +223,11 @@ describe("discoverSingleFile", () => {
 
     const result = discoverSingleFile(join(geminiDir, "session-1.json"), config);
 
-    expect(result).not.toBeNull();
-    expect(result!.provider).toBe("gemini");
-    expect(result!.sourceSessionId).toBe("gem-1");
-    expect(result!.projectPath).toBe("/workspace/dux");
-    expect(result!.metadata.unresolvedProject).toBe(false);
+    const discovered = expectDefined(result, "Expected Gemini session result");
+    expect(discovered.provider).toBe("gemini");
+    expect(discovered.sourceSessionId).toBe("gem-1");
+    expect(discovered.projectPath).toBe("/workspace/dux");
+    expect(discovered.metadata.unresolvedProject).toBe(false);
 
     rmSync(dir, { recursive: true, force: true });
   });

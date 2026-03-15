@@ -105,7 +105,7 @@ async function withIndexingWorkerOverride<T>(
 ): Promise<T> {
   const previous = process.env.CODETRAIL_ENABLE_INDEXING_WORKER;
   if (value === undefined) {
-    delete process.env.CODETRAIL_ENABLE_INDEXING_WORKER;
+    process.env.CODETRAIL_ENABLE_INDEXING_WORKER = undefined;
   } else {
     process.env.CODETRAIL_ENABLE_INDEXING_WORKER = value;
   }
@@ -113,7 +113,7 @@ async function withIndexingWorkerOverride<T>(
     return await callback();
   } finally {
     if (previous === undefined) {
-      delete process.env.CODETRAIL_ENABLE_INDEXING_WORKER;
+      process.env.CODETRAIL_ENABLE_INDEXING_WORKER = undefined;
     } else {
       process.env.CODETRAIL_ENABLE_INDEXING_WORKER = previous;
     }
@@ -509,7 +509,10 @@ describe("WorkerIndexingRunner", () => {
       bookmarksDbPath: "/tmp/codetrail.bookmarks.sqlite",
     });
 
-    const result = await runner.enqueueChangedFiles(["/tmp/session-1.jsonl", "/tmp/session-2.jsonl"]);
+    const result = await runner.enqueueChangedFiles([
+      "/tmp/session-1.jsonl",
+      "/tmp/session-2.jsonl",
+    ]);
 
     expect(result).toEqual({ jobId: "changed-1" });
     expect(indexChangedFiles).toHaveBeenCalledTimes(1);

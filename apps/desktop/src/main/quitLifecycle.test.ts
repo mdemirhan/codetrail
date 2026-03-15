@@ -12,8 +12,18 @@ function createDeferred<T>() {
 
   return {
     promise,
-    resolve: resolve!,
-    reject: reject!,
+    resolve: (value: T | PromiseLike<T>) => {
+      if (!resolve) {
+        throw new Error("Deferred resolve was not initialized");
+      }
+      resolve(value);
+    },
+    reject: (reason?: unknown) => {
+      if (!reject) {
+        throw new Error("Deferred reject was not initialized");
+      }
+      reject(reason);
+    },
   };
 }
 

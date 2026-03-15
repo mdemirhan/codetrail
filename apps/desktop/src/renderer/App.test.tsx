@@ -128,24 +128,24 @@ describe("App shell", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "10s scan" }));
+    await user.click(screen.getByRole("button", { name: "10s scan" }));
 
-    expect(
-      screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent,
-    ).toContain("10s scan");
+    expect(screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent).toContain(
+      "10s scan",
+    );
 
     fireEvent.keyDown(window, { key: "R", metaKey: true, shiftKey: true });
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent,
-      ).toContain("Off");
+      expect(screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent).toContain(
+        "Off",
+      );
     });
 
     fireEvent.keyDown(window, { key: "R", metaKey: true, shiftKey: true });
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent,
-      ).toContain("10s scan");
+      expect(screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent).toContain(
+        "10s scan",
+      );
     });
   });
 
@@ -154,11 +154,13 @@ describe("App shell", () => {
 
     renderWithClient(
       <App
-        initialPaneState={{
-          projectPaneWidth: 300,
-          sessionPaneWidth: 320,
-          preferredAutoRefreshStrategy: "watch-3s",
-        } as PaneStateSnapshot}
+        initialPaneState={
+          {
+            projectPaneWidth: 300,
+            sessionPaneWidth: 320,
+            preferredAutoRefreshStrategy: "watch-3s",
+          } as PaneStateSnapshot
+        }
       />,
       client,
     );
@@ -174,9 +176,9 @@ describe("App shell", () => {
     fireEvent.keyDown(window, { key: "R", metaKey: true, shiftKey: true });
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent,
-      ).toContain("Watch (3s debounce)");
+      expect(screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent).toContain(
+        "Watch (3s debounce)",
+      );
     });
   });
 
@@ -191,7 +193,7 @@ describe("App shell", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "Watch (1s debounce)" }));
+    await user.click(screen.getByRole("button", { name: "Watch (1s debounce)" }));
 
     await waitFor(() => {
       expect(client.invoke).toHaveBeenCalledWith("watcher:start", { debounceMs: 1000 });
@@ -215,7 +217,7 @@ describe("App shell", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "Watch (1s debounce)" }));
+    await user.click(screen.getByRole("button", { name: "Watch (1s debounce)" }));
 
     await waitFor(() => {
       expect(screen.getByText("2")).toBeInTheDocument();

@@ -519,7 +519,12 @@ export function getThemeVariant(theme: ThemeMode): ThemeVariantDefinition | null
 }
 
 export function resolveThemeCssBase(theme: ThemeMode): ThemeCssBase {
-  if (theme === "light" || theme === "dark" || theme === "tomorrow-night" || theme === "catppuccin-mocha") {
+  if (
+    theme === "light" ||
+    theme === "dark" ||
+    theme === "tomorrow-night" ||
+    theme === "catppuccin-mocha"
+  ) {
     return theme;
   }
   return getThemeVariant(theme)?.cssBase ?? "light";

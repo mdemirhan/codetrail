@@ -49,10 +49,9 @@ describe("indexChangedFiles", () => {
       includeClaudeSubagents: false,
     };
 
-    const result = indexChangedFiles(
-      { dbPath, discoveryConfig },
-      [join(claudeProject, "s1.jsonl")],
-    );
+    const result = indexChangedFiles({ dbPath, discoveryConfig }, [
+      join(claudeProject, "s1.jsonl"),
+    ]);
 
     expect(result.discoveredFiles).toBe(1);
     expect(result.indexedFiles).toBe(1);
@@ -60,12 +59,10 @@ describe("indexChangedFiles", () => {
     expect(result.removedFiles).toBe(0);
 
     const db = openDatabase(dbPath);
-    const sessionCount = (
-      db.prepare("SELECT COUNT(*) as c FROM sessions").get() as { c: number }
-    ).c;
-    const messageCount = (
-      db.prepare("SELECT COUNT(*) as c FROM messages").get() as { c: number }
-    ).c;
+    const sessionCount = (db.prepare("SELECT COUNT(*) as c FROM sessions").get() as { c: number })
+      .c;
+    const messageCount = (db.prepare("SELECT COUNT(*) as c FROM messages").get() as { c: number })
+      .c;
     const indexedCount = (
       db.prepare("SELECT COUNT(*) as c FROM indexed_files").get() as { c: number }
     ).c;
@@ -138,13 +135,10 @@ describe("indexChangedFiles", () => {
       includeClaudeSubagents: false,
     };
 
-    const result = indexChangedFiles(
-      { dbPath, discoveryConfig },
-      [
-        "/nonexistent/random/file.jsonl",
-        join(dir, ".claude", "projects", "proj", "missing.jsonl"),
-      ],
-    );
+    const result = indexChangedFiles({ dbPath, discoveryConfig }, [
+      "/nonexistent/random/file.jsonl",
+      join(dir, ".claude", "projects", "proj", "missing.jsonl"),
+    ]);
 
     expect(result.discoveredFiles).toBe(0);
     expect(result.indexedFiles).toBe(0);
@@ -200,9 +194,8 @@ describe("indexChangedFiles", () => {
     runIncrementalIndexing({ dbPath, discoveryConfig });
 
     const db = openDatabase(dbPath);
-    const sessionsBefore = (
-      db.prepare("SELECT COUNT(*) as c FROM sessions").get() as { c: number }
-    ).c;
+    const sessionsBefore = (db.prepare("SELECT COUNT(*) as c FROM sessions").get() as { c: number })
+      .c;
     db.close();
     expect(sessionsBefore).toBe(2);
 
@@ -262,7 +255,9 @@ describe("indexChangedFiles", () => {
 
     const db = openDatabase(dbPath);
     expect((db.prepare("SELECT COUNT(*) as c FROM sessions").get() as { c: number }).c).toBe(1);
-    expect((db.prepare("SELECT COUNT(*) as c FROM messages").get() as { c: number }).c).toBeGreaterThan(0);
+    expect(
+      (db.prepare("SELECT COUNT(*) as c FROM messages").get() as { c: number }).c,
+    ).toBeGreaterThan(0);
     db.close();
 
     // Delete the file, then call indexChangedFiles with the same path
@@ -273,9 +268,15 @@ describe("indexChangedFiles", () => {
 
     // Session and messages should be cleaned up
     const dbAfter = openDatabase(dbPath);
-    expect((dbAfter.prepare("SELECT COUNT(*) as c FROM sessions").get() as { c: number }).c).toBe(0);
-    expect((dbAfter.prepare("SELECT COUNT(*) as c FROM messages").get() as { c: number }).c).toBe(0);
-    expect((dbAfter.prepare("SELECT COUNT(*) as c FROM indexed_files").get() as { c: number }).c).toBe(0);
+    expect((dbAfter.prepare("SELECT COUNT(*) as c FROM sessions").get() as { c: number }).c).toBe(
+      0,
+    );
+    expect((dbAfter.prepare("SELECT COUNT(*) as c FROM messages").get() as { c: number }).c).toBe(
+      0,
+    );
+    expect(
+      (dbAfter.prepare("SELECT COUNT(*) as c FROM indexed_files").get() as { c: number }).c,
+    ).toBe(0);
     dbAfter.close();
 
     rmSync(dir, { recursive: true, force: true });

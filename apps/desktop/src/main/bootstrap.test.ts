@@ -39,74 +39,83 @@ const {
   }> = [];
 
   return {
-  mockGetPath: vi.fn((key: string) => {
-    if (key === "home") {
-      return "/Users/test";
-    }
-    if (key === "sessionData") {
-      return "/tmp/session-data";
-    }
-    return "/tmp/user-data";
-  }),
-  mockGetVersion: vi.fn(() => "0.1.0"),
-  mockInitializeDatabase: vi.fn<
-    () => { schemaVersion: number | undefined; tables: Array<{ name: string }> }
-  >(() => ({ schemaVersion: 7, tables: [{ name: "messages" }] })),
-  mockResolveSystemMessageRegexRules: vi.fn((overrides?: Record<string, string[]>) => {
-    return (
-      overrides ?? {
-        claude: ["^<command-name>"],
-        codex: ["^<environment_context>"],
-        gemini: [],
+    mockGetPath: vi.fn((key: string) => {
+      if (key === "home") {
+        return "/Users/test";
       }
-    );
-  }),
-  mockInitializeBookmarkStore: vi.fn(),
-  mockResolveBookmarksDbPath: vi.fn((dbPath: string) => `${dbPath}.bookmarks`),
-  mockCreateQueryService: vi.fn(),
-  mockWorkerIndexingRunner: vi.fn(),
-  mockRegisterIpcHandlers: vi.fn(),
-  mockEnqueue: vi.fn(async () => ({ jobId: "job-1" })),
-  mockGetStatus: vi.fn(() => ({ running: false, queuedJobs: 0, activeJobId: null, completedJobs: 0 })),
-  mockStat: vi.fn<() => Promise<{ isFile: () => boolean }>>(async () => ({ isFile: () => false })),
-  mockRealpath: vi.fn(async (pathValue: string) => pathValue),
-  mockOpenPath: vi.fn(async () => ""),
-  mockShowItemInFolder: vi.fn(),
-  mockListProjects: vi.fn(() => ({
-    projects: [
-      {
-        id: "project-1",
-        provider: "claude",
-        name: "Project One",
-        path: "/workspace/project-one",
-        sessionCount: 1,
-        lastActivity: "2026-03-01T12:00:00.000Z",
+      if (key === "sessionData") {
+        return "/tmp/session-data";
+      }
+      return "/tmp/user-data";
+    }),
+    mockGetVersion: vi.fn(() => "0.1.0"),
+    mockInitializeDatabase: vi.fn<
+      () => { schemaVersion: number | undefined; tables: Array<{ name: string }> }
+    >(() => ({ schemaVersion: 7, tables: [{ name: "messages" }] })),
+    mockResolveSystemMessageRegexRules: vi.fn((overrides?: Record<string, string[]>) => {
+      return (
+        overrides ?? {
+          claude: ["^<command-name>"],
+          codex: ["^<environment_context>"],
+          gemini: [],
+        }
+      );
+    }),
+    mockInitializeBookmarkStore: vi.fn(),
+    mockResolveBookmarksDbPath: vi.fn((dbPath: string) => `${dbPath}.bookmarks`),
+    mockCreateQueryService: vi.fn(),
+    mockWorkerIndexingRunner: vi.fn(),
+    mockRegisterIpcHandlers: vi.fn(),
+    mockEnqueue: vi.fn(async () => ({ jobId: "job-1" })),
+    mockGetStatus: vi.fn(() => ({
+      running: false,
+      queuedJobs: 0,
+      activeJobId: null,
+      completedJobs: 0,
+    })),
+    mockStat: vi.fn<() => Promise<{ isFile: () => boolean }>>(async () => ({
+      isFile: () => false,
+    })),
+    mockRealpath: vi.fn(async (pathValue: string) => pathValue),
+    mockOpenPath: vi.fn(async () => ""),
+    mockShowItemInFolder: vi.fn(),
+    mockListProjects: vi.fn(() => ({
+      projects: [
+        {
+          id: "project-1",
+          provider: "claude",
+          name: "Project One",
+          path: "/workspace/project-one",
+          sessionCount: 1,
+          lastActivity: "2026-03-01T12:00:00.000Z",
+        },
+      ],
+    })),
+    mockGetProjectCombinedDetail: vi.fn((payload) => ({
+      projectId: payload.projectId,
+      messages: [],
+    })),
+    mockListSessions: vi.fn((payload) => ({ items: [{ id: "s1", ...payload }], total: 1 })),
+    mockGetSessionDetail: vi.fn((payload) => ({ id: payload.id, messages: [] })),
+    mockListProjectBookmarks: vi.fn((payload) => ({ items: [{ id: "b1", ...payload }], total: 1 })),
+    mockToggleBookmark: vi.fn((payload) => ({ bookmarked: payload.bookmarked })),
+    mockRunSearchQuery: vi.fn((payload) => ({ items: [{ id: "m1", ...payload }], total: 1 })),
+    mockQueryServiceClose: vi.fn(),
+    mockFileWatcherInstances: fileWatcherInstances,
+    mockFileWatcherService: vi.fn(
+      (roots: string[], _onFilesChanged: unknown, options: Record<string, unknown> = {}) => {
+        const instance = {
+          roots,
+          options,
+          start: vi.fn(async () => {}),
+          stop: vi.fn(async () => {}),
+          getWatchedRoots: vi.fn(() => roots),
+          getStatus: vi.fn(() => ({ running: false, processing: false, pendingPathCount: 0 })),
+        };
+        fileWatcherInstances.push(instance);
+        return instance;
       },
-    ],
-  })),
-  mockGetProjectCombinedDetail: vi.fn((payload) => ({
-    projectId: payload.projectId,
-    messages: [],
-  })),
-  mockListSessions: vi.fn((payload) => ({ items: [{ id: "s1", ...payload }], total: 1 })),
-  mockGetSessionDetail: vi.fn((payload) => ({ id: payload.id, messages: [] })),
-  mockListProjectBookmarks: vi.fn((payload) => ({ items: [{ id: "b1", ...payload }], total: 1 })),
-  mockToggleBookmark: vi.fn((payload) => ({ bookmarked: payload.bookmarked })),
-  mockRunSearchQuery: vi.fn((payload) => ({ items: [{ id: "m1", ...payload }], total: 1 })),
-  mockQueryServiceClose: vi.fn(),
-  mockFileWatcherInstances: fileWatcherInstances,
-  mockFileWatcherService: vi.fn((roots: string[], _onFilesChanged: unknown, options: Record<string, unknown> = {}) => {
-    const instance = {
-      roots,
-      options,
-      start: vi.fn(async () => {}),
-      stop: vi.fn(async () => {}),
-      getWatchedRoots: vi.fn(() => roots),
-      getStatus: vi.fn(() => ({ running: false, processing: false, pendingPathCount: 0 })),
-    };
-    fileWatcherInstances.push(instance);
-    return instance;
-  }),
+    ),
   };
 });
 
@@ -499,11 +508,23 @@ describe("bootstrapMainProcess", () => {
 
       expect(result).toEqual({
         ok: true,
-        watchedRoots: ["/claude/root", "/codex/root", "/gemini/root", "/Users/test/.gemini/history", "/cursor/root"],
+        watchedRoots: [
+          "/claude/root",
+          "/codex/root",
+          "/gemini/root",
+          "/Users/test/.gemini/history",
+          "/cursor/root",
+        ],
         backend: "kqueue",
       });
       expect(mockFileWatcherService).toHaveBeenCalledWith(
-        ["/claude/root", "/codex/root", "/gemini/root", "/Users/test/.gemini/history", "/cursor/root"],
+        [
+          "/claude/root",
+          "/codex/root",
+          "/gemini/root",
+          "/Users/test/.gemini/history",
+          "/cursor/root",
+        ],
         expect.any(Function),
         expect.objectContaining({
           debounceMs: 3000,
@@ -525,32 +546,36 @@ describe("bootstrapMainProcess", () => {
     try {
       await bootstrapMainProcess({ runStartupIndexing: false });
       mockFileWatcherService
-        .mockImplementationOnce((roots: string[], _onFilesChanged: unknown, options: Record<string, unknown> = {}) => {
-          const instance = {
-            roots,
-            options,
-            start: vi.fn(async () => {
-              throw new Error("kqueue unavailable");
-            }),
-            stop: vi.fn(async () => {}),
-            getWatchedRoots: vi.fn(() => roots),
-            getStatus: vi.fn(() => ({ running: false, processing: false, pendingPathCount: 0 })),
-          };
-          mockFileWatcherInstances.push(instance);
-          return instance;
-        })
-        .mockImplementationOnce((roots: string[], _onFilesChanged: unknown, options: Record<string, unknown> = {}) => {
-          const instance = {
-            roots,
-            options,
-            start: vi.fn(async () => {}),
-            stop: vi.fn(async () => {}),
-            getWatchedRoots: vi.fn(() => roots),
-            getStatus: vi.fn(() => ({ running: false, processing: false, pendingPathCount: 0 })),
-          };
-          mockFileWatcherInstances.push(instance);
-          return instance;
-        });
+        .mockImplementationOnce(
+          (roots: string[], _onFilesChanged: unknown, options: Record<string, unknown> = {}) => {
+            const instance = {
+              roots,
+              options,
+              start: vi.fn(async () => {
+                throw new Error("kqueue unavailable");
+              }),
+              stop: vi.fn(async () => {}),
+              getWatchedRoots: vi.fn(() => roots),
+              getStatus: vi.fn(() => ({ running: false, processing: false, pendingPathCount: 0 })),
+            };
+            mockFileWatcherInstances.push(instance);
+            return instance;
+          },
+        )
+        .mockImplementationOnce(
+          (roots: string[], _onFilesChanged: unknown, options: Record<string, unknown> = {}) => {
+            const instance = {
+              roots,
+              options,
+              start: vi.fn(async () => {}),
+              stop: vi.fn(async () => {}),
+              getWatchedRoots: vi.fn(() => roots),
+              getStatus: vi.fn(() => ({ running: false, processing: false, pendingPathCount: 0 })),
+            };
+            mockFileWatcherInstances.push(instance);
+            return instance;
+          },
+        );
 
       const startWatcher = getRequiredHandler(handlers, "watcher:start");
       const result = (await startWatcher({ debounceMs: 1000 })) as {
@@ -562,7 +587,13 @@ describe("bootstrapMainProcess", () => {
       expect(result.backend).toBe("default");
       expect(mockFileWatcherService).toHaveBeenNthCalledWith(
         1,
-        ["/claude/root", "/codex/root", "/gemini/root", "/Users/test/.gemini/history", "/cursor/root"],
+        [
+          "/claude/root",
+          "/codex/root",
+          "/gemini/root",
+          "/Users/test/.gemini/history",
+          "/cursor/root",
+        ],
         expect.any(Function),
         expect.objectContaining({
           debounceMs: 1000,
@@ -571,7 +602,13 @@ describe("bootstrapMainProcess", () => {
       );
       expect(mockFileWatcherService).toHaveBeenNthCalledWith(
         2,
-        ["/claude/root", "/codex/root", "/gemini/root", "/Users/test/.gemini/history", "/cursor/root"],
+        [
+          "/claude/root",
+          "/codex/root",
+          "/gemini/root",
+          "/Users/test/.gemini/history",
+          "/cursor/root",
+        ],
         expect.any(Function),
         expect.objectContaining({
           debounceMs: 1000,

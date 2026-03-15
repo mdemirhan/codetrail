@@ -3,19 +3,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MessageCategory, Provider, SearchMode } from "@codetrail/core";
 
 import {
-  ADVANCED_SYNTAX_ITEMS,
-  COMMON_SYNTAX_ITEMS,
-  SHORTCUT_ITEMS,
-} from "./app/constants";
-import {
   DEFAULT_PREFERRED_REFRESH_STRATEGY,
   type RefreshStrategy,
+  SCAN_STRATEGY_TO_INTERVAL_MS,
   type ScanRefreshStrategy,
   WATCH_STRATEGY_TO_DEBOUNCE_MS,
-  SCAN_STRATEGY_TO_INTERVAL_MS,
   isScanRefreshStrategy,
   isWatchRefreshStrategy,
 } from "./app/autoRefresh";
+import { ADVANCED_SYNTAX_ITEMS, COMMON_SYNTAX_ITEMS, SHORTCUT_ITEMS } from "./app/constants";
 import type { MainView, PaneStateSnapshot } from "./app/types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SettingsView } from "./components/SettingsView";
@@ -219,8 +215,7 @@ export function App({
   const updateRefreshStrategy = useCallback(
     (nextValue: RefreshStrategy | ((value: RefreshStrategy) => RefreshStrategy)) => {
       setRefreshStrategy((current) => {
-        const next =
-          typeof nextValue === "function" ? nextValue(current) : nextValue;
+        const next = typeof nextValue === "function" ? nextValue(current) : nextValue;
         if (next !== "off") {
           history.setPreferredAutoRefreshStrategy(next);
         }

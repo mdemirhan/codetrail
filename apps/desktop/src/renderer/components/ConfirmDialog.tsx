@@ -45,6 +45,11 @@ export function ConfirmDialog({
           dialogRef.current?.close();
         }
       }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && e.target === dialogRef.current) {
+          dialogRef.current?.close();
+        }
+      }}
     >
       <div className="confirm-dialog-content">
         <h3 className="confirm-dialog-title">{title}</h3>

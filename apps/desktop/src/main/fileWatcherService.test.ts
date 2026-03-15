@@ -21,6 +21,26 @@ function createMockSubscribe() {
   return { subscribe, subscriptions, callbacks };
 }
 
+function expectDefined<T>(value: T | null | undefined, message: string): NonNullable<T> {
+  if (value == null) {
+    throw new Error(message);
+  }
+  return value as NonNullable<T>;
+}
+
+function getSubscription(subscriptions: MockSubscription[], index: number): MockSubscription {
+  return expectDefined(subscriptions[index], `Expected subscription ${index}`);
+}
+
+function getCallback(callbacks: EventCallback[], index: number): EventCallback {
+  return expectDefined(callbacks[index], `Expected callback ${index}`);
+}
+
+function getChangedPaths(onFilesChanged: ReturnType<typeof vi.fn>, index = 0): string[] {
+  const call = expectDefined(onFilesChanged.mock.calls[index], `Expected callback call ${index}`);
+  return call[0] as string[];
+}
+
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
   return { ...actual, existsSync: vi.fn(() => true) };
@@ -77,8 +97,8 @@ describe("FileWatcherService", () => {
     await service.start();
     await service.stop();
 
-    expect(subscriptions[0]!.unsubscribe).toHaveBeenCalledTimes(1);
-    expect(subscriptions[1]!.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(getSubscription(subscriptions, 0).unsubscribe).toHaveBeenCalledTimes(1);
+    expect(getSubscription(subscriptions, 1).unsubscribe).toHaveBeenCalledTimes(1);
     expect(service.isRunning()).toBe(false);
   });
 
@@ -86,18 +106,21 @@ describe("FileWatcherService", () => {
     const { subscribe, callbacks } = createMockSubscribe();
     const onFilesChanged = vi.fn();
 
-    const service = new FileWatcherService(["/root/a"], onFilesChanged, { subscribe, debounceMs: 50 });
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      debounceMs: 50,
+    });
     await service.start();
 
-    callbacks[0]!(null, [{ path: "/root/a/file1.json", type: "update" as const }]);
-    callbacks[0]!(null, [{ path: "/root/a/file2.jsonl", type: "create" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/file1.json", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/file2.jsonl", type: "create" as const }]);
 
     expect(onFilesChanged).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(50);
 
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
-    const paths = onFilesChanged.mock.calls[0]![0] as string[];
+    const paths = getChangedPaths(onFilesChanged);
     expect(paths).toContain("/root/a/file1.json");
     expect(paths).toContain("/root/a/file2.jsonl");
   });
@@ -106,17 +129,20 @@ describe("FileWatcherService", () => {
     const { subscribe, callbacks } = createMockSubscribe();
     const onFilesChanged = vi.fn();
 
-    const service = new FileWatcherService(["/root/a"], onFilesChanged, { subscribe, debounceMs: 50 });
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      debounceMs: 50,
+    });
     await service.start();
 
-    callbacks[0]!(null, [{ path: "/root/a/same.jsonl", type: "update" as const }]);
-    callbacks[0]!(null, [{ path: "/root/a/same.jsonl", type: "update" as const }]);
-    callbacks[0]!(null, [{ path: "/root/a/same.jsonl", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/same.jsonl", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/same.jsonl", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/same.jsonl", type: "update" as const }]);
 
     await vi.advanceTimersByTimeAsync(50);
 
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
-    const paths = onFilesChanged.mock.calls[0]![0] as string[];
+    const paths = getChangedPaths(onFilesChanged);
     expect(paths).toEqual(["/root/a/same.jsonl"]);
   });
 
@@ -124,20 +150,23 @@ describe("FileWatcherService", () => {
     const { subscribe, callbacks } = createMockSubscribe();
     const onFilesChanged = vi.fn();
 
-    const service = new FileWatcherService(["/root/a"], onFilesChanged, { subscribe, debounceMs: 50 });
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      debounceMs: 50,
+    });
     await service.start();
 
-    callbacks[0]!(null, [{ path: "/root/a/file.json", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/file.json", type: "update" as const }]);
     await vi.advanceTimersByTimeAsync(40);
     expect(onFilesChanged).not.toHaveBeenCalled();
 
     // New event arrives but does NOT reset the timer
-    callbacks[0]!(null, [{ path: "/root/a/other.json", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/other.json", type: "update" as const }]);
 
     // Original timer fires at t=50 (10ms from now), including both paths
     await vi.advanceTimersByTimeAsync(10);
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
-    const paths = onFilesChanged.mock.calls[0]![0] as string[];
+    const paths = getChangedPaths(onFilesChanged);
     expect(paths).toContain("/root/a/file.json");
     expect(paths).toContain("/root/a/other.json");
   });
@@ -146,16 +175,19 @@ describe("FileWatcherService", () => {
     const { subscribe, callbacks } = createMockSubscribe();
     const onFilesChanged = vi.fn();
 
-    const service = new FileWatcherService(["/root/a"], onFilesChanged, { subscribe, debounceMs: 50 });
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      debounceMs: 50,
+    });
     await service.start();
 
     // First batch
-    callbacks[0]!(null, [{ path: "/root/a/batch1.jsonl", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/batch1.jsonl", type: "update" as const }]);
     await vi.advanceTimersByTimeAsync(50);
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
 
     // Second batch — new timer starts
-    callbacks[0]!(null, [{ path: "/root/a/batch2.jsonl", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/batch2.jsonl", type: "update" as const }]);
     await vi.advanceTimersByTimeAsync(50);
     expect(onFilesChanged).toHaveBeenCalledTimes(2);
     expect(onFilesChanged).toHaveBeenLastCalledWith(["/root/a/batch2.jsonl"]);
@@ -165,10 +197,13 @@ describe("FileWatcherService", () => {
     const { subscribe, callbacks } = createMockSubscribe();
     const onFilesChanged = vi.fn();
 
-    const service = new FileWatcherService(["/root/a"], onFilesChanged, { subscribe, debounceMs: 50 });
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      debounceMs: 50,
+    });
     await service.start();
 
-    callbacks[0]!(null, [
+    getCallback(callbacks, 0)(null, [
       { path: "/root/a/file.txt", type: "update" as const },
       { path: "/root/a/file.ts", type: "update" as const },
       { path: "/root/a/file.log", type: "create" as const },
@@ -177,40 +212,50 @@ describe("FileWatcherService", () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(onFilesChanged).not.toHaveBeenCalled();
 
-    callbacks[0]!(null, [{ path: "/root/a/sessions-index.json", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [
+      { path: "/root/a/sessions-index.json", type: "update" as const },
+    ]);
     await vi.advanceTimersByTimeAsync(50);
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
   });
 
   it("prevents overlapping processing and flushes accumulated paths after", async () => {
     const { subscribe, callbacks } = createMockSubscribe();
-    let resolveProcessing: (() => void) | null = null;
+    let finishProcessing: (() => void) | null = null;
     const onFilesChanged = vi.fn(
       (_paths: string[]) =>
         new Promise<void>((resolve) => {
-          resolveProcessing = resolve;
+          finishProcessing = () => resolve();
         }),
     );
 
-    const service = new FileWatcherService(["/root/a"], onFilesChanged, { subscribe, debounceMs: 10 });
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      debounceMs: 10,
+    });
     await service.start();
 
     // First batch
-    callbacks[0]!(null, [{ path: "/root/a/first.jsonl", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/first.jsonl", type: "update" as const }]);
     await vi.advanceTimersByTimeAsync(10);
 
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
     expect(onFilesChanged).toHaveBeenCalledWith(["/root/a/first.jsonl"]);
 
     // While processing, new event arrives
-    callbacks[0]!(null, [{ path: "/root/a/second.jsonl", type: "create" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/second.jsonl", type: "create" as const }]);
     await vi.advanceTimersByTimeAsync(10);
 
     // Should not start second processing while first is in-flight
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
 
     // First processing completes — should immediately flush the accumulated second batch
-    resolveProcessing!();
+    const completeFirstBatch =
+      finishProcessing ??
+      (() => {
+        throw new Error("Expected in-flight processing resolver");
+      });
+    completeFirstBatch();
     await vi.advanceTimersByTimeAsync(0);
 
     expect(onFilesChanged).toHaveBeenCalledTimes(2);
@@ -242,10 +287,13 @@ describe("FileWatcherService", () => {
     const { subscribe, callbacks } = createMockSubscribe();
     const onFilesChanged = vi.fn();
 
-    const service = new FileWatcherService(["/root/a"], onFilesChanged, { subscribe, debounceMs: 50 });
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      debounceMs: 50,
+    });
     await service.start();
 
-    callbacks[0]!(null, [{ path: "/root/a/file.json", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/file.json", type: "update" as const }]);
     await service.stop();
 
     await vi.advanceTimersByTimeAsync(100);
@@ -254,28 +302,36 @@ describe("FileWatcherService", () => {
 
   it("stop() prevents in-flight processing from re-triggering flush", async () => {
     const { subscribe, callbacks } = createMockSubscribe();
-    let resolveProcessing: (() => void) | null = null;
+    let finishProcessing: (() => void) | null = null;
     const onFilesChanged = vi.fn(
       (_paths: string[]) =>
         new Promise<void>((resolve) => {
-          resolveProcessing = resolve;
+          finishProcessing = () => resolve();
         }),
     );
 
-    const service = new FileWatcherService(["/root/a"], onFilesChanged, { subscribe, debounceMs: 10 });
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      debounceMs: 10,
+    });
     await service.start();
 
     // Start first batch
-    callbacks[0]!(null, [{ path: "/root/a/first.jsonl", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/first.jsonl", type: "update" as const }]);
     await vi.advanceTimersByTimeAsync(10);
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
 
     // Accumulate while processing
-    callbacks[0]!(null, [{ path: "/root/a/second.jsonl", type: "create" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/second.jsonl", type: "create" as const }]);
 
     // Stop while first batch is processing — resolve concurrently so stop can drain
     const stopPromise = service.stop();
-    resolveProcessing!();
+    const completeInFlightBatch =
+      finishProcessing ??
+      (() => {
+        throw new Error("Expected in-flight processing resolver");
+      });
+    completeInFlightBatch();
     await stopPromise;
     await vi.advanceTimersByTimeAsync(0);
 
@@ -292,7 +348,7 @@ describe("FileWatcherService", () => {
     await service.start();
 
     const error = new Error("watcher failed");
-    callbacks[0]!(error, []);
+    getCallback(callbacks, 0)(error, []);
 
     expect(onError).toHaveBeenCalledWith(error);
     expect(onFilesChanged).not.toHaveBeenCalled();
@@ -320,10 +376,14 @@ describe("FileWatcherService", () => {
     });
     const onError = vi.fn();
 
-    const service = new FileWatcherService(["/root/a"], onFilesChanged, { subscribe, onError, debounceMs: 10 });
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      onError,
+      debounceMs: 10,
+    });
     await service.start();
 
-    callbacks[0]!(null, [{ path: "/root/a/file.json", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/file.json", type: "update" as const }]);
     await vi.advanceTimersByTimeAsync(10);
 
     expect(onError).toHaveBeenCalledWith(processingError);
@@ -339,11 +399,7 @@ describe("FileWatcherService", () => {
     });
     await service.start();
 
-    expect(subscribe).toHaveBeenCalledWith(
-      "/root/a",
-      expect.any(Function),
-      { backend: "kqueue" },
-    );
+    expect(subscribe).toHaveBeenCalledWith("/root/a", expect.any(Function), { backend: "kqueue" });
   });
 
   it("reports pending queue status", async () => {
@@ -362,7 +418,7 @@ describe("FileWatcherService", () => {
       pendingPathCount: 0,
     });
 
-    callbacks[0]!(null, [{ path: "/root/a/file.jsonl", type: "update" as const }]);
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/file.jsonl", type: "update" as const }]);
     expect(service.getStatus()).toEqual({
       running: true,
       processing: false,

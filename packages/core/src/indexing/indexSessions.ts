@@ -11,8 +11,8 @@ import {
 import {
   DEFAULT_DISCOVERY_CONFIG,
   type DiscoveryConfig,
-  discoverSingleFile,
   discoverSessionFiles,
+  discoverSingleFile,
 } from "../discovery";
 import { type ParserDiagnostic, parseSession, parseSessionEvent } from "../parsing";
 import { asArray, asRecord, readString } from "../parsing/helpers";
@@ -834,7 +834,7 @@ function indexStreamedJsonlSessionFile(args: {
           onEvent: (event, eventIndex) => {
             emittedEvents += 1;
             updateSourceMetadataFromEvent(args.discovered.provider, event, sourceMetaAccumulator);
-            let parsedEvent;
+            let parsedEvent: ReturnType<typeof parseSessionEvent>;
             try {
               parsedEvent = parseSessionEvent({
                 provider: args.discovered.provider,

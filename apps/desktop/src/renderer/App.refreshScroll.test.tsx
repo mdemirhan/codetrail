@@ -73,12 +73,28 @@ function makeSessionDetail({
   };
 }
 
+function expectDefined<T>(value: T | null | undefined, message: string): NonNullable<T> {
+  if (value == null) {
+    throw new Error(message);
+  }
+  return value as NonNullable<T>;
+}
+
+function getLastInvokePayload(
+  client: ReturnType<typeof createAppClient>,
+  channel: "projects:getCombinedDetail" | "sessions:getDetail",
+): Record<string, unknown> {
+  const calls = client.invoke.mock.calls.filter(([candidate]) => candidate === channel);
+  const lastCall = calls[calls.length - 1];
+  return expectDefined(lastCall, `Expected ${channel} to be invoked`)[1] as Record<string, unknown>;
+}
+
 // Waits for the initial project_all view to load, then clicks into the session.
 async function enterSessionView(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() => {
     expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
   });
-  await user.click(screen.getByText("Investigate markdown rendering"));
+  await user.click(await screen.findByText("Investigate markdown rendering"));
 }
 
 // Simulate the message list being scrolled away from the newest-messages edge
@@ -91,7 +107,11 @@ function mockScrolledAway(container: HTMLElement) {
 
 // Simulate the message list being at the bottom edge (ASC pinned).
 function mockScrolledToBottom(container: HTMLElement) {
-  Object.defineProperty(container, "scrollTop", { value: 1600, configurable: true, writable: true });
+  Object.defineProperty(container, "scrollTop", {
+    value: 1600,
+    configurable: true,
+    writable: true,
+  });
   Object.defineProperty(container, "scrollHeight", { value: 2000, configurable: true });
   Object.defineProperty(container, "clientHeight", { value: 400, configurable: true });
 }
@@ -99,7 +119,11 @@ function mockScrolledToBottom(container: HTMLElement) {
 // Simulate scrolled to within threshold of bottom edge (should be considered pinned).
 function mockScrolledNearBottom(container: HTMLElement) {
   // scrollTop(1595) + clientHeight(400) = 1995 >= scrollHeight(2000) - 10 = 1990 → pinned
-  Object.defineProperty(container, "scrollTop", { value: 1595, configurable: true, writable: true });
+  Object.defineProperty(container, "scrollTop", {
+    value: 1595,
+    configurable: true,
+    writable: true,
+  });
   Object.defineProperty(container, "scrollHeight", { value: 2000, configurable: true });
   Object.defineProperty(container, "clientHeight", { value: 400, configurable: true });
 }
@@ -107,7 +131,11 @@ function mockScrolledNearBottom(container: HTMLElement) {
 // Simulate scrolled just outside threshold of bottom edge (should NOT be pinned).
 function mockScrolledJustOutsideBottom(container: HTMLElement) {
   // scrollTop(1580) + clientHeight(400) = 1980 < scrollHeight(2000) - 10 = 1990 → NOT pinned
-  Object.defineProperty(container, "scrollTop", { value: 1580, configurable: true, writable: true });
+  Object.defineProperty(container, "scrollTop", {
+    value: 1580,
+    configurable: true,
+    writable: true,
+  });
   Object.defineProperty(container, "scrollHeight", { value: 2000, configurable: true });
   Object.defineProperty(container, "clientHeight", { value: 400, configurable: true });
 }
@@ -163,7 +191,7 @@ describe("App refresh scroll preservation", () => {
 
     // Enable periodic refresh (3s).
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     const callsBefore = client.invoke.mock.calls.filter(
       ([channel]) => channel === "sessions:getDetail",
@@ -178,12 +206,7 @@ describe("App refresh scroll preservation", () => {
     });
 
     // Verify no focusMessageId was sent in the refresh call.
-    const detailCalls = client.invoke.mock.calls.filter(
-      ([channel]) => channel === "sessions:getDetail",
-    );
-    const lastCall = detailCalls[detailCalls.length - 1];
-    expect(lastCall).toBeDefined();
-    const payload = lastCall![1] as Record<string, unknown>;
+    const payload = getLastInvokePayload(client, "sessions:getDetail");
     expect(payload.focusMessageId).toBeUndefined();
     expect(payload.page).toBe(0);
   });
@@ -219,20 +242,18 @@ describe("App refresh scroll preservation", () => {
 
     // Enable periodic refresh.
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     await vi.advanceTimersByTimeAsync(110);
 
     // Auto-scroll should navigate to last page: ceil(250/100) - 1 = 2.
-    await waitFor(
-      () => {
-        const detailCalls = client.invoke.mock.calls.filter(
-          ([channel]) => channel === "sessions:getDetail",
-        );
-        const pages = detailCalls.map(([, p]) => (p as Record<string, unknown>).page);
-        expect(pages).toContain(2);
-      },
-    );
+    await waitFor(() => {
+      const detailCalls = client.invoke.mock.calls.filter(
+        ([channel]) => channel === "sessions:getDetail",
+      );
+      const pages = detailCalls.map(([, p]) => (p as Record<string, unknown>).page);
+      expect(pages).toContain(2);
+    });
   });
 
   it("auto-scrolls to page 0 when pinned to top edge (DESC sort)", async () => {
@@ -271,17 +292,13 @@ describe("App refresh scroll preservation", () => {
     // In jsdom, scrollTop defaults to 0 which is the top edge — pinned for DESC.
     // Enable periodic refresh.
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     await vi.advanceTimersByTimeAsync(110);
 
     // For DESC, auto-scroll should navigate to page 0 (newest messages).
     await waitFor(() => {
-      const detailCalls = client.invoke.mock.calls.filter(
-        ([channel]) => channel === "sessions:getDetail",
-      );
-      const lastCall = detailCalls[detailCalls.length - 1];
-      expect((lastCall![1] as Record<string, unknown>).page).toBe(0);
+      expect(getLastInvokePayload(client, "sessions:getDetail").page).toBe(0);
     });
   });
 
@@ -308,7 +325,7 @@ describe("App refresh scroll preservation", () => {
 
     // Enable periodic refresh.
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     const detailCallsBefore = client.invoke.mock.calls.filter(
       ([channel]) => channel === "sessions:getDetail",
@@ -357,7 +374,7 @@ describe("App refresh scroll preservation", () => {
 
     // Enable periodic refresh.
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     // Navigate to page 2, then mock as scrolled away.
     await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -397,7 +414,7 @@ describe("App refresh scroll preservation", () => {
 
     // Enable periodic refresh.
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     // Toggle sort direction — this should invalidate any pending refresh context.
     await user.click(screen.getByRole("button", { name: /Sort .* descending/i }));
@@ -409,11 +426,7 @@ describe("App refresh scroll preservation", () => {
     });
 
     // No focusMessageId should be sent.
-    const detailCalls = client.invoke.mock.calls.filter(
-      ([channel]) => channel === "sessions:getDetail",
-    );
-    const lastCall = detailCalls[detailCalls.length - 1];
-    expect((lastCall![1] as Record<string, unknown>).focusMessageId).toBeUndefined();
+    expect(getLastInvokePayload(client, "sessions:getDetail").focusMessageId).toBeUndefined();
   });
 
   it("treats scroll within threshold as edge-pinned (ASC, 5px from bottom)", async () => {
@@ -426,9 +439,7 @@ describe("App refresh scroll preservation", () => {
         return makeSessionDetail({
           totalCount,
           page: Number(request.page ?? 0),
-          messages: [
-            { id: `m_${detailCallCount}_1`, content: `Threshold msg ${detailCallCount}` },
-          ],
+          messages: [{ id: `m_${detailCallCount}_1`, content: `Threshold msg ${detailCallCount}` }],
         });
       },
     });
@@ -443,20 +454,18 @@ describe("App refresh scroll preservation", () => {
     if (messageList) mockScrolledNearBottom(messageList);
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     await vi.advanceTimersByTimeAsync(110);
 
     // Should auto-scroll: navigate to latest page (page 2 for 250 messages).
-    await waitFor(
-      () => {
-        const detailCalls = client.invoke.mock.calls.filter(
-          ([channel]) => channel === "sessions:getDetail",
-        );
-        const pages = detailCalls.map(([, p]) => (p as Record<string, unknown>).page);
-        expect(pages).toContain(2);
-      },
-    );
+    await waitFor(() => {
+      const detailCalls = client.invoke.mock.calls.filter(
+        ([channel]) => channel === "sessions:getDetail",
+      );
+      const pages = detailCalls.map(([, p]) => (p as Record<string, unknown>).page);
+      expect(pages).toContain(2);
+    });
   });
 
   it("treats scroll outside threshold as NOT edge-pinned (ASC, 20px from bottom)", async () => {
@@ -480,7 +489,7 @@ describe("App refresh scroll preservation", () => {
     if (messageList) mockScrolledJustOutsideBottom(messageList);
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     const callsBefore = client.invoke.mock.calls.filter(
       ([channel]) => channel === "sessions:getDetail",
@@ -537,7 +546,7 @@ describe("App refresh scroll preservation", () => {
     if (messageList) mockScrolledAwayFromTop(messageList);
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     await vi.advanceTimersByTimeAsync(110);
 
@@ -580,17 +589,13 @@ describe("App refresh scroll preservation", () => {
     if (messageList) mockScrolledToTop(messageList);
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     await vi.advanceTimersByTimeAsync(110);
 
     // Should auto-scroll to page 0.
     await waitFor(() => {
-      const detailCalls = client.invoke.mock.calls.filter(
-        ([channel]) => channel === "sessions:getDetail",
-      );
-      const lastCall = detailCalls[detailCalls.length - 1];
-      expect((lastCall![1] as Record<string, unknown>).page).toBe(0);
+      expect(getLastInvokePayload(client, "sessions:getDetail").page).toBe(0);
     });
   });
 
@@ -653,7 +658,7 @@ describe("App refresh scroll preservation", () => {
     // The default projectAllSortDirection is "desc", so newest is at top.
     // jsdom scrollTop=0 → pinned for DESC → auto-scroll mode.
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     // Navigate to page 2 (away from page 0).
     await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -665,11 +670,7 @@ describe("App refresh scroll preservation", () => {
 
     // DESC auto-scroll should navigate back to page 0.
     await waitFor(() => {
-      const combinedCalls = client.invoke.mock.calls.filter(
-        ([channel]) => channel === "projects:getCombinedDetail",
-      );
-      const lastCall = combinedCalls[combinedCalls.length - 1];
-      expect((lastCall![1] as Record<string, unknown>).page).toBe(0);
+      expect(getLastInvokePayload(client, "projects:getCombinedDetail").page).toBe(0);
     });
   });
 
@@ -687,9 +688,7 @@ describe("App refresh scroll preservation", () => {
         return makeSessionDetail({
           totalCount,
           page: clampedPage,
-          messages: [
-            { id: `m_${detailCallCount}`, content: `Clamped msg ${detailCallCount}` },
-          ],
+          messages: [{ id: `m_${detailCallCount}`, content: `Clamped msg ${detailCallCount}` }],
         });
       },
     });
@@ -715,7 +714,7 @@ describe("App refresh scroll preservation", () => {
     if (messageList) mockScrolledAway(messageList);
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     await vi.advanceTimersByTimeAsync(110);
 
@@ -757,7 +756,7 @@ describe("App refresh scroll preservation", () => {
     if (messageList) mockScrolledAway(messageList);
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     // Fire 3 refresh ticks.
     for (let tick = 0; tick < 3; tick++) {
@@ -850,7 +849,7 @@ describe("App refresh scroll preservation", () => {
 
     // Enable periodic refresh.
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
-    await user.click(screen.getByRole("option", { name: "5s scan" }));
+    await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     // Switch to Session Beta before the refresh tick fires.
     await user.click(screen.getByText("Session Beta"));

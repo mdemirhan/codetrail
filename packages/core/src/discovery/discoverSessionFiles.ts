@@ -418,19 +418,19 @@ export function discoverSingleFile(
 
   const resolved = resolveDiscoveryDependencies(dependencies);
 
-  if (filePath.startsWith(config.claudeRoot + "/")) {
+  if (filePath.startsWith(`${config.claudeRoot}/`)) {
     return discoverSingleClaudeFile(filePath, config, resolved);
   }
-  if (filePath.startsWith(config.codexRoot + "/")) {
+  if (filePath.startsWith(`${config.codexRoot}/`)) {
     return discoverSingleCodexFile(filePath, resolved);
   }
-  if (filePath.startsWith(config.geminiRoot + "/")) {
+  if (filePath.startsWith(`${config.geminiRoot}/`)) {
     return discoverSingleGeminiFile(filePath, config, resolved);
   }
-  if (config.geminiHistoryRoot && filePath.startsWith(config.geminiHistoryRoot + "/")) {
+  if (config.geminiHistoryRoot && filePath.startsWith(`${config.geminiHistoryRoot}/`)) {
     return discoverSingleGeminiFile(filePath, config, resolved);
   }
-  if (filePath.startsWith(config.cursorRoot + "/")) {
+  if (filePath.startsWith(`${config.cursorRoot}/`)) {
     return discoverSingleCursorFile(filePath, config, resolved);
   }
 
@@ -458,7 +458,10 @@ function discoverSingleClaudeFile(
     return null;
   }
 
-  const projectId = segments[0]!;
+  const projectId = segments[0];
+  if (!projectId) {
+    return null;
+  }
   const projectDir = join(config.claudeRoot, projectId);
   const sessionIdentity = basename(filePath, ".jsonl");
   const sessionsIndexById = readClaudeSessionsIndex(projectDir, dependencies);
@@ -609,8 +612,11 @@ function discoverSingleCursorFile(
     return null;
   }
 
-  const encodedName = segments[0]!;
-  const uuid = segments[2]!;
+  const encodedName = segments[0];
+  const uuid = segments[2];
+  if (!encodedName || !uuid) {
+    return null;
+  }
   const expectedFilename = `${uuid}.jsonl`;
   if (basename(filePath) !== expectedFilename) {
     return null;

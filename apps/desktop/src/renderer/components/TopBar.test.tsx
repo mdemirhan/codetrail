@@ -54,7 +54,7 @@ describe("TopBar", () => {
     await user.click(screen.getByRole("button", { name: "Enter focus mode" }));
     await user.click(screen.getByRole("button", { name: "Open help" }));
     await user.click(screen.getByRole("button", { name: "Choose theme" }));
-    await user.click(screen.getByRole("option", { name: "Tomorrow Night" }));
+    await user.click(screen.getByRole("button", { name: "Tomorrow Night" }));
     await user.click(screen.getByRole("button", { name: "Open settings" }));
 
     expect(onToggleSearchView).toHaveBeenCalledTimes(1);
@@ -131,14 +131,14 @@ describe("TopBar", () => {
 
     await user.click(screen.getByRole("button", { name: "Auto-refresh strategy" }));
 
-    expect(screen.getByRole("option", { name: "Watch (1s debounce)" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Watch (3s debounce)" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Watch (5s debounce)" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "5s scan" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "10s scan" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "30s scan" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "1 min scan" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "5 min scan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Watch (1s debounce)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Watch (3s debounce)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Watch (5s debounce)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "5s scan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "10s scan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "30s scan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 min scan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "5 min scan" })).toBeInTheDocument();
     expect(screen.getByText("3")).toHaveAttribute(
       "title",
       "Number of changed files currently queued by the watcher before auto-refresh runs.",

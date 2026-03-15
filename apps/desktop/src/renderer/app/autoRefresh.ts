@@ -1,10 +1,5 @@
 export type WatchRefreshStrategy = "watch-1s" | "watch-3s" | "watch-5s";
-export type ScanRefreshStrategy =
-  | "scan-5s"
-  | "scan-10s"
-  | "scan-30s"
-  | "scan-1min"
-  | "scan-5min";
+export type ScanRefreshStrategy = "scan-5s" | "scan-10s" | "scan-30s" | "scan-1min" | "scan-5min";
 export type NonOffRefreshStrategy = WatchRefreshStrategy | ScanRefreshStrategy;
 export type RefreshStrategy = "off" | NonOffRefreshStrategy;
 
@@ -45,8 +40,6 @@ export function isWatchRefreshStrategy(
   return strategy in WATCH_STRATEGY_TO_DEBOUNCE_MS;
 }
 
-export function isScanRefreshStrategy(
-  strategy: RefreshStrategy,
-): strategy is ScanRefreshStrategy {
+export function isScanRefreshStrategy(strategy: RefreshStrategy): strategy is ScanRefreshStrategy {
   return strategy in SCAN_STRATEGY_TO_INTERVAL_MS;
 }

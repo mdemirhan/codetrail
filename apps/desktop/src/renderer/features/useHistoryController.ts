@@ -13,6 +13,7 @@ import type {
   SystemMessageRegexRules,
 } from "@codetrail/core";
 
+import { DEFAULT_PREFERRED_REFRESH_STRATEGY, type NonOffRefreshStrategy } from "../app/autoRefresh";
 import {
   BOOKMARKS_NAV_ID,
   DEFAULT_MESSAGE_CATEGORIES,
@@ -22,10 +23,6 @@ import {
   PROJECT_ALL_NAV_ID,
   PROVIDERS,
 } from "../app/constants";
-import {
-  DEFAULT_PREFERRED_REFRESH_STRATEGY,
-  type NonOffRefreshStrategy,
-} from "../app/autoRefresh";
 import {
   createHistorySelection,
   createHistorySelectionFromPaneState,
@@ -582,7 +579,7 @@ export function useHistoryController({
     // the layout effect consumes, then skip the scroll reset. Scroll-preservation mode never
     // changes pages — it always re-fetches the same sessionPage — so no cross-page handling needed.
     const refreshCtx = refreshContextRef.current;
-    if (refreshCtx !== null && refreshCtx.autoScroll) {
+    if (refreshCtx?.autoScroll) {
       pendingAutoScrollRef.current = true;
       prevMessageIdsRef.current = refreshCtx.prevMessageIds;
       refreshContextRef.current = null;
@@ -677,8 +674,7 @@ export function useHistoryController({
         const currentIds = activeHistoryMessages.map((m) => m.id).join(",");
         if (currentIds !== refreshCtx.prevMessageIds) {
           window.requestAnimationFrame(() => {
-            container.scrollTop =
-              activeMessageSortDirection === "asc" ? container.scrollHeight : 0;
+            container.scrollTop = activeMessageSortDirection === "asc" ? container.scrollHeight : 0;
           });
         }
         return;
@@ -965,8 +961,7 @@ export function useHistoryController({
         if (!container) return false;
         if (sortDir === "asc") {
           return (
-            container.scrollTop + container.clientHeight >=
-            container.scrollHeight - edgeThreshold
+            container.scrollTop + container.clientHeight >= container.scrollHeight - edgeThreshold
           );
         }
         return container.scrollTop <= edgeThreshold;
@@ -977,9 +972,8 @@ export function useHistoryController({
 
       if (isAtNewestEdge) {
         prevMessageIds = container
-          ? Array.from(
-              container.querySelectorAll<HTMLElement>("[data-history-message-id]"),
-              (el) => el.getAttribute("data-history-message-id"),
+          ? Array.from(container.querySelectorAll<HTMLElement>("[data-history-message-id]"), (el) =>
+              el.getAttribute("data-history-message-id"),
             ).join(",")
           : "";
       } else if (container) {
