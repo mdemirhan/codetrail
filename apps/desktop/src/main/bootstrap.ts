@@ -17,7 +17,11 @@ import {
 import type { AppStateStore } from "./appStateStore";
 import { initializeBookmarkStore, resolveBookmarksDbPath } from "./data/bookmarkStore";
 import { type QueryService, createQueryService } from "./data/queryService";
-import { type FileWatcherOptions, FileWatcherService } from "./fileWatcherService";
+import {
+  type FileWatcherBatch,
+  type FileWatcherOptions,
+  FileWatcherService,
+} from "./fileWatcherService";
 import { WorkerIndexingRunner } from "./indexingRunner";
 import { registerIpcHandlers } from "./ipc";
 
@@ -219,11 +223,17 @@ export async function bootstrapMainProcess(
       const createFileWatcher = (watcherOptions: FileWatcherOptions) =>
         new FileWatcherService(
           watcherRoots,
-          async (changedPaths) => {
+          async (batch: FileWatcherBatch) => {
             invalidateAllowedRootsCache();
-            await indexingRunner.enqueueChangedFiles(changedPaths).catch((error: unknown) => {
+            const enqueuePromise = batch.requiresFullScan
+              ? indexingRunner.enqueue({ force: false })
+              : indexingRunner.enqueueChangedFiles(batch.changedPaths);
+            await enqueuePromise.catch((error: unknown) => {
               if (options.onBackgroundError) {
-                options.onBackgroundError("watcher-triggered indexing failed", error);
+                options.onBackgroundError("watcher-triggered indexing failed", error, {
+                  requiresFullScan: batch.requiresFullScan,
+                  changedPathCount: batch.changedPaths.length,
+                });
                 return;
               }
               console.error("[codetrail] watcher-triggered indexing failed", error);
@@ -259,7 +269,9 @@ export async function bootstrapMainProcess(
             // Codex transcript appends on this macOS setup were missed by both Parcel's default
             // FSEvents backend and a direct CoreServices FSEvents probe, while Parcel's kqueue
             // backend consistently observed them. We force kqueue here for correctness and keep
-            // the default backend only as a fallback if kqueue subscription setup fails.
+            // the default backend only as a fallback if kqueue subscription setup fails. Because
+            // kqueue can still miss files created in brand-new nested directories, the watcher
+            // promotes structural events to a full incremental scan.
             startedWatcher = await startWatcher(
               { subscribeOptions: { backend: "kqueue" } },
               "kqueue",
