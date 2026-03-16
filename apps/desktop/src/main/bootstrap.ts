@@ -107,6 +107,7 @@ export async function bootstrapMainProcess(
     DEFAULT_DISCOVERY_CONFIG.geminiRoot,
     geminiHistoryRoot,
     DEFAULT_DISCOVERY_CONFIG.cursorRoot,
+    DEFAULT_DISCOVERY_CONFIG.copilotRoot,
   ];
   registerIpcHandlers(ipcMain, {
     "app:getHealth": () => ({
@@ -128,6 +129,7 @@ export async function bootstrapMainProcess(
         geminiHistoryRoot,
         geminiProjectsPath,
         cursorRoot: DEFAULT_DISCOVERY_CONFIG.cursorRoot,
+        copilotRoot: DEFAULT_DISCOVERY_CONFIG.copilotRoot,
       },
     }),
     "db:getSchemaVersion": () => ({
@@ -404,6 +406,7 @@ function getAllowedOpenInFileManagerRoots(input: {
   addRoot(input.geminiProjectsPath);
   addRoot(dirname(input.geminiProjectsPath));
   addRoot(DEFAULT_DISCOVERY_CONFIG.cursorRoot);
+  addRoot(DEFAULT_DISCOVERY_CONFIG.copilotRoot);
 
   try {
     // Indexed project paths are dynamic, so fold them into the static provider/app roots cache.

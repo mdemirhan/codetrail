@@ -428,6 +428,7 @@ function sanitizeSystemMessageRegexRules(value: unknown): Record<Provider, strin
     codex: [],
     gemini: [],
     cursor: [],
+    copilot: [],
   };
 
   for (const provider of PROVIDER_VALUES) {

@@ -111,6 +111,7 @@ function setupIndexedDb(): { dbPath: string; cleanup: () => void } {
       geminiHistoryRoot: join(dir, ".gemini", "history"),
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot: join(dir, ".copilot-workspace"),
       includeClaudeSubagents: false,
     },
   });

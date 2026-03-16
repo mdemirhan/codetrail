@@ -165,7 +165,9 @@ export function useHistoryController({
   const [sessionPage, setSessionPage] = useState(initialPaneState?.sessionPage ?? 0);
   const [sessionScrollTop, setSessionScrollTop] = useState(initialSessionScrollTop);
   const [systemMessageRegexRules, setSystemMessageRegexRules] = useState<SystemMessageRegexRules>(
-    initialPaneState?.systemMessageRegexRules ?? EMPTY_SYSTEM_MESSAGE_REGEX_RULES,
+    initialPaneState?.systemMessageRegexRules
+      ? { ...EMPTY_SYSTEM_MESSAGE_REGEX_RULES, ...initialPaneState.systemMessageRegexRules }
+      : EMPTY_SYSTEM_MESSAGE_REGEX_RULES,
   );
   const [projectSortDirection, setProjectSortDirection] = useState<SortDirection>(
     initialPaneState?.projectSortDirection ?? "desc",

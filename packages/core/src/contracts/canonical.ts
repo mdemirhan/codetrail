@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const providerSchema = z.enum(["claude", "codex", "gemini", "cursor"]);
+export const providerSchema = z.enum(["claude", "codex", "gemini", "cursor", "copilot"]);
 export type Provider = z.infer<typeof providerSchema>;
 export const PROVIDER_VALUES = providerSchema.options;
 

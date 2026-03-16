@@ -82,6 +82,7 @@ describe("AppStateStore", () => {
         codex: ["^<environment_context>"],
         gemini: [],
         cursor: [],
+        copilot: [],
       },
     });
     store.setWindowState({ width: 1440, height: 920, x: 48, y: 72, isMaximized: false });
@@ -113,6 +114,7 @@ describe("AppStateStore", () => {
         codex: ["^<environment_context>"],
         gemini: [],
         cursor: [],
+        copilot: [],
       },
     });
     expect(reloaded.getWindowState()).toEqual({
@@ -185,7 +187,7 @@ describe("AppStateStore", () => {
     expect(store.getPaneState()).toEqual({
       projectPaneWidth: 300,
       sessionPaneWidth: 360,
-      projectProviders: ["claude", "codex", "gemini", "cursor"],
+      projectProviders: ["claude", "codex", "gemini", "cursor", "copilot"],
       historyCategories: ["assistant"],
     });
   });

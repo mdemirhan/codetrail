@@ -51,6 +51,7 @@ describe("desktop smoke flow", () => {
         geminiHistoryRoot: join(dir, ".gemini", "history"),
         geminiProjectsPath: join(dir, ".gemini", "projects.json"),
         cursorRoot: join(dir, ".cursor", "projects"),
+        copilotRoot: join(dir, ".copilot-workspace"),
         includeClaudeSubagents: false,
       },
     });

@@ -41,7 +41,7 @@ export type RegularFontSize =
   | "18px"
   | "20px";
 
-export const UI_PROVIDER_VALUES: Provider[] = ["claude", "codex", "gemini", "cursor"];
+export const UI_PROVIDER_VALUES: Provider[] = ["claude", "codex", "gemini", "cursor", "copilot"];
 
 export const UI_MESSAGE_CATEGORY_VALUES: MessageCategory[] = [
   "user",

@@ -576,7 +576,7 @@ function processDiscoveredFiles(args: {
 
     try {
       const fileDiagnostics =
-        discovered.provider === "gemini"
+        discovered.provider === "gemini" || discovered.provider === "copilot"
           ? indexMaterializedSessionFile({
               db: args.db,
               discovered,
@@ -1954,8 +1954,8 @@ function readProviderSource(
   parsePayload: unknown[] | Record<string, unknown>;
 } | null {
   try {
-    // Gemini stores one JSON document per session, while the other providers currently emit JSONL.
-    if (provider === "gemini") {
+    // Gemini and Copilot store one JSON document per session, while the other providers emit JSONL.
+    if (provider === "gemini" || provider === "copilot") {
       const parsed = JSON.parse(readFileText(filePath)) as Record<string, unknown>;
       return {
         rawPayload: parsed,
@@ -2065,6 +2065,21 @@ function extractSourceMetadata(
         readString(record.cwd) ?? readString(messageRecord?.cwd) ?? readString(metadataRecord?.cwd);
       gitBranch ??=
         readString(gitRecord?.branch) ?? readString(record.gitBranch) ?? readString(record.branch);
+    }
+  }
+
+  if (provider === "copilot") {
+    const root = asRecord(payload);
+    const requests = asArray(root?.requests);
+    for (const request of requests) {
+      const record = asRecord(request);
+      if (!record) {
+        continue;
+      }
+      const model = readString(record.modelId);
+      if (model) {
+        models.add(model);
+      }
     }
   }
 
@@ -2255,6 +2270,7 @@ function compileSystemMessageRules(overrides?: SystemMessageRegexRuleOverrides):
     codex: [],
     gemini: [],
     cursor: [],
+    copilot: [],
   };
 
   let invalidCount = 0;

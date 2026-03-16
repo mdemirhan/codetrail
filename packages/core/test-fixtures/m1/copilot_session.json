@@ -1,0 +1,164 @@
+{
+  "name": "copilot session with user, assistant, tool, and elicitation messages",
+  "input": {
+    "provider": "copilot",
+    "sessionId": "copilot-session-1",
+    "payload": {
+      "version": 3,
+      "sessionId": "copilot-session-1",
+      "creationDate": "2026-03-10T14:00:00Z",
+      "lastMessageDate": "2026-03-10T14:05:00Z",
+      "requests": [
+        {
+          "requestId": "req-001",
+          "timestamp": 1741615200000,
+          "message": {
+            "text": "How do I add a new provider?"
+          },
+          "response": [
+            {
+              "kind": "markdownContent",
+              "value": "You can add a new provider by creating a parser function."
+            }
+          ]
+        },
+        {
+          "requestId": "req-002",
+          "timestamp": 1741615260000,
+          "message": {
+            "text": "Show me the code."
+          },
+          "response": [
+            {
+              "kind": "markdownContent",
+              "value": "Here is the relevant code:"
+            },
+            {
+              "kind": "toolInvocationSerialized",
+              "toolId": "vscode.open",
+              "toolSpecificData": {
+                "commandLine": "code src/parser.ts"
+              }
+            },
+            {
+              "kind": "progressMessage",
+              "value": "Opening file..."
+            },
+            {
+              "kind": "markdownContent",
+              "value": "The file has been opened."
+            }
+          ]
+        },
+        {
+          "requestId": "req-003",
+          "timestamp": 1741615320000,
+          "message": {
+            "text": "Apply changes"
+          },
+          "response": [
+            {
+              "kind": "elicitation",
+              "title": "Confirm changes",
+              "message": "Do you want to apply these edits?"
+            },
+            {
+              "kind": "toolInvocationSerialized",
+              "toolId": "editFile",
+              "toolSpecificData": {
+                "path": "src/parser.ts",
+                "operation": "write"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expected": {
+    "messages": [
+      {
+        "sessionId": "copilot-session-1",
+        "provider": "copilot",
+        "category": "user",
+        "content": "How do I add a new provider?",
+        "createdAt": "2025-03-10T14:00:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "copilot-session-1",
+        "provider": "copilot",
+        "category": "assistant",
+        "content": "You can add a new provider by creating a parser function.",
+        "createdAt": "2025-03-10T14:00:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "copilot-session-1",
+        "provider": "copilot",
+        "category": "user",
+        "content": "Show me the code.",
+        "createdAt": "2025-03-10T14:01:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "copilot-session-1",
+        "provider": "copilot",
+        "category": "assistant",
+        "content": "Here is the relevant code:",
+        "createdAt": "2025-03-10T14:01:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "copilot-session-1",
+        "provider": "copilot",
+        "category": "tool_use",
+        "content": "{\"type\":\"tool_use\",\"name\":\"vscode.open\",\"input\":{\"command\":\"code src/parser.ts\"}}",
+        "createdAt": "2025-03-10T14:01:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "copilot-session-1",
+        "provider": "copilot",
+        "category": "assistant",
+        "content": "The file has been opened.",
+        "createdAt": "2025-03-10T14:01:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "copilot-session-1",
+        "provider": "copilot",
+        "category": "user",
+        "content": "Apply changes",
+        "createdAt": "2025-03-10T14:02:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "copilot-session-1",
+        "provider": "copilot",
+        "category": "system",
+        "content": "Confirm changes: Do you want to apply these edits?",
+        "createdAt": "2025-03-10T14:02:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      },
+      {
+        "sessionId": "copilot-session-1",
+        "provider": "copilot",
+        "category": "tool_edit",
+        "content": "{\"type\":\"tool_use\",\"name\":\"editFile\",\"input\":{\"path\":\"src/parser.ts\",\"operation\":\"write\"}}",
+        "createdAt": "2025-03-10T14:02:00.000Z",
+        "tokenInput": null,
+        "tokenOutput": null
+      }
+    ],
+    "diagnostics": []
+  }
+}

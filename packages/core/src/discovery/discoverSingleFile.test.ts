@@ -15,6 +15,7 @@ function makeConfig(dir: string): DiscoveryConfig {
     geminiHistoryRoot: join(dir, ".gemini", "history"),
     geminiProjectsPath: join(dir, ".gemini", "projects.json"),
     cursorRoot: join(dir, ".cursor", "projects"),
+    copilotRoot: join(dir, "copilot-workspace"),
     includeClaudeSubagents: false,
   };
 }
@@ -227,6 +228,35 @@ describe("discoverSingleFile", () => {
     expect(discovered.provider).toBe("gemini");
     expect(discovered.sourceSessionId).toBe("gem-1");
     expect(discovered.projectPath).toBe("/workspace/dux");
+    expect(discovered.metadata.unresolvedProject).toBe(false);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("correctly identifies a Copilot session file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-single-copilot-"));
+    const config = makeConfig(dir);
+    const workspaceId = "test-workspace-id";
+    const chatSessionsDir = join(config.copilotRoot, workspaceId, "chatSessions");
+    mkdirSync(chatSessionsDir, { recursive: true });
+
+    writeFileSync(
+      join(config.copilotRoot, workspaceId, "workspace.json"),
+      JSON.stringify({ folder: "file:///workspace/copilot-project" }),
+    );
+
+    writeFileSync(
+      join(chatSessionsDir, "my-session.json"),
+      JSON.stringify({ version: 3, sessionId: "my-session", requests: [] }),
+    );
+
+    const result = discoverSingleFile(join(chatSessionsDir, "my-session.json"), config);
+
+    const discovered = expectDefined(result, "Expected Copilot session result");
+    expect(discovered.provider).toBe("copilot");
+    expect(discovered.sourceSessionId).toBe("my-session");
+    expect(discovered.projectPath).toBe("/workspace/copilot-project");
+    expect(discovered.projectName).toBe("copilot-project");
     expect(discovered.metadata.unresolvedProject).toBe(false);
 
     rmSync(dir, { recursive: true, force: true });

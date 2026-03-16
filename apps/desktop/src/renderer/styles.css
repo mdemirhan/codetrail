@@ -32,6 +32,9 @@
   --accent-purple: #7c3aed;
   --accent-purple-dim: rgba(124, 58, 237, 0.08);
   --accent-purple-border: rgba(124, 58, 237, 0.2);
+  --accent-teal: #0891b2;
+  --accent-teal-dim: rgba(8, 145, 178, 0.08);
+  --accent-teal-border: rgba(8, 145, 178, 0.2);
   --accent-red: #dc2626;
   --accent-red-dim: rgba(220, 38, 38, 0.08);
   --accent-red-border: rgba(220, 38, 38, 0.18);
@@ -155,6 +158,9 @@
   --accent-purple: #b8a0f8;
   --accent-purple-dim: rgba(184, 160, 248, 0.14);
   --accent-purple-border: rgba(184, 160, 248, 0.22);
+  --accent-teal: #22d3ee;
+  --accent-teal-dim: rgba(34, 211, 238, 0.14);
+  --accent-teal-border: rgba(34, 211, 238, 0.22);
   --accent-red: #f08080;
   --accent-red-dim: rgba(240, 128, 128, 0.14);
   --accent-red-border: rgba(240, 128, 128, 0.22);
@@ -271,6 +277,9 @@
   --accent-purple: #b294bb;
   --accent-purple-dim: rgba(178, 148, 187, 0.14);
   --accent-purple-border: rgba(178, 148, 187, 0.24);
+  --accent-teal: #5fb3b3;
+  --accent-teal-dim: rgba(95, 179, 179, 0.14);
+  --accent-teal-border: rgba(95, 179, 179, 0.24);
   --accent-red: #cc6666;
   --accent-red-dim: rgba(204, 102, 102, 0.14);
   --accent-red-border: rgba(204, 102, 102, 0.24);
@@ -385,6 +394,9 @@
   --accent-purple: #f5c2e7;
   --accent-purple-dim: rgba(245, 194, 231, 0.14);
   --accent-purple-border: rgba(245, 194, 231, 0.24);
+  --accent-teal: #94e2d5;
+  --accent-teal-dim: rgba(148, 226, 213, 0.14);
+  --accent-teal-border: rgba(148, 226, 213, 0.24);
   --accent-red: #f38ba8;
   --accent-red-dim: rgba(243, 139, 168, 0.14);
   --accent-red-border: rgba(243, 139, 168, 0.24);
@@ -1165,6 +1177,12 @@ body.platform-macos .titlebar-left {
   color: var(--accent-green);
 }
 
+.tag-copilot,
+.provider-chip.provider-copilot {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
+}
+
 .tag-codex.active,
 .provider-chip.active.provider-codex {
   background: var(--accent-blue);
@@ -1187,6 +1205,12 @@ body.platform-macos .titlebar-left {
 .tag-cursor.active,
 .provider-chip.active.provider-cursor {
   background: var(--accent-green);
+  color: #ffffff;
+}
+
+.tag-copilot.active,
+.provider-chip.active.provider-copilot {
+  background: var(--accent-teal);
   color: #ffffff;
 }
 
@@ -1317,6 +1341,11 @@ body.platform-macos .titlebar-left {
 .meta-tag.cursor {
   background: var(--accent-green-dim);
   color: var(--accent-green);
+}
+
+.meta-tag.copilot {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
 }
 
 .sessions-count {
@@ -2099,6 +2128,10 @@ body.platform-macos .titlebar-left {
   color: var(--accent-green);
 }
 
+.provider-label.provider-copilot {
+  color: var(--accent-teal);
+}
+
 .message-header-actions {
   display: inline-flex;
   align-items: center;
@@ -2801,6 +2834,11 @@ mark {
 .settings-provider-cursor {
   background: var(--accent-green-dim);
   color: var(--accent-green);
+}
+
+.settings-provider-copilot {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
 }
 
 .settings-value {

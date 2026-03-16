@@ -142,6 +142,7 @@ vi.mock("@codetrail/core", async () => {
       geminiHistoryRoot: null,
       geminiProjectsPath: null,
       cursorRoot: "/cursor/root",
+      copilotRoot: "/copilot/root",
     },
     initializeDatabase: mockInitializeDatabase,
     resolveSystemMessageRegexRules: mockResolveSystemMessageRegexRules,
@@ -233,6 +234,7 @@ describe("bootstrapMainProcess", () => {
       codex: ["^<environment_context>"],
       gemini: [],
       cursor: [],
+      copilot: [],
     },
   };
 
@@ -313,6 +315,7 @@ describe("bootstrapMainProcess", () => {
         geminiHistoryRoot: string;
         geminiProjectsPath: string;
         cursorRoot: string;
+        copilotRoot: string;
       };
     };
     expect(settings.storage).toEqual({
@@ -329,6 +332,7 @@ describe("bootstrapMainProcess", () => {
       geminiHistoryRoot: "/Users/test/.gemini/history",
       geminiProjectsPath: "/Users/test/.gemini/projects.json",
       cursorRoot: "/cursor/root",
+      copilotRoot: "/copilot/root",
     });
 
     const projectPayload = { providers: ["claude"], query: "" };
@@ -493,6 +497,7 @@ describe("bootstrapMainProcess", () => {
         codex: ["^<environment_context>"],
         gemini: [],
         cursor: [],
+        copilot: [],
       },
     });
 
@@ -529,6 +534,7 @@ describe("bootstrapMainProcess", () => {
           "/gemini/root",
           "/Users/test/.gemini/history",
           "/cursor/root",
+          "/copilot/root",
         ],
         backend: "kqueue",
       });
@@ -539,6 +545,7 @@ describe("bootstrapMainProcess", () => {
           "/gemini/root",
           "/Users/test/.gemini/history",
           "/cursor/root",
+          "/copilot/root",
         ],
         expect.any(Function),
         expect.objectContaining({
@@ -627,6 +634,7 @@ describe("bootstrapMainProcess", () => {
           "/gemini/root",
           "/Users/test/.gemini/history",
           "/cursor/root",
+          "/copilot/root",
         ],
         expect.any(Function),
         expect.objectContaining({
@@ -642,6 +650,7 @@ describe("bootstrapMainProcess", () => {
           "/gemini/root",
           "/Users/test/.gemini/history",
           "/cursor/root",
+          "/copilot/root",
         ],
         expect.any(Function),
         expect.objectContaining({

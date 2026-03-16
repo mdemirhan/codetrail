@@ -17,6 +17,7 @@ import type {
   ThemeMode,
 } from "../../shared/uiPreferences";
 import type { NonOffRefreshStrategy } from "../app/autoRefresh";
+import { EMPTY_SYSTEM_MESSAGE_REGEX_RULES } from "../app/constants";
 import { createHistorySelection } from "../app/historySelection";
 import type { HistorySelection } from "../app/types";
 import { useCodetrailClient } from "../lib/codetrailClient";
@@ -175,8 +176,11 @@ export function usePaneStateSync(args: {
         for (const [key, setter] of Object.entries(setters) as Array<
           [HydratableKey, (value: Exclude<PaneStateSnapshot[HydratableKey], null>) => void]
         >) {
-          const value = response[key];
+          let value = response[key];
           if (value !== null) {
+            if (key === "systemMessageRegexRules" && value && typeof value === "object") {
+              value = { ...EMPTY_SYSTEM_MESSAGE_REGEX_RULES, ...value } as PaneStateSnapshot[typeof key];
+            }
             setter(value as Exclude<PaneStateSnapshot[HydratableKey], null>);
           }
         }

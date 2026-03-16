@@ -1,6 +1,6 @@
 # Code Trail
 
-A local desktop app for browsing, searching, and revisiting your AI coding session history across **Claude**, **Codex**, **Gemini**, and **Cursor** — all from one interface.
+A local desktop app for browsing, searching, and revisiting your AI coding session history across **Claude**, **Codex**, **Gemini**, **Cursor**, and **VS Code Copilot** — all from one interface.
 
 Code Trail discovers session files from each provider's local directory, parses them into a unified format, indexes everything into SQLite, and gives you fast full-text search with filtering by provider, project, and message type.
 
@@ -8,7 +8,7 @@ Code Trail discovers session files from each provider's local directory, parses 
 
 ## Features
 
-- **Multi-provider support** — Claude Code, Codex CLI, Gemini CLI, and Cursor sessions in one place.
+- **Multi-provider support** — Claude Code, Codex CLI, Gemini CLI, Cursor, and VS Code Copilot sessions in one place.
 - **Full-text search** — BM25-ranked search across all messages with highlighted snippets.
 - **Project and session browser** — Navigate sessions grouped by project, with deep links to individual messages.
 - **Category filters** — Filter by User, Assistant, Tool Use, Write (edits), Tool Result, Thinking, and System messages.
@@ -121,6 +121,7 @@ Code Trail reads session files from the default provider directories:
 | Codex CLI | `~/.codex/sessions/` |
 | Gemini CLI | `~/.gemini/tmp/` and `~/.gemini/history/` |
 | Cursor | `~/.cursor/projects/` |
+| VS Code Copilot | `.../Code/User/workspaceStorage/*/chatSessions/` |
 
 Each session file is parsed into a canonical message format, indexed into a local SQLite database with FTS5 for full-text search, and made available through the UI. The database and settings are stored in the Electron `userData` directory (typically `~/Library/Application Support/Code Trail/` on macOS).
 

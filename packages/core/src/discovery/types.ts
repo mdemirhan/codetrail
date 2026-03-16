@@ -25,6 +25,7 @@ export type DiscoveryConfig = {
   geminiHistoryRoot?: string;
   geminiProjectsPath?: string;
   cursorRoot: string;
+  copilotRoot: string;
   includeClaudeSubagents: boolean;
 };
 

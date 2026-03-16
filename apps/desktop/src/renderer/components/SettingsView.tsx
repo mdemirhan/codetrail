@@ -129,6 +129,7 @@ export function SettingsView({
           provider: "gemini",
         },
         { label: "Cursor root", value: info.discovery.cursorRoot, provider: "cursor" },
+        { label: "Copilot root", value: info.discovery.copilotRoot, provider: "copilot" },
       ]
     : [];
 
@@ -351,7 +352,7 @@ export function SettingsView({
             </div>
           </div>
           <div className="settings-section-body">
-            {(["claude", "codex", "gemini", "cursor"] as const).map((provider) => {
+            {(["claude", "codex", "gemini", "cursor", "copilot"] as const).map((provider) => {
               const patterns = systemMessageRegexRules[provider] ?? [];
               return (
                 <div key={provider} className="settings-rule-group">

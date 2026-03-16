@@ -139,6 +139,7 @@ describe("runIncrementalIndexing", () => {
       geminiHistoryRoot,
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot: join(dir, ".copilot-workspace"),
       includeClaudeSubagents: false,
     };
 
@@ -543,6 +544,7 @@ describe("runIncrementalIndexing", () => {
           geminiHistoryRoot: join(dir, ".gemini", "history"),
           geminiProjectsPath: join(dir, ".gemini", "projects.json"),
           cursorRoot: join(dir, ".cursor", "projects"),
+          copilotRoot: join(dir, ".copilot-workspace"),
           includeClaudeSubagents: false,
         },
       },
@@ -719,6 +721,7 @@ describe("runIncrementalIndexing", () => {
         geminiHistoryRoot: join(dir, ".gemini", "history"),
         geminiProjectsPath: join(dir, ".gemini", "projects.json"),
         cursorRoot: join(dir, ".cursor", "projects"),
+        copilotRoot: join(dir, ".copilot-workspace"),
         includeClaudeSubagents: false,
       },
     });
@@ -792,6 +795,7 @@ describe("runIncrementalIndexing", () => {
       geminiHistoryRoot: join(dir, ".gemini", "history"),
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot: join(dir, ".copilot-workspace"),
       includeClaudeSubagents: false,
     };
 
@@ -906,6 +910,7 @@ describe("runIncrementalIndexing", () => {
         geminiHistoryRoot: join(dir, ".gemini", "history"),
         geminiProjectsPath: join(dir, ".gemini", "projects.json"),
         cursorRoot,
+        copilotRoot: join(dir, ".copilot-workspace"),
         includeClaudeSubagents: false,
       },
     });
@@ -1007,6 +1012,7 @@ describe("runIncrementalIndexing", () => {
         geminiHistoryRoot: join(dir, ".gemini", "history"),
         geminiProjectsPath: join(dir, ".gemini", "projects.json"),
         cursorRoot,
+        copilotRoot: join(dir, ".copilot-workspace"),
         includeClaudeSubagents: false,
       },
     });

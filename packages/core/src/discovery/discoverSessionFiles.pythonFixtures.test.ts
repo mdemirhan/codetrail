@@ -14,6 +14,7 @@ describe("discoverSessionFiles python fixtures", () => {
       geminiHistoryRoot: join(fixturesRoot, "gemini", "history"),
       geminiProjectsPath: join(fixturesRoot, "gemini", "projects.json"),
       cursorRoot: join(fixturesRoot, "cursor", "projects"),
+      copilotRoot: join(fixturesRoot, "copilot", "workspaceStorage"),
       includeClaudeSubagents: false,
     });
 

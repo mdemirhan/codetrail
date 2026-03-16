@@ -9,7 +9,7 @@ import {
   readdirSync,
   statSync,
 } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, platform } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
 import { asRecord, readString } from "../parsing/helpers";
@@ -65,6 +65,17 @@ const NODE_DISCOVERY_FILE_SYSTEM: DiscoveryFileSystem = {
   statSync: (path) => statSync(path),
 };
 
+function defaultCopilotRoot(): string {
+  const os = platform();
+  if (os === "darwin") {
+    return join(homedir(), "Library", "Application Support", "Code", "User", "workspaceStorage");
+  }
+  if (os === "win32") {
+    return join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "Code", "User", "workspaceStorage");
+  }
+  return join(homedir(), ".config", "Code", "User", "workspaceStorage");
+}
+
 export const DEFAULT_DISCOVERY_CONFIG: DiscoveryConfig = {
   claudeRoot: join(homedir(), ".claude", "projects"),
   codexRoot: join(homedir(), ".codex", "sessions"),
@@ -72,6 +83,7 @@ export const DEFAULT_DISCOVERY_CONFIG: DiscoveryConfig = {
   geminiHistoryRoot: join(homedir(), ".gemini", "history"),
   geminiProjectsPath: join(homedir(), ".gemini", "projects.json"),
   cursorRoot: join(homedir(), ".cursor", "projects"),
+  copilotRoot: defaultCopilotRoot(),
   includeClaudeSubagents: false,
 };
 
@@ -89,6 +101,7 @@ export function discoverSessionFiles(
     ...discoverCodexFiles(config, resolvedDependencies),
     ...discoverGeminiFiles(config, geminiResolution, resolvedDependencies),
     ...discoverCursorFiles(config, resolvedDependencies),
+    ...discoverCopilotFiles(config, resolvedDependencies),
   ].sort((left, right) => {
     const byMtime = right.fileMtimeMs - left.fileMtimeMs;
     if (byMtime !== 0) {
@@ -433,6 +446,9 @@ export function discoverSingleFile(
   if (filePath.startsWith(`${config.cursorRoot}/`)) {
     return discoverSingleCursorFile(filePath, config, resolved);
   }
+  if (filePath.startsWith(`${config.copilotRoot}/`)) {
+    return discoverSingleCopilotFile(filePath, config, resolved);
+  }
 
   return null;
 }
@@ -651,6 +667,138 @@ function discoverSingleCursorFile(
       cwd: projectPath || null,
     },
   };
+}
+
+function discoverCopilotFiles(
+  config: DiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): DiscoveredSessionFile[] {
+  if (!dependencies.fs.existsSync(config.copilotRoot)) {
+    return [];
+  }
+
+  const discovered: DiscoveredSessionFile[] = [];
+
+  for (const workspaceEntry of safeReadDir(config.copilotRoot, dependencies)) {
+    if (!workspaceEntry.isDirectory()) {
+      continue;
+    }
+
+    const workspaceDir = join(config.copilotRoot, workspaceEntry.name);
+    const chatSessionsDir = join(workspaceDir, "chatSessions");
+    if (!safeIsDirectory(chatSessionsDir, dependencies)) {
+      continue;
+    }
+
+    const projectPath = decodeCopilotWorkspaceProject(workspaceDir, dependencies);
+    const projectName = projectPath ? projectNameFromPath(projectPath) : workspaceEntry.name;
+    const unresolvedProject = !projectPath;
+
+    for (const sessionFile of safeReadDir(chatSessionsDir, dependencies)) {
+      if (!sessionFile.isFile() || extname(sessionFile.name) !== ".json") {
+        continue;
+      }
+
+      const filePath = join(chatSessionsDir, sessionFile.name);
+      const fileStat = safeStat(filePath, dependencies);
+      if (!fileStat) {
+        continue;
+      }
+
+      const sourceSessionId = basename(sessionFile.name, ".json");
+      const sessionIdentity = providerSessionIdentity("copilot", sourceSessionId, filePath);
+
+      discovered.push({
+        provider: "copilot",
+        projectPath: projectPath ?? "",
+        projectName,
+        sessionIdentity,
+        sourceSessionId,
+        filePath,
+        fileSize: fileStat.size,
+        fileMtimeMs: Math.trunc(fileStat.mtimeMs),
+        metadata: {
+          includeInHistory: true,
+          isSubagent: false,
+          unresolvedProject,
+          gitBranch: null,
+          cwd: projectPath || null,
+        },
+      });
+    }
+  }
+
+  return discovered;
+}
+
+function discoverSingleCopilotFile(
+  filePath: string,
+  config: DiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): DiscoveredSessionFile | null {
+  if (extname(filePath) !== ".json") {
+    return null;
+  }
+
+  // Expected: {copilotRoot}/{workspaceId}/chatSessions/{sessionId}.json
+  const relative = filePath.slice(config.copilotRoot.length + 1);
+  const segments = relative.split("/");
+  if (segments.length < 3 || segments[1] !== "chatSessions") {
+    return null;
+  }
+
+  const workspaceId = segments[0];
+  if (!workspaceId) {
+    return null;
+  }
+
+  const fileStat = safeStat(filePath, dependencies);
+  if (!fileStat) {
+    return null;
+  }
+
+  const workspaceDir = join(config.copilotRoot, workspaceId);
+  const projectPath = decodeCopilotWorkspaceProject(workspaceDir, dependencies);
+  const projectName = projectPath ? projectNameFromPath(projectPath) : workspaceId;
+  const unresolvedProject = !projectPath;
+  const sourceSessionId = basename(filePath, ".json");
+  const sessionIdentity = providerSessionIdentity("copilot", sourceSessionId, filePath);
+
+  return {
+    provider: "copilot",
+    projectPath: projectPath ?? "",
+    projectName,
+    sessionIdentity,
+    sourceSessionId,
+    filePath,
+    fileSize: fileStat.size,
+    fileMtimeMs: Math.trunc(fileStat.mtimeMs),
+    metadata: {
+      includeInHistory: true,
+      isSubagent: false,
+      unresolvedProject,
+      gitBranch: null,
+      cwd: projectPath || null,
+    },
+  };
+}
+
+function decodeCopilotWorkspaceProject(
+  workspaceDir: string,
+  dependencies: ResolvedDiscoveryDependencies,
+): string | null {
+  const workspaceJsonPath = join(workspaceDir, "workspace.json");
+  const content = parseJsonFile<{ folder?: string }>(workspaceJsonPath, dependencies);
+  if (!content?.folder) {
+    return null;
+  }
+
+  try {
+    const url = new URL(content.folder);
+    return decodeURIComponent(url.pathname);
+  } catch {
+    return content.folder;
+  }
 }
 
 function decodeCursorProjectPath(
@@ -1058,7 +1206,7 @@ function projectNameFromPath(projectPath: string): string {
 }
 
 function providerSessionIdentity(
-  provider: "codex" | "gemini" | "cursor",
+  provider: "codex" | "gemini" | "cursor" | "copilot",
   sourceSessionId: string,
   filePath: string,
 ): string {

@@ -96,6 +96,7 @@ describe("discoverSessionFiles", () => {
       geminiHistoryRoot,
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot: join(dir, ".copilot-workspace"),
       includeClaudeSubagents: true,
     });
 
@@ -124,6 +125,7 @@ describe("discoverSessionFiles", () => {
       geminiHistoryRoot,
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot: join(dir, ".copilot-workspace"),
       includeClaudeSubagents: false,
     });
 
@@ -189,6 +191,7 @@ describe("discoverSessionFiles", () => {
       geminiHistoryRoot: join(dir, ".gemini", "history"),
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot,
+      copilotRoot: join(dir, ".copilot-workspace"),
       includeClaudeSubagents: false,
     });
 
@@ -210,6 +213,120 @@ describe("discoverSessionFiles", () => {
 
     expect(resolved?.sessionIdentity).not.toBe(unresolved?.sessionIdentity);
 
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("discovers copilot sessions from workspaceStorage and resolves project paths", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-discovery-copilot-"));
+    const copilotRoot = join(dir, "workspaceStorage");
+
+    const workspaceId = "abc123def456";
+    const workspaceDir = join(copilotRoot, workspaceId);
+    const chatSessionsDir = join(workspaceDir, "chatSessions");
+    mkdirSync(chatSessionsDir, { recursive: true });
+
+    writeFileSync(
+      join(workspaceDir, "workspace.json"),
+      JSON.stringify({ folder: `file://${join(dir, "my-project")}` }),
+    );
+    mkdirSync(join(dir, "my-project"), { recursive: true });
+
+    writeFileSync(
+      join(chatSessionsDir, "session-a.json"),
+      JSON.stringify({
+        version: 3,
+        sessionId: "session-a",
+        requests: [{ requestId: "r1", message: { text: "test" }, response: [] }],
+      }),
+    );
+    writeFileSync(
+      join(chatSessionsDir, "session-b.json"),
+      JSON.stringify({
+        version: 3,
+        sessionId: "session-b",
+        requests: [],
+      }),
+    );
+
+    const unresolvedWorkspaceId = "xyz789";
+    const unresolvedWorkspaceDir = join(copilotRoot, unresolvedWorkspaceId);
+    const unresolvedChatDir = join(unresolvedWorkspaceDir, "chatSessions");
+    mkdirSync(unresolvedChatDir, { recursive: true });
+
+    writeFileSync(
+      join(unresolvedChatDir, "session-c.json"),
+      JSON.stringify({ version: 3, sessionId: "session-c", requests: [] }),
+    );
+
+    const discovered = discoverSessionFiles({
+      claudeRoot: join(dir, ".claude", "projects"),
+      codexRoot: join(dir, ".codex", "sessions"),
+      geminiRoot: join(dir, ".gemini", "tmp"),
+      geminiHistoryRoot: join(dir, ".gemini", "history"),
+      geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot,
+      includeClaudeSubagents: false,
+    });
+
+    const copilotSessions = discovered.filter((f) => f.provider === "copilot");
+    expect(copilotSessions).toHaveLength(3);
+
+    const resolved = copilotSessions.find((f) => f.sourceSessionId === "session-a");
+    expect(resolved?.projectPath).toBe(join(dir, "my-project"));
+    expect(resolved?.projectName).toBe("my-project");
+    expect(resolved?.metadata.unresolvedProject).toBe(false);
+    expect(resolved?.sessionIdentity.startsWith("copilot:session-a:")).toBe(true);
+
+    const unresolved = copilotSessions.find((f) => f.sourceSessionId === "session-c");
+    expect(unresolved?.projectPath).toBe("");
+    expect(unresolved?.projectName).toBe(unresolvedWorkspaceId);
+    expect(unresolved?.metadata.unresolvedProject).toBe(true);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("returns no copilot sessions when copilotRoot does not exist", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-no-copilot-"));
+
+    const discovered = discoverSessionFiles({
+      claudeRoot: join(dir, ".claude", "projects"),
+      codexRoot: join(dir, ".codex", "sessions"),
+      geminiRoot: join(dir, ".gemini", "tmp"),
+      geminiHistoryRoot: join(dir, ".gemini", "history"),
+      geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot: join(dir, "nonexistent-copilot-root"),
+      includeClaudeSubagents: false,
+    });
+
+    expect(discovered.filter((f) => f.provider === "copilot")).toHaveLength(0);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("returns no copilot sessions when workspaceStorage exists but has no chatSessions", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-copilot-empty-"));
+    const copilotRoot = join(dir, "workspaceStorage");
+
+    const workspaceDir = join(copilotRoot, "some-workspace-id");
+    mkdirSync(workspaceDir, { recursive: true });
+    writeFileSync(
+      join(workspaceDir, "workspace.json"),
+      JSON.stringify({ folder: `file://${join(dir, "some-project")}` }),
+    );
+
+    const discovered = discoverSessionFiles({
+      claudeRoot: join(dir, ".claude", "projects"),
+      codexRoot: join(dir, ".codex", "sessions"),
+      geminiRoot: join(dir, ".gemini", "tmp"),
+      geminiHistoryRoot: join(dir, ".gemini", "history"),
+      geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot,
+      includeClaudeSubagents: false,
+    });
+
+    expect(discovered.filter((f) => f.provider === "copilot")).toHaveLength(0);
     rmSync(dir, { recursive: true, force: true });
   });
 });
