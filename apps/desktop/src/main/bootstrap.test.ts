@@ -131,6 +131,7 @@ vi.mock("@codetrail/core", async () => {
       geminiHistoryRoot: null,
       geminiProjectsPath: null,
       cursorRoot: "/cursor/root",
+      opencodeDbPath: "/mock/.local/share/opencode/opencode.db",
     },
     initializeDatabase: mockInitializeDatabase,
     resolveSystemMessageRegexRules: mockResolveSystemMessageRegexRules,
@@ -222,6 +223,7 @@ describe("bootstrapMainProcess", () => {
       codex: ["^<environment_context>"],
       gemini: [],
       cursor: [],
+      opencode: [],
     },
   };
 
@@ -317,6 +319,7 @@ describe("bootstrapMainProcess", () => {
       geminiHistoryRoot: "/Users/test/.gemini/history",
       geminiProjectsPath: "/Users/test/.gemini/projects.json",
       cursorRoot: "/cursor/root",
+      opencodeDbPath: "/mock/.local/share/opencode/opencode.db",
     });
 
     const projectPayload = { providers: ["claude"], query: "" };
@@ -478,6 +481,7 @@ describe("bootstrapMainProcess", () => {
         codex: ["^<environment_context>"],
         gemini: [],
         cursor: [],
+        opencode: [],
       },
     });
 
@@ -514,6 +518,7 @@ describe("bootstrapMainProcess", () => {
           "/gemini/root",
           "/Users/test/.gemini/history",
           "/cursor/root",
+          "/mock/.local/share/opencode",
         ],
         backend: "kqueue",
       });
@@ -524,6 +529,7 @@ describe("bootstrapMainProcess", () => {
           "/gemini/root",
           "/Users/test/.gemini/history",
           "/cursor/root",
+          "/mock/.local/share/opencode",
         ],
         expect.any(Function),
         expect.objectContaining({
@@ -593,6 +599,7 @@ describe("bootstrapMainProcess", () => {
           "/gemini/root",
           "/Users/test/.gemini/history",
           "/cursor/root",
+          "/mock/.local/share/opencode",
         ],
         expect.any(Function),
         expect.objectContaining({
@@ -608,6 +615,7 @@ describe("bootstrapMainProcess", () => {
           "/gemini/root",
           "/Users/test/.gemini/history",
           "/cursor/root",
+          "/mock/.local/share/opencode",
         ],
         expect.any(Function),
         expect.objectContaining({

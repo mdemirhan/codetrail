@@ -13,6 +13,7 @@ import {
   type DiscoveryConfig,
   discoverSessionFiles,
   discoverSingleFile,
+  parseOpenCodeVirtualPath,
 } from "../discovery";
 import { type ParserDiagnostic, parseSession, parseSessionEvent } from "../parsing";
 import { asArray, asRecord, readString } from "../parsing/helpers";
@@ -571,7 +572,7 @@ function processDiscoveredFiles(args: {
 
     try {
       const fileDiagnostics =
-        discovered.provider === "gemini"
+        discovered.provider === "gemini" || discovered.provider === "opencode"
           ? indexMaterializedSessionFile({
               db: args.db,
               discovered,
@@ -690,7 +691,8 @@ function indexMaterializedSessionFile(args: {
     args.discovered.provider,
     args.discovered.fileMtimeMs,
   );
-  const sessionTitle = deriveSessionTitle(messagesWithTimestamps);
+  const sessionTitle =
+    deriveSessionTitle(messagesWithTimestamps) || args.discovered.metadata.title || "";
   const modelNames = sourceMeta.models.join(",");
   const aggregate = buildSessionAggregate(
     messagesWithTimestamps.map((message) => ({
@@ -1691,7 +1693,7 @@ function shouldResumeFromCheckpoint(args: {
   if (!args.existing || !args.checkpoint || !args.existingSessionId) {
     return false;
   }
-  if (args.discovered.provider === "gemini") {
+  if (args.discovered.provider === "gemini" || args.discovered.provider === "opencode") {
     return false;
   }
   if (args.existingSessionId !== args.expectedSessionDbId) {
@@ -1948,6 +1950,11 @@ function readProviderSource(
       };
     }
 
+    // OpenCode stores sessions in its own SQLite DB; read messages+parts and synthesize events.
+    if (provider === "opencode") {
+      return readOpenCodeSource(filePath);
+    }
+
     const lines = readFileText(filePath)
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -1967,6 +1974,82 @@ function readProviderSource(
       rawPayload: parsedLines,
       parsePayload: parsedLines,
     };
+  } catch {
+    return null;
+  }
+}
+
+export type OpenCodeMessagePartReader = {
+  readSessionMessagesWithParts: (
+    dbPath: string,
+    sessionId: string,
+  ) => Array<{
+    messageId: string;
+    role: string;
+    timeCreated: number;
+    timeCompleted: number | null;
+    modelId: string | null;
+    providerId: string | null;
+    cwd: string | null;
+    tokenInput: number | null;
+    tokenOutput: number | null;
+    parts: Array<{ id: string; type: string; data: string }>;
+  }>;
+};
+
+let _opencodeMessagePartReader: OpenCodeMessagePartReader | null = null;
+
+export function setOpenCodeMessagePartReader(reader: OpenCodeMessagePartReader): void {
+  _opencodeMessagePartReader = reader;
+}
+
+function readOpenCodeSource(filePath: string): {
+  rawPayload: unknown[];
+  parsePayload: unknown[];
+} | null {
+  const parsed = parseOpenCodeVirtualPath(filePath);
+  if (!parsed) {
+    return null;
+  }
+
+  const reader = _opencodeMessagePartReader;
+  if (!reader) {
+    return null;
+  }
+
+  try {
+    const messages = reader.readSessionMessagesWithParts(parsed.dbPath, parsed.sessionId);
+    const events: unknown[] = [];
+
+    for (const message of messages) {
+      const parts: unknown[] = [];
+      for (const part of message.parts) {
+        try {
+          parts.push(JSON.parse(part.data));
+        } catch {
+          parts.push({ type: part.type, text: part.data });
+        }
+      }
+
+      events.push({
+        messageId: message.messageId,
+        role: message.role,
+        timestamp: new Date(message.timeCreated).toISOString(),
+        completedAt: message.timeCompleted
+          ? new Date(message.timeCompleted).toISOString()
+          : null,
+        model: message.modelId,
+        providerId: message.providerId,
+        cwd: message.cwd,
+        usage: {
+          input_tokens: message.tokenInput,
+          output_tokens: message.tokenOutput,
+        },
+        parts,
+      });
+    }
+
+    return { rawPayload: events, parsePayload: events };
   } catch {
     return null;
   }
@@ -2050,6 +2133,20 @@ function extractSourceMetadata(
         readString(record.cwd) ?? readString(messageRecord?.cwd) ?? readString(metadataRecord?.cwd);
       gitBranch ??=
         readString(gitRecord?.branch) ?? readString(record.gitBranch) ?? readString(record.branch);
+    }
+  }
+
+  if (provider === "opencode") {
+    for (const entry of asArray(payload)) {
+      const record = asRecord(entry);
+      if (!record) {
+        continue;
+      }
+      const model = readString(record.model);
+      if (model) {
+        models.add(model);
+      }
+      cwd ??= readString(record.cwd);
     }
   }
 
@@ -2240,6 +2337,7 @@ function compileSystemMessageRules(overrides?: SystemMessageRegexRuleOverrides):
     codex: [],
     gemini: [],
     cursor: [],
+    opencode: [],
   };
 
   let invalidCount = 0;

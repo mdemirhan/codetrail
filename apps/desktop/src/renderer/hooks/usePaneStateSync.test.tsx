@@ -57,6 +57,7 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     codex: [],
     gemini: [],
     cursor: [],
+    opencode: [],
   });
   const sessionScrollTopRef = useRef(0);
   const pendingRestoredSessionScrollRef = useRef<{
@@ -171,6 +172,7 @@ describe("usePaneStateSync", () => {
             codex: ["^<environment_context>"],
             gemini: [],
             cursor: [],
+            opencode: [],
           },
         };
       }
@@ -200,6 +202,7 @@ describe("usePaneStateSync", () => {
         codex: ["^<environment_context>"],
         gemini: [],
         cursor: [],
+        opencode: [],
       },
     });
     expect(logError).not.toHaveBeenCalled();

@@ -8,6 +8,8 @@ import {
   runIncrementalIndexing,
 } from "@codetrail/core";
 
+import { initializeOpenCodeReaders } from "./openCodeReaders";
+
 type IncrementalRequest = {
   kind: "incremental";
   dbPath: string;
@@ -128,6 +130,8 @@ function handleRequest(request: IndexingWorkerRequest): void {
     });
   }
 }
+
+initializeOpenCodeReaders();
 
 if (parentPort) {
   parentPort.on("message", (request: IndexingWorkerRequest) => {

@@ -145,6 +145,7 @@ const systemMessageRegexRulesSchema = z.object({
   codex: z.array(z.string()),
   gemini: z.array(z.string()),
   cursor: z.array(z.string()),
+  opencode: z.array(z.string()),
 });
 
 // Single source of truth for pane state fields. The non-nullable base schema is used
@@ -206,6 +207,7 @@ const settingsInfoResponseSchema = z.object({
     geminiHistoryRoot: z.string().min(1),
     geminiProjectsPath: z.string().min(1),
     cursorRoot: z.string().min(1),
+    opencodeDbPath: z.string().min(1),
   }),
 });
 

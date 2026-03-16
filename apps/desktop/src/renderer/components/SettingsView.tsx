@@ -119,6 +119,7 @@ export function SettingsView({
           provider: "gemini",
         },
         { label: "Cursor root", value: info.discovery.cursorRoot, provider: "cursor" },
+        { label: "OpenCode DB", value: info.discovery.opencodeDbPath, provider: "opencode" },
       ]
     : [];
 

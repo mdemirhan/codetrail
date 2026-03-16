@@ -54,6 +54,7 @@ export const EMPTY_SYSTEM_MESSAGE_REGEX_RULES: SystemMessageRegexRules = {
   codex: [],
   gemini: [],
   cursor: [],
+  opencode: [],
 };
 
 export const SHORTCUT_ITEMS = [

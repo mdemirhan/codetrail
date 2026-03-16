@@ -99,6 +99,10 @@ export function parseProviderEvent(args: ParseProviderEventArgs): ParseProviderE
     return parseCursorEvent(args);
   }
 
+  if (args.provider === "opencode") {
+    return parseOpenCodeEvent(args);
+  }
+
   return parseGeminiEvent(args);
 }
 
@@ -377,6 +381,160 @@ function parseCursorEvent(args: ParseProviderEventArgs): ParseProviderEventResul
       fallbackRaw: event,
     }),
   };
+}
+
+function parseOpenCodeEvent(args: ParseProviderEventArgs): ParseProviderEventResult {
+  const { provider, sessionId, eventIndex, event, diagnostics, sequence } = args;
+  const output: ParsedProviderMessage[] = [];
+  const eventRecord = asRecord(event);
+  if (!eventRecord) {
+    return {
+      messages: output,
+      nextSequence: pushNonObjectEvent({
+        output,
+        provider,
+        sessionId,
+        eventIndex,
+        event,
+        diagnostics,
+        sequence,
+      }),
+    };
+  }
+
+  const role = lowerString(eventRecord.role);
+  const messageId = readString(eventRecord.messageId);
+  const parts = asArray(eventRecord.parts);
+
+  if (parts.length === 0) {
+    return { messages: output, nextSequence: sequence };
+  }
+
+  const createdAt = extractEventTimestamp(eventRecord);
+  const usage = extractTokenUsage(eventRecord);
+  const segments: EventSegment[] = [];
+
+  for (const part of parts) {
+    const partRecord = asRecord(part);
+    if (!partRecord) {
+      continue;
+    }
+
+    const partType = lowerString(partRecord.type);
+    const text = readString(partRecord.text) ?? "";
+
+    if (partType === "text") {
+      if (text.length > 0) {
+        const category = role === "user" ? "user" : "assistant";
+        segments.push({ category, content: text });
+      }
+      continue;
+    }
+
+    if (partType === "reasoning") {
+      if (text.length > 0) {
+        segments.push({ category: "thinking", content: text });
+      }
+      continue;
+    }
+
+    if (partType === "tool") {
+      const state = asRecord(partRecord.state);
+      const toolName = readString(partRecord.tool) ?? "tool";
+      const input = state ? asRecord(state.input) : null;
+      const toolOutput = state ? readString(state.output) : null;
+      const status = state ? readString(state.status) : null;
+
+      segments.push({
+        category: isLikelyEditOperation(toolName) ? "tool_edit" : "tool_use",
+        content: serializeUnknown({
+          type: "tool_use",
+          id: readString(partRecord.callID) ?? `${sessionId}:tool:${sequence}`,
+          name: toolName,
+          input: input ?? {},
+        }),
+      });
+
+      if (toolOutput && status === "completed") {
+        const durationMs = extractOpenCodeToolDuration(state);
+        segments.push({
+          category: "tool_result",
+          content: toolOutput,
+          operationDurationMs: durationMs,
+          operationDurationSource: durationMs !== null ? "native" : null,
+          operationDurationConfidence: durationMs !== null ? "high" : null,
+        });
+      }
+      continue;
+    }
+
+    if (partType === "patch" || partType === "file") {
+      const filename = readString(partRecord.filename) ?? "";
+      const files = asArray(partRecord.files);
+      const content =
+        files.length > 0
+          ? files.map((f) => readString(f) ?? "").join(", ")
+          : filename || serializeUnknown(partRecord);
+      if (content.length > 0) {
+        segments.push({ category: "tool_edit", content });
+      }
+      continue;
+    }
+
+    if (partType === "step-start" || partType === "step-finish") {
+      if (partType === "step-finish") {
+        const tokens = asRecord(partRecord.tokens);
+        if (tokens) {
+          const tokenInput =
+            typeof tokens.input === "number" ? tokens.input : null;
+          const tokenOutput =
+            typeof tokens.output === "number" ? tokens.output : null;
+          if (tokenInput !== null || tokenOutput !== null) {
+            // Token info is captured via the message-level usage extraction
+          }
+        }
+      }
+      continue;
+    }
+  }
+
+  const normalizedSegments = dedupeSegments(segments);
+  if (normalizedSegments.length === 0) {
+    return { messages: output, nextSequence: sequence };
+  }
+
+  return {
+    messages: output,
+    nextSequence: pushSplitMessages({
+      output,
+      sessionId,
+      sequence,
+      baseId: messageId,
+      createdAt,
+      tokenUsage: usage,
+      segments: normalizedSegments,
+      fallbackRaw: event,
+    }),
+  };
+}
+
+function extractOpenCodeToolDuration(
+  state: Record<string, unknown> | null | undefined,
+): number | null {
+  if (!state) {
+    return null;
+  }
+  const time = asRecord(state.time);
+  if (!time) {
+    return null;
+  }
+  const start = typeof time.start === "number" ? time.start : null;
+  const end = typeof time.end === "number" ? time.end : null;
+  if (start === null || end === null) {
+    return null;
+  }
+  const durationMs = end - start;
+  return durationMs > 0 ? durationMs : null;
 }
 
 function parseCursorSegments(role: string | null, event: Record<string, unknown>): EventSegment[] {

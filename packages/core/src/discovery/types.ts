@@ -15,6 +15,7 @@ export type DiscoveredSessionFile = {
     unresolvedProject: boolean;
     gitBranch: string | null;
     cwd: string | null;
+    title?: string | null;
   };
 };
 
@@ -25,6 +26,7 @@ export type DiscoveryConfig = {
   geminiHistoryRoot?: string;
   geminiProjectsPath?: string;
   cursorRoot: string;
+  opencodeDbPath: string;
   includeClaudeSubagents: boolean;
 };
 

@@ -35,6 +35,9 @@
   --accent-red: #dc2626;
   --accent-red-dim: rgba(220, 38, 38, 0.08);
   --accent-red-border: rgba(220, 38, 38, 0.18);
+  --accent-teal: #0891b2;
+  --accent-teal-dim: rgba(8, 145, 178, 0.08);
+  --accent-teal-border: rgba(8, 145, 178, 0.2);
   --accent-muted: #64748b;
   --accent-muted-dim: rgba(100, 116, 139, 0.08);
   --accent-muted-border: rgba(100, 116, 139, 0.18);
@@ -158,6 +161,9 @@
   --accent-red: #f08080;
   --accent-red-dim: rgba(240, 128, 128, 0.14);
   --accent-red-border: rgba(240, 128, 128, 0.22);
+  --accent-teal: #22d3ee;
+  --accent-teal-dim: rgba(34, 211, 238, 0.14);
+  --accent-teal-border: rgba(34, 211, 238, 0.22);
   --accent-muted: #a8b0c0;
   --accent-muted-dim: rgba(148, 163, 184, 0.1);
   --accent-muted-border: rgba(148, 163, 184, 0.18);
@@ -274,6 +280,9 @@
   --accent-red: #cc6666;
   --accent-red-dim: rgba(204, 102, 102, 0.14);
   --accent-red-border: rgba(204, 102, 102, 0.24);
+  --accent-teal: #8abeb7;
+  --accent-teal-dim: rgba(138, 190, 183, 0.14);
+  --accent-teal-border: rgba(138, 190, 183, 0.24);
   --accent-muted: #969896;
   --accent-muted-dim: rgba(150, 152, 150, 0.1);
   --accent-muted-border: rgba(150, 152, 150, 0.18);
@@ -388,6 +397,9 @@
   --accent-red: #f38ba8;
   --accent-red-dim: rgba(243, 139, 168, 0.14);
   --accent-red-border: rgba(243, 139, 168, 0.24);
+  --accent-teal: #94e2d5;
+  --accent-teal-dim: rgba(148, 226, 213, 0.14);
+  --accent-teal-border: rgba(148, 226, 213, 0.24);
   --accent-muted: #a6adc8;
   --accent-muted-dim: rgba(166, 173, 200, 0.1);
   --accent-muted-border: rgba(166, 173, 200, 0.18);
@@ -1160,6 +1172,12 @@ body.platform-macos .titlebar-left {
   color: var(--accent-green);
 }
 
+.tag-opencode,
+.provider-chip.provider-opencode {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
+}
+
 .tag-codex.active,
 .provider-chip.active.provider-codex {
   background: var(--accent-blue);
@@ -1182,6 +1200,12 @@ body.platform-macos .titlebar-left {
 .tag-cursor.active,
 .provider-chip.active.provider-cursor {
   background: var(--accent-green);
+  color: #ffffff;
+}
+
+.tag-opencode.active,
+.provider-chip.active.provider-opencode {
+  background: var(--accent-teal);
   color: #ffffff;
 }
 
@@ -1312,6 +1336,11 @@ body.platform-macos .titlebar-left {
 .meta-tag.cursor {
   background: var(--accent-green-dim);
   color: var(--accent-green);
+}
+
+.meta-tag.opencode {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
 }
 
 .sessions-count {
@@ -2065,6 +2094,10 @@ body.platform-macos .titlebar-left {
   color: var(--accent-green);
 }
 
+.provider-label.provider-opencode {
+  color: var(--accent-teal);
+}
+
 .message-header-actions {
   display: inline-flex;
   align-items: center;
@@ -2727,6 +2760,11 @@ mark {
 .settings-provider-cursor {
   background: var(--accent-green-dim);
   color: var(--accent-green);
+}
+
+.settings-provider-opencode {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
 }
 
 .settings-value {

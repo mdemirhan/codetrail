@@ -144,7 +144,7 @@ export function useHistoryInteractions({
   sessionSearchInputRef: RefObject<HTMLInputElement | null>;
   loadProjects: () => Promise<void>;
   loadSessions: () => Promise<void>;
-  setProjectProviders: Dispatch<SetStateAction<("claude" | "codex" | "gemini" | "cursor")[]>>;
+  setProjectProviders: Dispatch<SetStateAction<("claude" | "codex" | "gemini" | "cursor" | "opencode")[]>>;
   setProjectQueryInput: Dispatch<SetStateAction<string>>;
   prettyProvider: (provider: ProjectSummary["provider"]) => string;
   refreshContextRef: MutableRefObject<RefreshContext | null>;

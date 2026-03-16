@@ -72,6 +72,7 @@ export const DEFAULT_DISCOVERY_CONFIG: DiscoveryConfig = {
   geminiHistoryRoot: join(homedir(), ".gemini", "history"),
   geminiProjectsPath: join(homedir(), ".gemini", "projects.json"),
   cursorRoot: join(homedir(), ".cursor", "projects"),
+  opencodeDbPath: join(homedir(), ".local", "share", "opencode", "opencode.db"),
   includeClaudeSubagents: false,
 };
 
@@ -89,6 +90,7 @@ export function discoverSessionFiles(
     ...discoverCodexFiles(config, resolvedDependencies),
     ...discoverGeminiFiles(config, geminiResolution, resolvedDependencies),
     ...discoverCursorFiles(config, resolvedDependencies),
+    ...discoverOpenCodeFiles(config, resolvedDependencies),
   ].sort((left, right) => {
     const byMtime = right.fileMtimeMs - left.fileMtimeMs;
     if (byMtime !== 0) {
@@ -402,6 +404,169 @@ function discoverCursorFiles(
   return discovered;
 }
 
+type OpenCodeSessionRow = {
+  id: string;
+  project_id: string;
+  title: string;
+  directory: string;
+  time_created: number;
+  time_updated: number;
+  parent_id: string | null;
+};
+
+type OpenCodeProjectRow = {
+  id: string;
+  worktree: string;
+  name: string | null;
+};
+
+export type OpenCodeDbReader = {
+  readSessions: (dbPath: string) => OpenCodeSessionRow[];
+  readProjects: (dbPath: string) => OpenCodeProjectRow[];
+};
+
+let _opencodeDbReader: OpenCodeDbReader | null = null;
+
+export function setOpenCodeDbReader(reader: OpenCodeDbReader): void {
+  _opencodeDbReader = reader;
+}
+
+export function getOpenCodeDbReader(): OpenCodeDbReader | null {
+  return _opencodeDbReader;
+}
+
+export const OPENCODE_SESSION_SEPARATOR = "#session:";
+
+function openCodeVirtualPath(dbPath: string, sessionId: string): string {
+  return `${dbPath}${OPENCODE_SESSION_SEPARATOR}${sessionId}`;
+}
+
+export function parseOpenCodeVirtualPath(
+  filePath: string,
+): { dbPath: string; sessionId: string } | null {
+  const idx = filePath.indexOf(OPENCODE_SESSION_SEPARATOR);
+  if (idx < 0) {
+    return null;
+  }
+  return {
+    dbPath: filePath.slice(0, idx),
+    sessionId: filePath.slice(idx + OPENCODE_SESSION_SEPARATOR.length),
+  };
+}
+
+function discoverOpenCodeFiles(
+  config: DiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): DiscoveredSessionFile[] {
+  if (!config.opencodeDbPath || !dependencies.fs.existsSync(config.opencodeDbPath)) {
+    return [];
+  }
+
+  const reader = _opencodeDbReader;
+  if (!reader) {
+    return [];
+  }
+
+  const discovered: DiscoveredSessionFile[] = [];
+
+  try {
+    const projects = reader.readProjects(config.opencodeDbPath);
+    const projectMap = new Map<string, OpenCodeProjectRow>();
+    for (const project of projects) {
+      projectMap.set(project.id, project);
+    }
+
+    const sessions = reader.readSessions(config.opencodeDbPath);
+    for (const session of sessions) {
+      if (session.parent_id) {
+        continue;
+      }
+
+      const virtualPath = openCodeVirtualPath(config.opencodeDbPath, session.id);
+      const project = projectMap.get(session.project_id);
+      const projectPath = project?.worktree ?? session.directory ?? "";
+      const sessionIdentity = providerSessionIdentity("opencode", session.id, virtualPath);
+
+      discovered.push({
+        provider: "opencode",
+        projectPath,
+        projectName: projectNameFromPath(projectPath),
+        sessionIdentity,
+        sourceSessionId: session.id,
+        filePath: virtualPath,
+        fileSize: session.time_updated,
+        fileMtimeMs: session.time_updated,
+        metadata: {
+          includeInHistory: true,
+          isSubagent: false,
+          unresolvedProject: !projectPath,
+          gitBranch: null,
+          cwd: projectPath || null,
+          title: session.title || null,
+        },
+      });
+    }
+  } catch {
+    // OpenCode DB may be locked or corrupt; reduce coverage, don't abort.
+  }
+
+  return discovered;
+}
+
+function discoverSingleOpenCodeFile(
+  filePath: string,
+  config: DiscoveryConfig,
+  _dependencies: ResolvedDiscoveryDependencies,
+): DiscoveredSessionFile | null {
+  if (!config.opencodeDbPath) {
+    return null;
+  }
+
+  const parsed = parseOpenCodeVirtualPath(filePath);
+  if (!parsed) {
+    return null;
+  }
+
+  const reader = _opencodeDbReader;
+  if (!reader) {
+    return null;
+  }
+
+  try {
+    const sessions = reader.readSessions(config.opencodeDbPath);
+    const session = sessions.find((s) => s.id === parsed.sessionId);
+    if (!session) {
+      return null;
+    }
+
+    const projects = reader.readProjects(config.opencodeDbPath);
+    const project = projects.find((p) => p.id === session.project_id);
+    const projectPath = project?.worktree ?? session.directory ?? "";
+    const sessionIdentity = providerSessionIdentity("opencode", session.id, filePath);
+
+    return {
+      provider: "opencode",
+      projectPath,
+      projectName: projectNameFromPath(projectPath),
+      sessionIdentity,
+      sourceSessionId: session.id,
+      filePath,
+      fileSize: session.time_updated,
+      fileMtimeMs: session.time_updated,
+      metadata: {
+        includeInHistory: true,
+        isSubagent: false,
+        unresolvedProject: !projectPath,
+        gitBranch: null,
+        cwd: projectPath || null,
+        title: session.title || null,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Determines which provider a single file belongs to and constructs a {@link DiscoveredSessionFile}
  * using the same rules as the per-provider discover functions. Returns `null` if the file is
@@ -432,6 +597,12 @@ export function discoverSingleFile(
   }
   if (filePath.startsWith(`${config.cursorRoot}/`)) {
     return discoverSingleCursorFile(filePath, config, resolved);
+  }
+  if (
+    config.opencodeDbPath &&
+    (filePath === config.opencodeDbPath || filePath.startsWith(`${config.opencodeDbPath}#`))
+  ) {
+    return discoverSingleOpenCodeFile(filePath, config, resolved);
   }
 
   return null;
@@ -1058,7 +1229,7 @@ function projectNameFromPath(projectPath: string): string {
 }
 
 function providerSessionIdentity(
-  provider: "codex" | "gemini" | "cursor",
+  provider: "codex" | "gemini" | "cursor" | "opencode",
   sourceSessionId: string,
   filePath: string,
 ): string {

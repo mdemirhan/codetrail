@@ -8,7 +8,7 @@ type WorkerMessage =
   | {
       type: "file-issue";
       issue: {
-        provider: "claude" | "codex" | "gemini" | "cursor";
+        provider: "claude" | "codex" | "gemini" | "cursor" | "opencode";
         sessionId: string;
         filePath: string;
         stage: "read" | "parse" | "persist";
@@ -18,7 +18,7 @@ type WorkerMessage =
   | {
       type: "notice";
       notice: {
-        provider: "claude" | "codex" | "gemini" | "cursor";
+        provider: "claude" | "codex" | "gemini" | "cursor" | "opencode";
         sessionId: string;
         filePath: string;
         stage: "read" | "parse" | "persist";
@@ -38,6 +38,7 @@ type WorkerRequest = {
     codex?: string[];
     gemini?: string[];
     cursor?: string[];
+    opencode?: string[];
   };
 };
 
@@ -219,6 +220,7 @@ describe("WorkerIndexingRunner", () => {
         codex: ["^<environment_context>"],
         gemini: [],
         cursor: [],
+        opencode: [],
       }),
     });
 
@@ -233,6 +235,7 @@ describe("WorkerIndexingRunner", () => {
           codex: ["^<environment_context>"],
           gemini: [],
           cursor: [],
+          opencode: [],
         },
       },
       {},

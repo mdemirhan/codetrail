@@ -22,6 +22,7 @@ describe("systemMessageRules", () => {
       codex: [],
       gemini: [],
       cursor: [],
+      opencode: [],
     });
   });
 

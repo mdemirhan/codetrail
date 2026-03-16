@@ -96,6 +96,7 @@ describe("discoverSessionFiles", () => {
       geminiHistoryRoot,
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
+      opencodeDbPath: join(dir, ".local", "share", "opencode", "opencode.db"),
       includeClaudeSubagents: true,
     });
 
@@ -124,6 +125,7 @@ describe("discoverSessionFiles", () => {
       geminiHistoryRoot,
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
+      opencodeDbPath: join(dir, ".local", "share", "opencode", "opencode.db"),
       includeClaudeSubagents: false,
     });
 
@@ -189,6 +191,7 @@ describe("discoverSessionFiles", () => {
       geminiHistoryRoot: join(dir, ".gemini", "history"),
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot,
+      opencodeDbPath: join(dir, ".local", "share", "opencode", "opencode.db"),
       includeClaudeSubagents: false,
     });
 

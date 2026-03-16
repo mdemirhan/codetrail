@@ -35,6 +35,7 @@ const info = {
     geminiHistoryRoot: "/Users/test/.gemini/history",
     geminiProjectsPath: "/Users/test/.gemini/projects.json",
     cursorRoot: "/Users/test/.cursor/projects",
+    opencodeDbPath: "/mock/.local/share/opencode/opencode.db",
   },
 };
 
@@ -61,6 +62,7 @@ function createBaseProps() {
       codex: ["^<environment_context>"],
       gemini: [],
       cursor: [],
+      opencode: [],
     },
     onAddSystemMessageRegexRule: vi.fn(),
     onUpdateSystemMessageRegexRule: vi.fn(),

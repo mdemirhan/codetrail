@@ -11,6 +11,7 @@ export const DEFAULT_SYSTEM_MESSAGE_REGEX_RULES: SystemMessageRegexRules = {
   ],
   gemini: [],
   cursor: [],
+  opencode: [],
 };
 
 export function resolveSystemMessageRegexRules(
@@ -21,6 +22,7 @@ export function resolveSystemMessageRegexRules(
     codex: [...DEFAULT_SYSTEM_MESSAGE_REGEX_RULES.codex],
     gemini: [...DEFAULT_SYSTEM_MESSAGE_REGEX_RULES.gemini],
     cursor: [...DEFAULT_SYSTEM_MESSAGE_REGEX_RULES.cursor],
+    opencode: [...DEFAULT_SYSTEM_MESSAGE_REGEX_RULES.opencode],
   };
 
   if (!overrides) {

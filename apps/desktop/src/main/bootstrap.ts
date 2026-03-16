@@ -20,6 +20,7 @@ import { type QueryService, createQueryService } from "./data/queryService";
 import { type FileWatcherOptions, FileWatcherService } from "./fileWatcherService";
 import { WorkerIndexingRunner } from "./indexingRunner";
 import { registerIpcHandlers } from "./ipc";
+import { initializeOpenCodeReaders } from "./openCodeReaders";
 
 const MIN_ZOOM_PERCENT = 60;
 const MAX_ZOOM_PERCENT = 175;
@@ -60,6 +61,7 @@ export async function bootstrapMainProcess(
 
   const dbBootstrap = initializeDatabase(dbPath);
   initializeBookmarkStore(bookmarksDbPath);
+  initializeOpenCodeReaders();
   const indexingRunner = new WorkerIndexingRunner(dbPath, {
     bookmarksDbPath,
     getSystemMessageRegexRules: () =>
@@ -100,6 +102,7 @@ export async function bootstrapMainProcess(
     DEFAULT_DISCOVERY_CONFIG.geminiRoot,
     geminiHistoryRoot,
     DEFAULT_DISCOVERY_CONFIG.cursorRoot,
+    dirname(DEFAULT_DISCOVERY_CONFIG.opencodeDbPath),
   ];
   registerIpcHandlers(ipcMain, {
     "app:getHealth": () => ({
@@ -121,6 +124,7 @@ export async function bootstrapMainProcess(
         geminiHistoryRoot,
         geminiProjectsPath,
         cursorRoot: DEFAULT_DISCOVERY_CONFIG.cursorRoot,
+        opencodeDbPath: DEFAULT_DISCOVERY_CONFIG.opencodeDbPath,
       },
     }),
     "db:getSchemaVersion": () => ({
@@ -366,6 +370,7 @@ function getAllowedOpenInFileManagerRoots(input: {
   addRoot(input.geminiProjectsPath);
   addRoot(dirname(input.geminiProjectsPath));
   addRoot(DEFAULT_DISCOVERY_CONFIG.cursorRoot);
+  addRoot(dirname(DEFAULT_DISCOVERY_CONFIG.opencodeDbPath));
 
   try {
     // Indexed project paths are dynamic, so fold them into the static provider/app roots cache.
