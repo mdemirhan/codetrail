@@ -2584,6 +2584,36 @@ mark {
   color: var(--text-tertiary);
 }
 
+.settings-tab-bar {
+  display: inline-flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.settings-tab {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 10px 16px;
+  transition: all 0.18s ease;
+}
+
+.settings-tab:hover {
+  border-color: var(--border-active);
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.settings-tab.active {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: rgba(37, 99, 235, 0.18);
+  color: var(--accent-blue);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
 .settings-view::-webkit-scrollbar {
   width: 5px;
 }
@@ -2657,6 +2687,16 @@ mark {
 .settings-section-icon-discovery {
   color: var(--accent-muted);
   background: var(--accent-muted-dim);
+}
+
+.settings-section-icon-diagnostics {
+  color: var(--accent-blue);
+  background: var(--accent-blue-dim);
+}
+
+.settings-section-icon-breakdown {
+  color: var(--accent-green);
+  background: var(--accent-green-dim);
 }
 
 .settings-section h3 {
@@ -3007,6 +3047,139 @@ mark {
   opacity: 1;
 }
 
+.settings-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-metric-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.settings-metric-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.settings-metric-value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.settings-metric-detail {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.settings-diagnostics-table {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-diagnostics-row-header {
+  min-height: 0;
+  padding: 0 14px 2px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.settings-diagnostics-row-header .settings-diagnostics-label,
+.settings-diagnostics-row-header .settings-diagnostics-number {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-diagnostics-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px 88px 88px;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  padding: 12px 14px;
+}
+
+.settings-diagnostics-label {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.settings-diagnostics-number {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.settings-runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-runtime-stat {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.settings-runtime-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.settings-runtime-value {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.settings-last-run {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  padding: 14px;
+}
+
+.settings-last-run-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.settings-last-run-value {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
 @media (max-width: 900px) {
   .settings-view {
     padding: 18px 14px 24px;
@@ -3046,6 +3219,15 @@ mark {
   }
 
   .settings-font-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-metric-grid,
+  .settings-runtime-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-diagnostics-row {
     grid-template-columns: 1fr;
   }
 

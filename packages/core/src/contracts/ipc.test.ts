@@ -236,6 +236,34 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
     request: {},
     response: { running: true, processing: false, pendingPathCount: 3 },
   },
+  "watcher:getStats": {
+    request: {},
+    response: {
+      startedAt: "2026-03-16T10:00:00.000Z",
+      watcher: {
+        backend: "default",
+        watchedRootCount: 5,
+        watchBasedTriggers: 2,
+        fallbackToIncrementalScans: 1,
+        lastTriggerAt: "2026-03-16T10:05:00.000Z",
+        lastTriggerPathCount: 3,
+      },
+      jobs: {
+        startupIncremental: makeDiagnosticsBucket(),
+        manualIncremental: makeDiagnosticsBucket(),
+        manualForceReindex: makeDiagnosticsBucket(),
+        watchTriggered: makeDiagnosticsBucket(),
+        watchTargeted: makeDiagnosticsBucket(),
+        watchFallbackIncremental: makeDiagnosticsBucket(),
+        watchInitialScan: makeDiagnosticsBucket(),
+        totals: {
+          completedRuns: 0,
+          failedRuns: 0,
+        },
+      },
+      lastRun: null,
+    },
+  },
   "watcher:stop": {
     request: {},
     response: { ok: true },
@@ -258,3 +286,14 @@ describe("ipc contracts", () => {
     expect(ipcContractSchemas["ui:setZoom"].response.safeParse({ percent: 0 }).success).toBe(false);
   });
 });
+
+function makeDiagnosticsBucket() {
+  return {
+    runs: 0,
+    failedRuns: 0,
+    totalDurationMs: 0,
+    averageDurationMs: 0,
+    maxDurationMs: 0,
+    lastDurationMs: null,
+  };
+}

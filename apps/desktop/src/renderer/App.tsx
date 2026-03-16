@@ -12,7 +12,7 @@ import {
   isWatchRefreshStrategy,
 } from "./app/autoRefresh";
 import { ADVANCED_SYNTAX_ITEMS, COMMON_SYNTAX_ITEMS, SHORTCUT_ITEMS } from "./app/constants";
-import type { MainView, PaneStateSnapshot } from "./app/types";
+import type { MainView, PaneStateSnapshot, WatchStatsResponse } from "./app/types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SettingsView } from "./components/SettingsView";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
@@ -51,6 +51,9 @@ export function App({
   const [refreshStrategy, setRefreshStrategy] = useState<RefreshStrategy>("off");
   const [watcherPendingPathCount, setWatcherPendingPathCount] = useState(0);
   const [autoRefreshScanInFlight, setAutoRefreshScanInFlight] = useState(false);
+  const [watchStats, setWatchStats] = useState<WatchStatsResponse | null>(null);
+  const [watchStatsLoading, setWatchStatsLoading] = useState(false);
+  const [watchStatsError, setWatchStatsError] = useState<string | null>(null);
   const [searchProviders, setSearchProviders] = useState<Provider[]>(
     initialPaneState?.searchProviders ?? [],
   );
@@ -62,6 +65,7 @@ export function App({
   }, []);
   const wasIndexingRef = useRef(false);
   const lastCompletedJobsRef = useRef(-1);
+  const watchStatsLoadedRef = useRef(false);
 
   const appearance = useAppearanceController({
     initialPaneState,
@@ -93,6 +97,47 @@ export function App({
     }
     void appearance.loadSettingsInfo();
   }, [appearance.loadSettingsInfo, appearance.settingsInfo, appearance.settingsLoading, mainView]);
+
+  useEffect(() => {
+    if (mainView !== "settings") {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadWatchStats = async (showLoading: boolean) => {
+      if (showLoading) {
+        setWatchStatsLoading(true);
+        setWatchStatsError(null);
+      }
+      try {
+        const response = await codetrail.invoke("watcher:getStats", {});
+        if (!cancelled) {
+          setWatchStats(response);
+          setWatchStatsError(null);
+          watchStatsLoadedRef.current = true;
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setWatchStatsError(toErrorMessage(error));
+        }
+      } finally {
+        if (!cancelled && showLoading) {
+          setWatchStatsLoading(false);
+        }
+      }
+    };
+
+    void loadWatchStats(!watchStatsLoadedRef.current);
+    const intervalId = window.setInterval(() => {
+      void loadWatchStats(false);
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [codetrail, mainView]);
 
   useEffect(() => {
     if (
@@ -440,6 +485,9 @@ export function App({
               info={appearance.settingsInfo}
               loading={appearance.settingsLoading}
               error={appearance.settingsError}
+              diagnostics={watchStats}
+              diagnosticsLoading={watchStatsLoading}
+              diagnosticsError={watchStatsError}
               theme={appearance.theme}
               zoomPercent={appearance.zoomPercent}
               monoFontFamily={appearance.monoFontFamily}

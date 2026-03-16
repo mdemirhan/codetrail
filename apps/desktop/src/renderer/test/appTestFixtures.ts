@@ -87,6 +87,42 @@ function createRendererClient(handlers: Record<string, ChannelHandler>) {
     if (channel === "watcher:getStatus") {
       return { running: false, processing: false, pendingPathCount: 0 };
     }
+    if (channel === "watcher:getStats") {
+      return {
+        startedAt: "2026-03-16T10:00:00.000Z",
+        watcher: {
+          backend: "default",
+          watchedRootCount: 5,
+          watchBasedTriggers: 2,
+          fallbackToIncrementalScans: 1,
+          lastTriggerAt: "2026-03-16T10:05:00.000Z",
+          lastTriggerPathCount: 3,
+        },
+        jobs: {
+          startupIncremental: makeDiagnosticsBucket(),
+          manualIncremental: makeDiagnosticsBucket({ runs: 1, averageDurationMs: 140, maxDurationMs: 140 }),
+          manualForceReindex: makeDiagnosticsBucket(),
+          watchTriggered: makeDiagnosticsBucket({ runs: 2, averageDurationMs: 90, maxDurationMs: 120 }),
+          watchTargeted: makeDiagnosticsBucket({ runs: 1, averageDurationMs: 60, maxDurationMs: 60 }),
+          watchFallbackIncremental: makeDiagnosticsBucket({
+            runs: 1,
+            averageDurationMs: 120,
+            maxDurationMs: 120,
+          }),
+          watchInitialScan: makeDiagnosticsBucket(),
+          totals: {
+            completedRuns: 3,
+            failedRuns: 0,
+          },
+        },
+        lastRun: {
+          source: "watch_fallback_incremental",
+          completedAt: "2026-03-16T10:05:03.000Z",
+          durationMs: 320,
+          success: true,
+        },
+      };
+    }
     if (channel === "watcher:stop") {
       return { ok: true };
     }
@@ -95,6 +131,27 @@ function createRendererClient(handlers: Record<string, ChannelHandler>) {
   });
 
   return client;
+}
+
+function makeDiagnosticsBucket(
+  overrides: Partial<{
+    runs: number;
+    failedRuns: number;
+    totalDurationMs: number;
+    averageDurationMs: number;
+    maxDurationMs: number;
+    lastDurationMs: number | null;
+  }> = {},
+) {
+  return {
+    runs: 0,
+    failedRuns: 0,
+    totalDurationMs: 0,
+    averageDurationMs: 0,
+    maxDurationMs: 0,
+    lastDurationMs: null,
+    ...overrides,
+  };
 }
 
 export function createAppClient(overrides: Record<string, ChannelHandler> = {}) {

@@ -13,6 +13,7 @@ const {
   mockWorkerIndexingRunner,
   mockRegisterIpcHandlers,
   mockEnqueue,
+  mockEnqueueChangedFiles,
   mockGetStatus,
   mockStat,
   mockRealpath,
@@ -32,6 +33,7 @@ const {
   const fileWatcherInstances: Array<{
     roots: string[];
     options: Record<string, unknown>;
+    onFilesChanged: (batch: { changedPaths: string[]; requiresFullScan: boolean }) => Promise<void>;
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
     getWatchedRoots: ReturnType<typeof vi.fn>;
@@ -67,6 +69,7 @@ const {
     mockWorkerIndexingRunner: vi.fn(),
     mockRegisterIpcHandlers: vi.fn(),
     mockEnqueue: vi.fn(async () => ({ jobId: "job-1" })),
+    mockEnqueueChangedFiles: vi.fn(async () => ({ jobId: "job-2" })),
     mockGetStatus: vi.fn(() => ({
       running: false,
       queuedJobs: 0,
@@ -103,10 +106,18 @@ const {
     mockQueryServiceClose: vi.fn(),
     mockFileWatcherInstances: fileWatcherInstances,
     mockFileWatcherService: vi.fn(
-      (roots: string[], _onFilesChanged: unknown, options: Record<string, unknown> = {}) => {
+      (
+        roots: string[],
+        onFilesChanged: (batch: {
+          changedPaths: string[];
+          requiresFullScan: boolean;
+        }) => Promise<void>,
+        options: Record<string, unknown> = {},
+      ) => {
         const instance = {
           roots,
           options,
+          onFilesChanged,
           start: vi.fn(async () => {}),
           stop: vi.fn(async () => {}),
           getWatchedRoots: vi.fn(() => roots),
@@ -236,6 +247,7 @@ describe("bootstrapMainProcess", () => {
 
     mockWorkerIndexingRunner.mockImplementation(() => ({
       enqueue: mockEnqueue,
+      enqueueChangedFiles: mockEnqueueChangedFiles,
       getStatus: mockGetStatus,
     }));
     mockCreateQueryService.mockImplementation(() => ({
@@ -389,6 +401,9 @@ describe("bootstrapMainProcess", () => {
       expect.objectContaining({
         force: true,
       }),
+      {
+        source: "manual_force_reindex",
+      },
     );
     expect(getRequiredHandler(handlers, "indexer:getStatus")({})).toEqual({
       running: false,
@@ -538,7 +553,10 @@ describe("bootstrapMainProcess", () => {
         }),
       );
       expect(mockFileWatcherInstances[0]?.start).toHaveBeenCalledTimes(1);
-      expect(mockEnqueue).toHaveBeenCalledWith({ force: false });
+      expect(mockEnqueue).toHaveBeenCalledWith(
+        { force: false },
+        { source: "watch_initial_scan" },
+      );
     } finally {
       Object.defineProperty(process, "platform", { value: originalPlatform });
     }
@@ -553,10 +571,18 @@ describe("bootstrapMainProcess", () => {
       await bootstrapMainProcess({ runStartupIndexing: false });
       mockFileWatcherService
         .mockImplementationOnce(
-          (roots: string[], _onFilesChanged: unknown, options: Record<string, unknown> = {}) => {
+          (
+            roots: string[],
+            onFilesChanged: (batch: {
+              changedPaths: string[];
+              requiresFullScan: boolean;
+            }) => Promise<void>,
+            options: Record<string, unknown> = {},
+          ) => {
             const instance = {
               roots,
               options,
+              onFilesChanged,
               start: vi.fn(async () => {
                 throw new Error("kqueue unavailable");
               }),
@@ -569,10 +595,18 @@ describe("bootstrapMainProcess", () => {
           },
         )
         .mockImplementationOnce(
-          (roots: string[], _onFilesChanged: unknown, options: Record<string, unknown> = {}) => {
+          (
+            roots: string[],
+            onFilesChanged: (batch: {
+              changedPaths: string[];
+              requiresFullScan: boolean;
+            }) => Promise<void>,
+            options: Record<string, unknown> = {},
+          ) => {
             const instance = {
               roots,
               options,
+              onFilesChanged,
               start: vi.fn(async () => {}),
               stop: vi.fn(async () => {}),
               getWatchedRoots: vi.fn(() => roots),
@@ -659,6 +693,52 @@ describe("bootstrapMainProcess", () => {
     });
   });
 
+  it("uses targeted indexing for tracked file watcher batches", async () => {
+    await bootstrapMainProcess({ runStartupIndexing: false });
+    await getRequiredHandler(handlers, "watcher:start")({ debounceMs: 5000 });
+    mockEnqueue.mockClear();
+    mockEnqueueChangedFiles.mockClear();
+
+    const firstWatcher = mockFileWatcherInstances[0];
+    if (!firstWatcher) {
+      throw new Error("Expected watcher instance");
+    }
+
+    await firstWatcher.onFilesChanged({
+      changedPaths: ["/codex/root/2026/03/16/session-1.jsonl"],
+      requiresFullScan: false,
+    });
+
+    expect(mockEnqueueChangedFiles).toHaveBeenCalledWith(
+      ["/codex/root/2026/03/16/session-1.jsonl"],
+      { source: "watch_targeted" },
+    );
+    expect(mockEnqueue).not.toHaveBeenCalledWith({ force: false }, expect.anything());
+  });
+
+  it("promotes structural watcher batches to a full incremental scan", async () => {
+    await bootstrapMainProcess({ runStartupIndexing: false });
+    await getRequiredHandler(handlers, "watcher:start")({ debounceMs: 5000 });
+    mockEnqueue.mockClear();
+    mockEnqueueChangedFiles.mockClear();
+
+    const firstWatcher = mockFileWatcherInstances[0];
+    if (!firstWatcher) {
+      throw new Error("Expected watcher instance");
+    }
+
+    await firstWatcher.onFilesChanged({
+      changedPaths: [],
+      requiresFullScan: true,
+    });
+
+    expect(mockEnqueue).toHaveBeenCalledWith(
+      { force: false },
+      { source: "watch_fallback_incremental" },
+    );
+    expect(mockEnqueueChangedFiles).not.toHaveBeenCalled();
+  });
+
   it("handles zoom get/in/out/reset and explicit percent actions", async () => {
     await bootstrapMainProcess({ runStartupIndexing: false });
 
@@ -705,7 +785,10 @@ describe("bootstrapMainProcess", () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       await bootstrapMainProcess();
-      expect(mockEnqueue).toHaveBeenCalledWith({ force: false });
+      expect(mockEnqueue).toHaveBeenCalledWith(
+        { force: false },
+        { source: "startup_incremental" },
+      );
 
       mockEnqueue.mockRejectedValueOnce(new Error("index boom"));
       await bootstrapMainProcess({ dbPath: "/tmp/next.sqlite" });

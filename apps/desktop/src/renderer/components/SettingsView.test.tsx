@@ -39,8 +39,58 @@ const info = {
   },
 };
 
+const diagnostics = {
+  startedAt: "2026-03-16T10:00:00.000Z",
+  watcher: {
+    backend: "kqueue" as const,
+    watchedRootCount: 5,
+    watchBasedTriggers: 4,
+    fallbackToIncrementalScans: 1,
+    lastTriggerAt: "2026-03-16T10:05:00.000Z",
+    lastTriggerPathCount: 2,
+  },
+  jobs: {
+    startupIncremental: makeDiagnosticsBucket(),
+    manualIncremental: makeDiagnosticsBucket({
+      runs: 2,
+      averageDurationMs: 150,
+      maxDurationMs: 220,
+    }),
+    manualForceReindex: makeDiagnosticsBucket(),
+    watchTriggered: makeDiagnosticsBucket({
+      runs: 3,
+      averageDurationMs: 80,
+      maxDurationMs: 120,
+    }),
+    watchTargeted: makeDiagnosticsBucket({
+      runs: 2,
+      averageDurationMs: 50,
+      maxDurationMs: 65,
+    }),
+    watchFallbackIncremental: makeDiagnosticsBucket({
+      runs: 1,
+      averageDurationMs: 120,
+      maxDurationMs: 120,
+    }),
+    watchInitialScan: makeDiagnosticsBucket(),
+    totals: {
+      completedRuns: 5,
+      failedRuns: 0,
+    },
+  },
+  lastRun: {
+    source: "watch_fallback_incremental" as const,
+    completedAt: "2026-03-16T10:05:03.000Z",
+    durationMs: 320,
+    success: true,
+  },
+};
+
 function createBaseProps() {
   return {
+    diagnostics,
+    diagnosticsLoading: false,
+    diagnosticsError: null,
     theme: "dark" as const,
     zoomPercent: 100,
     monoFontFamily: "droid_sans_mono" as const,
@@ -138,4 +188,42 @@ describe("SettingsView", () => {
     expect(copyTextToClipboard).toHaveBeenCalled();
     expect(openPath).toHaveBeenCalled();
   });
+
+  it("shows diagnostics in a separate tab", async () => {
+    const user = userEvent.setup();
+    const baseProps = createBaseProps();
+
+    render(<SettingsView info={info} loading={false} error={null} {...baseProps} />);
+
+    await user.click(screen.getByRole("tab", { name: "Diagnostics" }));
+
+    expect(screen.getByText("Overview")).toBeInTheDocument();
+    expect(screen.getByText("Manual Incremental Scans")).toBeInTheDocument();
+    expect(screen.getByText("Watch-Based Triggers")).toBeInTheDocument();
+    expect(screen.getByText("Run Breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Trigger type")).toBeInTheDocument();
+    expect(screen.getByText("Avg duration")).toBeInTheDocument();
+    expect(screen.getByText("Max duration")).toBeInTheDocument();
+  });
 });
+
+function makeDiagnosticsBucket(
+  overrides: Partial<{
+    runs: number;
+    failedRuns: number;
+    totalDurationMs: number;
+    averageDurationMs: number;
+    maxDurationMs: number;
+    lastDurationMs: number | null;
+  }> = {},
+) {
+  return {
+    runs: 0,
+    failedRuns: 0,
+    totalDurationMs: 0,
+    averageDurationMs: 0,
+    maxDurationMs: 0,
+    lastDurationMs: null,
+    ...overrides,
+  };
+}

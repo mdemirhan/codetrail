@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import type {
   IpcResponse,
   MessageCategory,
@@ -24,6 +26,7 @@ import { prettyCategory } from "../lib/viewUtils";
 import { ToolbarIcon } from "./ToolbarIcon";
 import { ZoomPercentInput } from "./ZoomPercentInput";
 type SettingsInfo = IpcResponse<"app:getSettingsInfo">;
+type WatchStats = IpcResponse<"watcher:getStats">;
 
 const MONO_FONT_OPTIONS: Array<{ value: MonoFontFamily; label: string }> = [
   ...UI_MONO_FONT_VALUES.map((value) => ({
@@ -49,6 +52,9 @@ export function SettingsView({
   info,
   loading,
   error,
+  diagnostics,
+  diagnosticsLoading,
+  diagnosticsError,
   theme,
   zoomPercent,
   monoFontFamily,
@@ -73,6 +79,9 @@ export function SettingsView({
   info: SettingsInfo | null;
   loading: boolean;
   error: string | null;
+  diagnostics: WatchStats | null;
+  diagnosticsLoading: boolean;
+  diagnosticsError: string | null;
   theme: ThemeMode;
   zoomPercent: number;
   monoFontFamily: MonoFontFamily;
@@ -94,6 +103,7 @@ export function SettingsView({
   onUpdateSystemMessageRegexRule: (provider: Provider, index: number, pattern: string) => void;
   onRemoveSystemMessageRegexRule: (provider: Provider, index: number) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<"settings" | "diagnostics">("settings");
   const storageRows = info
     ? [
         { label: "Settings file", value: info.storage.settingsFile },
@@ -133,7 +143,29 @@ export function SettingsView({
             <p>Application preferences and configuration</p>
           </div>
         </header>
+        <div className="settings-tab-bar" role="tablist" aria-label="Settings sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "settings"}
+            className={`settings-tab${activeTab === "settings" ? " active" : ""}`}
+            onClick={() => setActiveTab("settings")}
+          >
+            Application Settings
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "diagnostics"}
+            className={`settings-tab${activeTab === "diagnostics" ? " active" : ""}`}
+            onClick={() => setActiveTab("diagnostics")}
+          >
+            Diagnostics
+          </button>
+        </div>
 
+        {activeTab === "settings" ? (
+          <>
         <section className="settings-section">
           <div className="settings-section-header">
             <div className="settings-section-icon settings-section-icon-theme" aria-hidden>
@@ -436,6 +468,14 @@ export function SettingsView({
             </section>
           </>
         ) : null}
+          </>
+        ) : (
+          <DiagnosticsTab
+            diagnostics={diagnostics}
+            loading={diagnosticsLoading}
+            error={diagnosticsError}
+          />
+        )}
       </div>
     </div>
   );
@@ -501,4 +541,288 @@ function SettingsInfoRow({
       </div>
     </div>
   );
+}
+
+function DiagnosticsTab({
+  diagnostics,
+  loading,
+  error,
+}: {
+  diagnostics: WatchStats | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  if (loading && !diagnostics) {
+    return (
+      <section className="settings-section settings-status-card">
+        <p className="empty-state">Loading diagnostics...</p>
+      </section>
+    );
+  }
+
+  if (error && !diagnostics) {
+    return (
+      <section className="settings-section settings-status-card">
+        <p className="empty-state">{error}</p>
+      </section>
+    );
+  }
+
+  if (!diagnostics) {
+    return (
+      <section className="settings-section settings-status-card">
+        <p className="empty-state">Diagnostics are not available yet.</p>
+      </section>
+    );
+  }
+
+  return (
+    <>
+      {error ? (
+        <section className="settings-section settings-status-card">
+          <p className="empty-state">{error}</p>
+        </section>
+      ) : null}
+
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <div className="settings-section-icon settings-section-icon-diagnostics" aria-hidden>
+            DI
+          </div>
+          <div>
+            <h3>Overview</h3>
+            <p>In-memory refresh and watcher counters for this app run.</p>
+          </div>
+        </div>
+        <div className="settings-section-body">
+          <div className="settings-metric-grid">
+            <MetricCard
+              label="Manual Incremental Scans"
+              value={formatUnitCount(diagnostics.jobs.manualIncremental.runs, "run")}
+              detail={`average ${formatDurationPerRun(diagnostics.jobs.manualIncremental.averageDurationMs)}`}
+            />
+            <MetricCard
+              label="Watch Fallback Scans"
+              value={formatUnitCount(diagnostics.watcher.fallbackToIncrementalScans, "scan")}
+              detail={`${formatUnitCount(diagnostics.jobs.watchFallbackIncremental.runs, "fallback incremental run")} executed`}
+            />
+            <MetricCard
+              label="Watch-Based Triggers"
+              value={formatUnitCount(diagnostics.watcher.watchBasedTriggers, "trigger")}
+              detail={`${formatUnitCount(diagnostics.jobs.watchTargeted.runs, "targeted run")} | ${formatUnitCount(diagnostics.jobs.watchFallbackIncremental.runs, "fallback run")}`}
+            />
+            <MetricCard
+              label="Completed Runs"
+              value={formatUnitCount(diagnostics.jobs.totals.completedRuns, "run")}
+              detail={`${formatUnitCount(diagnostics.jobs.totals.failedRuns, "failed run")} recorded`}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <div className="settings-section-icon settings-section-icon-breakdown" aria-hidden>
+            RB
+          </div>
+          <div>
+            <h3>Run Breakdown</h3>
+            <p>Run counts and durations grouped by refresh source.</p>
+          </div>
+        </div>
+        <div className="settings-section-body">
+          <div className="settings-diagnostics-table">
+            <div className="settings-diagnostics-row settings-diagnostics-row-header">
+              <span className="settings-diagnostics-label">Trigger type</span>
+              <span className="settings-diagnostics-number">Runs</span>
+              <span className="settings-diagnostics-number">Avg duration</span>
+              <span className="settings-diagnostics-number">Max duration</span>
+            </div>
+            <DiagnosticsRow
+              label="Startup incremental"
+              runs={diagnostics.jobs.startupIncremental.runs}
+              averageDurationMs={diagnostics.jobs.startupIncremental.averageDurationMs}
+              maxDurationMs={diagnostics.jobs.startupIncremental.maxDurationMs}
+            />
+            <DiagnosticsRow
+              label="Manual incremental"
+              runs={diagnostics.jobs.manualIncremental.runs}
+              averageDurationMs={diagnostics.jobs.manualIncremental.averageDurationMs}
+              maxDurationMs={diagnostics.jobs.manualIncremental.maxDurationMs}
+            />
+            <DiagnosticsRow
+              label="Manual force reindex"
+              runs={diagnostics.jobs.manualForceReindex.runs}
+              averageDurationMs={diagnostics.jobs.manualForceReindex.averageDurationMs}
+              maxDurationMs={diagnostics.jobs.manualForceReindex.maxDurationMs}
+            />
+            <DiagnosticsRow
+              label="Watch-triggered total"
+              runs={diagnostics.jobs.watchTriggered.runs}
+              averageDurationMs={diagnostics.jobs.watchTriggered.averageDurationMs}
+              maxDurationMs={diagnostics.jobs.watchTriggered.maxDurationMs}
+            />
+            <DiagnosticsRow
+              label="Watch targeted"
+              runs={diagnostics.jobs.watchTargeted.runs}
+              averageDurationMs={diagnostics.jobs.watchTargeted.averageDurationMs}
+              maxDurationMs={diagnostics.jobs.watchTargeted.maxDurationMs}
+            />
+            <DiagnosticsRow
+              label="Watch fallback incremental"
+              runs={diagnostics.jobs.watchFallbackIncremental.runs}
+              averageDurationMs={diagnostics.jobs.watchFallbackIncremental.averageDurationMs}
+              maxDurationMs={diagnostics.jobs.watchFallbackIncremental.maxDurationMs}
+            />
+            <DiagnosticsRow
+              label="Watch initial scan"
+              runs={diagnostics.jobs.watchInitialScan.runs}
+              averageDurationMs={diagnostics.jobs.watchInitialScan.averageDurationMs}
+              maxDurationMs={diagnostics.jobs.watchInitialScan.maxDurationMs}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <div className="settings-section-icon settings-section-icon-discovery" aria-hidden>
+            RT
+          </div>
+          <div>
+            <h3>Runtime</h3>
+            <p>Watcher backend, run durations, and the most recent indexing job.</p>
+          </div>
+        </div>
+        <div className="settings-section-body">
+          <div className="settings-runtime-grid">
+            <RuntimeStat
+              label="Started"
+              value={formatTimestamp(diagnostics.startedAt)}
+            />
+            <RuntimeStat
+              label="Watcher backend"
+              value={diagnostics.watcher.backend ?? "not started"}
+            />
+            <RuntimeStat
+              label="Watched roots"
+              value={formatUnitCount(diagnostics.watcher.watchedRootCount, "root")}
+            />
+            <RuntimeStat
+              label="Last trigger"
+              value={formatOptionalTrigger(diagnostics.watcher.lastTriggerAt, diagnostics.watcher.lastTriggerPathCount)}
+            />
+            <RuntimeStat
+              label="Manual avg duration"
+              value={formatDurationPerRun(diagnostics.jobs.manualIncremental.averageDurationMs)}
+            />
+            <RuntimeStat
+              label="Watch avg duration"
+              value={formatDurationPerRun(diagnostics.jobs.watchTriggered.averageDurationMs)}
+            />
+          </div>
+          <div className="settings-last-run">
+            <div className="settings-last-run-label">Last run</div>
+            {diagnostics.lastRun ? (
+              <div className="settings-last-run-value">
+                <strong>{formatSourceLabel(diagnostics.lastRun.source)}</strong>
+                <span>{formatTimestamp(diagnostics.lastRun.completedAt)}</span>
+                <span>duration {formatDuration(diagnostics.lastRun.durationMs)}</span>
+                <span>{diagnostics.lastRun.success ? "completed successfully" : "failed"}</span>
+              </div>
+            ) : (
+              <div className="settings-last-run-value">No indexing jobs recorded yet.</div>
+            )}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="settings-metric-card">
+      <div className="settings-metric-label">{label}</div>
+      <div className="settings-metric-value">{value}</div>
+      <div className="settings-metric-detail">{detail}</div>
+    </div>
+  );
+}
+
+function DiagnosticsRow({
+  label,
+  runs,
+  averageDurationMs,
+  maxDurationMs,
+}: {
+  label: string;
+  runs: number;
+  averageDurationMs: number;
+  maxDurationMs: number;
+}) {
+  return (
+    <div className="settings-diagnostics-row">
+      <span className="settings-diagnostics-label">{label}</span>
+      <span className="settings-diagnostics-number">{formatCount(runs)}</span>
+      <span className="settings-diagnostics-number">{formatDuration(averageDurationMs)}</span>
+      <span className="settings-diagnostics-number">{formatDuration(maxDurationMs)}</span>
+    </div>
+  );
+}
+
+function RuntimeStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="settings-runtime-stat">
+      <span className="settings-runtime-label">{label}</span>
+      <span className="settings-runtime-value">{value}</span>
+    </div>
+  );
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat().format(value);
+}
+
+function formatUnitCount(value: number, singular: string, plural = `${singular}s`): string {
+  return `${formatCount(value)} ${value === 1 ? singular : plural}`;
+}
+
+function formatDuration(value: number): string {
+  if (value <= 0) {
+    return "0 ms";
+  }
+  if (value < 1000) {
+    return `${value} ms`;
+  }
+  return `${(value / 1000).toFixed(2)} s`;
+}
+
+function formatDurationPerRun(value: number): string {
+  return `${formatDuration(value)} per run`;
+}
+
+function formatTimestamp(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatSourceLabel(source: NonNullable<WatchStats["lastRun"]>["source"]): string {
+  return source.replaceAll("_", " ");
+}
+
+function formatOptionalTrigger(timestamp: string | null, pathCount: number | null): string {
+  if (!timestamp) {
+    return "No watch trigger yet";
+  }
+  const countLabel = pathCount === null ? "" : ` (${formatUnitCount(pathCount, "changed path")})`;
+  return `${formatTimestamp(timestamp)}${countLabel}`;
 }

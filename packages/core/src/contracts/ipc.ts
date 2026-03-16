@@ -218,6 +218,57 @@ const indexerStatusResponseSchema = z.object({
   completedJobs: z.number().int().nonnegative(),
 });
 
+const diagnosticsSourceSchema = z.object({
+  runs: z.number().int().nonnegative(),
+  failedRuns: z.number().int().nonnegative(),
+  totalDurationMs: z.number().int().nonnegative(),
+  averageDurationMs: z.number().int().nonnegative(),
+  maxDurationMs: z.number().int().nonnegative(),
+  lastDurationMs: z.number().int().nonnegative().nullable(),
+});
+
+const diagnosticsSourceTypeSchema = z.enum([
+  "startup_incremental",
+  "manual_incremental",
+  "manual_force_reindex",
+  "watch_targeted",
+  "watch_fallback_incremental",
+  "watch_initial_scan",
+]);
+
+const watcherStatsResponseSchema = z.object({
+  startedAt: z.string().min(1),
+  watcher: z.object({
+    backend: z.enum(["default", "kqueue"]).nullable(),
+    watchedRootCount: z.number().int().nonnegative(),
+    watchBasedTriggers: z.number().int().nonnegative(),
+    fallbackToIncrementalScans: z.number().int().nonnegative(),
+    lastTriggerAt: z.string().nullable(),
+    lastTriggerPathCount: z.number().int().nonnegative().nullable(),
+  }),
+  jobs: z.object({
+    startupIncremental: diagnosticsSourceSchema,
+    manualIncremental: diagnosticsSourceSchema,
+    manualForceReindex: diagnosticsSourceSchema,
+    watchTriggered: diagnosticsSourceSchema,
+    watchTargeted: diagnosticsSourceSchema,
+    watchFallbackIncremental: diagnosticsSourceSchema,
+    watchInitialScan: diagnosticsSourceSchema,
+    totals: z.object({
+      completedRuns: z.number().int().nonnegative(),
+      failedRuns: z.number().int().nonnegative(),
+    }),
+  }),
+  lastRun: z
+    .object({
+      source: diagnosticsSourceTypeSchema,
+      completedAt: z.string().min(1),
+      durationMs: z.number().int().nonnegative(),
+      success: z.boolean(),
+    })
+    .nullable(),
+});
+
 export const ipcContractSchemas = {
   "app:getHealth": {
     request: z.object({}),
@@ -412,6 +463,10 @@ export const ipcContractSchemas = {
       processing: z.boolean(),
       pendingPathCount: z.number().int().nonnegative(),
     }),
+  },
+  "watcher:getStats": {
+    request: z.object({}),
+    response: watcherStatsResponseSchema,
   },
   "watcher:stop": {
     request: z.object({}),

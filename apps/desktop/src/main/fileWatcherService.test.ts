@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { FileWatcherOptions } from "./fileWatcherService";
+import type { FileWatcherBatch, FileWatcherOptions } from "./fileWatcherService";
 import { FileWatcherService } from "./fileWatcherService";
 
 type SubscribeFn = NonNullable<FileWatcherOptions["subscribe"]>;
@@ -36,9 +36,9 @@ function getCallback(callbacks: EventCallback[], index: number): EventCallback {
   return expectDefined(callbacks[index], `Expected callback ${index}`);
 }
 
-function getChangedPaths(onFilesChanged: ReturnType<typeof vi.fn>, index = 0): string[] {
+function getBatch(onFilesChanged: ReturnType<typeof vi.fn>, index = 0): FileWatcherBatch {
   const call = expectDefined(onFilesChanged.mock.calls[index], `Expected callback call ${index}`);
-  return call[0] as string[];
+  return call[0] as FileWatcherBatch;
 }
 
 vi.mock("node:fs", async (importOriginal) => {
@@ -120,9 +120,10 @@ describe("FileWatcherService", () => {
     await vi.advanceTimersByTimeAsync(50);
 
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
-    const paths = getChangedPaths(onFilesChanged);
+    const { changedPaths: paths, requiresFullScan } = getBatch(onFilesChanged);
     expect(paths).toContain("/root/a/file1.json");
     expect(paths).toContain("/root/a/file2.jsonl");
+    expect(requiresFullScan).toBe(false);
   });
 
   it("deduplicates paths within a debounce window", async () => {
@@ -142,8 +143,10 @@ describe("FileWatcherService", () => {
     await vi.advanceTimersByTimeAsync(50);
 
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
-    const paths = getChangedPaths(onFilesChanged);
-    expect(paths).toEqual(["/root/a/same.jsonl"]);
+    expect(getBatch(onFilesChanged)).toEqual({
+      changedPaths: ["/root/a/same.jsonl"],
+      requiresFullScan: false,
+    });
   });
 
   it("does not reset timer on new events — flushes at fixed interval from first event", async () => {
@@ -166,9 +169,10 @@ describe("FileWatcherService", () => {
     // Original timer fires at t=50 (10ms from now), including both paths
     await vi.advanceTimersByTimeAsync(10);
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
-    const paths = getChangedPaths(onFilesChanged);
+    const { changedPaths: paths, requiresFullScan } = getBatch(onFilesChanged);
     expect(paths).toContain("/root/a/file.json");
     expect(paths).toContain("/root/a/other.json");
+    expect(requiresFullScan).toBe(false);
   });
 
   it("starts a new timer after flush completes for events that arrive during continuous activity", async () => {
@@ -190,7 +194,10 @@ describe("FileWatcherService", () => {
     getCallback(callbacks, 0)(null, [{ path: "/root/a/batch2.jsonl", type: "update" as const }]);
     await vi.advanceTimersByTimeAsync(50);
     expect(onFilesChanged).toHaveBeenCalledTimes(2);
-    expect(onFilesChanged).toHaveBeenLastCalledWith(["/root/a/batch2.jsonl"]);
+    expect(onFilesChanged).toHaveBeenLastCalledWith({
+      changedPaths: ["/root/a/batch2.jsonl"],
+      requiresFullScan: false,
+    });
   });
 
   it("only accumulates .json and .jsonl files", async () => {
@@ -206,7 +213,7 @@ describe("FileWatcherService", () => {
     getCallback(callbacks, 0)(null, [
       { path: "/root/a/file.txt", type: "update" as const },
       { path: "/root/a/file.ts", type: "update" as const },
-      { path: "/root/a/file.log", type: "create" as const },
+      { path: "/root/a/file.log", type: "update" as const },
     ]);
 
     await vi.advanceTimersByTimeAsync(100);
@@ -223,7 +230,7 @@ describe("FileWatcherService", () => {
     const { subscribe, callbacks } = createMockSubscribe();
     let finishProcessing: (() => void) | null = null;
     const onFilesChanged = vi.fn(
-      (_paths: string[]) =>
+      (_batch: FileWatcherBatch) =>
         new Promise<void>((resolve) => {
           finishProcessing = () => resolve();
         }),
@@ -240,7 +247,10 @@ describe("FileWatcherService", () => {
     await vi.advanceTimersByTimeAsync(10);
 
     expect(onFilesChanged).toHaveBeenCalledTimes(1);
-    expect(onFilesChanged).toHaveBeenCalledWith(["/root/a/first.jsonl"]);
+    expect(onFilesChanged).toHaveBeenCalledWith({
+      changedPaths: ["/root/a/first.jsonl"],
+      requiresFullScan: false,
+    });
 
     // While processing, new event arrives
     getCallback(callbacks, 0)(null, [{ path: "/root/a/second.jsonl", type: "create" as const }]);
@@ -259,7 +269,10 @@ describe("FileWatcherService", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(onFilesChanged).toHaveBeenCalledTimes(2);
-    expect(onFilesChanged).toHaveBeenLastCalledWith(["/root/a/second.jsonl"]);
+    expect(onFilesChanged).toHaveBeenLastCalledWith({
+      changedPaths: ["/root/a/second.jsonl"],
+      requiresFullScan: false,
+    });
   });
 
   it("start() is a no-op when already running", async () => {
@@ -304,7 +317,7 @@ describe("FileWatcherService", () => {
     const { subscribe, callbacks } = createMockSubscribe();
     let finishProcessing: (() => void) | null = null;
     const onFilesChanged = vi.fn(
-      (_paths: string[]) =>
+      (_batch: FileWatcherBatch) =>
         new Promise<void>((resolve) => {
           finishProcessing = () => resolve();
         }),
@@ -371,7 +384,7 @@ describe("FileWatcherService", () => {
   it("calls onError when onFilesChanged throws", async () => {
     const { subscribe, callbacks } = createMockSubscribe();
     const processingError = new Error("processing failed");
-    const onFilesChanged = vi.fn(async (_paths: string[]) => {
+    const onFilesChanged = vi.fn(async (_batch: FileWatcherBatch) => {
       throw processingError;
     });
     const onError = vi.fn();
@@ -387,6 +400,26 @@ describe("FileWatcherService", () => {
     await vi.advanceTimersByTimeAsync(10);
 
     expect(onError).toHaveBeenCalledWith(processingError);
+  });
+
+  it("requests a full scan when structural changes are observed", async () => {
+    const { subscribe, callbacks } = createMockSubscribe();
+    const onFilesChanged = vi.fn();
+
+    const service = new FileWatcherService(["/root/a"], onFilesChanged, {
+      subscribe,
+      debounceMs: 10,
+    });
+    await service.start();
+
+    getCallback(callbacks, 0)(null, [{ path: "/root/a/2026", type: "create" as const }]);
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(onFilesChanged).toHaveBeenCalledTimes(1);
+    expect(onFilesChanged).toHaveBeenCalledWith({
+      changedPaths: [],
+      requiresFullScan: true,
+    });
   });
 
   it("passes subscribe options through to the watcher backend", async () => {

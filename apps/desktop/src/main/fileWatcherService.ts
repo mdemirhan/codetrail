@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 import * as watcher from "@parcel/watcher";
@@ -28,9 +28,14 @@ export type FileWatcherStatus = {
   pendingPathCount: number;
 };
 
+export type FileWatcherBatch = {
+  changedPaths: string[];
+  requiresFullScan: boolean;
+};
+
 export class FileWatcherService {
   private readonly roots: string[];
-  private readonly onFilesChanged: (changedPaths: string[]) => void | Promise<void>;
+  private readonly onFilesChanged: (batch: FileWatcherBatch) => void | Promise<void>;
   private readonly debounceMs: number;
   private readonly onError: (error: unknown) => void;
   private readonly subscribeFn: SubscribeFn;
@@ -40,6 +45,7 @@ export class FileWatcherService {
   private watchedRoots: string[] = [];
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingPaths = new Set<string>();
+  private pendingStructureChange = false;
   private processing = false;
   private flushPromise: Promise<void> | null = null;
   private stopped = false;
@@ -47,7 +53,7 @@ export class FileWatcherService {
 
   constructor(
     roots: string[],
-    onFilesChanged: (changedPaths: string[]) => void | Promise<void>,
+    onFilesChanged: (batch: FileWatcherBatch) => void | Promise<void>,
     options: FileWatcherOptions = {},
   ) {
     this.roots = roots;
@@ -85,12 +91,17 @@ export class FileWatcherService {
 
             for (const event of events) {
               const eventPath = resolve(event.path);
-              if (WATCHED_EXTENSIONS.some((ext) => eventPath.endsWith(ext))) {
+              const isTrackedFile = WATCHED_EXTENSIONS.some((ext) => eventPath.endsWith(ext));
+              if (isTrackedFile) {
                 this.pendingPaths.add(eventPath);
+                continue;
+              }
+              if (event.type !== "update" || isDirectoryPath(eventPath)) {
+                this.pendingStructureChange = true;
               }
             }
 
-            if (this.pendingPaths.size > 0) {
+            if (this.pendingPaths.size > 0 || this.pendingStructureChange) {
               this.scheduleDebouncedFlush();
             }
           },
@@ -130,6 +141,7 @@ export class FileWatcherService {
     }
 
     this.pendingPaths.clear();
+    this.pendingStructureChange = false;
 
     // Await any in-flight flush before unsubscribing
     if (this.flushPromise) {
@@ -171,25 +183,42 @@ export class FileWatcherService {
   }
 
   private async flush(): Promise<void> {
-    if (this.stopped || this.processing || this.pendingPaths.size === 0) {
+    if (
+      this.stopped ||
+      this.processing ||
+      (this.pendingPaths.size === 0 && !this.pendingStructureChange)
+    ) {
       return;
     }
 
     this.processing = true;
     const batch = [...this.pendingPaths];
+    const requiresFullScan = this.pendingStructureChange;
     this.pendingPaths.clear();
+    this.pendingStructureChange = false;
 
     try {
-      await this.onFilesChanged(batch);
+      await this.onFilesChanged({
+        changedPaths: batch,
+        requiresFullScan,
+      });
     } catch (error) {
       this.onError(error);
     } finally {
       this.processing = false;
       this.flushPromise = null;
       // If new paths accumulated during processing, flush again
-      if (!this.stopped && this.pendingPaths.size > 0) {
+      if (!this.stopped && (this.pendingPaths.size > 0 || this.pendingStructureChange)) {
         this.flushPromise = this.flush();
       }
     }
+  }
+}
+
+function isDirectoryPath(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
   }
 }

@@ -17,10 +17,15 @@ import {
 import type { AppStateStore } from "./appStateStore";
 import { initializeBookmarkStore, resolveBookmarksDbPath } from "./data/bookmarkStore";
 import { type QueryService, createQueryService } from "./data/queryService";
-import { type FileWatcherOptions, FileWatcherService } from "./fileWatcherService";
+import {
+  type FileWatcherBatch,
+  type FileWatcherOptions,
+  FileWatcherService,
+} from "./fileWatcherService";
 import { WorkerIndexingRunner } from "./indexingRunner";
 import { registerIpcHandlers } from "./ipc";
 import { initializeOpenCodeReaders } from "./openCodeReaders";
+import { WatchStatsStore } from "./watchStatsStore";
 
 const MIN_ZOOM_PERCENT = 60;
 const MAX_ZOOM_PERCENT = 175;
@@ -62,10 +67,12 @@ export async function bootstrapMainProcess(
   const dbBootstrap = initializeDatabase(dbPath);
   initializeBookmarkStore(bookmarksDbPath);
   initializeOpenCodeReaders();
+  const watchStatsStore = new WatchStatsStore();
   const indexingRunner = new WorkerIndexingRunner(dbPath, {
     bookmarksDbPath,
     getSystemMessageRegexRules: () =>
       options.appStateStore?.getPaneState()?.systemMessageRegexRules,
+    onJobSettled: (event) => watchStatsStore.recordJobSettled(event),
     ...(options.onIndexingFileIssue ? { onFileIssue: options.onIndexingFileIssue } : {}),
     ...(options.onIndexingNotice ? { onNotice: options.onIndexingNotice } : {}),
   });
@@ -132,7 +139,12 @@ export async function bootstrapMainProcess(
     }),
     "indexer:refresh": async (payload) => {
       invalidateAllowedRootsCache();
-      const job = await indexingRunner.enqueue({ force: payload.force });
+      const job = await indexingRunner.enqueue(
+        { force: payload.force },
+        {
+          source: payload.force ? "manual_force_reindex" : "manual_incremental",
+        },
+      );
       return { jobId: job.jobId };
     },
     "indexer:getStatus": () => indexingRunner.getStatus(),
@@ -223,11 +235,26 @@ export async function bootstrapMainProcess(
       const createFileWatcher = (watcherOptions: FileWatcherOptions) =>
         new FileWatcherService(
           watcherRoots,
-          async (changedPaths) => {
+          async (batch: FileWatcherBatch) => {
             invalidateAllowedRootsCache();
-            await indexingRunner.enqueueChangedFiles(changedPaths).catch((error: unknown) => {
+            watchStatsStore.recordWatcherTrigger({
+              changedPathCount: batch.changedPaths.length,
+              requiresFullScan: batch.requiresFullScan,
+            });
+            const enqueuePromise = batch.requiresFullScan
+              ? indexingRunner.enqueue(
+                  { force: false },
+                  { source: "watch_fallback_incremental" },
+                )
+              : indexingRunner.enqueueChangedFiles(batch.changedPaths, {
+                  source: "watch_targeted",
+                });
+            await enqueuePromise.catch((error: unknown) => {
               if (options.onBackgroundError) {
-                options.onBackgroundError("watcher-triggered indexing failed", error);
+                options.onBackgroundError("watcher-triggered indexing failed", error, {
+                  requiresFullScan: batch.requiresFullScan,
+                  changedPathCount: batch.changedPaths.length,
+                });
                 return;
               }
               console.error("[codetrail] watcher-triggered indexing failed", error);
@@ -246,6 +273,10 @@ export async function bootstrapMainProcess(
         });
         await fileWatcher.start();
         activeFileWatcher = fileWatcher;
+        watchStatsStore.recordWatcherStart({
+          backend,
+          watchedRootCount: fileWatcher.getWatchedRoots().length,
+        });
         return {
           backend,
           watchedRoots: fileWatcher.getWatchedRoots(),
@@ -263,7 +294,9 @@ export async function bootstrapMainProcess(
             // Codex transcript appends on this macOS setup were missed by both Parcel's default
             // FSEvents backend and a direct CoreServices FSEvents probe, while Parcel's kqueue
             // backend consistently observed them. We force kqueue here for correctness and keep
-            // the default backend only as a fallback if kqueue subscription setup fails.
+            // the default backend only as a fallback if kqueue subscription setup fails. Because
+            // kqueue can still miss files created in brand-new nested directories, the watcher
+            // promotes structural events to a full incremental scan.
             startedWatcher = await startWatcher(
               { subscribeOptions: { backend: "kqueue" } },
               "kqueue",
@@ -280,13 +313,15 @@ export async function bootstrapMainProcess(
         }
 
         // Run one full incremental scan to bring the DB up to date before relying on events
-        void indexingRunner.enqueue({ force: false }).catch((error: unknown) => {
-          if (options.onBackgroundError) {
-            options.onBackgroundError("watcher initial scan failed", error);
-            return;
-          }
-          console.error("[codetrail] watcher initial scan failed", error);
-        });
+        void indexingRunner
+          .enqueue({ force: false }, { source: "watch_initial_scan" })
+          .catch((error: unknown) => {
+            if (options.onBackgroundError) {
+              options.onBackgroundError("watcher initial scan failed", error);
+              return;
+            }
+            console.error("[codetrail] watcher initial scan failed", error);
+          });
         return {
           ok: true,
           watchedRoots: startedWatcher.watchedRoots,
@@ -301,6 +336,7 @@ export async function bootstrapMainProcess(
         activeFileWatcher?.getStatus() ?? { running: false, processing: false, pendingPathCount: 0 }
       );
     },
+    "watcher:getStats": async () => watchStatsStore.snapshot(),
     "watcher:stop": async () => {
       if (activeFileWatcher) {
         await activeFileWatcher.stop();
@@ -311,13 +347,15 @@ export async function bootstrapMainProcess(
   });
 
   if (options.runStartupIndexing ?? true) {
-    void indexingRunner.enqueue({ force: false }).catch((error: unknown) => {
-      if (options.onBackgroundError) {
-        options.onBackgroundError("startup incremental indexing failed", error);
-        return;
-      }
-      console.error("[codetrail] startup incremental indexing failed", error);
-    });
+    void indexingRunner
+      .enqueue({ force: false }, { source: "startup_incremental" })
+      .catch((error: unknown) => {
+        if (options.onBackgroundError) {
+          options.onBackgroundError("startup incremental indexing failed", error);
+          return;
+        }
+        console.error("[codetrail] startup incremental indexing failed", error);
+      });
   }
 
   return {

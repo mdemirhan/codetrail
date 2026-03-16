@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
-import { closeSync, openSync, readFileSync, readSync } from "node:fs";
+import {
+  closeSync,
+  openSync,
+  readFileSync,
+  readSync,
+} from "node:fs";
 
 import { type MessageCategory, PROVIDER_VALUES, type Provider } from "../contracts/canonical";
 import {
@@ -645,11 +650,7 @@ function indexMaterializedSessionFile(args: {
     parsePayload: unknown[] | Record<string, unknown>;
   };
   try {
-    const loaded = readProviderSource(
-      args.discovered.provider,
-      args.discovered.filePath,
-      args.readFileText,
-    );
+    const loaded = readProviderSource(args.discovered.provider, args.discovered.filePath, args.readFileText);
     if (!loaded) {
       throw new Error("Unable to read provider source.");
     }
@@ -946,7 +947,10 @@ function indexStreamedJsonlSessionFile(args: {
         args.discovered.fileMtimeMs,
         args.nowIso,
       );
-      const hashes = computeFileHashes(args.discovered.filePath, args.discovered.fileSize);
+      const hashes = computeFileHashes(
+        args.discovered.filePath,
+        args.discovered.fileSize,
+      );
       const checkpoint = buildStreamCheckpointState({
         discovered: args.discovered,
         sessionDbId: args.sessionDbId,
@@ -1843,7 +1847,11 @@ function computeFileHashes(
   tailHash: string;
 } {
   return {
-    headHash: hashFileSlice(filePath, 0, Math.min(fileSize, JSONL_FINGERPRINT_WINDOW_BYTES)),
+    headHash: hashFileSlice(
+      filePath,
+      0,
+      Math.min(fileSize, JSONL_FINGERPRINT_WINDOW_BYTES),
+    ),
     tailHash: hashFileSlice(
       filePath,
       Math.max(0, fileSize - JSONL_FINGERPRINT_WINDOW_BYTES),
@@ -1859,8 +1867,11 @@ function verifyAppendOnlyFingerprint(
   expectedTailHash: string,
 ): boolean {
   return (
-    hashFileSlice(filePath, 0, Math.min(previousFileSize, JSONL_FINGERPRINT_WINDOW_BYTES)) ===
-      expectedHeadHash &&
+    hashFileSlice(
+      filePath,
+      0,
+      Math.min(previousFileSize, JSONL_FINGERPRINT_WINDOW_BYTES),
+    ) === expectedHeadHash &&
     hashFileSlice(
       filePath,
       Math.max(0, previousFileSize - JSONL_FINGERPRINT_WINDOW_BYTES),
@@ -1869,7 +1880,11 @@ function verifyAppendOnlyFingerprint(
   );
 }
 
-function hashFileSlice(filePath: string, start: number, length: number): string {
+function hashFileSlice(
+  filePath: string,
+  start: number,
+  length: number,
+): string {
   const hash = createHash("sha256");
   if (length <= 0) {
     return hash.digest("hex");

@@ -130,6 +130,28 @@ describe("registerIpcHandlers", () => {
         }),
         "watcher:start": () => ({ ok: true, watchedRoots: [], backend: "default" }),
         "watcher:getStatus": () => ({ running: false, processing: false, pendingPathCount: 0 }),
+        "watcher:getStats": () => ({
+          startedAt: "2026-03-16T10:00:00.000Z",
+          watcher: {
+            backend: "default",
+            watchedRootCount: 0,
+            watchBasedTriggers: 0,
+            fallbackToIncrementalScans: 0,
+            lastTriggerAt: null,
+            lastTriggerPathCount: null,
+          },
+          jobs: {
+            startupIncremental: makeDiagnosticsBucket(),
+            manualIncremental: makeDiagnosticsBucket(),
+            manualForceReindex: makeDiagnosticsBucket(),
+            watchTriggered: makeDiagnosticsBucket(),
+            watchTargeted: makeDiagnosticsBucket(),
+            watchFallbackIncremental: makeDiagnosticsBucket(),
+            watchInitialScan: makeDiagnosticsBucket(),
+            totals: { completedRuns: 0, failedRuns: 0 },
+          },
+          lastRun: null,
+        }),
         "watcher:stop": () => ({ ok: true }),
       },
     );
@@ -251,6 +273,28 @@ describe("registerIpcHandlers", () => {
         "ui:setZoom": () => ({ percent: 0 }) as never,
         "watcher:start": () => ({ ok: true, watchedRoots: [], backend: "default" }),
         "watcher:getStatus": () => ({ running: false, processing: false, pendingPathCount: 0 }),
+        "watcher:getStats": () => ({
+          startedAt: "2026-03-16T10:00:00.000Z",
+          watcher: {
+            backend: "default",
+            watchedRootCount: 0,
+            watchBasedTriggers: 0,
+            fallbackToIncrementalScans: 0,
+            lastTriggerAt: null,
+            lastTriggerPathCount: null,
+          },
+          jobs: {
+            startupIncremental: makeDiagnosticsBucket(),
+            manualIncremental: makeDiagnosticsBucket(),
+            manualForceReindex: makeDiagnosticsBucket(),
+            watchTriggered: makeDiagnosticsBucket(),
+            watchTargeted: makeDiagnosticsBucket(),
+            watchFallbackIncremental: makeDiagnosticsBucket(),
+            watchInitialScan: makeDiagnosticsBucket(),
+            totals: { completedRuns: 0, failedRuns: 0 },
+          },
+          lastRun: null,
+        }),
         "watcher:stop": () => ({ ok: true }),
       },
     );
@@ -261,3 +305,14 @@ describe("registerIpcHandlers", () => {
     ).rejects.toThrowError("Invalid response");
   });
 });
+
+function makeDiagnosticsBucket() {
+  return {
+    runs: 0,
+    failedRuns: 0,
+    totalDurationMs: 0,
+    averageDurationMs: 0,
+    maxDurationMs: 0,
+    lastDurationMs: null,
+  };
+}

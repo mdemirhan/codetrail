@@ -25,6 +25,14 @@ export type RefreshJobResponse = {
   jobId: string;
 };
 
+export type IndexingJobSource =
+  | "startup_incremental"
+  | "manual_incremental"
+  | "manual_force_reindex"
+  | "watch_targeted"
+  | "watch_fallback_incremental"
+  | "watch_initial_scan";
+
 export type IndexingStatus = {
   running: boolean;
   queuedJobs: number;
@@ -85,6 +93,12 @@ export type IndexingRunnerDependencies = {
   createBookmarkStore?: (bookmarksDbPath: string) => BookmarkStore;
   onFileIssue?: (issue: IndexingFileIssue) => void;
   onNotice?: (notice: IndexingNotice) => void;
+  onJobSettled?: (event: {
+    source: IndexingJobSource;
+    request: IndexingWorkerRequest;
+    durationMs: number;
+    success: boolean;
+  }) => void;
 };
 
 type IndexingWorkerRuntimeOptions = {
@@ -111,6 +125,16 @@ export class WorkerIndexingRunner {
   private readonly createBookmarkStoreFn: (bookmarksDbPath: string) => BookmarkStore;
   private readonly onFileIssue: ((issue: IndexingFileIssue) => void) | undefined;
   private readonly onNotice: ((notice: IndexingNotice) => void) | undefined;
+  private readonly onJobSettled:
+    | ((
+        event: {
+          source: IndexingJobSource;
+          request: IndexingWorkerRequest;
+          durationMs: number;
+          success: boolean;
+        },
+      ) => void)
+    | undefined;
   private pendingJobs = 0;
   private completedJobs = 0;
   private activeJobId: string | null = null;
@@ -163,19 +187,26 @@ export class WorkerIndexingRunner {
     this.createBookmarkStoreFn = dependencies.createBookmarkStore ?? createBookmarkStore;
     this.onFileIssue = dependencies.onFileIssue;
     this.onNotice = dependencies.onNotice;
+    this.onJobSettled = dependencies.onJobSettled;
   }
 
-  async enqueue(request: RefreshJobRequest): Promise<RefreshJobResponse> {
+  async enqueue(
+    request: RefreshJobRequest,
+    options: { source?: IndexingJobSource } = {},
+  ): Promise<RefreshJobResponse> {
     const systemMessageRegexRules = this.getSystemMessageRegexRulesFn?.();
     return this.enqueueJob(`refresh-${++this.sequence}`, {
       kind: "incremental",
       dbPath: this.dbPath,
       forceReindex: request.force,
       ...(systemMessageRegexRules ? { systemMessageRegexRules } : {}),
-    });
+    }, options.source ?? (request.force ? "manual_force_reindex" : "manual_incremental"));
   }
 
-  async enqueueChangedFiles(changedFilePaths: string[]): Promise<RefreshJobResponse> {
+  async enqueueChangedFiles(
+    changedFilePaths: string[],
+    options: { source?: IndexingJobSource } = {},
+  ): Promise<RefreshJobResponse> {
     if (changedFilePaths.length === 0) {
       return { jobId: `changed-${++this.sequence}-noop` };
     }
@@ -185,15 +216,17 @@ export class WorkerIndexingRunner {
       dbPath: this.dbPath,
       changedFilePaths,
       ...(systemMessageRegexRules ? { systemMessageRegexRules } : {}),
-    });
+    }, options.source ?? "watch_targeted");
   }
 
   private async enqueueJob(
     jobId: string,
     request: IndexingWorkerRequest,
+    source: IndexingJobSource,
   ): Promise<RefreshJobResponse> {
     this.pendingJobs += 1;
     const task = this.queue.then(async () => {
+      const startedAt = Date.now();
       try {
         this.activeJobId = jobId;
         await runIndexingJob({
@@ -212,6 +245,20 @@ export class WorkerIndexingRunner {
         } finally {
           bookmarkStore.close();
         }
+        this.onJobSettled?.({
+          source,
+          request,
+          durationMs: Date.now() - startedAt,
+          success: true,
+        });
+      } catch (error) {
+        this.onJobSettled?.({
+          source,
+          request,
+          durationMs: Date.now() - startedAt,
+          success: false,
+        });
+        throw error;
       } finally {
         this.activeJobId = null;
         this.pendingJobs -= 1;
@@ -268,18 +315,18 @@ function runInProcess(
       config.changedFilePaths,
       deps,
     );
-  } else {
-    fns.runIncrementalIndexing?.(
-      {
-        dbPath: config.dbPath,
-        forceReindex: config.forceReindex,
-        ...(config.systemMessageRegexRules
-          ? { systemMessageRegexRules: config.systemMessageRegexRules }
-          : {}),
-      },
-      deps,
-    );
+    return;
   }
+  fns.runIncrementalIndexing?.(
+    {
+      dbPath: config.dbPath,
+      forceReindex: config.forceReindex,
+      ...(config.systemMessageRegexRules
+        ? { systemMessageRegexRules: config.systemMessageRegexRules }
+        : {}),
+    },
+    deps,
+  );
 }
 
 async function runIndexingJob(args: {
@@ -299,7 +346,7 @@ async function runIndexingJob(args: {
 
   if (!args.workerUrl) {
     // Tests and some dev builds do not emit the worker bundle, so keep an in-process path.
-    runInProcess(
+    return runInProcess(
       args.request,
       {
         runIncrementalIndexing: args.runIncrementalIndexing,
@@ -307,19 +354,23 @@ async function runIndexingJob(args: {
       },
       deps,
     );
-    return;
   }
 
   try {
     const runtime = shouldUseIndexingWorker()
       ? args.createWorker(args.workerUrl)
       : args.createBackgroundProcess(args.workerUrl);
-    await runIndexingInBackgroundRuntime(runtime, args.request, args.onFileIssue, args.onNotice);
+    return await runIndexingInBackgroundRuntime(
+      runtime,
+      args.request,
+      args.onFileIssue,
+      args.onNotice,
+    );
   } catch (error) {
     // Falling back preserves functionality even if the worker cannot boot due to packaging or ABI
     // issues. The cost is UI responsiveness, not correctness.
     console.error("[codetrail] indexing worker failed; falling back to in-process indexing", error);
-    runInProcess(
+    return runInProcess(
       args.request,
       {
         runIncrementalIndexing: args.runIncrementalIndexing,
@@ -370,7 +421,7 @@ function runIndexingInBackgroundRuntime(
         finish(() => reject(error));
         return;
       }
-      finish(resolve);
+      finish(() => resolve());
     });
 
     worker.once("error", (error) => {

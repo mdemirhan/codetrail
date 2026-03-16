@@ -8,6 +8,7 @@ export type BookmarkListResponse = IpcResponse<"bookmarks:listProject">;
 export type SearchQueryResponse = IpcResponse<"search:query">;
 export type SearchResult = SearchQueryResponse["results"][number];
 export type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
+export type WatchStatsResponse = IpcResponse<"watcher:getStats">;
 export type PaneStateSnapshot = IpcResponse<"ui:getState">;
 
 export type HistoryMessage =
