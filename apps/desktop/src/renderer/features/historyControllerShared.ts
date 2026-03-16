@@ -52,7 +52,7 @@ export function scrollFocusedHistoryMessageIntoView(
   if (containerHeight > 0 && messageHeight > containerHeight) {
     const nextScrollTop = Math.max(0, container.scrollTop + (messageRect.top - containerRect.top));
     if (typeof container.scrollTo === "function") {
-      container.scrollTo({ top: nextScrollTop, behavior: "smooth" });
+      container.scrollTo({ top: nextScrollTop });
       return;
     }
     container.scrollTop = nextScrollTop;
@@ -61,7 +61,6 @@ export function scrollFocusedHistoryMessageIntoView(
 
   messageElement.scrollIntoView({
     block: "center",
-    behavior: "smooth",
   });
 }
 

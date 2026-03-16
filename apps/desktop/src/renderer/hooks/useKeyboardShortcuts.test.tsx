@@ -49,6 +49,7 @@ function createProps(
     toggleFocusMode: vi.fn(),
     toggleScopedMessagesExpanded: vi.fn(),
     toggleHistoryCategory: vi.fn(),
+    toggleHistoryCategoryExpanded: vi.fn(),
     toggleProjectPaneCollapsed: vi.fn(),
     toggleSessionPaneCollapsed: vi.fn(),
     focusPreviousHistoryMessage: vi.fn(),
@@ -81,7 +82,10 @@ describe("useKeyboardShortcuts", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "=", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "m", metaKey: true, shiftKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "e", metaKey: true }));
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", code: "Digit1", metaKey: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "1", code: "Digit1", metaKey: true, altKey: true }),
+    );
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "b", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "b", metaKey: true, shiftKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", metaKey: true }));
@@ -107,6 +111,7 @@ describe("useKeyboardShortcuts", () => {
     expect(props.toggleFocusMode).toHaveBeenCalledTimes(1);
     expect(props.toggleScopedMessagesExpanded).toHaveBeenCalledTimes(1);
     expect(props.toggleHistoryCategory).toHaveBeenCalledWith("user");
+    expect(props.toggleHistoryCategoryExpanded).toHaveBeenCalledWith("user");
     expect(props.toggleProjectPaneCollapsed).toHaveBeenCalledTimes(1);
     expect(props.toggleSessionPaneCollapsed).toHaveBeenCalledTimes(1);
     expect(props.goToPreviousHistoryPage).toHaveBeenCalledTimes(1);

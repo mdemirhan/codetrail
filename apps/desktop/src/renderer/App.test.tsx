@@ -100,6 +100,25 @@ describe("App shell", () => {
     expect(screen.getByText("Next page")).toBeInTheDocument();
   });
 
+  it("stores pane widths in CSS variables instead of inline grid columns", async () => {
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(screen.getByText("Project One")).toBeInTheDocument();
+    });
+
+    const workspace = container.querySelector<HTMLElement>(".workspace.history-layout");
+    expect(workspace).not.toBeNull();
+    if (!workspace) {
+      throw new Error("Expected history workspace");
+    }
+
+    expect(workspace.style.gridTemplateColumns).toBe("");
+    expect(workspace.style.getPropertyValue("--project-pane-width")).toBe("300px");
+    expect(workspace.style.getPropertyValue("--session-pane-width")).toBe("320px");
+  });
+
   it("disables refresh and reindex controls while background indexing is active", async () => {
     const client = createAppClient({
       "indexer:getStatus": () => ({
@@ -220,7 +239,11 @@ describe("App shell", () => {
     await user.click(screen.getByRole("button", { name: "Watch (1s debounce)" }));
 
     await waitFor(() => {
-      expect(screen.getByText("2")).toBeInTheDocument();
+      expect(
+        screen.getByTitle(
+          "Number of changed files currently queued by the watcher before auto-refresh runs.",
+        ),
+      ).toHaveTextContent("2");
     });
   });
 

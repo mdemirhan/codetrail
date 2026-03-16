@@ -189,6 +189,16 @@ export function App({
     search.focusGlobalSearch();
   }, [search]);
 
+  const toggleFocusMode = useCallback(() => {
+    if (mainView !== "history") {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      history.refs.messageListRef.current?.focus({ preventScroll: true });
+    });
+    setFocusMode((value) => !value);
+  }, [history.refs.messageListRef, mainView]);
+
   const handleRefresh = useCallback(
     async (force: boolean) => {
       setRefreshing(true);
@@ -279,9 +289,10 @@ export function App({
     clearFocusedHistoryMessage: () => history.setFocusMessageId(""),
     focusGlobalSearch,
     focusSessionSearch,
-    toggleFocusMode: () => setFocusMode((value) => !value),
+    toggleFocusMode,
     toggleScopedMessagesExpanded: history.handleToggleScopedMessagesExpanded,
     toggleHistoryCategory: history.handleToggleHistoryCategoryShortcut,
+    toggleHistoryCategoryExpanded: history.handleToggleCategoryMessagesExpanded,
     toggleProjectPaneCollapsed: () => history.setProjectPaneCollapsed((value) => !value),
     toggleSessionPaneCollapsed: () => history.setSessionPaneCollapsed((value) => !value),
     focusPreviousHistoryMessage: () => history.focusAdjacentHistoryMessage("previous"),
@@ -355,7 +366,7 @@ export function App({
         autoRefreshStatusLabel={autoRefreshStatusLabel}
         autoRefreshStatusTone={autoRefreshStatusTone}
         autoRefreshStatusTooltip={autoRefreshStatusTooltip}
-        onToggleFocus={() => setFocusMode((value) => !value)}
+        onToggleFocus={toggleFocusMode}
         onToggleHelp={() => setMainView((value) => (value === "help" ? "history" : "help"))}
         onToggleSettings={() =>
           setMainView((value) => (value === "settings" ? "history" : "settings"))
@@ -385,7 +396,7 @@ export function App({
               logError={logError}
             />
           ) : (
-            <section className="pane content-pane">
+            <section className="pane content-pane history-focus-pane">
               <HistoryDetailPane
                 history={history}
                 advancedSearchEnabled={advancedSearchEnabled}
