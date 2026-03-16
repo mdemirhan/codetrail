@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import type { CSSProperties } from "react";
 
 import type { MessageCategory } from "@codetrail/core";
 
@@ -6,6 +7,7 @@ import {
   BOOKMARKS_NAV_ID,
   COLLAPSED_PANE_WIDTH,
   EMPTY_CATEGORY_COUNTS,
+  HISTORY_CATEGORY_EXPAND_SHORTCUTS,
   HISTORY_CATEGORY_SHORTCUTS,
   PAGE_SIZE,
   PROJECT_ALL_NAV_ID,
@@ -261,13 +263,16 @@ export function useHistoryDerivedState({
   const scopedActionLabel = areScopedMessagesExpanded ? "Collapse" : "Expand";
   const scopedExpandCollapseLabel = `${scopedActionLabel} ${bulkScopeLabel}`;
   const workspaceStyle = isHistoryLayout
-    ? {
-        // Collapsed panes still reserve a narrow track so keyboard focus and affordances remain
-        // visible instead of disappearing from the grid entirely.
-        gridTemplateColumns: `${
+    ? ({
+        // Keep user-resized widths in CSS variables so responsive media queries can still take
+        // over when zoom shrinks the effective viewport.
+        "--project-pane-width": `${
           projectPaneCollapsed ? COLLAPSED_PANE_WIDTH : projectPaneWidth
-        }px 1px ${sessionPaneCollapsed ? COLLAPSED_PANE_WIDTH : sessionPaneWidth}px 1px minmax(420px, 1fr)`,
-      }
+        }px`,
+        "--session-pane-width": `${
+          sessionPaneCollapsed ? COLLAPSED_PANE_WIDTH : sessionPaneWidth
+        }px`,
+      } as CSSProperties)
     : undefined;
 
   return {
@@ -328,6 +333,7 @@ export function useHistoryDerivedState({
         : selectedProject
           ? prettyProvider(selectedProject.provider)
           : "-",
+    historyCategoryExpandShortcutMap: HISTORY_CATEGORY_EXPAND_SHORTCUTS,
     historyCategoriesShortcutMap: HISTORY_CATEGORY_SHORTCUTS,
     prettyCategory,
     prettyProvider,

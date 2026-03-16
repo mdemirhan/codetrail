@@ -17,6 +17,7 @@ export function useKeyboardShortcuts(args: {
   toggleFocusMode: () => void;
   toggleScopedMessagesExpanded: () => void;
   toggleHistoryCategory: (category: MessageCategory) => void;
+  toggleHistoryCategoryExpanded: (category: MessageCategory) => void;
   toggleProjectPaneCollapsed: () => void;
   toggleSessionPaneCollapsed: () => void;
   focusPreviousHistoryMessage: () => void;
@@ -56,6 +57,7 @@ export function useKeyboardShortcuts(args: {
         toggleFocusMode,
         toggleScopedMessagesExpanded,
         toggleHistoryCategory,
+        toggleHistoryCategoryExpanded,
         toggleProjectPaneCollapsed,
         toggleSessionPaneCollapsed,
         focusPreviousHistoryMessage,
@@ -86,6 +88,7 @@ export function useKeyboardShortcuts(args: {
       const command = event.metaKey || event.ctrlKey;
       const shift = event.shiftKey;
       const key = event.key.toLowerCase();
+      const code = event.code;
       const isHistoryArrowNavigation =
         mainView === "history" && !shift && !isEditableTarget(shortcutTarget);
       if (event.defaultPrevented) {
@@ -326,25 +329,88 @@ export function useKeyboardShortcuts(args: {
       } else if (mainView === "history" && command && key === "b") {
         event.preventDefault();
         toggleProjectPaneCollapsed();
-      } else if (mainView === "history" && command && event.key === "1") {
+      } else if (mainView === "history" && command && event.altKey && code === "Digit1") {
+        event.preventDefault();
+        toggleHistoryCategoryExpanded("user");
+      } else if (mainView === "history" && command && event.altKey && code === "Digit2") {
+        event.preventDefault();
+        toggleHistoryCategoryExpanded("assistant");
+      } else if (mainView === "history" && command && event.altKey && code === "Digit3") {
+        event.preventDefault();
+        toggleHistoryCategoryExpanded("tool_edit");
+      } else if (mainView === "history" && command && event.altKey && code === "Digit4") {
+        event.preventDefault();
+        toggleHistoryCategoryExpanded("tool_use");
+      } else if (mainView === "history" && command && event.altKey && code === "Digit5") {
+        event.preventDefault();
+        toggleHistoryCategoryExpanded("tool_result");
+      } else if (mainView === "history" && command && event.altKey && code === "Digit6") {
+        event.preventDefault();
+        toggleHistoryCategoryExpanded("thinking");
+      } else if (mainView === "history" && command && event.altKey && code === "Digit7") {
+        event.preventDefault();
+        toggleHistoryCategoryExpanded("system");
+      } else if (
+        mainView === "history" &&
+        command &&
+        !shift &&
+        !event.altKey &&
+        code === "Digit1"
+      ) {
         event.preventDefault();
         toggleHistoryCategory("user");
-      } else if (mainView === "history" && command && event.key === "2") {
+      } else if (
+        mainView === "history" &&
+        command &&
+        !shift &&
+        !event.altKey &&
+        code === "Digit2"
+      ) {
         event.preventDefault();
         toggleHistoryCategory("assistant");
-      } else if (mainView === "history" && command && event.key === "3") {
+      } else if (
+        mainView === "history" &&
+        command &&
+        !shift &&
+        !event.altKey &&
+        code === "Digit3"
+      ) {
         event.preventDefault();
         toggleHistoryCategory("tool_edit");
-      } else if (mainView === "history" && command && event.key === "4") {
+      } else if (
+        mainView === "history" &&
+        command &&
+        !shift &&
+        !event.altKey &&
+        code === "Digit4"
+      ) {
         event.preventDefault();
         toggleHistoryCategory("tool_use");
-      } else if (mainView === "history" && command && event.key === "5") {
+      } else if (
+        mainView === "history" &&
+        command &&
+        !shift &&
+        !event.altKey &&
+        code === "Digit5"
+      ) {
         event.preventDefault();
         toggleHistoryCategory("tool_result");
-      } else if (mainView === "history" && command && event.key === "6") {
+      } else if (
+        mainView === "history" &&
+        command &&
+        !shift &&
+        !event.altKey &&
+        code === "Digit6"
+      ) {
         event.preventDefault();
         toggleHistoryCategory("thinking");
-      } else if (mainView === "history" && command && event.key === "7") {
+      } else if (
+        mainView === "history" &&
+        command &&
+        !shift &&
+        !event.altKey &&
+        code === "Digit7"
+      ) {
         event.preventDefault();
         toggleHistoryCategory("system");
       }

@@ -197,4 +197,28 @@ describe("App history messages", () => {
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 40 });
     expect(document.activeElement).toBe(messageList);
   });
+
+  it("keeps the message pane focused when entering and exiting focus mode", async () => {
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+    const messageList = () => container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Enter focus mode" }));
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(messageList());
+      expect(messageList()?.closest(".history-focus-pane")).not.toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Exit focus mode" }));
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(messageList());
+      expect(messageList()?.closest(".history-focus-pane")).not.toBeNull();
+    });
+  });
 });

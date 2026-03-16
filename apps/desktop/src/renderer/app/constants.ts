@@ -29,6 +29,16 @@ export const HISTORY_CATEGORY_SHORTCUTS: Record<MessageCategory, string> = {
   system: "Cmd/Ctrl+7",
 };
 
+export const HISTORY_CATEGORY_EXPAND_SHORTCUTS: Record<MessageCategory, string> = {
+  user: "Cmd/Ctrl+Alt+1",
+  assistant: "Cmd/Ctrl+Alt+2",
+  tool_edit: "Cmd/Ctrl+Alt+3",
+  tool_use: "Cmd/Ctrl+Alt+4",
+  tool_result: "Cmd/Ctrl+Alt+5",
+  thinking: "Cmd/Ctrl+Alt+6",
+  system: "Cmd/Ctrl+Alt+7",
+};
+
 export const EMPTY_CATEGORY_COUNTS = {
   user: 0,
   assistant: 0,
@@ -96,8 +106,18 @@ export const SHORTCUT_ITEMS = [
   },
   {
     group: "Message Filters",
+    shortcut: "Cmd/Ctrl+Alt+1",
+    description: "Expand/collapse User messages",
+  },
+  {
+    group: "Message Filters",
     shortcut: "Cmd/Ctrl+2",
     description: "Toggle Assistant button on session messages",
+  },
+  {
+    group: "Message Filters",
+    shortcut: "Cmd/Ctrl+Alt+2",
+    description: "Expand/collapse Assistant messages",
   },
   {
     group: "Message Filters",
@@ -106,8 +126,18 @@ export const SHORTCUT_ITEMS = [
   },
   {
     group: "Message Filters",
+    shortcut: "Cmd/Ctrl+Alt+3",
+    description: "Expand/collapse Write messages",
+  },
+  {
+    group: "Message Filters",
     shortcut: "Cmd/Ctrl+4",
     description: "Toggle Tool Use button on session messages",
+  },
+  {
+    group: "Message Filters",
+    shortcut: "Cmd/Ctrl+Alt+4",
+    description: "Expand/collapse Tool Use messages",
   },
   {
     group: "Message Filters",
@@ -116,13 +146,28 @@ export const SHORTCUT_ITEMS = [
   },
   {
     group: "Message Filters",
+    shortcut: "Cmd/Ctrl+Alt+5",
+    description: "Expand/collapse Tool Result messages",
+  },
+  {
+    group: "Message Filters",
     shortcut: "Cmd/Ctrl+6",
     description: "Toggle Thinking button on session messages",
   },
   {
     group: "Message Filters",
+    shortcut: "Cmd/Ctrl+Alt+6",
+    description: "Expand/collapse Thinking messages",
+  },
+  {
+    group: "Message Filters",
     shortcut: "Cmd/Ctrl+7",
     description: "Toggle System button on session messages",
+  },
+  {
+    group: "Message Filters",
+    shortcut: "Cmd/Ctrl+Alt+7",
+    description: "Expand/collapse System messages",
   },
   { group: "Refresh", shortcut: "Cmd/Ctrl+R", description: "Incremental refresh" },
   {

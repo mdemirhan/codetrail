@@ -171,6 +171,28 @@ export function useHistoryInteractions({
     [setHistoryCategories, setSessionPage],
   );
 
+  const handleToggleCategoryMessagesExpanded = useCallback(
+    (category: MessageCategory) => {
+      const categoryMessages = activeHistoryMessages.filter(
+        (message) => message.category === category,
+      );
+      if (categoryMessages.length === 0) {
+        return;
+      }
+      setMessageExpanded((value) => {
+        const expanded = !categoryMessages.every(
+          (message) => value[message.id] ?? isExpandedByDefault(message.category),
+        );
+        const next = { ...value };
+        for (const message of categoryMessages) {
+          next[message.id] = expanded;
+        }
+        return next;
+      });
+    },
+    [activeHistoryMessages, isExpandedByDefault, setMessageExpanded],
+  );
+
   const handleToggleMessageExpanded = useCallback(
     (messageId: string, category: MessageCategory) => {
       setMessageExpanded((value) => ({
@@ -534,6 +556,7 @@ export function useHistoryInteractions({
   return {
     handleToggleScopedMessagesExpanded,
     handleToggleHistoryCategoryShortcut,
+    handleToggleCategoryMessagesExpanded,
     handleToggleMessageExpanded,
     handleRevealInSession,
     handleToggleBookmark,

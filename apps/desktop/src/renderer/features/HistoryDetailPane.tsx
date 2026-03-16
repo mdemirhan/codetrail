@@ -12,6 +12,20 @@ import type { useHistoryController } from "./useHistoryController";
 
 type HistoryController = ReturnType<typeof useHistoryController>;
 
+function getHistoryCategoryShortcutDigit(
+  history: HistoryController,
+  category: MessageCategory,
+): string {
+  const match = history.historyCategoriesShortcutMap[category].match(/\d$/);
+  return match?.[0] ?? "";
+}
+
+function getHistoryCategoryTooltip(history: HistoryController, category: MessageCategory): string {
+  const label = history.prettyCategory(category);
+  return `Toggle ${label} messages on or off (${history.historyCategoriesShortcutMap[category]})
+(${history.historyCategoryExpandShortcutMap[category]} to expand or collapse ${label} messages)`;
+}
+
 export function HistoryDetailPane({
   history,
   advancedSearchEnabled,
@@ -144,7 +158,7 @@ export function HistoryDetailPane({
             className={`msg-filter ${category}-filter${
               history.historyCategories.includes(category) ? " active" : ""
             }`}
-            title={`${history.prettyCategory(category)} messages (${history.historyCategoriesShortcutMap[category]})`}
+            title={getHistoryCategoryTooltip(history, category)}
             onClick={() => {
               history.setHistoryCategories((value) =>
                 toggleValue<MessageCategory>(value, category),
@@ -152,8 +166,13 @@ export function HistoryDetailPane({
               history.setSessionPage(0);
             }}
           >
-            {history.prettyCategory(category)}
-            <span className="filter-count">{history.historyCategoryCounts[category]}</span>
+            <span className="filter-shortcut" aria-hidden="true">
+              {getHistoryCategoryShortcutDigit(history, category)}
+            </span>
+            <span className="filter-label">
+              {history.prettyCategory(category)}
+              <span className="filter-count">{history.historyCategoryCounts[category]}</span>
+            </span>
           </button>
         ))}
       </div>
