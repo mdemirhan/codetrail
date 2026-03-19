@@ -831,6 +831,7 @@ describe("bootstrapMainProcess", () => {
     }
   });
 
+
   it("reports watcher queue status through IPC", async () => {
     await bootstrapMainProcess({ runStartupIndexing: false });
 

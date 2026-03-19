@@ -879,12 +879,22 @@ function indexStreamedJsonlSessionFile(args: {
                 continue;
               }
               const normalizedMessage = normalizeIndexedMessage(processingState, message);
-              insertIndexedMessage(args.statements, args.sessionDbId, normalizedMessage, {
-                provider: args.discovered.provider,
-                sessionId: args.discovered.sourceSessionId,
-                filePath: args.discovered.filePath,
-                onNotice: args.onNotice,
-              });
+              try {
+                insertIndexedMessage(args.statements, args.sessionDbId, normalizedMessage, {
+                  provider: args.discovered.provider,
+                  sessionId: args.discovered.sourceSessionId,
+                  filePath: args.discovered.filePath,
+                  onNotice: args.onNotice,
+                });
+              } catch (error) {
+                throw new IndexingFileProcessingError({
+                  provider: args.discovered.provider,
+                  sessionId: args.discovered.sourceSessionId,
+                  filePath: args.discovered.filePath,
+                  stage: "persist",
+                  error,
+                });
+              }
             }
           },
           onInvalidLine: (lineNumber, error) => {
@@ -1453,8 +1463,18 @@ function streamJsonlEvents(
       }
     }
     if (pendingLineBytes > 0 || lineChunks.length > 0 || discardingOversizedLine) {
-      consumedOffset = readOffset;
-      flushLine();
+      const finalizedTrailingLine = tryConsumeTrailingJsonlLine({
+        lineChunks,
+        discardingOversizedLine,
+        lineNumber,
+        eventIndex,
+        callbacks,
+      });
+      if (finalizedTrailingLine) {
+        consumedOffset = readOffset;
+        lineNumber += 1;
+        eventIndex = finalizedTrailingLine.nextEventIndex;
+      }
     }
   } finally {
     if (fd !== null) {
@@ -1467,6 +1487,43 @@ function streamJsonlEvents(
     nextLineNumber: lineNumber,
     nextEventIndex: eventIndex,
   };
+}
+
+function tryConsumeTrailingJsonlLine(args: {
+  lineChunks: Buffer[];
+  discardingOversizedLine: boolean;
+  lineNumber: number;
+  eventIndex: number;
+  callbacks: {
+    onEvent: (event: unknown, eventIndex: number) => void;
+    onInvalidLine: (lineNumber: number, error: unknown) => void;
+  };
+}): { nextEventIndex: number } | null {
+  if (args.discardingOversizedLine) {
+    // Leave the checkpoint at the start of the line until a newline arrives so we do not resume in
+    // the middle of an oversized JSON object and permanently desynchronize the stream.
+    return null;
+  }
+  if (args.lineChunks.length === 0) {
+    return null;
+  }
+
+  const line = Buffer.concat(args.lineChunks).toString("utf8");
+  const trimmed = line.trim();
+  if (trimmed.length === 0) {
+    return { nextEventIndex: args.eventIndex };
+  }
+
+  let event: unknown;
+  try {
+    event = JSON.parse(trimmed) as unknown;
+  } catch {
+    // An unterminated trailing line is normal for actively-written JSONL transcripts. Keep the
+    // checkpoint before the partial line so the next append can complete it.
+    return null;
+  }
+  args.callbacks.onEvent(event, args.eventIndex);
+  return { nextEventIndex: args.eventIndex + 1 };
 }
 
 function handleJsonlLine(
@@ -1482,13 +1539,15 @@ function handleJsonlLine(
   if (trimmed.length === 0) {
     return eventIndex;
   }
+  let event: unknown;
   try {
-    callbacks.onEvent(JSON.parse(trimmed) as unknown, eventIndex);
-    return eventIndex + 1;
+    event = JSON.parse(trimmed) as unknown;
   } catch (error) {
     callbacks.onInvalidLine(lineNumber + 1, error);
     return eventIndex;
   }
+  callbacks.onEvent(event, eventIndex);
+  return eventIndex + 1;
 }
 
 function insertIndexedMessage(

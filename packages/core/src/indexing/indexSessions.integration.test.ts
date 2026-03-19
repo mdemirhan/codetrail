@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
+import type { DiscoveryConfig } from "../discovery";
 import { openDatabase } from "../db/bootstrap";
 import { makeSessionId } from "./ids";
 import { runIncrementalIndexing } from "./indexSessions";
@@ -571,6 +572,110 @@ describe("runIncrementalIndexing", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("does not checkpoint past an unterminated trailing codex JSONL line", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-index-codex-partial-line-"));
+    const dbPath = join(dir, "index.db");
+    const codexFile = join(dir, ".codex", "sessions", "2026", "03", "19", "partial.jsonl");
+    mkdirSync(dirname(codexFile), { recursive: true });
+    writeFileSync(
+      codexFile,
+      `${[
+        JSON.stringify({
+          timestamp: "2026-03-19T10:00:00Z",
+          type: "session_meta",
+          payload: {
+            id: "codex-session-partial",
+            cwd: "/workspace/codex",
+            git: { branch: "main" },
+          },
+        }),
+        JSON.stringify({
+          timestamp: "2026-03-19T10:00:01Z",
+          type: "response_item",
+          payload: {
+            type: "message",
+            id: "before-append",
+            role: "user",
+            content: [{ type: "input_text", text: "Before append" }],
+          },
+        }),
+      ].join("\n")}\n`,
+    );
+
+    const discoveryConfig: Partial<DiscoveryConfig> = {
+      codexRoot: join(dir, ".codex", "sessions"),
+      enabledProviders: ["codex"],
+    };
+
+    const first = runIncrementalIndexing({ dbPath, discoveryConfig });
+    expect(first.indexedFiles).toBe(1);
+
+    appendFileSync(
+      codexFile,
+      JSON.stringify({
+        timestamp: "2026-03-19T10:00:02Z",
+        type: "response_item",
+        payload: {
+          type: "message",
+          id: "after-append",
+          role: "assistant",
+          content: [{ type: "output_text", text: "After append" }],
+        },
+      }).slice(0, -12),
+    );
+    const partialNow = new Date();
+    utimesSync(codexFile, partialNow, partialNow);
+
+    const second = runIncrementalIndexing({ dbPath, discoveryConfig });
+    expect(second.indexedFiles).toBe(1);
+
+    const dbAfterPartial = openDatabase(dbPath);
+    const partialCheckpoint = dbAfterPartial
+      .prepare("SELECT last_offset_bytes, file_size FROM index_checkpoints WHERE file_path = ?")
+      .get(codexFile) as { last_offset_bytes: number; file_size: number };
+    const partialSession = dbAfterPartial
+      .prepare("SELECT id FROM sessions WHERE file_path = ?")
+      .get(codexFile) as { id: string };
+    const partialMessages = dbAfterPartial
+      .prepare("SELECT content FROM messages WHERE session_id = ? ORDER BY created_at, id")
+      .all(partialSession.id) as Array<{
+      content: string;
+    }>;
+    dbAfterPartial.close();
+
+    expect(partialCheckpoint.last_offset_bytes).toBeLessThan(partialCheckpoint.file_size);
+    expect(partialMessages.map((message) => message.content)).toEqual(["Before append"]);
+
+    appendFileSync(codexFile, ' append"}]}}\n');
+    const completedNow = new Date();
+    utimesSync(codexFile, completedNow, completedNow);
+
+    const third = runIncrementalIndexing({ dbPath, discoveryConfig });
+    expect(third.indexedFiles).toBe(1);
+
+    const dbAfterCompletion = openDatabase(dbPath);
+    const completedCheckpoint = dbAfterCompletion
+      .prepare("SELECT last_offset_bytes, file_size FROM index_checkpoints WHERE file_path = ?")
+      .get(codexFile) as { last_offset_bytes: number; file_size: number };
+    const completedSession = dbAfterCompletion
+      .prepare("SELECT id FROM sessions WHERE file_path = ?")
+      .get(codexFile) as { id: string };
+    const completedMessages = dbAfterCompletion
+      .prepare("SELECT content FROM messages WHERE session_id = ? ORDER BY created_at, id")
+      .all(completedSession.id) as Array<{
+      content: string;
+    }>;
+    dbAfterCompletion.close();
+
+    expect(completedCheckpoint.last_offset_bytes).toBe(completedCheckpoint.file_size);
+    expect(completedMessages.map((message) => message.content)).toEqual([
+      "Before append",
+      "After append",
+    ]);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("resumes append-only indexing and skips oversized JSONL lines", () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-index-resume-"));
     const dbPath = join(dir, "index.db");
@@ -771,6 +876,70 @@ describe("runIncrementalIndexing", () => {
     expect(notices).toEqual(
       expect.arrayContaining(["index.message_fts_truncated", "index.tool_call_raw_truncated"]),
     );
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("surfaces streamed event persistence failures instead of reporting them as invalid JSONL", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-index-streamed-persist-failure-"));
+    const dbPath = join(dir, "index.db");
+    const claudeFile = join(dir, ".claude", "projects", "persist-failure", "session.jsonl");
+    mkdirSync(dirname(claudeFile), { recursive: true });
+    writeFileSync(
+      claudeFile,
+      `${[
+        JSON.stringify({
+          sessionId: "claude-session-persist-failure",
+          type: "assistant",
+          id: "duplicate-message",
+          cwd: "/workspace/claude",
+          gitBranch: "main",
+          timestamp: "2026-03-19T10:00:00Z",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: "First version" }],
+          },
+        }),
+        JSON.stringify({
+          sessionId: "claude-session-persist-failure",
+          type: "assistant",
+          id: "duplicate-message",
+          cwd: "/workspace/claude",
+          gitBranch: "main",
+          timestamp: "2026-03-19T10:00:01Z",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: "Second version" }],
+          },
+        }),
+      ].join("\n")}\n`,
+    );
+
+    const notices: string[] = [];
+    const issues: Array<{ stage: string; error: unknown }> = [];
+    const result = runIncrementalIndexing(
+      {
+        dbPath,
+        discoveryConfig: {
+          claudeRoot: join(dir, ".claude", "projects"),
+          enabledProviders: ["claude"],
+        },
+      },
+      {
+        onNotice: (notice) => {
+          notices.push(notice.code);
+        },
+        onFileIssue: (issue) => {
+          issues.push({ stage: issue.stage, error: issue.error });
+        },
+      },
+    );
+
+    expect(result.indexedFiles).toBe(0);
+    expect(result.diagnostics.errors).toBe(1);
+    expect(notices).not.toContain("parser.invalid_jsonl_line");
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.stage).toBe("persist");
 
     rmSync(dir, { recursive: true, force: true });
   });
