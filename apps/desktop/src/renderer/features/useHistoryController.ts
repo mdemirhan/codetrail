@@ -1138,30 +1138,35 @@ export function useHistoryController({
     refreshTreeProjectSessions,
   });
 
-  const pageHistoryMessages = useCallback((direction: "up" | "down") => {
-    const container = messageListRef.current;
-    if (!container) {
-      return;
-    }
+  const pageHistoryMessages = useCallback(
+    (direction: "up" | "down", { preserveFocus = false }: { preserveFocus?: boolean } = {}) => {
+      const container = messageListRef.current;
+      if (!container) {
+        return;
+      }
 
-    const styles = window.getComputedStyle(container);
-    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
-    const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
-    const visibleContentHeight = container.clientHeight - paddingTop - paddingBottom;
-    const pageSize = Math.max(0, visibleContentHeight - MESSAGE_PAGE_SCROLL_OVERLAP_PX);
-    if (pageSize <= 0) {
-      return;
-    }
+      const styles = window.getComputedStyle(container);
+      const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+      const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+      const visibleContentHeight = container.clientHeight - paddingTop - paddingBottom;
+      const pageSize = Math.max(0, visibleContentHeight - MESSAGE_PAGE_SCROLL_OVERLAP_PX);
+      if (pageSize <= 0) {
+        return;
+      }
 
-    const delta = direction === "down" ? pageSize : -pageSize;
-    const nextScrollTop = Math.max(0, container.scrollTop + delta);
-    if (typeof container.scrollTo === "function") {
-      container.scrollTo({ top: nextScrollTop });
-    } else {
-      container.scrollTop = nextScrollTop;
-    }
-    container.focus({ preventScroll: true });
-  }, []);
+      const delta = direction === "down" ? pageSize : -pageSize;
+      const nextScrollTop = Math.max(0, container.scrollTop + delta);
+      if (typeof container.scrollTo === "function") {
+        container.scrollTo({ top: nextScrollTop });
+      } else {
+        container.scrollTop = nextScrollTop;
+      }
+      if (!preserveFocus) {
+        container.focus({ preventScroll: true });
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     return codetrail.onHistoryExportProgress((progress: HistoryExportProgressPayload) => {
@@ -1362,8 +1367,10 @@ export function useHistoryController({
     handleCopyProjectDetails,
     focusSessionSearch,
     focusAdjacentHistoryMessage,
-    pageHistoryMessagesUp: () => pageHistoryMessages("up"),
-    pageHistoryMessagesDown: () => pageHistoryMessages("down"),
+    pageHistoryMessagesUp: (options?: { preserveFocus?: boolean }) =>
+      pageHistoryMessages("up", options),
+    pageHistoryMessagesDown: (options?: { preserveFocus?: boolean }) =>
+      pageHistoryMessages("down", options),
     handleExportMessages,
     historyExportState,
     selectProjectAllMessages,

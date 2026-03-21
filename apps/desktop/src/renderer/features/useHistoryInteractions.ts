@@ -309,6 +309,11 @@ export function useHistoryInteractions({
 
   const handleHistorySearchKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        messageListRef.current?.focus({ preventScroll: true });
+        return;
+      }
       if (event.key !== "Escape") {
         return;
       }

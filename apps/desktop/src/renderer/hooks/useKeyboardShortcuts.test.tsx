@@ -189,6 +189,84 @@ describe("useKeyboardShortcuts", () => {
     expect(props.pageHistoryMessagesDown).not.toHaveBeenCalled();
   });
 
+  it("pages the currently focused history pane with bare PageUp and PageDown", () => {
+    const props = createProps();
+
+    render(<Harness {...props} />);
+
+    const projectList = props.projectListRef.current;
+    const sessionList = props.sessionListRef.current;
+    const messageList = props.messageListRef.current;
+    if (!projectList || !sessionList || !messageList) {
+      throw new Error("Expected pane refs to be attached");
+    }
+
+    for (const pane of [projectList, sessionList, messageList]) {
+      Object.defineProperty(pane, "clientHeight", {
+        value: 320,
+        configurable: true,
+      });
+      Object.defineProperty(pane, "scrollTop", {
+        value: 40,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(pane, "scrollTo", {
+        value: ({ top }: { top: number }) => {
+          pane.scrollTop = top;
+        },
+        configurable: true,
+      });
+    }
+
+    projectList.focus();
+    projectList.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown", bubbles: true }));
+    expect(projectList.scrollTop).toBe(340);
+    expect(sessionList.scrollTop).toBe(40);
+    expect(messageList.scrollTop).toBe(40);
+
+    sessionList.focus();
+    sessionList.dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp", bubbles: true }));
+    expect(sessionList.scrollTop).toBe(0);
+    expect(projectList.scrollTop).toBe(340);
+    expect(messageList.scrollTop).toBe(40);
+
+    expect(props.pageHistoryMessagesUp).not.toHaveBeenCalled();
+    expect(props.pageHistoryMessagesDown).not.toHaveBeenCalled();
+  });
+
+  it("falls back to paging the message pane when no history pane is focused", () => {
+    const props = createProps();
+
+    render(<Harness {...props} />);
+
+    const messageList = props.messageListRef.current;
+    if (!messageList) {
+      throw new Error("Expected message pane ref to be attached");
+    }
+
+    Object.defineProperty(messageList, "clientHeight", {
+      value: 320,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTop", {
+      value: 40,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTo", {
+      value: ({ top }: { top: number }) => {
+        messageList.scrollTop = top;
+      },
+      configurable: true,
+    });
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown" }));
+
+    expect(messageList.scrollTop).toBe(340);
+    expect(props.pageHistoryMessagesDown).not.toHaveBeenCalled();
+  });
+
   it("keeps search paging shortcuts active from search inputs and cycles the search tab order", () => {
     const props = createProps({ mainView: "search" });
 
@@ -273,8 +351,6 @@ describe("useKeyboardShortcuts", () => {
     input?.dispatchEvent(
       new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, ctrlKey: true }),
     );
-    input?.dispatchEvent(new KeyboardEvent("keydown", { key: "u", bubbles: true, ctrlKey: true }));
-    input?.dispatchEvent(new KeyboardEvent("keydown", { key: "d", bubbles: true, ctrlKey: true }));
     input?.dispatchEvent(
       new KeyboardEvent("keydown", {
         key: "ArrowUp",
@@ -298,6 +374,53 @@ describe("useKeyboardShortcuts", () => {
     expect(props.selectNextProject).not.toHaveBeenCalled();
     expect(props.pageHistoryMessagesUp).not.toHaveBeenCalled();
     expect(props.pageHistoryMessagesDown).not.toHaveBeenCalled();
+  });
+
+  it("preserves focus while routing Ctrl+U and Ctrl+D from the history search input", () => {
+    const props = createProps();
+
+    render(
+      <div>
+        <div className="msg-search">
+          <input id="query-input" className="search-input" />
+        </div>
+        <Harness {...props} />
+      </div>,
+    );
+
+    const input = document.getElementById("query-input");
+    input?.focus();
+    input?.dispatchEvent(new KeyboardEvent("keydown", { key: "u", bubbles: true, ctrlKey: true }));
+    input?.dispatchEvent(new KeyboardEvent("keydown", { key: "d", bubbles: true, ctrlKey: true }));
+
+    expect(props.pageHistoryMessagesUp).toHaveBeenCalledWith({ preserveFocus: true });
+    expect(props.pageHistoryMessagesDown).toHaveBeenCalledWith({ preserveFocus: true });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("routes Cmd+Up and Cmd+Down from the history search input to history message focus", () => {
+    const props = createProps();
+
+    render(
+      <div>
+        <div className="msg-search">
+          <input id="query-input" className="search-input" />
+        </div>
+        <Harness {...props} />
+      </div>,
+    );
+
+    const input = document.getElementById("query-input");
+    input?.focus();
+    input?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, metaKey: true }),
+    );
+    input?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, metaKey: true }),
+    );
+
+    expect(props.focusPreviousHistoryMessage).toHaveBeenCalledTimes(1);
+    expect(props.focusNextHistoryMessage).toHaveBeenCalledTimes(1);
   });
 
   it("cycles pane focus with Tab and routes plain Up/Down on focused project and session panes", () => {

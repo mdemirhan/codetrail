@@ -5,6 +5,7 @@ import type { MainView } from "../app/types";
 
 type HistoryPane = "project" | "session" | "message";
 type ShortcutArgs = Parameters<typeof useKeyboardShortcuts>[0];
+type MessagePageOptions = { preserveFocus?: boolean };
 type ShortcutContext = ShortcutArgs & {
   event: KeyboardEvent;
   shortcutTarget: HTMLElement | null;
@@ -25,6 +26,7 @@ const HISTORY_CATEGORY_SHORTCUTS = [
   { code: "Digit6", category: "thinking" },
   { code: "Digit7", category: "system" },
 ] as const satisfies ReadonlyArray<{ code: string; category: MessageCategory }>;
+const HISTORY_PAGE_SCROLL_OVERLAP_PX = 20;
 
 export function useKeyboardShortcuts(args: {
   mainView: MainView;
@@ -58,8 +60,8 @@ export function useKeyboardShortcuts(args: {
   selectNextProject: () => void;
   handleProjectTreeArrow: (direction: "left" | "right") => void;
   handleProjectTreeEnter: () => void;
-  pageHistoryMessagesUp: () => void;
-  pageHistoryMessagesDown: () => void;
+  pageHistoryMessagesUp: (options?: MessagePageOptions) => void;
+  pageHistoryMessagesDown: (options?: MessagePageOptions) => void;
   pageSearchResultsUp: () => void;
   pageSearchResultsDown: () => void;
   goToPreviousHistoryPage: () => void;
@@ -348,9 +350,8 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
       ? context.pageHistoryMessagesDown
       : context.pageSearchResultsDown;
   const editableTarget = isEditableTarget(context.event.target);
-  if (context.mainView === "history" && editableTarget) {
-    return false;
-  }
+  const historySearchInputTarget =
+    context.mainView === "history" && isHistorySearchInputTarget(context.shortcutTarget);
 
   if (
     context.event.ctrlKey &&
@@ -360,7 +361,11 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.key === "u"
   ) {
     context.event.preventDefault();
-    pageUp();
+    if (historySearchInputTarget) {
+      context.pageHistoryMessagesUp({ preserveFocus: true });
+    } else {
+      pageUp();
+    }
     return true;
   }
   if (
@@ -371,8 +376,39 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.key === "d"
   ) {
     context.event.preventDefault();
-    pageDown();
+    if (historySearchInputTarget) {
+      context.pageHistoryMessagesDown({ preserveFocus: true });
+    } else {
+      pageDown();
+    }
     return true;
+  }
+  if (historySearchInputTarget) {
+    if (
+      context.event.metaKey &&
+      !context.event.altKey &&
+      !context.event.ctrlKey &&
+      !context.shift &&
+      context.event.key === "ArrowUp"
+    ) {
+      context.event.preventDefault();
+      context.focusPreviousHistoryMessage();
+      return true;
+    }
+    if (
+      context.event.metaKey &&
+      !context.event.altKey &&
+      !context.event.ctrlKey &&
+      !context.shift &&
+      context.event.key === "ArrowDown"
+    ) {
+      context.event.preventDefault();
+      context.focusNextHistoryMessage();
+      return true;
+    }
+  }
+  if (context.mainView === "history" && editableTarget) {
+    return false;
   }
   if (
     !context.event.metaKey &&
@@ -382,7 +418,11 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.event.key === "PageUp"
   ) {
     context.event.preventDefault();
-    pageUp();
+    if (context.mainView === "history") {
+      pageFocusedHistoryPane(context, "up");
+    } else {
+      pageUp();
+    }
     return true;
   }
   if (
@@ -393,7 +433,11 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.event.key === "PageDown"
   ) {
     context.event.preventDefault();
-    pageDown();
+    if (context.mainView === "history") {
+      pageFocusedHistoryPane(context, "down");
+    } else {
+      pageDown();
+    }
     return true;
   }
   if (
@@ -602,6 +646,10 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
 }
 
+function isHistorySearchInputTarget(target: HTMLElement | null): boolean {
+  return Boolean(target?.closest(".msg-search .search-input"));
+}
+
 function isSequentialSearchTarget(
   target: HTMLElement | null,
 ): target is HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLDivElement {
@@ -646,4 +694,43 @@ function isVisiblePaneTarget(pane: HTMLDivElement | null): pane is HTMLDivElemen
   }
   const styles = window.getComputedStyle(pane);
   return styles.display !== "none" && styles.visibility !== "hidden";
+}
+
+function resolvePageableHistoryPaneElement(context: ShortcutContext): HTMLDivElement | null {
+  if (context.focusedPane === "project") {
+    return context.projectListRef.current;
+  }
+  if (context.focusedPane === "session") {
+    return context.sessionListRef.current;
+  }
+  if (context.focusedPane === "message") {
+    return context.messageListRef.current;
+  }
+  return context.messageListRef.current;
+}
+
+function pageScrollableElement(container: HTMLDivElement | null, direction: "up" | "down"): void {
+  if (!container) {
+    return;
+  }
+  const styles = window.getComputedStyle(container);
+  const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+  const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+  const visibleContentHeight = container.clientHeight - paddingTop - paddingBottom;
+  const pageSize = Math.max(0, visibleContentHeight - HISTORY_PAGE_SCROLL_OVERLAP_PX);
+  if (pageSize <= 0) {
+    return;
+  }
+
+  const delta = direction === "down" ? pageSize : -pageSize;
+  const nextScrollTop = Math.max(0, container.scrollTop + delta);
+  if (typeof container.scrollTo === "function") {
+    container.scrollTo({ top: nextScrollTop });
+  } else {
+    container.scrollTop = nextScrollTop;
+  }
+}
+
+function pageFocusedHistoryPane(context: ShortcutContext, direction: "up" | "down"): void {
+  pageScrollableElement(resolvePageableHistoryPaneElement(context), direction);
 }

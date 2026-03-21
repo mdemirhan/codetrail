@@ -198,6 +198,88 @@ describe("App history messages", () => {
     expect(document.activeElement).toBe(messageList);
   });
 
+  it("lets Ctrl+U/Ctrl+D page messages without leaving the search box and Enter returns focus to messages", async () => {
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+    });
+
+    const messageList = container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+    const searchInput = container.querySelector<HTMLInputElement>(".msg-search .search-input");
+    expect(messageList).not.toBeNull();
+    expect(searchInput).not.toBeNull();
+    if (!messageList || !searchInput) {
+      throw new Error("Expected message list and history search input");
+    }
+
+    const scrollTo = vi.fn(({ top }: { top: number }) => {
+      messageList.scrollTop = top;
+    });
+
+    messageList.style.paddingTop = "20px";
+    messageList.style.paddingBottom = "20px";
+    Object.defineProperty(messageList, "clientHeight", {
+      value: 320,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTop", {
+      value: 40,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTo", {
+      value: scrollTo,
+      configurable: true,
+    });
+
+    searchInput.focus();
+
+    fireEvent.keyDown(searchInput, { key: "d", ctrlKey: true });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 300 });
+    expect(document.activeElement).toBe(searchInput);
+
+    fireEvent.keyDown(searchInput, { key: "u", ctrlKey: true });
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 40 });
+    expect(document.activeElement).toBe(searchInput);
+
+    fireEvent.keyDown(searchInput, { key: "Enter" });
+    expect(document.activeElement).toBe(messageList);
+  });
+
+  it("lets Cmd+Up/Cmd+Down from the history search box move focus into the message list", async () => {
+    installScrollIntoViewMock();
+
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+    const messageList = () => container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>(".msg-search .search-input");
+    expect(searchInput).not.toBeNull();
+    if (!searchInput) {
+      throw new Error("Expected history search input");
+    }
+
+    searchInput.focus();
+    fireEvent.keyDown(searchInput, { key: "ArrowDown", metaKey: true });
+    await waitFor(() => {
+      expect(getFocusedHistoryMessageId(container)).toBe("m1");
+      expect(document.activeElement).toBe(messageList());
+    });
+
+    searchInput.focus();
+    fireEvent.keyDown(searchInput, { key: "ArrowUp", metaKey: true });
+    await waitFor(() => {
+      expect(getFocusedHistoryMessageId(container)).toBe("m1");
+      expect(document.activeElement).toBe(messageList());
+    });
+  });
+
   it("keeps the message pane focused when entering and exiting focus mode", async () => {
     const client = createAppClient();
     const { container } = renderWithClient(<App />, client);
