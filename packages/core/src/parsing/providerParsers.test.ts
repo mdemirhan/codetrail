@@ -227,3 +227,63 @@ describe("parseProviderPayload (Copilot)", () => {
     expect(messages).toHaveLength(0);
   });
 });
+
+describe("parseProviderPayload (Codex tool classification)", () => {
+  it("keeps write_stdin as tool_use", () => {
+    const diagnostics: ParserDiagnostic[] = [];
+
+    const messages = parseProviderPayload({
+      provider: "codex",
+      sessionId: "codex-test",
+      payload: [
+        {
+          type: "response_item",
+          timestamp: "2026-03-21T19:48:31.960Z",
+          payload: {
+            id: "call-write-stdin",
+            type: "custom_tool_call",
+            call_id: "call-write-stdin",
+            name: "write_stdin",
+            input: {
+              session_id: 123,
+              chars: "",
+              yield_time_ms: 1000,
+            },
+          },
+        },
+      ],
+      diagnostics,
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.category).toBe("tool_use");
+    expect(messages[0]?.content).toContain("write_stdin");
+  });
+
+  it("still classifies apply_patch as tool_edit", () => {
+    const diagnostics: ParserDiagnostic[] = [];
+
+    const messages = parseProviderPayload({
+      provider: "codex",
+      sessionId: "codex-test",
+      payload: [
+        {
+          type: "response_item",
+          timestamp: "2026-03-21T19:47:10.130Z",
+          payload: {
+            id: "call-apply-patch",
+            type: "custom_tool_call",
+            call_id: "call-apply-patch",
+            name: "apply_patch",
+            input: "*** Begin Patch\n*** End Patch\n",
+          },
+        },
+      ],
+      diagnostics,
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.category).toBe("tool_edit");
+    expect(messages[0]?.content).toContain("apply_patch");
+  });
+});

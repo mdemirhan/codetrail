@@ -14,7 +14,7 @@ import type { BookmarkListResponse } from "./types";
 
 export const PAGE_SIZE = 100;
 export const SEARCH_PAGE_SIZE = 100;
-export const COLLAPSED_PANE_WIDTH = 48;
+export const COLLAPSED_PANE_WIDTH = 36;
 
 export const PROJECT_ALL_NAV_ID = "__project_all__";
 export const BOOKMARKS_NAV_ID = "__bookmarks__";

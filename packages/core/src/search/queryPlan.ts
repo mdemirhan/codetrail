@@ -1,5 +1,7 @@
 export const SEARCH_TOKEN_MAX_LENGTH = 64;
 export type SearchMode = "simple" | "advanced";
+const HIGHLIGHT_PATTERN_TOKEN = /[\p{L}\p{N}*]+/gu;
+const HIGHLIGHT_TOKEN_SEPARATOR_REGEX = String.raw`[^\p{L}\p{N}]+`;
 
 type FtsToken = {
   value: string;
@@ -251,11 +253,39 @@ function escapeLikeToken(value: string): string {
 }
 
 function highlightPatternToRegexFragment(pattern: string): string {
-  const escaped = escapeRegExp(pattern);
-  if (!pattern.includes("*")) {
-    return escaped;
+  const tokens = Array.from(pattern.matchAll(HIGHLIGHT_PATTERN_TOKEN), (match) => match[0] ?? "");
+  if (tokens.length === 0) {
+    return "";
   }
-  return escaped.replaceAll("\\*", "\\S*");
+
+  if (tokens.length === 1 && tokens[0] === pattern) {
+    const escaped = escapeRegExp(pattern);
+    if (!pattern.includes("*")) {
+      return escaped;
+    }
+    return escaped.replaceAll("\\*", "\\S*");
+  }
+
+  const fragments = tokens
+    .map((token) => tokenToHighlightRegexFragment(token))
+    .filter((fragment) => fragment.length > 0);
+  if (fragments.length === 0) {
+    return "";
+  }
+  return fragments.join(HIGHLIGHT_TOKEN_SEPARATOR_REGEX);
+}
+
+function tokenToHighlightRegexFragment(token: string): string {
+  if (!token.includes("*")) {
+    return escapeRegExp(token);
+  }
+
+  if (supportsFtsPrefix(token)) {
+    const value = token.slice(0, -1);
+    return `${escapeRegExp(value)}[\\p{L}\\p{N}]*`;
+  }
+
+  return escapeRegExp(token.replaceAll("*", ""));
 }
 
 function escapeRegExp(value: string): string {

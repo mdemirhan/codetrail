@@ -41,6 +41,7 @@ function createProject(
     path: `/tmp/${id}`,
     sessionCount: 1,
     messageCount: 0,
+    bookmarkCount: 0,
     lastActivity: null,
     ...rest,
   };

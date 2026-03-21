@@ -81,6 +81,7 @@ function createProps(
     selectPreviousProject: vi.fn(),
     selectNextProject: vi.fn(),
     handleProjectTreeArrow: vi.fn(),
+    handleProjectTreeEnter: vi.fn(),
     pageHistoryMessagesUp: vi.fn(),
     pageHistoryMessagesDown: vi.fn(),
     pageSearchResultsUp: vi.fn(),
@@ -333,6 +334,22 @@ describe("useKeyboardShortcuts", () => {
     projectList.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
     sessionList.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
     expect(document.activeElement).toBe(messageList);
+  });
+
+  it("routes Enter on the focused project pane to the tree enter handler", () => {
+    const props = createProps();
+
+    render(<Harness {...props} />);
+
+    const projectList = props.projectListRef.current;
+    if (!projectList) {
+      throw new Error("Expected project pane ref to be attached");
+    }
+
+    projectList.focus();
+    projectList.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    expect(props.handleProjectTreeEnter).toHaveBeenCalledTimes(1);
   });
 
   it("skips collapsed pane targets when cycling with Tab", () => {

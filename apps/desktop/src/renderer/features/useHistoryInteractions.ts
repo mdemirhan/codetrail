@@ -39,6 +39,17 @@ import { toggleValue } from "../lib/viewUtils";
 import { focusHistoryList } from "./historyControllerShared";
 import { formatProjectDetails, formatSessionDetails } from "./historyCopyFormat";
 
+function focusVisibleProjectTarget(
+  projectListElement: HTMLDivElement | null,
+  element: HTMLElement | null,
+) {
+  if (!projectListElement || !element) {
+    return;
+  }
+  element.focus({ preventScroll: true });
+  element.scrollIntoView?.({ block: "nearest" });
+}
+
 // Interaction handlers are collected here so keyboard/mouse behavior can share the same
 // state-transition rules without being spread across components.
 export function useHistoryInteractions({
@@ -51,6 +62,8 @@ export function useHistoryInteractions({
   setSessionPage,
   isExpandedByDefault,
   historyMode,
+  selection,
+  bookmarkReturnSelection,
   bookmarksResponse,
   activeHistoryMessages,
   selectedProjectId,
@@ -67,6 +80,7 @@ export function useHistoryInteractions({
   setPendingMessageAreaFocus,
   setPendingMessagePageNavigation,
   setHistorySelection,
+  setBookmarkReturnSelection,
   sessionListRef,
   selectedSessionId,
   sessionPaneNavigationItems,
@@ -89,6 +103,7 @@ export function useHistoryInteractions({
   setProjectQueryInput,
   prettyProvider,
   refreshContextRef,
+  refreshTreeProjectSessions,
 }: {
   codetrail: CodetrailClient;
   logError: (context: string, error: unknown) => void;
@@ -99,6 +114,8 @@ export function useHistoryInteractions({
   setSessionPage: Dispatch<SetStateAction<number>>;
   isExpandedByDefault: (category: MessageCategory) => boolean;
   historyMode: HistorySelection["mode"];
+  selection: HistorySelection;
+  bookmarkReturnSelection: HistorySelection | null;
   bookmarksResponse: {
     results: Array<{
       projectId: string;
@@ -121,6 +138,7 @@ export function useHistoryInteractions({
   setPendingMessageAreaFocus: Dispatch<SetStateAction<boolean>>;
   setPendingMessagePageNavigation: Dispatch<SetStateAction<PendingMessagePageNavigation | null>>;
   setHistorySelection: Dispatch<SetStateAction<HistorySelection>>;
+  setBookmarkReturnSelection: Dispatch<SetStateAction<HistorySelection | null>>;
   sessionListRef: RefObject<HTMLDivElement | null>;
   selectedSessionId: string;
   sessionPaneNavigationItems: SessionPaneNavigationItem[];
@@ -143,6 +161,7 @@ export function useHistoryInteractions({
   setProjectQueryInput: Dispatch<SetStateAction<string>>;
   prettyProvider: (provider: ProjectSummary["provider"]) => string;
   refreshContextRef: MutableRefObject<RefreshContext | null>;
+  refreshTreeProjectSessions: () => Promise<void>;
 }) {
   const handleToggleScopedMessagesExpanded = useCallback(() => {
     if (scopedMessages.length === 0) {
@@ -325,25 +344,86 @@ export function useHistoryInteractions({
     setSessionPage,
   ]);
 
+  const clearBookmarkReturnSelection = useCallback(() => {
+    setBookmarkReturnSelection(null);
+  }, [setBookmarkReturnSelection]);
+
   const selectProjectAllMessages = useCallback(
     (projectId: string) => {
       resetHistorySelectionState();
+      clearBookmarkReturnSelection();
       setHistorySelection(createHistorySelection("project_all", projectId, ""));
     },
-    [resetHistorySelectionState, setHistorySelection],
+    [clearBookmarkReturnSelection, resetHistorySelectionState, setHistorySelection],
   );
 
   const selectBookmarksView = useCallback(() => {
     resetHistorySelectionState();
+    setBookmarkReturnSelection((current) => (historyMode === "bookmarks" ? current : selection));
     setHistorySelection(createHistorySelection("bookmarks", selectedProjectId, ""));
-  }, [resetHistorySelectionState, selectedProjectId, setHistorySelection]);
+  }, [
+    historyMode,
+    resetHistorySelectionState,
+    selectedProjectId,
+    selection,
+    setBookmarkReturnSelection,
+    setHistorySelection,
+  ]);
+
+  const openProjectBookmarksView = useCallback(
+    (projectId: string) => {
+      if (!projectId) {
+        return;
+      }
+      if (historyMode === "bookmarks" && selectedProjectId === projectId) {
+        resetHistorySelectionState();
+        const nextSelection =
+          bookmarkReturnSelection ?? createHistorySelection("project_all", projectId, "");
+        setBookmarkReturnSelection(null);
+        setHistorySelection(nextSelection);
+        return;
+      }
+      resetHistorySelectionState();
+      setBookmarkReturnSelection((current) => (historyMode === "bookmarks" ? current : selection));
+      setHistorySelection(createHistorySelection("bookmarks", projectId, ""));
+    },
+    [
+      bookmarkReturnSelection,
+      historyMode,
+      resetHistorySelectionState,
+      selectedProjectId,
+      selection,
+      setBookmarkReturnSelection,
+      setHistorySelection,
+    ],
+  );
+
+  const closeBookmarksView = useCallback(() => {
+    resetHistorySelectionState();
+    const nextSelection =
+      bookmarkReturnSelection ?? createHistorySelection("project_all", selectedProjectId, "");
+    setBookmarkReturnSelection(null);
+    setHistorySelection(nextSelection);
+  }, [
+    bookmarkReturnSelection,
+    resetHistorySelectionState,
+    selectedProjectId,
+    setBookmarkReturnSelection,
+    setHistorySelection,
+  ]);
 
   const selectSessionView = useCallback(
-    (sessionId: string) => {
+    (sessionId: string, projectId = selectedProjectId) => {
       resetHistorySelectionState();
-      setHistorySelection(createHistorySelection("session", selectedProjectId, sessionId));
+      clearBookmarkReturnSelection();
+      setHistorySelection(createHistorySelection("session", projectId, sessionId));
     },
-    [resetHistorySelectionState, selectedProjectId, setHistorySelection],
+    [
+      clearBookmarkReturnSelection,
+      resetHistorySelectionState,
+      selectedProjectId,
+      setHistorySelection,
+    ],
   );
 
   const selectAdjacentSession = useCallback(
@@ -371,7 +451,7 @@ export function useHistoryInteractions({
         selectBookmarksView();
         return;
       }
-      selectSessionView(nextNavigationId);
+      selectSessionView(nextNavigationId, selectedProjectId);
     },
     [
       historyMode,
@@ -397,25 +477,17 @@ export function useHistoryInteractions({
         direction,
       );
       if (visibleTarget?.kind === "folder") {
-        focusHistoryList(projectListRef.current);
-        window.requestAnimationFrame(() => {
-          visibleTarget.element.focus({ preventScroll: true });
-        });
+        focusVisibleProjectTarget(projectListRef.current, visibleTarget.element);
         return;
       }
 
-      const nextProjectId =
-        visibleTarget?.id || getAdjacentItemId(sortedProjects, selectedProjectId, direction);
-      if (!nextProjectId) {
+      if (!visibleTarget) {
         return;
       }
-      focusHistoryList(projectListRef.current);
-      window.requestAnimationFrame(() => {
-        visibleTarget?.element.focus({ preventScroll: true });
-      });
-      selectProjectAllMessages(nextProjectId);
+
+      focusVisibleProjectTarget(projectListRef.current, visibleTarget.element);
     },
-    [projectListRef, selectProjectAllMessages, selectedProjectId, sortedProjects],
+    [projectListRef],
   );
 
   const handleProjectTreeArrow = useCallback(
@@ -439,47 +511,115 @@ export function useHistoryInteractions({
         if (!folderElement) {
           return;
         }
+        const folderToggleElement = container.querySelector<HTMLElement>(
+          `[data-project-expand-toggle-for="${CSS.escape(currentTarget.id)}"]`,
+        );
         const expanded = folderElement.getAttribute("aria-expanded") === "true";
         if (direction === "right" && !expanded) {
-          folderElement.click();
-          window.requestAnimationFrame(() => {
-            folderElement.focus({ preventScroll: true });
-          });
+          folderToggleElement?.click();
+          focusVisibleProjectTarget(container, folderElement);
           return;
         }
         if (direction === "left" && expanded) {
-          folderElement.click();
-          window.requestAnimationFrame(() => {
-            folderElement.focus({ preventScroll: true });
-          });
+          folderToggleElement?.click();
+          focusVisibleProjectTarget(container, folderElement);
           return;
         }
         if (direction === "right" && expanded) {
           const childTarget = getAdjacentVisibleProjectTarget(container, currentTarget, "next");
-          if (childTarget?.kind === "project") {
-            focusHistoryList(container);
-            window.requestAnimationFrame(() => {
-              childTarget.element.focus({ preventScroll: true });
-            });
-            selectProjectAllMessages(childTarget.id);
+          if (childTarget) {
+            focusVisibleProjectTarget(container, childTarget.element);
           }
         }
         return;
       }
 
+      if (currentTarget.kind === "session") {
+        if (direction === "left") {
+          const projectElement = container.querySelector<HTMLButtonElement>(
+            `[data-project-nav-kind="project"][data-project-nav-id="${CSS.escape(currentTarget.projectId)}"]`,
+          );
+          if (!projectElement) {
+            return;
+          }
+          focusVisibleProjectTarget(container, projectElement);
+        }
+        return;
+      }
+
+      const projectElement = container.querySelector<HTMLElement>(
+        `[data-project-nav-kind="project"][data-project-nav-id="${CSS.escape(currentTarget.id)}"]`,
+      );
+      const expanded = projectElement?.getAttribute("aria-expanded") === "true";
+      const canExpand = projectElement?.dataset.projectCanExpand === "true";
+      const toggle = container.querySelector<HTMLElement>(
+        `[data-project-expand-toggle-for="${CSS.escape(currentTarget.id)}"]`,
+      );
+
+      if (direction === "right" && canExpand && !expanded) {
+        toggle?.click();
+        focusVisibleProjectTarget(container, projectElement);
+        return;
+      }
+      if (direction === "left" && canExpand && expanded) {
+        toggle?.click();
+        focusVisibleProjectTarget(container, projectElement);
+        return;
+      }
+      if (direction === "right" && expanded) {
+        const childTarget = getAdjacentVisibleProjectTarget(container, currentTarget, "next");
+        if (!childTarget) {
+          return;
+        }
+        focusVisibleProjectTarget(container, childTarget.element);
+        return;
+      }
       if (direction === "left") {
         const parentFolder = getProjectParentFolderTarget(container, currentTarget.id);
         if (!parentFolder || parentFolder.kind !== "folder") {
           return;
         }
-        focusHistoryList(container);
-        window.requestAnimationFrame(() => {
-          parentFolder.element.focus({ preventScroll: true });
-        });
+        focusVisibleProjectTarget(container, parentFolder.element);
       }
     },
-    [projectListRef, selectProjectAllMessages],
+    [projectListRef],
   );
+
+  const handleProjectTreeEnter = useCallback(() => {
+    const container = projectListRef.current;
+    if (!container) {
+      return;
+    }
+    const currentTarget =
+      getProjectNavigationTargetFromElement(
+        document.activeElement instanceof HTMLElement ? document.activeElement : null,
+      ) ?? getProjectNavigationTargetFromContainer(container);
+    if (!currentTarget) {
+      return;
+    }
+
+    if (currentTarget.kind === "folder") {
+      const folderElement = container.querySelector<HTMLButtonElement>(
+        `[data-project-nav-kind="folder"][data-folder-id="${CSS.escape(currentTarget.id)}"]`,
+      );
+      folderElement?.click();
+      return;
+    }
+
+    if (currentTarget.kind === "project") {
+      const projectElement = container.querySelector<HTMLElement>(
+        `[data-project-nav-kind="project"][data-project-nav-id="${CSS.escape(currentTarget.id)}"]`,
+      );
+      const canExpand = projectElement?.dataset.projectCanExpand === "true";
+      if (!canExpand) {
+        return;
+      }
+      const toggle = container.querySelector<HTMLElement>(
+        `[data-project-expand-toggle-for="${CSS.escape(currentTarget.id)}"]`,
+      );
+      toggle?.click();
+    }
+  }, [projectListRef]);
 
   const goToPreviousHistoryPage = useCallback(() => {
     if (!canNavigatePages) {
@@ -599,9 +739,10 @@ export function useHistoryInteractions({
         loadProjects(source === "auto" ? "auto" : "resort"),
         loadSessions(),
         loadBookmarks(),
+        refreshTreeProjectSessions(),
       ]);
     },
-    [loadBookmarks, loadProjects, loadSessions],
+    [loadBookmarks, loadProjects, loadSessions, refreshTreeProjectSessions],
   );
 
   const navigateFromSearchResult = useCallback(
@@ -627,10 +768,13 @@ export function useHistoryInteractions({
     handleHistorySearchKeyDown,
     selectProjectAllMessages,
     selectBookmarksView,
+    openProjectBookmarksView,
+    closeBookmarksView,
     selectSessionView,
     selectAdjacentSession,
     selectAdjacentProject,
     handleProjectTreeArrow,
+    handleProjectTreeEnter,
     goToPreviousHistoryPage,
     goToNextHistoryPage,
     focusAdjacentHistoryMessage,

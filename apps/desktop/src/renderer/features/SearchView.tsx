@@ -9,7 +9,12 @@ import { AdvancedSearchToggleButton } from "../components/AdvancedSearchToggleBu
 import { ToolbarIcon } from "../components/ToolbarIcon";
 import { HighlightedText } from "../components/messages/MessagePresentation";
 import { useClickOutside } from "../hooks/useClickOutside";
-import { SEARCH_PLACEHOLDERS } from "../lib/searchPlaceholders";
+import {
+  SEARCH_PLACEHOLDERS,
+  getAdvancedSearchToggleTitle,
+  getSearchQueryPlaceholder,
+  getSearchQueryTooltip,
+} from "../lib/searchLabels";
 import {
   compactPath,
   formatDate,
@@ -40,12 +45,8 @@ export function SearchView({
   const [controlsCollapsed, setControlsCollapsed] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const projectMenuRef = useRef<HTMLDivElement | null>(null);
-  const queryPlaceholder = advancedSearchEnabled
-    ? 'Advanced search: try "build error" AND deploy* or auth AND (timeout OR retry)'
-    : SEARCH_PLACEHOLDERS.globalMessages;
-  const queryTitle = advancedSearchEnabled
-    ? 'Advanced search is enabled. Use quoted phrases, AND/OR/NOT, parentheses, and postfix wildcard syntax like term*. Example: "build error" AND deploy*. Refer to Help for more examples and syntax details.'
-    : "Standard search is enabled. Type plain words to match message text, and use postfix wildcard syntax like term* when needed. Turn on Advanced Search for quoted phrases, boolean operators, and grouping. Refer to Help for more.";
+  const queryPlaceholder = getSearchQueryPlaceholder(advancedSearchEnabled);
+  const queryTitle = getSearchQueryTooltip(advancedSearchEnabled);
   const sortedProjects = [...projects].sort(compareProjectsByNameThenProvider);
   const selectedProject = useMemo(
     () => sortedProjects.find((project) => project.id === search.searchProjectId) ?? null,
@@ -93,15 +94,12 @@ export function SearchView({
                   <AdvancedSearchToggleButton
                     buttonRef={search.advancedSearchToggleRef}
                     enabled={advancedSearchEnabled}
+                    variant="search"
                     onToggle={() => {
                       setAdvancedSearchEnabled((value) => !value);
                       search.setSearchPage(0);
                     }}
-                    title={
-                      advancedSearchEnabled
-                        ? 'Advanced search is on. You can use quoted phrases, AND/OR/NOT, parentheses, and postfix wildcard syntax like term*. Example: "rate limit" AND retry*. Turn this off to go back to plain text search. Refer to Help for more.'
-                        : "Advanced search is off. Search works like plain text matching, with optional postfix wildcard syntax like term*. Turn this on if you want quoted phrases, AND/OR/NOT, and grouped expressions with parentheses. Refer to Help for more."
-                    }
+                    title={getAdvancedSearchToggleTitle(advancedSearchEnabled)}
                   />
 
                   <div
@@ -115,7 +113,7 @@ export function SearchView({
                   <button
                     ref={search.searchCollapseButtonRef}
                     type="button"
-                    className="search-panel-collapse-btn"
+                    className="search-panel-icon-btn search-panel-collapse-btn"
                     aria-expanded={!controlsCollapsed}
                     aria-label={
                       controlsCollapsed ? "Expand search filters" : "Collapse search filters"
@@ -127,9 +125,12 @@ export function SearchView({
                     }
                     onClick={() => setControlsCollapsed((value) => !value)}
                   >
-                    <span className="search-panel-collapse-glyph" aria-hidden>
-                      {controlsCollapsed ? "▾" : "▴"}
-                    </span>
+                    <svg className="search-panel-collapse-glyph" viewBox="0 0 12 12" aria-hidden>
+                      <title>
+                        {controlsCollapsed ? "Expand search filters" : "Collapse search filters"}
+                      </title>
+                      <path d={controlsCollapsed ? "M3 4.5 6 7.5 9 4.5" : "M3 7.5 6 4.5 9 7.5"} />
+                    </svg>
                   </button>
                 </div>
 

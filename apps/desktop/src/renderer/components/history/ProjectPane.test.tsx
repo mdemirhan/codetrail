@@ -6,8 +6,16 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { SEARCH_PLACEHOLDERS } from "../../lib/searchPlaceholders";
+import { SEARCH_PLACEHOLDERS } from "../../lib/searchLabels";
 import { ProjectPane } from "./ProjectPane";
+
+type ProjectPaneOverrides = {
+  data?: Partial<ComponentProps<typeof ProjectPane>["data"]>;
+  sorting?: Partial<ComponentProps<typeof ProjectPane>["sorting"]>;
+  preferences?: Partial<ComponentProps<typeof ProjectPane>["preferences"]>;
+  capabilities?: Partial<ComponentProps<typeof ProjectPane>["capabilities"]>;
+  actions?: Partial<ComponentProps<typeof ProjectPane>["actions"]>;
+};
 
 const projects = [
   {
@@ -17,6 +25,7 @@ const projects = [
     path: "/Users/test/project-one",
     sessionCount: 2,
     messageCount: 12,
+    bookmarkCount: 0,
     lastActivity: "2026-03-01T12:00:00.000Z",
   },
   {
@@ -26,6 +35,7 @@ const projects = [
     path: "/Users/test/project-two",
     sessionCount: 1,
     messageCount: 6,
+    bookmarkCount: 0,
     lastActivity: "2026-03-01T13:00:00.000Z",
   },
   {
@@ -35,41 +45,68 @@ const projects = [
     path: "/tmp/project-three",
     sessionCount: 7,
     messageCount: 22,
+    bookmarkCount: 0,
     lastActivity: "2026-03-01T10:00:00.000Z",
   },
 ];
 
-function renderProjectPane(overrides: Partial<ComponentProps<typeof ProjectPane>> = {}) {
-  return render(
-    <ProjectPane
-      sortedProjects={projects}
-      selectedProjectId="project_1"
-      sortField="last_active"
-      sortDirection="desc"
-      viewMode="list"
-      updateSource="resort"
-      collapsed={false}
-      projectQueryInput=""
-      projectProviders={["claude", "codex", "gemini"]}
-      providers={["claude", "codex", "gemini", "cursor"]}
-      projectProviderCounts={{ claude: 1, codex: 1, gemini: 1, cursor: 0, copilot: 0 }}
-      projectUpdates={{ project_2: { messageDelta: 3, updatedAt: Date.now() } }}
-      onToggleCollapsed={vi.fn()}
-      onProjectQueryChange={vi.fn()}
-      onToggleProvider={vi.fn()}
-      onSetSortField={vi.fn()}
-      onToggleSortDirection={vi.fn()}
-      onToggleViewMode={vi.fn()}
-      onCopyProjectDetails={vi.fn()}
-      onSelectProject={vi.fn()}
-      onOpenProjectLocation={vi.fn()}
-      onDeleteProject={vi.fn()}
-      canCopyProjectDetails={true}
-      canDeleteProject={true}
-      canOpenProjectLocation={true}
-      {...overrides}
-    />,
-  );
+function createProjectPaneProps(
+  overrides: ProjectPaneOverrides = {},
+): ComponentProps<typeof ProjectPane> {
+  const data: ComponentProps<typeof ProjectPane>["data"] = {
+    sortedProjects: projects,
+    selectedProjectId: "project_1",
+    viewMode: "list" as const,
+    updateSource: "resort" as const,
+    collapsed: false,
+    projectQueryInput: "",
+    projectProviders: ["claude", "codex", "gemini"],
+    providers: ["claude", "codex", "gemini", "cursor"],
+    projectProviderCounts: { claude: 1, codex: 1, gemini: 1, cursor: 0, copilot: 0 },
+    projectUpdates: { project_2: { messageDelta: 3, updatedAt: Date.now() } },
+  };
+  const sorting: ComponentProps<typeof ProjectPane>["sorting"] = {
+    sortField: "last_active" as const,
+    sortDirection: "desc" as const,
+  };
+  const preferences: ComponentProps<typeof ProjectPane>["preferences"] = {
+    singleClickFoldersExpand: true,
+    singleClickProjectsExpand: false,
+  };
+  const capabilities: ComponentProps<typeof ProjectPane>["capabilities"] = {
+    canCopyProjectDetails: true,
+    canDeleteProject: true,
+    canOpenProjectLocation: true,
+  };
+  const actions: ComponentProps<typeof ProjectPane>["actions"] = {
+    onToggleCollapsed: vi.fn(),
+    onProjectQueryChange: vi.fn(),
+    onToggleProvider: vi.fn(),
+    onSetSortField: vi.fn(),
+    onToggleSortDirection: vi.fn(),
+    onToggleViewMode: vi.fn(),
+    onToggleSingleClickFoldersExpand: vi.fn(),
+    onToggleSingleClickProjectsExpand: vi.fn(),
+    onCopyProjectDetails: vi.fn(),
+    onCopySession: vi.fn(),
+    onSelectProject: vi.fn(),
+    onOpenProjectLocation: vi.fn(),
+    onOpenSessionLocation: vi.fn(),
+    onDeleteProject: vi.fn(),
+    onDeleteSession: vi.fn(),
+  };
+
+  return {
+    data: { ...data, ...overrides.data },
+    sorting: { ...sorting, ...overrides.sorting },
+    preferences: { ...preferences, ...overrides.preferences },
+    capabilities: { ...capabilities, ...overrides.capabilities },
+    actions: { ...actions, ...overrides.actions },
+  };
+}
+
+function renderProjectPane(overrides: ProjectPaneOverrides = {}) {
+  return render(<ProjectPane {...createProjectPaneProps(overrides)} />);
 }
 
 describe("ProjectPane", () => {
@@ -91,15 +128,17 @@ describe("ProjectPane", () => {
     const onOpenProjectLocation = vi.fn();
 
     renderProjectPane({
-      onToggleCollapsed,
-      onSetSortField,
-      onToggleSortDirection,
-      onToggleViewMode,
-      onProjectQueryChange,
-      onToggleProvider,
-      onSelectProject,
-      onCopyProjectDetails,
-      onOpenProjectLocation,
+      actions: {
+        onToggleCollapsed,
+        onSetSortField,
+        onToggleSortDirection,
+        onToggleViewMode,
+        onProjectQueryChange,
+        onToggleProvider,
+        onSelectProject,
+        onCopyProjectDetails,
+        onOpenProjectLocation,
+      },
     });
 
     expect(screen.getByText("Project One")).toBeInTheDocument();
@@ -113,7 +152,11 @@ describe("ProjectPane", () => {
     await user.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
     await user.click(screen.getByRole("button", { name: "Project sort field: Last Active" }));
     await user.click(screen.getByRole("button", { name: "Name" }));
-    await user.click(screen.getByRole("button", { name: "Sort projects ascending" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Newest activity first (projects). Switch to oldest first",
+      }),
+    );
     await user.click(screen.getByRole("button", { name: "Project options" }));
     await user.click(screen.getByRole("button", { name: "Copy" }));
     await user.click(screen.getByRole("button", { name: "Switch to By Folder" }));
@@ -134,13 +177,19 @@ describe("ProjectPane", () => {
 
   it("hides sort and overflow actions when collapsed", () => {
     renderProjectPane({
-      collapsed: true,
-      selectedProjectId: "",
-      sortDirection: "asc",
-      projectProviders: ["claude"],
-      canCopyProjectDetails: false,
-      canDeleteProject: false,
-      canOpenProjectLocation: false,
+      data: {
+        collapsed: true,
+        selectedProjectId: "",
+        projectProviders: ["claude"],
+      },
+      sorting: {
+        sortDirection: "asc",
+      },
+      capabilities: {
+        canCopyProjectDetails: false,
+        canDeleteProject: false,
+        canOpenProjectLocation: false,
+      },
     });
 
     expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
@@ -149,7 +198,11 @@ describe("ProjectPane", () => {
       "Expand Projects (Cmd/Ctrl+B)",
     );
     expect(screen.queryByRole("button", { name: "Project sort field: Last Active" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Sort projects descending" })).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: "Newest activity first (projects). Switch to oldest first",
+      }),
+    ).toBeNull();
     expect(screen.queryByRole("button", { name: "Switch to By Folder" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Project options" })).toBeNull();
   });
@@ -158,7 +211,9 @@ describe("ProjectPane", () => {
     const user = userEvent.setup();
 
     const { rerender } = renderProjectPane({
-      viewMode: "tree",
+      data: {
+        viewMode: "tree",
+      },
     });
 
     expect(screen.getByRole("button", { name: "Collapse all folders" })).toBeInTheDocument();
@@ -168,35 +223,7 @@ describe("ProjectPane", () => {
     expect(screen.getByRole("button", { name: "Expand all folders" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Project One/i })).toBeNull();
 
-    rerender(
-      <ProjectPane
-        sortedProjects={projects}
-        selectedProjectId="project_1"
-        sortField="last_active"
-        sortDirection="desc"
-        viewMode="list"
-        updateSource="resort"
-        collapsed={false}
-        projectQueryInput=""
-        projectProviders={["claude", "codex", "gemini"]}
-        providers={["claude", "codex", "gemini", "cursor"]}
-        projectProviderCounts={{ claude: 1, codex: 1, gemini: 1, cursor: 0, copilot: 0 }}
-        projectUpdates={{ project_2: { messageDelta: 3, updatedAt: Date.now() } }}
-        onToggleCollapsed={vi.fn()}
-        onProjectQueryChange={vi.fn()}
-        onToggleProvider={vi.fn()}
-        onSetSortField={vi.fn()}
-        onToggleSortDirection={vi.fn()}
-        onToggleViewMode={vi.fn()}
-        onCopyProjectDetails={vi.fn()}
-        onSelectProject={vi.fn()}
-        onOpenProjectLocation={vi.fn()}
-        onDeleteProject={vi.fn()}
-        canCopyProjectDetails={true}
-        canDeleteProject={true}
-        canOpenProjectLocation={true}
-      />,
-    );
+    rerender(<ProjectPane {...createProjectPaneProps({ data: { viewMode: "list" } })} />);
 
     expect(screen.queryByRole("button", { name: "Expand all folders" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Collapse all folders" })).toBeNull();
@@ -206,73 +233,217 @@ describe("ProjectPane", () => {
     const user = userEvent.setup();
 
     const { rerender } = renderProjectPane({
-      viewMode: "tree",
+      data: {
+        viewMode: "tree",
+      },
     });
 
-    await user.click(screen.getByRole("button", { name: /~\/project-one, 1 projects/i }));
+    fireEvent.keyDown(screen.getByRole("button", { name: /~\/project-one, 1 projects/i }), {
+      key: "Enter",
+    });
     expect(screen.queryByRole("button", { name: /Project One/i })).toBeNull();
 
     rerender(
       <ProjectPane
-        sortedProjects={projects}
-        selectedProjectId="project_1"
-        sortField="last_active"
-        sortDirection="desc"
-        viewMode="list"
-        updateSource="resort"
-        collapsed={false}
-        projectQueryInput=""
-        projectProviders={["claude", "codex", "gemini"]}
-        providers={["claude", "codex", "gemini", "cursor"]}
-        projectProviderCounts={{ claude: 1, codex: 1, gemini: 1, cursor: 0, copilot: 0 }}
-        projectUpdates={{}}
-        onToggleCollapsed={vi.fn()}
-        onProjectQueryChange={vi.fn()}
-        onToggleProvider={vi.fn()}
-        onSetSortField={vi.fn()}
-        onToggleSortDirection={vi.fn()}
-        onToggleViewMode={vi.fn()}
-        onCopyProjectDetails={vi.fn()}
-        onSelectProject={vi.fn()}
-        onOpenProjectLocation={vi.fn()}
-        onDeleteProject={vi.fn()}
-        canCopyProjectDetails={true}
-        canDeleteProject={true}
-        canOpenProjectLocation={true}
+        {...createProjectPaneProps({ data: { viewMode: "list", projectUpdates: {} } })}
       />,
     );
 
     rerender(
       <ProjectPane
-        sortedProjects={projects}
-        selectedProjectId="project_1"
-        sortField="last_active"
-        sortDirection="desc"
-        viewMode="tree"
-        updateSource="resort"
-        collapsed={false}
-        projectQueryInput=""
-        projectProviders={["claude", "codex", "gemini"]}
-        providers={["claude", "codex", "gemini", "cursor"]}
-        projectProviderCounts={{ claude: 1, codex: 1, gemini: 1, cursor: 0, copilot: 0 }}
-        projectUpdates={{}}
-        onToggleCollapsed={vi.fn()}
-        onProjectQueryChange={vi.fn()}
-        onToggleProvider={vi.fn()}
-        onSetSortField={vi.fn()}
-        onToggleSortDirection={vi.fn()}
-        onToggleViewMode={vi.fn()}
-        onCopyProjectDetails={vi.fn()}
-        onSelectProject={vi.fn()}
-        onOpenProjectLocation={vi.fn()}
-        onDeleteProject={vi.fn()}
-        canCopyProjectDetails={true}
-        canDeleteProject={true}
-        canOpenProjectLocation={true}
+        {...createProjectPaneProps({ data: { viewMode: "tree", projectUpdates: {} } })}
       />,
     );
 
     expect(screen.getByRole("button", { name: /Project One/i })).toBeInTheDocument();
+  });
+
+  it("keeps a collapsed project collapsed when session mode selects one of its sessions", () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: () => undefined,
+      configurable: true,
+    });
+
+    renderProjectPane({
+      data: {
+        viewMode: "tree",
+        historyMode: "session",
+        selectedProjectId: "project_1",
+        selectedSessionId: "session_2",
+        treeProjectSessionsByProjectId: {
+          project_1: [
+            {
+              id: "session_1",
+              projectId: "project_1",
+              provider: "claude",
+              filePath: "/tmp/session-1.jsonl",
+              title: "Session One",
+              modelNames: "claude-opus",
+              startedAt: "2026-03-01T10:00:00.000Z",
+              endedAt: "2026-03-01T10:00:05.000Z",
+              durationMs: 5000,
+              gitBranch: "main",
+              cwd: "/workspace",
+              messageCount: 3,
+              bookmarkCount: 0,
+              tokenInputTotal: 10,
+              tokenOutputTotal: 8,
+            },
+            {
+              id: "session_2",
+              projectId: "project_1",
+              provider: "claude",
+              filePath: "/tmp/session-2.jsonl",
+              title: "Session Two",
+              modelNames: "claude-opus",
+              startedAt: "2026-03-01T11:00:00.000Z",
+              endedAt: "2026-03-01T11:00:05.000Z",
+              durationMs: 5000,
+              gitBranch: "main",
+              cwd: "/workspace",
+              messageCount: 4,
+              bookmarkCount: 0,
+              tokenInputTotal: 12,
+              tokenOutputTotal: 9,
+            },
+          ],
+        },
+      },
+      actions: {
+        onEnsureTreeProjectSessionsLoaded: vi.fn(),
+      },
+    });
+
+    expect(screen.queryByRole("button", { name: /Session Two/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /Project One/i })).toBeInTheDocument();
+  });
+
+  it("reveals and scrolls the selected session when its project is already expanded", async () => {
+    const user = userEvent.setup();
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: scrollIntoView,
+      configurable: true,
+    });
+
+    const { rerender } = renderProjectPane({
+      data: {
+        viewMode: "tree",
+        historyMode: "project_all",
+        selectedProjectId: "project_1",
+        treeProjectSessionsByProjectId: {
+          project_1: [
+            {
+              id: "session_1",
+              projectId: "project_1",
+              provider: "claude",
+              filePath: "/tmp/session-1.jsonl",
+              title: "Session One",
+              modelNames: "claude-opus",
+              startedAt: "2026-03-01T10:00:00.000Z",
+              endedAt: "2026-03-01T10:00:05.000Z",
+              durationMs: 5000,
+              gitBranch: "main",
+              cwd: "/workspace",
+              messageCount: 3,
+              bookmarkCount: 0,
+              tokenInputTotal: 10,
+              tokenOutputTotal: 8,
+            },
+            {
+              id: "session_2",
+              projectId: "project_1",
+              provider: "claude",
+              filePath: "/tmp/session-2.jsonl",
+              title: "Session Two",
+              modelNames: "claude-opus",
+              startedAt: "2026-03-01T11:00:00.000Z",
+              endedAt: "2026-03-01T11:00:05.000Z",
+              durationMs: 5000,
+              gitBranch: "main",
+              cwd: "/workspace",
+              messageCount: 4,
+              bookmarkCount: 0,
+              tokenInputTotal: 12,
+              tokenOutputTotal: 9,
+            },
+          ],
+        },
+      },
+      actions: {
+        onEnsureTreeProjectSessionsLoaded: vi.fn(),
+      },
+    });
+
+    const expandProjectOneButton = document.querySelector<HTMLButtonElement>(
+      '[data-project-expand-toggle-for="project_1"]',
+    );
+    if (!expandProjectOneButton) {
+      throw new Error("Expected expand toggle for project_1");
+    }
+
+    await user.click(expandProjectOneButton);
+    scrollIntoView.mockClear();
+
+    rerender(
+      <ProjectPane
+        {...createProjectPaneProps({
+          data: {
+            selectedSessionId: "session_2",
+            viewMode: "tree",
+            historyMode: "session",
+            projectUpdates: {},
+            treeProjectSessionsByProjectId: {
+              project_1: [
+                {
+                  id: "session_1",
+                  projectId: "project_1",
+                  provider: "claude",
+                  filePath: "/tmp/session-1.jsonl",
+                  title: "Session One",
+                  modelNames: "claude-opus",
+                  startedAt: "2026-03-01T10:00:00.000Z",
+                  endedAt: "2026-03-01T10:00:05.000Z",
+                  durationMs: 5000,
+                  gitBranch: "main",
+                  cwd: "/workspace",
+                  messageCount: 3,
+                  bookmarkCount: 0,
+                  tokenInputTotal: 10,
+                  tokenOutputTotal: 8,
+                },
+                {
+                  id: "session_2",
+                  projectId: "project_1",
+                  provider: "claude",
+                  filePath: "/tmp/session-2.jsonl",
+                  title: "Session Two",
+                  modelNames: "claude-opus",
+                  startedAt: "2026-03-01T11:00:00.000Z",
+                  endedAt: "2026-03-01T11:00:05.000Z",
+                  durationMs: 5000,
+                  gitBranch: "main",
+                  cwd: "/workspace",
+                  messageCount: 4,
+                  bookmarkCount: 0,
+                  tokenInputTotal: 12,
+                  tokenOutputTotal: 9,
+                },
+              ],
+            },
+          },
+          actions: {
+            onToggleSessionSortDirection: vi.fn(),
+            onSelectProjectSession: vi.fn(),
+            onSelectProjectBookmarks: vi.fn(),
+            onEnsureTreeProjectSessionsLoaded: vi.fn(),
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Session Two/i })).toBeInTheDocument();
+    expect(scrollIntoView).toHaveBeenCalled();
   });
 
   it("opens a project context menu with grouped actions for the clicked row", async () => {
@@ -281,8 +452,10 @@ describe("ProjectPane", () => {
     const onOpenProjectLocation = vi.fn();
 
     renderProjectPane({
-      onSelectProject,
-      onOpenProjectLocation,
+      actions: {
+        onSelectProject,
+        onOpenProjectLocation,
+      },
     });
 
     fireEvent.contextMenu(screen.getByRole("button", { name: /Project Two/i }));
@@ -303,8 +476,12 @@ describe("ProjectPane", () => {
     const onSelectProject = vi.fn();
 
     renderProjectPane({
-      viewMode: "tree",
-      onSelectProject,
+      data: {
+        viewMode: "tree",
+      },
+      actions: {
+        onSelectProject,
+      },
     });
 
     expect(screen.getByRole("button", { name: "~/project-one, 1 projects" })).toBeInTheDocument();
@@ -314,22 +491,256 @@ describe("ProjectPane", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Today 1:00 PM")).toBeNull();
 
+    await user.click(screen.getByRole("button", { name: "Collapse all folders" }));
     await user.click(screen.getByRole("button", { name: "~/project-one, 1 projects" }));
 
     expect(onSelectProject).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: /Project One/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /Project One/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "~/project-one, 1 projects" }));
     await user.click(screen.getByRole("button", { name: /Project One/i }));
 
     expect(onSelectProject).toHaveBeenCalledWith("project_1");
   });
 
+  it("lets the overflow toggles control single-click expansion behavior", async () => {
+    const user = userEvent.setup();
+    const onSelectProject = vi.fn();
+    const onToggleSingleClickFoldersExpand = vi.fn();
+    const onToggleSingleClickProjectsExpand = vi.fn();
+
+    const { rerender } = renderProjectPane({
+      data: {
+        viewMode: "tree",
+      },
+      actions: {
+        onSelectProject,
+        onToggleSingleClickFoldersExpand,
+        onToggleSingleClickProjectsExpand,
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Project options" }));
+    await user.click(
+      screen.getByRole("button", { name: /Single-click folders to expand or collapse/i }),
+    );
+    expect(onToggleSingleClickFoldersExpand).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "Project options" }));
+    await user.click(
+      screen.getByRole("button", { name: /Single-click projects to expand or collapse/i }),
+    );
+    expect(onToggleSingleClickProjectsExpand).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ProjectPane
+        {...createProjectPaneProps({
+          data: {
+            viewMode: "tree",
+            historyMode: "project_all",
+            treeProjectSessionsByProjectId: {},
+            treeProjectSessionsLoadingByProjectId: {},
+            projectUpdates: {},
+          },
+          preferences: {
+            singleClickFoldersExpand: false,
+            singleClickProjectsExpand: true,
+          },
+          actions: {
+            onSelectProject,
+            onSelectProjectSession: vi.fn(),
+            onSelectProjectBookmarks: vi.fn(),
+            onEnsureTreeProjectSessionsLoaded: vi.fn(),
+            onToggleCollapsed: vi.fn(),
+            onProjectQueryChange: vi.fn(),
+            onToggleProvider: vi.fn(),
+            onSetSortField: vi.fn(),
+            onToggleSortDirection: vi.fn(),
+            onToggleSessionSortDirection: vi.fn(),
+            onToggleViewMode: vi.fn(),
+            onToggleSingleClickFoldersExpand: vi.fn(),
+            onToggleSingleClickProjectsExpand: vi.fn(),
+            onCopyProjectDetails: vi.fn(),
+            onCopySession: vi.fn(),
+            onOpenProjectLocation: vi.fn(),
+            onOpenSessionLocation: vi.fn(),
+            onDeleteProject: vi.fn(),
+            onDeleteSession: vi.fn(),
+          },
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Collapse all folders" }));
+    await user.click(screen.getByRole("button", { name: "~/project-one, 1 projects" }));
+    expect(screen.queryByRole("button", { name: /Project One/i })).toBeNull();
+
+    rerender(
+      <ProjectPane
+        {...createProjectPaneProps({
+          data: {
+            viewMode: "tree",
+            historyMode: "project_all",
+            treeProjectSessionsByProjectId: {},
+            treeProjectSessionsLoadingByProjectId: {},
+            projectUpdates: {},
+          },
+          preferences: {
+            singleClickFoldersExpand: true,
+            singleClickProjectsExpand: true,
+          },
+          actions: {
+            onSelectProject,
+            onSelectProjectSession: vi.fn(),
+            onSelectProjectBookmarks: vi.fn(),
+            onEnsureTreeProjectSessionsLoaded: vi.fn(),
+            onToggleCollapsed: vi.fn(),
+            onProjectQueryChange: vi.fn(),
+            onToggleProvider: vi.fn(),
+            onSetSortField: vi.fn(),
+            onToggleSortDirection: vi.fn(),
+            onToggleSessionSortDirection: vi.fn(),
+            onToggleViewMode: vi.fn(),
+            onToggleSingleClickFoldersExpand: vi.fn(),
+            onToggleSingleClickProjectsExpand: vi.fn(),
+            onCopyProjectDetails: vi.fn(),
+            onCopySession: vi.fn(),
+            onOpenProjectLocation: vi.fn(),
+            onOpenSessionLocation: vi.fn(),
+            onDeleteProject: vi.fn(),
+            onDeleteSession: vi.fn(),
+          },
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "~/project-one, 1 projects" }));
+    await user.click(screen.getByRole("button", { name: /Project One/i }));
+
+    expect(onSelectProject).toHaveBeenCalledWith("project_1");
+    expect(screen.getByRole("button", { name: /Project One/i })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+
+  it("keeps project-row click separate from project expansion and exposes bookmarks inline", async () => {
+    const user = userEvent.setup();
+    const onSelectProject = vi.fn();
+    const onSelectProjectBookmarks = vi.fn();
+    const onSelectProjectSession = vi.fn();
+    const onEnsureTreeProjectSessionsLoaded = vi.fn();
+
+    renderProjectPane({
+      data: {
+        viewMode: "tree",
+        historyMode: "project_all",
+        sortedProjects: [{ ...projects[0]!, bookmarkCount: 3 }],
+        treeProjectSessionsByProjectId: {
+          project_1: [
+            {
+              id: "session_1",
+              projectId: "project_1",
+              provider: "claude",
+              filePath: "/Users/test/project-one/session.jsonl",
+              title: "Investigate markdown rendering",
+              modelNames: "claude-opus-4-1",
+              startedAt: "2026-03-01T10:00:00.000Z",
+              endedAt: "2026-03-01T10:05:00.000Z",
+              durationMs: 300000,
+              gitBranch: "main",
+              cwd: "/Users/test/project-one",
+              messageCount: 12,
+              bookmarkCount: 2,
+              tokenInputTotal: 10,
+              tokenOutputTotal: 20,
+            },
+          ],
+        },
+      },
+      actions: {
+        onSelectProject,
+        onSelectProjectBookmarks,
+        onSelectProjectSession,
+        onEnsureTreeProjectSessionsLoaded,
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: /project one/i }));
+    expect(onSelectProject).toHaveBeenCalledWith("project_1");
+    expect(screen.queryByText("Investigate markdown rendering")).toBeNull();
+
+    const expandProjectOneButton = document.querySelector<HTMLButtonElement>(
+      '[data-project-expand-toggle-for="project_1"]',
+    );
+    if (!expandProjectOneButton) {
+      throw new Error("Expected expand toggle for project_1");
+    }
+
+    await user.click(expandProjectOneButton);
+    expect(onEnsureTreeProjectSessionsLoaded).toHaveBeenCalledWith("project_1");
+    expect(screen.getByText("Investigate markdown rendering")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open 3 bookmarked messages" }));
+    expect(onSelectProjectBookmarks).toHaveBeenCalledWith("project_1");
+
+    await user.click(screen.getByRole("button", { name: /Investigate markdown rendering/i }));
+    expect(onSelectProjectSession).toHaveBeenCalledWith("project_1", "session_1");
+  });
+
+  it("moves ArrowLeft from a tree session row back to its parent project row", async () => {
+    const user = userEvent.setup();
+
+    renderProjectPane({
+      data: {
+        viewMode: "tree",
+        historyMode: "project_all",
+        sortedProjects: [projects[0]!],
+        treeProjectSessionsByProjectId: {
+          project_1: [
+            {
+              id: "session_1",
+              projectId: "project_1",
+              provider: "claude",
+              filePath: "/Users/test/project-one/session.jsonl",
+              title: "Investigate markdown rendering",
+              modelNames: "claude-opus-4-1",
+              startedAt: "2026-03-01T10:00:00.000Z",
+              endedAt: "2026-03-01T10:05:00.000Z",
+              durationMs: 300000,
+              gitBranch: "main",
+              cwd: "/Users/test/project-one",
+              messageCount: 12,
+              bookmarkCount: 2,
+              tokenInputTotal: 10,
+              tokenOutputTotal: 20,
+            },
+          ],
+        },
+      },
+      actions: {
+        onSelectProjectSession: vi.fn(),
+        onEnsureTreeProjectSessionsLoaded: vi.fn(),
+      },
+    });
+
+    await user.dblClick(screen.getByRole("button", { name: /project one/i }));
+
+    const sessionRow = screen.getByRole("button", { name: /Investigate markdown rendering/i });
+    const projectRow = screen.getByRole("button", { name: /project one/i });
+
+    sessionRow.focus();
+    await user.keyboard("{ArrowLeft}");
+
+    expect(projectRow).toHaveFocus();
+  });
+
   it("hides empty roots in tree mode when the visible project set is filtered", () => {
     renderProjectPane({
-      viewMode: "tree",
-      sortedProjects: [projects[2]!],
-      projectQueryInput: "three",
+      data: {
+        viewMode: "tree",
+        sortedProjects: [projects[2]!],
+        projectQueryInput: "three",
+      },
     });
 
     expect(
@@ -340,9 +751,11 @@ describe("ProjectPane", () => {
 
   it("keeps folder ordering stable during auto refresh while showing child update badges", () => {
     const { rerender } = renderProjectPane({
-      viewMode: "tree",
-      updateSource: "resort",
-      sortedProjects: [projects[1]!, projects[0]!, projects[2]!],
+      data: {
+        viewMode: "tree",
+        updateSource: "resort",
+        sortedProjects: [projects[1]!, projects[0]!, projects[2]!],
+      },
     });
 
     const projectTwoFolder = screen.getByRole("button", { name: "~/project-two, 1 projects" });
@@ -356,31 +769,32 @@ describe("ProjectPane", () => {
 
     rerender(
       <ProjectPane
-        sortedProjects={[projects[2]!, projects[0]!, projects[1]!]}
-        selectedProjectId="project_1"
-        sortField="last_active"
-        sortDirection="desc"
-        viewMode="tree"
-        updateSource="auto"
-        collapsed={false}
-        projectQueryInput=""
-        projectProviders={["claude", "codex", "gemini"]}
-        providers={["claude", "codex", "gemini", "cursor"]}
-        projectProviderCounts={{ claude: 1, codex: 1, gemini: 1, cursor: 0, copilot: 0 }}
-        projectUpdates={{ project_3: { messageDelta: 4, updatedAt: Date.now() } }}
-        onToggleCollapsed={vi.fn()}
-        onProjectQueryChange={vi.fn()}
-        onToggleProvider={vi.fn()}
-        onSetSortField={vi.fn()}
-        onToggleSortDirection={vi.fn()}
-        onToggleViewMode={vi.fn()}
-        onCopyProjectDetails={vi.fn()}
-        onSelectProject={vi.fn()}
-        onOpenProjectLocation={vi.fn()}
-        onDeleteProject={vi.fn()}
-        canCopyProjectDetails={true}
-        canDeleteProject={true}
-        canOpenProjectLocation={true}
+        {...createProjectPaneProps({
+          data: {
+            sortedProjects: [projects[2]!, projects[0]!, projects[1]!],
+            selectedProjectId: "project_1",
+            viewMode: "tree",
+            updateSource: "auto",
+            projectUpdates: { project_3: { messageDelta: 4, updatedAt: Date.now() } },
+          },
+          actions: {
+            onToggleCollapsed: vi.fn(),
+            onProjectQueryChange: vi.fn(),
+            onToggleProvider: vi.fn(),
+            onSetSortField: vi.fn(),
+            onToggleSortDirection: vi.fn(),
+            onToggleViewMode: vi.fn(),
+            onToggleSingleClickFoldersExpand: vi.fn(),
+            onToggleSingleClickProjectsExpand: vi.fn(),
+            onCopyProjectDetails: vi.fn(),
+            onCopySession: vi.fn(),
+            onSelectProject: vi.fn(),
+            onOpenProjectLocation: vi.fn(),
+            onOpenSessionLocation: vi.fn(),
+            onDeleteProject: vi.fn(),
+            onDeleteSession: vi.fn(),
+          },
+        })}
       />,
     );
 
@@ -394,57 +808,59 @@ describe("ProjectPane", () => {
       reorderedProjectTwoFolder.compareDocumentPosition(reorderedProjectThreeFolder) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(screen.getByText("+4")).toBeInTheDocument();
+    expect(screen.getAllByText("+4")).toHaveLength(2);
   });
 
-  it("shows root-level update indicators only when a folder is collapsed", async () => {
+  it("keeps the root-level update indicator visible after a folder expands", async () => {
     const user = userEvent.setup();
     const { rerender } = renderProjectPane({
-      viewMode: "tree",
-      sortedProjects: [projects[0]!, projects[1]!],
-      projectUpdates: {},
+      data: {
+        viewMode: "tree",
+        sortedProjects: [projects[0]!, projects[1]!],
+        projectUpdates: {},
+      },
     });
 
     await user.click(screen.getByRole("button", { name: "~/project-one, 1 projects" }));
 
     rerender(
       <ProjectPane
-        sortedProjects={[projects[0]!, projects[1]!]}
-        selectedProjectId=""
-        sortField="last_active"
-        sortDirection="desc"
-        viewMode="tree"
-        updateSource="auto"
-        collapsed={false}
-        projectQueryInput=""
-        projectProviders={["claude", "codex", "gemini"]}
-        providers={["claude", "codex", "gemini", "cursor"]}
-        projectProviderCounts={{ claude: 1, codex: 1, gemini: 0, cursor: 0, copilot: 0 }}
-        projectUpdates={{ project_1: { messageDelta: 5, updatedAt: Date.now() } }}
-        onToggleCollapsed={vi.fn()}
-        onProjectQueryChange={vi.fn()}
-        onToggleProvider={vi.fn()}
-        onSetSortField={vi.fn()}
-        onToggleSortDirection={vi.fn()}
-        onToggleViewMode={vi.fn()}
-        onCopyProjectDetails={vi.fn()}
-        onSelectProject={vi.fn()}
-        onOpenProjectLocation={vi.fn()}
-        onDeleteProject={vi.fn()}
-        canCopyProjectDetails={true}
-        canDeleteProject={true}
-        canOpenProjectLocation={true}
+        {...createProjectPaneProps({
+          data: {
+            sortedProjects: [projects[0]!, projects[1]!],
+            selectedProjectId: "",
+            viewMode: "tree",
+            updateSource: "auto",
+            projectProviderCounts: { claude: 1, codex: 1, gemini: 0, cursor: 0, copilot: 0 },
+            projectUpdates: { project_1: { messageDelta: 5, updatedAt: Date.now() } },
+          },
+          actions: {
+            onToggleCollapsed: vi.fn(),
+            onProjectQueryChange: vi.fn(),
+            onToggleProvider: vi.fn(),
+            onSetSortField: vi.fn(),
+            onToggleSortDirection: vi.fn(),
+            onToggleViewMode: vi.fn(),
+            onToggleSingleClickFoldersExpand: vi.fn(),
+            onToggleSingleClickProjectsExpand: vi.fn(),
+            onCopyProjectDetails: vi.fn(),
+            onCopySession: vi.fn(),
+            onSelectProject: vi.fn(),
+            onOpenProjectLocation: vi.fn(),
+            onOpenSessionLocation: vi.fn(),
+            onDeleteProject: vi.fn(),
+            onDeleteSession: vi.fn(),
+          },
+        })}
       />,
     );
 
-    const collapsedRoot = screen.getByRole("button", { name: "~/project-one, 1 projects" });
-    expect(collapsedRoot).toHaveTextContent("+5");
-    expect(screen.queryByRole("button", { name: /Project One/i })).toBeNull();
-
-    await user.click(collapsedRoot);
-
-    expect(collapsedRoot).not.toHaveTextContent("+5");
-    expect(screen.getByText("Project One")).toBeInTheDocument();
-    expect(screen.getByLabelText("5 new messages")).toBeInTheDocument();
+    const expandedRoot = screen.getByRole("button", { name: "~/project-one, 1 projects" });
+    expect(expandedRoot).toHaveTextContent("+5");
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "~/project-one, 1 projects" }));
+    expect(screen.getByRole("button", { name: /Project One/i })).toBeInTheDocument();
+    expect(screen.getAllByLabelText("5 new messages")).toHaveLength(2);
   });
 });

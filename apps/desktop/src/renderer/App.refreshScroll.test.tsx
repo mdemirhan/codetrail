@@ -277,7 +277,7 @@ describe("App refresh scroll preservation", () => {
     });
 
     // Toggle sort direction to DESC.
-    await user.click(screen.getByRole("button", { name: /Sort .* descending/i }));
+    await user.click(screen.getByRole("button", { name: /Switch to newest first/i }));
 
     // Navigate to page 2 (away from newest in DESC).
     await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -417,7 +417,7 @@ describe("App refresh scroll preservation", () => {
     await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     // Toggle sort direction — this should invalidate any pending refresh context.
-    await user.click(screen.getByRole("button", { name: /Sort .* descending/i }));
+    await user.click(screen.getByRole("button", { name: /Switch to newest first/i }));
 
     await vi.advanceTimersByTimeAsync(110);
 
@@ -533,7 +533,7 @@ describe("App refresh scroll preservation", () => {
     });
 
     // Switch to DESC sort.
-    await user.click(screen.getByRole("button", { name: /Sort .* descending/i }));
+    await user.click(screen.getByRole("button", { name: /Switch to newest first/i }));
 
     // Navigate to page 2.
     await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -576,7 +576,7 @@ describe("App refresh scroll preservation", () => {
       expect(screen.getByText("DESC pinned msg")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: /Sort .* descending/i }));
+    await user.click(screen.getByRole("button", { name: /Switch to newest first/i }));
 
     // Navigate to page 2.
     await user.click(screen.getByRole("button", { name: "Next page" }));

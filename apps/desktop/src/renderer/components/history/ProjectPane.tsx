@@ -1,229 +1,78 @@
-import type { Provider } from "@codetrail/core/browser";
-import { type Ref, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { ProjectSortField, ProjectSummary, ProjectViewMode } from "../../app/types";
-import { useClickOutside } from "../../hooks/useClickOutside";
-import { buildProjectFolderGroups, getProjectGroupId } from "../../lib/projectTree";
-import { mergeStableProjectOrder } from "../../lib/projectUpdates";
-import { SEARCH_PLACEHOLDERS } from "../../lib/searchPlaceholders";
-import { compactPath, formatDate, prettyProvider } from "../../lib/viewUtils";
+import type { ProjectSummary, SessionSummary } from "../../app/types";
+import { getProjectGroupId } from "../../lib/projectTree";
+import { SEARCH_PLACEHOLDERS } from "../../lib/searchLabels";
+import { compactPath, deriveSessionTitle, formatDate, prettyProvider } from "../../lib/viewUtils";
 import { ToolbarIcon } from "../ToolbarIcon";
 import { HistoryListContextMenu } from "./HistoryListContextMenu";
-
-const PROJECT_SORT_FIELD_LABELS: Record<ProjectSortField, string> = {
-  last_active: "Last Active",
-  name: "Name",
-  sessions: "Sessions",
-};
-
-function ProjectPaneChevron({ open }: { open: boolean }) {
-  return (
-    <svg className="project-pane-inline-icon" viewBox="0 0 12 12" aria-hidden>
-      <title>{open ? "Collapse folder" : "Expand folder"}</title>
-      <path
-        d={open ? "M3 4.5 6 7.5 9 4.5" : "M4.5 3 7.5 6 4.5 9"}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ProjectPaneDropdownChevron({ open }: { open: boolean }) {
-  return (
-    <svg className="project-pane-inline-icon" viewBox="0 0 12 12" aria-hidden>
-      <title>{open ? "Close menu" : "Open menu"}</title>
-      <path
-        d={open ? "M3 7.5 6 4.5 9 7.5" : "M3 4.5 6 7.5 9 4.5"}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ProjectPaneSortFieldIcon() {
-  return (
-    <svg className="project-pane-inline-icon" viewBox="0 0 16 16" aria-hidden>
-      <title>Sort field</title>
-      <path
-        d="M3 4.5h7M3 8h10M3 11.5h5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinecap="round"
-      />
-      <path
-        d="M11.5 3.75 13 5.25 14.5 3.75"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.15"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ProjectPaneFolderIcon() {
-  return (
-    <svg className="project-pane-inline-icon" viewBox="0 0 16 16" aria-hidden>
-      <title>Folder</title>
-      <path
-        d="M2.5 4.5v7a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H8L6.8 4.2A1 1 0 0 0 6 3.8H3.5a1 1 0 0 0-1 0.7Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ProjectPaneMenuIcon() {
-  return (
-    <svg className="project-pane-inline-icon" viewBox="0 0 16 16" aria-hidden>
-      <title>More options</title>
-      <circle cx="3.25" cy="8" r="1.1" fill="currentColor" />
-      <circle cx="8" cy="8" r="1.1" fill="currentColor" />
-      <circle cx="12.75" cy="8" r="1.1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function ProjectPaneListIcon() {
-  return (
-    <svg className="project-pane-inline-icon" viewBox="0 0 16 16" aria-hidden>
-      <title>List view</title>
-      <path
-        d="M4 4.5h8M4 8h8M4 11.5h8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function ProjectPaneTreeIcon() {
-  return (
-    <svg className="project-pane-inline-icon" viewBox="0 0 16 16" aria-hidden>
-      <title>By folder view</title>
-      <path
-        d="M3 4.5h4M3 11.5h4M7 4.5v7M7 8h6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+import type { ProjectPaneContextMenuState, ProjectPaneProps } from "./ProjectPane.types";
+import { ProjectPaneHeader } from "./ProjectPaneHeader";
+import { ProjectPaneChevron, ProjectPaneFolderIcon } from "./ProjectPaneIcons";
+import { useProjectPaneTreeState } from "./useProjectPaneTreeState";
 
 function getProjectLabel(project: ProjectSummary): string {
   return project.name || project.path || "(no project path)";
 }
 
-export function ProjectPane({
-  sortedProjects,
-  selectedProjectId,
-  sortField,
-  sortDirection,
-  viewMode,
-  updateSource,
-  collapsed,
-  projectQueryInput,
-  projectProviders,
-  providers,
-  projectProviderCounts,
-  projectUpdates,
-  onToggleCollapsed,
-  onProjectQueryChange,
-  onToggleProvider,
-  onSetSortField,
-  onToggleSortDirection,
-  onToggleViewMode,
-  onCopyProjectDetails,
-  onSelectProject,
-  onOpenProjectLocation,
-  onDeleteProject,
-  canCopyProjectDetails,
-  canOpenProjectLocation,
-  canDeleteProject,
-  listRef,
-}: {
-  sortedProjects: ProjectSummary[];
-  selectedProjectId: string;
-  sortField: ProjectSortField;
-  sortDirection: "asc" | "desc";
-  viewMode: ProjectViewMode;
-  updateSource: "auto" | "resort";
-  collapsed: boolean;
-  projectQueryInput: string;
-  projectProviders: Provider[];
-  providers: Provider[];
-  projectProviderCounts: Record<Provider, number>;
-  projectUpdates: Record<string, { messageDelta: number; updatedAt: number }>;
-  onToggleCollapsed: () => void;
-  onProjectQueryChange: (value: string) => void;
-  onToggleProvider: (provider: Provider) => void;
-  onSetSortField: (value: ProjectSortField) => void;
-  onToggleSortDirection: () => void;
-  onToggleViewMode: () => void;
-  onCopyProjectDetails: (projectId?: string) => void;
-  onSelectProject: (projectId: string) => void;
-  onOpenProjectLocation: (projectId?: string) => void;
-  onDeleteProject: (projectId?: string) => void;
-  canCopyProjectDetails: boolean;
-  canOpenProjectLocation: boolean;
-  canDeleteProject: boolean;
-  listRef?: Ref<HTMLDivElement>;
-}) {
-  const selectedProjectRef = useRef<HTMLButtonElement | null>(null);
-  const sortMenuRef = useRef<HTMLDivElement | null>(null);
-  const overflowMenuRef = useRef<HTMLDivElement | null>(null);
-  const folderOrderControlKeyRef = useRef("");
-  const folderExpansionResetKeyRef = useRef<string | null>(null);
-  const seenFolderIdsRef = useRef<Set<string>>(new Set());
-  const [contextMenu, setContextMenu] = useState<{
-    projectId: string;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
-  const [folderOrderIds, setFolderOrderIds] = useState<string[]>([]);
-  const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>([]);
-  const [treeFocusedRow, setTreeFocusedRow] = useState<{
-    kind: "folder" | "project";
-    id: string;
-  } | null>(null);
-  const sortLabel = PROJECT_SORT_FIELD_LABELS[sortField];
-  const sortTooltip =
-    sortDirection === "asc"
-      ? `Projects sorted by ${sortLabel}, ascending. Click to show descending order.`
-      : `Projects sorted by ${sortLabel}, descending. Click to show ascending order.`;
-  const projectProviderKey = useMemo(() => projectProviders.join(","), [projectProviders]);
-  const folderExpansionResetKey = useMemo(
-    () => [sortField, sortDirection, projectProviderKey, projectQueryInput].join("\u0000"),
-    [projectProviderKey, projectQueryInput, sortDirection, sortField],
+function isTreeRowActionTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    Boolean(target.closest(".project-tree-toggle-btn, .project-tree-bookmark-btn"))
   );
-  const folderOrderControlKey = useMemo(
-    () => [sortField, sortDirection, projectProviderKey, projectQueryInput].join("\u0000"),
-    [projectProviderKey, projectQueryInput, sortDirection, sortField],
-  );
+}
 
-  useClickOutside(sortMenuRef, sortMenuOpen, () => setSortMenuOpen(false));
-  useClickOutside(overflowMenuRef, overflowMenuOpen, () => setOverflowMenuOpen(false));
+export function ProjectPane({
+  data,
+  sorting,
+  preferences,
+  capabilities,
+  actions,
+}: ProjectPaneProps) {
+  const {
+    sortedProjects,
+    selectedProjectId,
+    selectedSessionId = "",
+    viewMode,
+    updateSource,
+    historyMode = "project_all",
+    collapsed,
+    projectQueryInput,
+    projectProviders,
+    providers,
+    projectProviderCounts,
+    projectUpdates,
+    treeProjectSessionsByProjectId = {},
+    treeProjectSessionsLoadingByProjectId = {},
+    listRef,
+  } = data;
+  const { sortField, sortDirection, sessionSortDirection = "desc" } = sorting;
+  const { singleClickFoldersExpand = true, singleClickProjectsExpand = false } = preferences;
+  const { canCopyProjectDetails, canOpenProjectLocation, canDeleteProject } = capabilities;
+  const {
+    onToggleCollapsed,
+    onProjectQueryChange,
+    onToggleProvider,
+    onSetSortField,
+    onToggleSortDirection,
+    onToggleSessionSortDirection = () => {},
+    onToggleViewMode,
+    onToggleSingleClickFoldersExpand,
+    onToggleSingleClickProjectsExpand,
+    onCopyProjectDetails,
+    onCopySession,
+    onSelectProject,
+    onSelectProjectSession = () => {},
+    onSelectProjectBookmarks = () => {},
+    onEnsureTreeProjectSessionsLoaded = () => {},
+    onOpenProjectLocation,
+    onOpenSessionLocation,
+    onDeleteProject,
+    onDeleteSession,
+  } = actions;
+  const selectedProjectRef = useRef<HTMLButtonElement | null>(null);
+  const [contextMenu, setContextMenu] = useState<ProjectPaneContextMenuState>(null);
+  const projectProviderKey = useMemo(() => projectProviders.join(","), [projectProviders]);
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -231,125 +80,47 @@ export function ProjectPane({
     }
     selectedProjectRef.current?.scrollIntoView?.({ block: "nearest" });
   }, [selectedProjectId]);
-
-  useEffect(() => {
-    if (viewMode !== "tree") {
-      setTreeFocusedRow(null);
-      return;
-    }
-    if (!selectedProjectId) {
-      return;
-    }
-    setTreeFocusedRow((current) =>
-      current?.kind === "folder"
-        ? current
-        : current?.kind === "project" && current.id === selectedProjectId
-          ? current
-          : { kind: "project", id: selectedProjectId },
-    );
-  }, [selectedProjectId, viewMode]);
-
-  const naturalFolderGroups = useMemo(
-    () => buildProjectFolderGroups(sortedProjects, sortField, sortDirection),
-    [sortedProjects, sortDirection, sortField],
-  );
-
-  useEffect(() => {
-    if (viewMode !== "tree") {
-      folderExpansionResetKeyRef.current = null;
-      seenFolderIdsRef.current.clear();
-      setExpandedFolderIds([]);
-      return;
-    }
-    if (folderExpansionResetKeyRef.current === folderExpansionResetKey) {
-      return;
-    }
-    folderExpansionResetKeyRef.current = folderExpansionResetKey;
-    seenFolderIdsRef.current.clear();
-  }, [folderExpansionResetKey, viewMode]);
-
-  useEffect(() => {
-    if (viewMode !== "tree") {
-      return;
-    }
-
-    const nextIds = naturalFolderGroups.map((group) => group.id);
-    const didControlsChange = folderOrderControlKeyRef.current !== folderOrderControlKey;
-    folderOrderControlKeyRef.current = folderOrderControlKey;
-
-    setFolderOrderIds((current) => {
-      if (didControlsChange || updateSource !== "auto" || current.length === 0) {
-        return nextIds;
-      }
-      return mergeStableProjectOrder(current, nextIds);
-    });
-  }, [folderOrderControlKey, naturalFolderGroups, updateSource, viewMode]);
-
-  const folderGroups = useMemo(() => {
-    if (viewMode !== "tree" || folderOrderIds.length === 0) {
-      return naturalFolderGroups;
-    }
-    const groupsById = new Map(naturalFolderGroups.map((group) => [group.id, group] as const));
-    return folderOrderIds
-      .map((groupId) => groupsById.get(groupId) ?? null)
-      .filter((group): group is (typeof naturalFolderGroups)[number] => group !== null);
-  }, [folderOrderIds, naturalFolderGroups, viewMode]);
-
-  useEffect(() => {
-    if (viewMode !== "tree") {
-      return;
-    }
-
-    setExpandedFolderIds((current) => {
-      const visibleFolderIds = new Set(folderGroups.map((group) => group.id));
-      const next = current.filter((groupId) => visibleFolderIds.has(groupId));
-      const nextSet = new Set(next);
-      let changed = next.length !== current.length;
-
-      for (const group of folderGroups) {
-        const isNewFolder = !seenFolderIdsRef.current.has(group.id);
-        seenFolderIdsRef.current.add(group.id);
-        const shouldForceOpen =
-          projectQueryInput.trim().length > 0 ||
-          group.projects.some((project) => project.id === selectedProjectId);
-        if ((isNewFolder || shouldForceOpen) && !nextSet.has(group.id)) {
-          next.push(group.id);
-          nextSet.add(group.id);
-          changed = true;
-        }
-      }
-
-      return changed ? next : current;
-    });
-  }, [folderGroups, projectQueryInput, selectedProjectId, viewMode]);
-
-  const expandedFolderIdSet = useMemo(() => new Set(expandedFolderIds), [expandedFolderIds]);
-  const allVisibleFoldersExpanded =
-    folderGroups.length > 0 && folderGroups.every((group) => expandedFolderIdSet.has(group.id));
+  const {
+    folderGroups,
+    expandedFolderIdSet,
+    expandedProjectIds,
+    allVisibleFoldersExpanded,
+    treeFocusedRow,
+    setTreeFocusedRow,
+    handleToggleFolder: toggleFolder,
+    handleToggleAllFolders: toggleAllFolders,
+    handleToggleProjectExpansion: toggleProjectExpansion,
+  } = useProjectPaneTreeState({
+    sortedProjects,
+    selectedProjectId,
+    selectedSessionId,
+    sortField,
+    sortDirection,
+    viewMode,
+    updateSource,
+    historyMode,
+    projectProvidersKey: projectProviderKey,
+    projectQueryInput,
+    onEnsureTreeProjectSessionsLoaded,
+  });
 
   const handleToggleFolder = (folderId: string) => {
     setContextMenu(null);
-    setExpandedFolderIds((current) =>
-      current.includes(folderId)
-        ? current.filter((value) => value !== folderId)
-        : [...current, folderId],
-    );
+    toggleFolder(folderId);
   };
 
   const handleToggleAllFolders = () => {
     setContextMenu(null);
-    setExpandedFolderIds(allVisibleFoldersExpanded ? [] : folderGroups.map((group) => group.id));
+    toggleAllFolders();
   };
 
-  const getCollapsedFolderUpdateDelta = (projects: ProjectSummary[], expanded: boolean): number => {
-    if (expanded) {
-      return 0;
-    }
-    return projects.reduce(
-      (total, project) => total + (projectUpdates[project.id]?.messageDelta ?? 0),
-      0,
-    );
+  const handleToggleProjectExpansion = (projectId: string) => {
+    setContextMenu(null);
+    toggleProjectExpansion(projectId);
   };
+
+  const getFolderUpdateDelta = (projects: ProjectSummary[]): number =>
+    projects.reduce((total, project) => total + (projectUpdates[project.id]?.messageDelta ?? 0), 0);
 
   const renderFlatProjectRow = (project: ProjectSummary) => {
     const update = projectUpdates[project.id];
@@ -363,14 +134,15 @@ export function ProjectPane({
         className={`list-item project-item${project.id === selectedProjectId ? " active" : ""}${
           update ? " recently-updated" : ""
         }`}
+        onFocus={() => onSelectProject(project.id)}
         onClick={() => {
           setContextMenu(null);
-          onSelectProject(project.id);
         }}
         onContextMenu={(event) => {
           event.preventDefault();
           onSelectProject(project.id);
           setContextMenu({
+            kind: "project",
             projectId: project.id,
             x: event.clientX,
             y: event.clientY,
@@ -400,225 +172,262 @@ export function ProjectPane({
     );
   };
 
-  const renderTreeProjectRow = (project: ProjectSummary) => {
-    const update = projectUpdates[project.id];
-    const isActive = treeFocusedRow?.kind === "project" && treeFocusedRow.id === project.id;
+  const renderTreeSessionRow = (project: ProjectSummary, session: SessionSummary) => {
+    const isActive = treeFocusedRow?.kind === "session" && treeFocusedRow.id === session.id;
     return (
       <button
-        key={project.id}
+        key={session.id}
         type="button"
-        data-project-nav-kind="project"
-        data-project-nav-id={project.id}
-        data-parent-folder-id={getProjectGroupId(project)}
-        ref={project.id === selectedProjectId ? selectedProjectRef : null}
-        className={`list-item project-item project-tree-item${
-          isActive ? " active" : ""
-        }${update ? " recently-updated" : ""}`}
-        onFocus={() => setTreeFocusedRow({ kind: "project", id: project.id })}
+        data-project-nav-kind="session"
+        data-session-id={session.id}
+        data-project-id={project.id}
+        className={`project-tree-session-row${isActive ? " active" : ""}`}
+        onFocus={() => {
+          setTreeFocusedRow({ kind: "session", id: session.id, projectId: project.id });
+          onSelectProjectSession(project.id, session.id);
+        }}
         onClick={() => {
           setContextMenu(null);
-          setTreeFocusedRow({ kind: "project", id: project.id });
-          onSelectProject(project.id);
+          setTreeFocusedRow({ kind: "session", id: session.id, projectId: project.id });
+          onSelectProjectSession(project.id, session.id);
         }}
         onContextMenu={(event) => {
           event.preventDefault();
-          onSelectProject(project.id);
+          setTreeFocusedRow({ kind: "session", id: session.id, projectId: project.id });
+          onSelectProjectSession(project.id, session.id);
           setContextMenu({
+            kind: "session",
             projectId: project.id,
+            sessionId: session.id,
             x: event.clientX,
             y: event.clientY,
           });
         }}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowLeft") {
+            return;
+          }
+          event.preventDefault();
+          const projectRow = document.querySelector<HTMLElement>(
+            `[data-project-nav-kind="project"][data-project-nav-id="${CSS.escape(project.id)}"]`,
+          );
+          projectRow?.focus();
+        }}
       >
-        <div className="project-tree-row-main">
-          <div className="project-tree-name-group">
-            <span className="project-tree-name">{getProjectLabel(project)}</span>
-            <span
-              className={`project-update-badge project-tree-update-badge${update ? " visible" : ""}`}
-              aria-label={update ? `${update.messageDelta} new messages` : undefined}
+        <span className="project-tree-session-title">{deriveSessionTitle(session)}</span>
+        <span className="project-tree-session-count">{session.messageCount} msgs</span>
+      </button>
+    );
+  };
+
+  const renderTreeProjectRow = (project: ProjectSummary) => {
+    const update = projectUpdates[project.id];
+    const isActive = treeFocusedRow?.kind === "project" && treeFocusedRow.id === project.id;
+    const hasSessions = project.sessionCount > 0;
+    const isExpanded = expandedProjectIds.includes(project.id);
+    const projectSessions = treeProjectSessionsByProjectId[project.id] ?? [];
+    const isLoadingSessions = treeProjectSessionsLoadingByProjectId[project.id] === true;
+    const bookmarkButtonActive = historyMode === "bookmarks" && selectedProjectId === project.id;
+    const selectProjectRow = () => {
+      setContextMenu(null);
+      setTreeFocusedRow({ kind: "project", id: project.id });
+      onSelectProject(project.id);
+    };
+    return (
+      <div
+        key={project.id}
+        className={`project-tree-project-row${update ? " recently-updated" : ""}`}
+      >
+        <div
+          className={`project-tree-project-row-main${isActive ? " active" : ""}`}
+          onMouseUp={(event) => {
+            if (
+              !(event.target instanceof HTMLElement) ||
+              event.target.closest(
+                ".project-tree-select-btn, .project-tree-toggle-btn, .project-tree-bookmark-btn",
+              )
+            ) {
+              return;
+            }
+            const row = event.currentTarget.querySelector<HTMLElement>(".project-tree-select-btn");
+            row?.focus();
+            if (hasSessions && singleClickProjectsExpand) {
+              handleToggleProjectExpansion(project.id);
+            }
+          }}
+          onDoubleClick={(event) => {
+            if (isTreeRowActionTarget(event.target) || !hasSessions) {
+              return;
+            }
+            handleToggleProjectExpansion(project.id);
+            const row = event.currentTarget.querySelector<HTMLElement>(".project-tree-select-btn");
+            row?.focus();
+          }}
+          onContextMenu={(event) => {
+            if (isTreeRowActionTarget(event.target)) {
+              return;
+            }
+            event.preventDefault();
+            selectProjectRow();
+            setContextMenu({
+              kind: "project",
+              projectId: project.id,
+              x: event.clientX,
+              y: event.clientY,
+            });
+          }}
+        >
+          {hasSessions ? (
+            <button
+              type="button"
+              className="project-tree-toggle-btn"
+              data-project-expand-toggle
+              data-project-expand-toggle-for={project.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleToggleProjectExpansion(project.id);
+              }}
+              aria-label={isExpanded ? "Collapse project sessions" : "Expand project sessions"}
+              title={isExpanded ? "Collapse project sessions" : "Expand project sessions"}
             >
-              {update ? `+${update.messageDelta}` : "+0"}
-            </span>
-          </div>
+              <ProjectPaneChevron open={isExpanded} />
+            </button>
+          ) : (
+            <span className="project-tree-toggle-placeholder" aria-hidden />
+          )}
+          <button
+            type="button"
+            data-project-nav-kind="project"
+            data-project-nav-id={project.id}
+            data-parent-folder-id={getProjectGroupId(project)}
+            data-project-can-expand={hasSessions}
+            aria-expanded={hasSessions ? isExpanded : undefined}
+            ref={project.id === selectedProjectId ? selectedProjectRef : null}
+            className={`project-tree-select-btn${isActive ? " active" : ""}`}
+            onFocus={() => {
+              setTreeFocusedRow({ kind: "project", id: project.id });
+              onSelectProject(project.id);
+            }}
+            onClick={() => {
+              selectProjectRow();
+              if (hasSessions && singleClickProjectsExpand) {
+                handleToggleProjectExpansion(project.id);
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                selectProjectRow();
+                if (hasSessions) {
+                  handleToggleProjectExpansion(project.id);
+                }
+                return;
+              }
+              if (event.key === "ArrowRight" && hasSessions && !isExpanded) {
+                event.preventDefault();
+                handleToggleProjectExpansion(project.id);
+                return;
+              }
+              if (event.key === "ArrowLeft" && hasSessions && isExpanded) {
+                event.preventDefault();
+                handleToggleProjectExpansion(project.id);
+              }
+            }}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              onSelectProject(project.id);
+              setContextMenu({
+                kind: "project",
+                projectId: project.id,
+                x: event.clientX,
+                y: event.clientY,
+              });
+            }}
+          >
+            <div className="project-tree-row-main">
+              <div className="project-tree-name-group">
+                <span className="project-tree-name">{getProjectLabel(project)}</span>
+                <span
+                  className={`project-update-badge project-tree-update-badge${
+                    update ? " visible" : ""
+                  }`}
+                  aria-label={update ? `${update.messageDelta} new messages` : undefined}
+                >
+                  {update ? `+${update.messageDelta}` : "+0"}
+                </span>
+              </div>
+            </div>
+          </button>
           <div className="project-tree-badge-rail">
+            {(project.bookmarkCount ?? 0) > 0 ? (
+              <button
+                type="button"
+                className={`project-tree-bookmark-btn${bookmarkButtonActive ? " active" : ""}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setTreeFocusedRow({ kind: "project", id: project.id });
+                  onSelectProjectBookmarks(project.id);
+                }}
+                title={
+                  bookmarkButtonActive
+                    ? `Close ${project.bookmarkCount} bookmarked messages`
+                    : `Open ${project.bookmarkCount} bookmarked messages`
+                }
+                aria-label={
+                  bookmarkButtonActive
+                    ? `Close ${project.bookmarkCount} bookmarked messages`
+                    : `Open ${project.bookmarkCount} bookmarked messages`
+                }
+              >
+                <ToolbarIcon name="bookmark" />
+                <span>{project.bookmarkCount}</span>
+              </button>
+            ) : null}
             <span className={`meta-tag project-tree-provider-badge ${project.provider}`}>
               {prettyProvider(project.provider)}
               <span className="project-tree-provider-count">{project.sessionCount}</span>
             </span>
           </div>
         </div>
-      </button>
+        {isExpanded ? (
+          <div className="project-tree-session-children">
+            {isLoadingSessions ? (
+              <div className="project-tree-session-loading">Loading sessions…</div>
+            ) : (
+              projectSessions.map((session) => renderTreeSessionRow(project, session))
+            )}
+          </div>
+        ) : null}
+      </div>
     );
   };
 
   return (
     <aside className={`panel history-focus-pane project-pane${collapsed ? " collapsed" : ""}`}>
-      <div className="panel-header">
-        <div className="panel-header-left">
-          <span className="panel-title">Projects</span>
-        </div>
-        <div className="pane-head-controls">
-          {!collapsed ? (
-            <>
-              <div className="project-pane-sort-group" ref={sortMenuRef}>
-                <button
-                  type="button"
-                  className="collapse-btn tb-dropdown-trigger project-pane-sort-field-btn"
-                  aria-haspopup="menu"
-                  aria-expanded={sortMenuOpen}
-                  aria-label={`Project sort field: ${sortLabel}`}
-                  title={`Sort field: ${sortLabel}. Click to choose a different sort field.`}
-                  onClick={() => setSortMenuOpen((value) => !value)}
-                >
-                  <ProjectPaneSortFieldIcon />
-                </button>
-                <button
-                  type="button"
-                  className="collapse-btn sort-btn project-pane-sort-direction-btn"
-                  onClick={onToggleSortDirection}
-                  aria-label={
-                    sortDirection === "asc" ? "Sort projects descending" : "Sort projects ascending"
-                  }
-                  title={sortTooltip}
-                >
-                  <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
-                </button>
-                {sortMenuOpen ? (
-                  <dialog
-                    className="tb-dropdown-menu project-pane-header-menu"
-                    open
-                    aria-label="Project sort field"
-                  >
-                    {(
-                      Object.entries(PROJECT_SORT_FIELD_LABELS) as [ProjectSortField, string][]
-                    ).map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        className={`tb-dropdown-item tb-dropdown-item-checkable${
-                          value === sortField ? " selected" : ""
-                        }`}
-                        onClick={() => {
-                          onSetSortField(value);
-                          setSortMenuOpen(false);
-                        }}
-                      >
-                        <span>{label}</span>
-                        {value === sortField ? <span className="tb-dropdown-check">✓</span> : null}
-                      </button>
-                    ))}
-                  </dialog>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                className={`collapse-btn project-pane-view-toggle-btn${
-                  viewMode === "tree" ? " active" : ""
-                }`}
-                onClick={onToggleViewMode}
-                aria-label={viewMode === "list" ? "Switch to By Folder" : "Switch to List"}
-                title={
-                  viewMode === "list"
-                    ? "List view enabled. Click to switch to By Folder."
-                    : "By Folder view enabled. Click to switch to List."
-                }
-              >
-                {viewMode === "list" ? <ProjectPaneListIcon /> : <ProjectPaneFolderIcon />}
-              </button>
-              {viewMode === "tree" ? (
-                <button
-                  type="button"
-                  className="collapse-btn"
-                  onClick={handleToggleAllFolders}
-                  aria-label={
-                    allVisibleFoldersExpanded ? "Collapse all folders" : "Expand all folders"
-                  }
-                  title={
-                    allVisibleFoldersExpanded
-                      ? "Collapse all visible folders"
-                      : "Expand all visible folders"
-                  }
-                >
-                  <ToolbarIcon name={allVisibleFoldersExpanded ? "collapseAll" : "expandAll"} />
-                </button>
-              ) : null}
-              <div className="tb-dropdown project-pane-overflow-dropdown" ref={overflowMenuRef}>
-                <button
-                  type="button"
-                  className="collapse-btn tb-dropdown-trigger"
-                  onClick={() => setOverflowMenuOpen((value) => !value)}
-                  aria-haspopup="menu"
-                  aria-expanded={overflowMenuOpen}
-                  aria-label="Project options"
-                  title="Project actions"
-                >
-                  <ProjectPaneMenuIcon />
-                </button>
-                {overflowMenuOpen ? (
-                  <dialog
-                    className="tb-dropdown-menu tb-dropdown-menu-right project-pane-header-menu project-pane-overflow-menu"
-                    open
-                    aria-label="Project options"
-                  >
-                    <button
-                      type="button"
-                      className="tb-dropdown-item project-pane-overflow-item"
-                      onClick={() => {
-                        onCopyProjectDetails();
-                        setOverflowMenuOpen(false);
-                      }}
-                      disabled={!canCopyProjectDetails}
-                    >
-                      <span className="project-pane-overflow-icon" aria-hidden>
-                        <ToolbarIcon name="copy" />
-                      </span>
-                      <span>Copy</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="tb-dropdown-item project-pane-overflow-item"
-                      onClick={() => {
-                        onOpenProjectLocation();
-                        setOverflowMenuOpen(false);
-                      }}
-                      disabled={!canOpenProjectLocation}
-                    >
-                      <span className="project-pane-overflow-icon" aria-hidden>
-                        <ToolbarIcon name="folderOpen" />
-                      </span>
-                      <span>Open Folder</span>
-                    </button>
-                    <div className="tb-dropdown-separator" />
-                    <button
-                      type="button"
-                      className="tb-dropdown-item project-pane-overflow-item project-pane-overflow-item-danger"
-                      onClick={() => {
-                        onDeleteProject();
-                        setOverflowMenuOpen(false);
-                      }}
-                      disabled={!canDeleteProject}
-                    >
-                      <span className="project-pane-overflow-icon" aria-hidden>
-                        <ToolbarIcon name="trash" />
-                      </span>
-                      <span>Delete</span>
-                    </button>
-                  </dialog>
-                ) : null}
-              </div>
-            </>
-          ) : null}
-          <button
-            type="button"
-            className="collapse-btn pane-collapse-btn"
-            onClick={onToggleCollapsed}
-            aria-label={collapsed ? "Expand Projects pane" : "Collapse Projects pane"}
-            title={collapsed ? "Expand Projects (Cmd/Ctrl+B)" : "Collapse Projects (Cmd/Ctrl+B)"}
-          >
-            <ToolbarIcon name="chevronLeft" />
-          </button>
-        </div>
-      </div>
+      <ProjectPaneHeader
+        collapsed={collapsed}
+        sortField={sortField}
+        sortDirection={sortDirection}
+        sessionSortDirection={sessionSortDirection}
+        viewMode={viewMode}
+        singleClickFoldersExpand={singleClickFoldersExpand}
+        singleClickProjectsExpand={singleClickProjectsExpand}
+        allVisibleFoldersExpanded={allVisibleFoldersExpanded}
+        canCopyProjectDetails={canCopyProjectDetails}
+        canOpenProjectLocation={canOpenProjectLocation}
+        canDeleteProject={canDeleteProject}
+        onToggleCollapsed={onToggleCollapsed}
+        onSetSortField={onSetSortField}
+        onToggleSortDirection={onToggleSortDirection}
+        onToggleSessionSortDirection={onToggleSessionSortDirection}
+        onToggleViewMode={onToggleViewMode}
+        onToggleAllFolders={handleToggleAllFolders}
+        onToggleSingleClickFoldersExpand={onToggleSingleClickFoldersExpand}
+        onToggleSingleClickProjectsExpand={onToggleSingleClickProjectsExpand}
+        onCopyProjectDetails={() => onCopyProjectDetails()}
+        onOpenProjectLocation={() => onOpenProjectLocation()}
+        onDeleteProject={() => onDeleteProject()}
+      />
       <div className="search-wrapper">
         <div className="search-box">
           <div className="search-input-shell">
@@ -654,10 +463,7 @@ export function ProjectPane({
           ? sortedProjects.map((project) => renderFlatProjectRow(project))
           : folderGroups.map((group) => {
               const isExpanded = expandedFolderIdSet.has(group.id);
-              const collapsedUpdateDelta = getCollapsedFolderUpdateDelta(
-                group.projects,
-                isExpanded,
-              );
+              const folderUpdateDelta = getFolderUpdateDelta(group.projects);
               const isFolderActive =
                 treeFocusedRow?.kind === "folder" && treeFocusedRow.id === group.id;
               return (
@@ -671,31 +477,67 @@ export function ProjectPane({
                       group.projects[group.projects.length - 1]?.id ?? ""
                     }
                     className={`project-folder-row${isFolderActive ? " active" : ""}${
-                      collapsedUpdateDelta > 0 ? " recently-updated" : ""
-                    }`}
+                      folderUpdateDelta > 0 ? " recently-updated" : ""
+                    }${isExpanded && folderUpdateDelta > 0 ? " expanded-with-updates" : ""}`}
                     onFocus={() => setTreeFocusedRow({ kind: "folder", id: group.id })}
-                    onClick={() => {
+                    onClick={(event) => {
                       setTreeFocusedRow({ kind: "folder", id: group.id });
+                      if (
+                        event.target instanceof HTMLElement &&
+                        event.target.closest(".project-folder-toggle-hit")
+                      ) {
+                        handleToggleFolder(group.id);
+                        return;
+                      }
+                      if (singleClickFoldersExpand) {
+                        handleToggleFolder(group.id);
+                      }
+                    }}
+                    onDoubleClick={() => {
                       handleToggleFolder(group.id);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleToggleFolder(group.id);
+                        return;
+                      }
+                      if (event.key === "ArrowRight" && !isExpanded) {
+                        event.preventDefault();
+                        handleToggleFolder(group.id);
+                        return;
+                      }
+                      if (event.key === "ArrowLeft" && isExpanded) {
+                        event.preventDefault();
+                        handleToggleFolder(group.id);
+                      }
                     }}
                     aria-expanded={isExpanded}
                     aria-label={`${group.label}, ${group.projectCount} projects`}
                   >
-                    <span className="project-folder-chevron" aria-hidden>
+                    <span
+                      className="project-folder-chevron project-folder-toggle-hit"
+                      data-project-expand-toggle-for={group.id}
+                      aria-hidden
+                    >
                       <ProjectPaneChevron open={isExpanded} />
                     </span>
                     <span className="project-folder-icon" aria-hidden>
                       <ProjectPaneFolderIcon />
                     </span>
-                    <span className="project-folder-label">{group.label}</span>
-                    {collapsedUpdateDelta > 0 ? (
-                      <span
-                        className="project-update-badge project-folder-update-badge visible"
-                        aria-label={`${collapsedUpdateDelta} new messages`}
-                      >
-                        +{collapsedUpdateDelta}
-                      </span>
-                    ) : null}
+                    <span className="project-folder-main">
+                      <span className="project-folder-label">{group.label}</span>
+                      {folderUpdateDelta > 0 ? (
+                        <span
+                          className={`project-update-badge project-folder-update-badge visible${
+                            isExpanded ? " project-folder-update-badge-muted" : ""
+                          }`}
+                          aria-label={`${folderUpdateDelta} new messages`}
+                        >
+                          +{folderUpdateDelta}
+                        </span>
+                      ) : null}
+                    </span>
                     <span className="project-folder-count">{group.projectCount}</span>
                   </button>
                   {isExpanded ? (
@@ -713,7 +555,7 @@ export function ProjectPane({
         y={contextMenu?.y ?? 0}
         onClose={() => setContextMenu(null)}
         groups={
-          contextMenu
+          contextMenu?.kind === "project"
             ? [
                 [
                   {
@@ -739,7 +581,33 @@ export function ProjectPane({
                   },
                 ],
               ]
-            : []
+            : contextMenu?.kind === "session"
+              ? [
+                  [
+                    {
+                      id: "copy-session",
+                      label: "Copy",
+                      icon: "copy",
+                      onSelect: () => onCopySession(contextMenu.sessionId),
+                    },
+                    {
+                      id: "open-session-folder",
+                      label: "Open Folder",
+                      icon: "folderOpen",
+                      onSelect: () => onOpenSessionLocation(contextMenu.sessionId),
+                    },
+                  ],
+                  [
+                    {
+                      id: "delete-session",
+                      label: "Delete",
+                      icon: "trash",
+                      tone: "danger",
+                      onSelect: () => onDeleteSession(contextMenu.sessionId),
+                    },
+                  ],
+                ]
+              : []
         }
       />
     </aside>

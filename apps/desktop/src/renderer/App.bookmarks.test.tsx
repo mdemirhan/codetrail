@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { App } from "./App";
-import { SEARCH_PLACEHOLDERS } from "./lib/searchPlaceholders";
+import { SEARCH_PLACEHOLDERS } from "./lib/searchLabels";
 import {
   createBookmarkSearchDelayClient,
   createBookmarksSearchClient,
@@ -31,12 +31,14 @@ describe("App bookmarks", () => {
       expect(screen.getByText("Parser behavior inspected and fixed.")).toBeInTheDocument();
     });
 
-    const bookmarksSearch = screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyBookmarks);
+    const bookmarksSearch = screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages);
     await user.clear(bookmarksSearch);
     await user.type(bookmarksSearch, "no-match-token");
 
     await waitFor(() => {
-      expect(screen.getByText("No bookmarked messages match current filters.")).toBeInTheDocument();
+      expect(
+        screen.getByText(/No (bookmarked )?messages match current filters\./),
+      ).toBeInTheDocument();
     });
 
     await waitFor(() => {
@@ -64,7 +66,7 @@ describe("App bookmarks", () => {
       expect(screen.getByText("Parser behavior inspected and fixed.")).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyBookmarks), {
+    fireEvent.change(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages), {
       target: { value: "delayed-search" },
     });
 
@@ -97,7 +99,9 @@ describe("App bookmarks", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("No bookmarked messages match current filters.")).toBeInTheDocument();
+      expect(
+        screen.getByText(/No (bookmarked )?messages match current filters\./),
+      ).toBeInTheDocument();
     });
     expect(screen.getByText("Bookmarked Messages")).toBeInTheDocument();
     expect(screen.getByText("Investigate markdown rendering")).toBeInTheDocument();
@@ -122,7 +126,7 @@ describe("App bookmarks", () => {
     });
 
     const bookmarksSearch = screen.getByPlaceholderText(
-      SEARCH_PLACEHOLDERS.historyBookmarks,
+      SEARCH_PLACEHOLDERS.globalMessages,
     ) as HTMLInputElement;
 
     await user.keyboard("{Control>}f{/Control}");
@@ -130,7 +134,7 @@ describe("App bookmarks", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(bookmarksSearch);
     });
-    expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyBookmarks)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages)).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(SEARCH_PLACEHOLDERS.historySession)).toBeNull();
   });
 });

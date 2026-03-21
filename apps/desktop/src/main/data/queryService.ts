@@ -170,10 +170,10 @@ export function createQueryServiceFromDb(
 
   let closed = false;
   return {
-    listProjects: (request) => listProjectsWithDatabase(db, request),
+    listProjects: (request) => listProjectsWithDatabase(db, bookmarkStore, request),
     getProjectCombinedDetail: (request) => getProjectCombinedDetailWithDatabase(db, request),
     deleteProject: (request) => deleteProjectWithStore(db, bookmarkStore, request),
-    listSessions: (request) => listSessionsWithDatabase(db, request),
+    listSessions: (request) => listSessionsWithDatabase(db, bookmarkStore, request),
     getSessionDetail: (request) => getSessionDetailWithDatabase(db, request),
     deleteSession: (request) => deleteSessionWithStore(db, bookmarkStore, request),
     listProjectBookmarks: (request) => listProjectBookmarksWithStore(db, bookmarkStore, request),
@@ -197,10 +197,10 @@ export function listProjects(
   request: IpcRequest<"projects:list">,
   dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"projects:list"> {
-  return withDatabase(
+  return withDatabaseAndBookmarkStore(
     dbPath,
-    (db) => listProjectsWithDatabase(db, request),
-    dependencies.openDatabase,
+    (db, bookmarkStore) => listProjectsWithDatabase(db, bookmarkStore, request),
+    dependencies,
   );
 }
 
@@ -209,10 +209,10 @@ export function listSessions(
   request: IpcRequest<"sessions:list">,
   dependencies: QueryServiceDependencies = {},
 ): IpcResponse<"sessions:list"> {
-  return withDatabase(
+  return withDatabaseAndBookmarkStore(
     dbPath,
-    (db) => listSessionsWithDatabase(db, request),
-    dependencies.openDatabase,
+    (db, bookmarkStore) => listSessionsWithDatabase(db, bookmarkStore, request),
+    dependencies,
   );
 }
 
@@ -302,6 +302,7 @@ export function runSearchQuery(
 
 function listProjectsWithDatabase(
   db: DatabaseHandle,
+  bookmarkStore: BookmarkStore,
   request: IpcRequest<"projects:list">,
 ): IpcResponse<"projects:list"> {
   if (request.providers && request.providers.length === 0) {
@@ -356,6 +357,7 @@ function listProjectsWithDatabase(
       path: row.path,
       sessionCount: row.session_count,
       messageCount: row.message_count,
+      bookmarkCount: bookmarkStore.countProjectBookmarks(row.id),
       lastActivity: row.last_activity,
     })),
   };
@@ -363,6 +365,7 @@ function listProjectsWithDatabase(
 
 function listSessionsWithDatabase(
   db: DatabaseHandle,
+  bookmarkStore: BookmarkStore,
   request: IpcRequest<"sessions:list">,
 ): IpcResponse<"sessions:list"> {
   const params: string[] = [];
@@ -394,7 +397,14 @@ function listSessionsWithDatabase(
     )
     .all(...params) as SessionSummaryRow[];
 
-  return { sessions: rows.map(mapSessionSummaryRow) };
+  return {
+    sessions: rows.map((row) =>
+      mapSessionSummaryRow(
+        row,
+        request.projectId ? bookmarkStore.countSessionBookmarks(request.projectId, row.id) : 0,
+      ),
+    ),
+  };
 }
 
 function getProjectCombinedDetailWithDatabase(
@@ -1305,6 +1315,7 @@ function mapStoredBookmarkMessageRow(
 
 function mapSessionSummaryRow(
   row: SessionSummaryRow,
+  bookmarkCount = 0,
 ): IpcResponse<"sessions:list">["sessions"][number] {
   return {
     id: row.id,
@@ -1319,6 +1330,7 @@ function mapSessionSummaryRow(
     gitBranch: row.git_branch,
     cwd: row.cwd,
     messageCount: row.message_count,
+    bookmarkCount,
     tokenInputTotal: row.token_input_total,
     tokenOutputTotal: row.token_output_total,
   };

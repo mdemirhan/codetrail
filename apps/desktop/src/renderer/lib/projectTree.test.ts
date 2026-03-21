@@ -10,6 +10,7 @@ const projects = [
     path: "/Users/test/src/alpha",
     sessionCount: 2,
     messageCount: 12,
+    bookmarkCount: 0,
     lastActivity: "2026-03-01T12:00:00.000Z",
   },
   {
@@ -19,6 +20,7 @@ const projects = [
     path: "/Users/test/src/beta",
     sessionCount: 9,
     messageCount: 36,
+    bookmarkCount: 0,
     lastActivity: "2026-03-01T13:00:00.000Z",
   },
   {
@@ -28,6 +30,7 @@ const projects = [
     path: "/tmp/gamma",
     sessionCount: 3,
     messageCount: 14,
+    bookmarkCount: 0,
     lastActivity: "2026-03-01T10:00:00.000Z",
   },
   {
@@ -37,6 +40,7 @@ const projects = [
     path: "",
     sessionCount: 1,
     messageCount: 2,
+    bookmarkCount: 0,
     lastActivity: null,
   },
 ];
@@ -52,18 +56,6 @@ describe("buildProjectFolderGroups", () => {
       "Other Locations",
     ]);
     expect(groups[0]?.projects.map((project) => project.id)).toEqual(["project_2"]);
-  });
-
-  it("sorts folder groups by aggregate session count when requested", () => {
-    const groups = buildProjectFolderGroups(projects, "sessions", "desc");
-
-    expect(groups.map((group) => group.label)).toEqual([
-      "~/src/beta",
-      "/tmp/gamma",
-      "~/src/alpha",
-      "Other Locations",
-    ]);
-    expect(groups[0]?.sessionCount).toBe(9);
   });
 
   it("sorts folder groups by label using the selected direction in name mode", () => {
@@ -95,6 +87,7 @@ describe("buildProjectFolderGroups", () => {
           path: "/Users/test/src/alpha",
           sessionCount: 4,
           messageCount: 18,
+          bookmarkCount: 0,
           lastActivity: "2026-03-01T14:00:00.000Z",
         },
       ],

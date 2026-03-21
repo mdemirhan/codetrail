@@ -70,6 +70,8 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
   ] = useState(false);
   const [projectPaneCollapsed, setProjectPaneCollapsed] = useState(false);
   const [sessionPaneCollapsed, setSessionPaneCollapsed] = useState(false);
+  const [singleClickFoldersExpand, setSingleClickFoldersExpand] = useState(true);
+  const [singleClickProjectsExpand, setSingleClickProjectsExpand] = useState(false);
   const [projectProviders, setProjectProviders] = useState<Provider[]>(["claude"]);
   const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>(["assistant"]);
   const [expandedByDefaultCategories, setExpandedByDefaultCategories] = useState<MessageCategory[]>(
@@ -90,9 +92,7 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     "session",
   );
   const [projectViewMode, setProjectViewMode] = useState<"list" | "tree">("list");
-  const [projectSortField, setProjectSortField] = useState<"last_active" | "name" | "sessions">(
-    "last_active",
-  );
+  const [projectSortField, setProjectSortField] = useState<"last_active" | "name">("last_active");
   const [projectSortDirection, setProjectSortDirection] = useState<"asc" | "desc">("desc");
   const [sessionSortDirection, setSessionSortDirection] = useState<"asc" | "desc">("desc");
   const [messageSortDirection, setMessageSortDirection] = useState<"asc" | "desc">("asc");
@@ -125,6 +125,8 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
       sessionPaneWidth,
       projectPaneCollapsed,
       sessionPaneCollapsed,
+      singleClickFoldersExpand,
+      singleClickProjectsExpand,
       projectProviders,
       historyCategories,
       expandedByDefaultCategories,
@@ -156,6 +158,8 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     setSessionPaneWidth,
     setProjectPaneCollapsed,
     setSessionPaneCollapsed,
+    setSingleClickFoldersExpand,
+    setSingleClickProjectsExpand,
     setProjectProviders,
     setHistoryCategories,
     setExpandedByDefaultCategories,
@@ -207,6 +211,8 @@ describe("usePaneStateSync", () => {
             sessionPaneWidth: 410,
             projectPaneCollapsed: true,
             sessionPaneCollapsed: false,
+            singleClickFoldersExpand: false,
+            singleClickProjectsExpand: true,
             projectProviders: ["claude", "codex"],
             historyCategories: ["assistant", "user"],
             expandedByDefaultCategories: ["assistant"],
@@ -222,7 +228,7 @@ describe("usePaneStateSync", () => {
             selectedSessionId: "session_1",
             historyMode: "bookmarks",
             projectViewMode: "tree",
-            projectSortField: "sessions",
+            projectSortField: "name",
             projectSortDirection: "desc",
             sessionSortDirection: "desc",
             messageSortDirection: "asc",
@@ -266,7 +272,9 @@ describe("usePaneStateSync", () => {
       const lastPaneSavePayload = paneSaveCalls.at(-1)?.[1];
       expect(lastPaneSavePayload).toMatchObject({
         projectViewMode: "tree",
-        projectSortField: "sessions",
+        projectSortField: "name",
+        singleClickFoldersExpand: false,
+        singleClickProjectsExpand: true,
         preferredAutoRefreshStrategy: "scan-10s",
         systemMessageRegexRules: {
           claude: ["^<command-name>"],
@@ -324,6 +332,8 @@ describe("usePaneStateSync", () => {
             sessionPaneWidth: null,
             projectPaneCollapsed: null,
             sessionPaneCollapsed: null,
+            singleClickFoldersExpand: null,
+            singleClickProjectsExpand: null,
             projectProviders: null,
             historyCategories: null,
             expandedByDefaultCategories: null,

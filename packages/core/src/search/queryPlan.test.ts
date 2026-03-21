@@ -90,6 +90,28 @@ describe("buildSearchHighlightRegex", () => {
     expect(value.match(matcher ?? /$/g)).toEqual(["focus", "focus", "cus"]);
   });
 
+  it("matches phrases across punctuation and whitespace token separators", () => {
+    const matcher = buildSearchHighlightRegex("focus+on+some*");
+    expect(matcher).not.toBeNull();
+    const value = "keep focus on somethingElse concrete";
+    expect(value.match(matcher ?? /$/g)).toEqual(["focus on somethingElse"]);
+  });
+
+  it("matches phrase highlights across punctuation-delimited tokens", () => {
+    const matcher = buildSearchHighlightRegex({
+      normalizedQuery: '"history add"',
+      mode: "simple",
+      ftsTokens: [],
+      ftsQuery: null,
+      highlightPatterns: ["history add"],
+      hasTerms: true,
+      error: null,
+    });
+    expect(matcher).not.toBeNull();
+    const value = "feat(history): add collapsible side panes";
+    expect(value.match(matcher ?? /$/g)).toEqual(["history): add"]);
+  });
+
   it("returns null for empty/ignored queries", () => {
     expect(buildSearchHighlightRegex("")).toBeNull();
     expect(buildSearchHighlightRegex("***")).toBeNull();

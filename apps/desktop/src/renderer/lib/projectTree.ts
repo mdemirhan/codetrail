@@ -71,15 +71,6 @@ function compareFolderGroupsByField(
     );
   }
 
-  if (sortField === "sessions") {
-    return (
-      left.sessionCount - right.sessionCount ||
-      compareRecent(left.lastActivity, right.lastActivity) ||
-      PROJECT_FOLDER_COLLATOR.compare(left.label, right.label) ||
-      left.id.localeCompare(right.id)
-    );
-  }
-
   return (
     compareRecent(left.lastActivity, right.lastActivity) ||
     PROJECT_FOLDER_COLLATOR.compare(left.label, right.label) ||

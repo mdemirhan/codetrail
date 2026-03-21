@@ -369,7 +369,7 @@ export function SettingsView({
                   tone="expansion"
                   icon="⊞"
                   title="Default Expansion"
-                  subtitle="Which message types should start expanded in session view."
+                  subtitle="Which message types should start expanded in message view."
                 />
                 <div className="settings-token-grid">
                   {UI_MESSAGE_CATEGORY_VALUES.map((category) => {

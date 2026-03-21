@@ -1,6 +1,6 @@
 export const EDIT_OPERATION_HINTS = [
   "edit",
-  "write",
+  "write_file",
   "rewrite",
   "replace",
   "apply_patch",

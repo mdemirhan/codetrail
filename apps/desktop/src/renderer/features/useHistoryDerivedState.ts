@@ -98,14 +98,14 @@ export function useHistoryDerivedState({
         : messageSortDirection;
   const messageSortScopeLabel =
     historyMode === "project_all"
-      ? "All Sessions messages"
+      ? "all sessions"
       : historyMode === "bookmarks"
-        ? "bookmarked messages"
-        : "session messages";
+        ? "bookmarks"
+        : "session";
   const messageSortTooltip =
     activeMessageSortDirection === "asc"
-      ? `${messageSortScopeLabel}: oldest to newest. Click to switch to newest first.`
-      : `${messageSortScopeLabel}: newest to oldest. Click to switch to oldest first.`;
+      ? `Oldest first (${messageSortScopeLabel}). Click to switch to newest first.`
+      : `Newest first (${messageSortScopeLabel}). Click to switch to oldest first.`;
 
   const bookmarkOrphanedByMessageId = useMemo(
     () =>
@@ -171,6 +171,12 @@ export function useHistoryDerivedState({
   const visibleSessionPaneAllSessionsCount = isSessionPaneReadyForSelectedProject
     ? allSessionsCount
     : 0;
+  const currentViewBookmarkCount =
+    historyMode === "bookmarks"
+      ? bookmarksResponse.totalCount
+      : historyMode === "session"
+        ? (selectedSession?.bookmarkCount ?? 0)
+        : (selectedProject?.bookmarkCount ?? 0);
 
   const sessionPaneNavigationItems = useMemo<SessionPaneNavigationItem[]>(() => {
     // The session pane is modeled as one navigation list that includes synthetic entries for
@@ -290,6 +296,7 @@ export function useHistoryDerivedState({
     visibleSessionPaneSessions,
     visibleSessionPaneBookmarksCount,
     visibleSessionPaneAllSessionsCount,
+    currentViewBookmarkCount,
     sessionPaneNavigationItems,
     messagePathRoots,
     projectProviderCounts,

@@ -550,9 +550,32 @@ describe("queryService in-memory", () => {
         path: "/workspace/cursor-project",
         sessionCount: 0,
         messageCount: 0,
+        bookmarkCount: 0,
         lastActivity: null,
       },
     ]);
+  });
+
+  it("includes bookmark counts in project and session listings", () => {
+    const db = seedQueryDb();
+    const bookmarkStore = createBookmarkStoreMock({
+      countProjectBookmarks: vi.fn((projectId: string) => (projectId === "project_1" ? 4 : 0)),
+      countSessionBookmarks: vi.fn((projectId: string, sessionId: string) =>
+        projectId === "project_1" && sessionId === "session_1" ? 2 : 0,
+      ),
+    });
+    const service = createQueryServiceFromDb(db, {
+      bookmarkStore,
+      ownsBookmarkStore: false,
+    });
+
+    const projects = service.listProjects({ providers: undefined, query: "" });
+    const sessions = service.listSessions({ projectId: "project_1" });
+
+    expect(projects.projects[0]?.bookmarkCount).toBe(4);
+    expect(sessions.sessions[0]?.bookmarkCount).toBe(2);
+    expect(bookmarkStore.countProjectBookmarks).toHaveBeenCalledWith("project_1");
+    expect(bookmarkStore.countSessionBookmarks).toHaveBeenCalledWith("project_1", "session_1");
   });
 
   it("supports injected openDatabase dependency in path-based helpers", () => {

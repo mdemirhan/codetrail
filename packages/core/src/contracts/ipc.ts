@@ -16,6 +16,7 @@ const projectSummarySchema = z.object({
   path: z.string(),
   sessionCount: z.number().int().nonnegative(),
   messageCount: z.number().int().nonnegative(),
+  bookmarkCount: z.number().int().nonnegative().default(0),
   lastActivity: z.string().nullable(),
 });
 
@@ -32,6 +33,7 @@ const sessionSummarySchema = z.object({
   gitBranch: z.string().nullable(),
   cwd: z.string().nullable(),
   messageCount: z.number().int().nonnegative(),
+  bookmarkCount: z.number().int().nonnegative().default(0),
   tokenInputTotal: z.number().int().nonnegative(),
   tokenOutputTotal: z.number().int().nonnegative(),
 });
@@ -133,7 +135,7 @@ const themeModeSchema = z.enum([
 ]);
 const sortDirectionSchema = z.enum(["asc", "desc"]);
 const projectViewModeSchema = z.enum(["list", "tree"]);
-const projectSortFieldSchema = z.enum(["last_active", "name", "sessions"]);
+const projectSortFieldSchema = z.enum(["last_active", "name"]);
 const searchModeSchema = z.enum(["simple", "advanced"]);
 const providerSourceFormatSchema = z.enum(["jsonl_stream", "materialized_json"]);
 const historyExportModeSchema = z.enum(["session", "project_all", "bookmarks"]);
@@ -168,6 +170,8 @@ export const paneStateBaseSchema = z.object({
   sessionPaneWidth: z.number().int().positive(),
   projectPaneCollapsed: z.boolean(),
   sessionPaneCollapsed: z.boolean(),
+  singleClickFoldersExpand: z.boolean(),
+  singleClickProjectsExpand: z.boolean(),
   projectProviders: z.array(providerSchema),
   historyCategories: z.array(messageCategorySchema),
   expandedByDefaultCategories: z.array(messageCategorySchema),

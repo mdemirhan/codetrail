@@ -1,10 +1,22 @@
-import { type Ref, useCallback, useEffect, useState } from "react";
+import { type Ref, useCallback, useEffect, useRef, useState } from "react";
 
 import type { SessionSummary } from "../../app/types";
+import { useClickOutside } from "../../hooks/useClickOutside";
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
 import { ToolbarIcon } from "../ToolbarIcon";
 import { HistoryListContextMenu } from "./HistoryListContextMenu";
 import { scheduleSelectedSessionScroll } from "./sessionAutoScroll";
+
+function SessionPaneMenuIcon() {
+  return (
+    <svg className="project-pane-inline-icon" viewBox="0 0 16 16" aria-hidden>
+      <title>More options</title>
+      <circle cx="3.25" cy="8" r="1.1" fill="currentColor" />
+      <circle cx="8" cy="8" r="1.1" fill="currentColor" />
+      <circle cx="12.75" cy="8" r="1.1" fill="currentColor" />
+    </svg>
+  );
+}
 
 export function SessionPane({
   sortedSessions,
@@ -52,11 +64,13 @@ export function SessionPane({
   const [selectedSessionElement, setSelectedSessionElement] = useState<HTMLButtonElement | null>(
     null,
   );
+  const overflowMenuRef = useRef<HTMLDivElement | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     sessionId: string;
     x: number;
     y: number;
   } | null>(null);
+  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const selectedItemId = allSessionsSelected
     ? "__project_all__"
     : bookmarksSelected
@@ -64,11 +78,17 @@ export function SessionPane({
       : selectedSessionId;
   const sortTooltip =
     sortDirection === "asc"
-      ? "Sessions: oldest activity first. Click to show newest activity first."
-      : "Sessions: newest activity first. Click to show oldest activity first.";
+      ? "Oldest first (sessions). Click to switch to newest first."
+      : "Newest first (sessions). Click to switch to oldest first.";
+  const sortAriaLabel =
+    sortDirection === "asc"
+      ? "Oldest first (sessions). Switch to newest first"
+      : "Newest first (sessions). Switch to oldest first";
   const selectedSessionRef = useCallback((node: HTMLButtonElement | null) => {
     setSelectedSessionElement(node);
   }, []);
+
+  useClickOutside(overflowMenuRef, overflowMenuOpen, () => setOverflowMenuOpen(false));
 
   useEffect(() => {
     return scheduleSelectedSessionScroll({
@@ -83,52 +103,84 @@ export function SessionPane({
       <div className="panel-header">
         <div className="panel-header-left">
           <span className="panel-title">Sessions</span>
-          <span className="panel-count">{sortedSessions.length}</span>
+          {!collapsed ? <span className="panel-count">{sortedSessions.length}</span> : null}
         </div>
         <div className="pane-head-controls">
           {!collapsed ? (
             <>
               <button
                 type="button"
-                className="collapse-btn sort-btn"
+                className="collapse-btn"
                 onClick={onToggleSortDirection}
-                aria-label={
-                  sortDirection === "asc" ? "Sort sessions descending" : "Sort sessions ascending"
-                }
+                aria-label={sortAriaLabel}
                 title={sortTooltip}
               >
                 <ToolbarIcon name={sortDirection === "asc" ? "sortAsc" : "sortDesc"} />
               </button>
-              <button
-                type="button"
-                className="collapse-btn"
-                onClick={() => onCopySession()}
-                aria-label="Copy session details"
-                title="Copy details for the selected session"
-                disabled={!canCopySession}
-              >
-                <ToolbarIcon name="copy" />
-              </button>
-              <button
-                type="button"
-                className="collapse-btn pane-delete-btn"
-                onClick={() => onDeleteSession()}
-                aria-label="Delete session from Code Trail"
-                title="Delete the selected session from Code Trail"
-                disabled={!canDeleteSession}
-              >
-                <ToolbarIcon name="trash" />
-              </button>
-              <button
-                type="button"
-                className="collapse-btn pane-open-location-btn"
-                onClick={() => onOpenSessionLocation()}
-                aria-label="Open session folder"
-                title="Open the selected session folder"
-                disabled={!canOpenSessionLocation}
-              >
-                <ToolbarIcon name="folderOpen" />
-              </button>
+              <div className="tb-dropdown session-pane-overflow-dropdown" ref={overflowMenuRef}>
+                <button
+                  type="button"
+                  className="collapse-btn tb-dropdown-trigger"
+                  onClick={() => setOverflowMenuOpen((value) => !value)}
+                  aria-haspopup="menu"
+                  aria-expanded={overflowMenuOpen}
+                  aria-label="Session options"
+                  title="Session actions"
+                >
+                  <SessionPaneMenuIcon />
+                </button>
+                {overflowMenuOpen ? (
+                  <dialog
+                    className="tb-dropdown-menu tb-dropdown-menu-right project-pane-header-menu project-pane-overflow-menu"
+                    open
+                    aria-label="Session options"
+                  >
+                    <button
+                      type="button"
+                      className="tb-dropdown-item project-pane-overflow-item"
+                      onClick={() => {
+                        onCopySession();
+                        setOverflowMenuOpen(false);
+                      }}
+                      disabled={!canCopySession}
+                    >
+                      <span className="project-pane-overflow-icon" aria-hidden>
+                        <ToolbarIcon name="copy" />
+                      </span>
+                      <span>Copy</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="tb-dropdown-item project-pane-overflow-item"
+                      onClick={() => {
+                        onOpenSessionLocation();
+                        setOverflowMenuOpen(false);
+                      }}
+                      disabled={!canOpenSessionLocation}
+                    >
+                      <span className="project-pane-overflow-icon" aria-hidden>
+                        <ToolbarIcon name="folderOpen" />
+                      </span>
+                      <span>Open Folder</span>
+                    </button>
+                    <div className="tb-dropdown-separator" />
+                    <button
+                      type="button"
+                      className="tb-dropdown-item project-pane-overflow-item project-pane-overflow-item-danger"
+                      onClick={() => {
+                        onDeleteSession();
+                        setOverflowMenuOpen(false);
+                      }}
+                      disabled={!canDeleteSession}
+                    >
+                      <span className="project-pane-overflow-icon" aria-hidden>
+                        <ToolbarIcon name="trash" />
+                      </span>
+                      <span>Delete</span>
+                    </button>
+                  </dialog>
+                ) : null}
+              </div>
             </>
           ) : null}
           <button
@@ -146,38 +198,6 @@ export function SessionPane({
           </button>
         </div>
       </div>
-      {collapsed ? (
-        <div className="collapsed-quick-switch" aria-label="Collapsed session quick actions">
-          <button
-            type="button"
-            className={
-              allSessionsSelected
-                ? "collapse-btn collapsed-quick-btn active"
-                : "collapse-btn collapsed-quick-btn"
-            }
-            onClick={onSelectAllSessions}
-            aria-label="Switch to All Sessions"
-            title="Show All Sessions"
-          >
-            <ToolbarIcon name="history" />
-          </button>
-          {bookmarksCount > 0 ? (
-            <button
-              type="button"
-              className={
-                bookmarksSelected
-                  ? "collapse-btn collapsed-quick-btn active"
-                  : "collapse-btn collapsed-quick-btn"
-              }
-              onClick={onSelectBookmarks}
-              aria-label="Switch to Bookmarks"
-              title="Show Bookmarked Messages"
-            >
-              <ToolbarIcon name="bookmark" />
-            </button>
-          ) : null}
-        </div>
-      ) : null}
       <div className="list-scroll session-list" ref={listRef} tabIndex={-1}>
         <button
           type="button"

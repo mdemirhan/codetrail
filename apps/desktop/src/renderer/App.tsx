@@ -41,6 +41,7 @@ import { useSearchController } from "./features/useSearchController";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useReconcileProviderSelection } from "./hooks/useReconcileProviderSelection";
 import { isMissingCodetrailClient, useCodetrailClient } from "./lib/codetrailClient";
+import { findSessionSummaryById } from "./lib/historySessionLookup";
 import { toErrorMessage, toggleValue } from "./lib/viewUtils";
 
 // Module-level override for tests — keeps the component API clean
@@ -62,6 +63,32 @@ function resolveExplicitOrSelectedItem<T extends { id: string }>(
   selectedItem: T | null | undefined,
 ): T | null {
   return items.find((item) => item.id === (explicitId ?? selectedId)) ?? selectedItem ?? null;
+}
+
+function resolveExplicitOrSelectedSession({
+  explicitId,
+  selectedId,
+  selectedSession,
+  sortedSessions,
+  treeProjectSessionsByProjectId,
+}: {
+  explicitId: string | undefined;
+  selectedId: string | null | undefined;
+  selectedSession: ReturnType<typeof useHistoryController>["selectedSession"];
+  sortedSessions: ReturnType<typeof useHistoryController>["sortedSessions"];
+  treeProjectSessionsByProjectId: ReturnType<
+    typeof useHistoryController
+  >["treeProjectSessionsByProjectId"];
+}) {
+  const targetId = explicitId ?? selectedId;
+  if (!targetId) {
+    return selectedSession ?? null;
+  }
+  return (
+    findSessionSummaryById(targetId, sortedSessions, treeProjectSessionsByProjectId) ??
+    selectedSession ??
+    null
+  );
 }
 
 export function App({
@@ -256,12 +283,13 @@ export function App({
   );
   const handleOpenSessionDelete = useCallback(
     (sessionId?: string) => {
-      const targetSession = resolveExplicitOrSelectedItem(
-        history.sortedSessions,
-        sessionId,
-        history.selectedSessionId,
-        history.selectedSession,
-      );
+      const targetSession = resolveExplicitOrSelectedSession({
+        explicitId: sessionId,
+        selectedId: history.selectedSessionId,
+        selectedSession: history.selectedSession,
+        sortedSessions: history.sortedSessions,
+        treeProjectSessionsByProjectId: history.treeProjectSessionsByProjectId,
+      });
       if (!targetSession) {
         return;
       }
@@ -275,7 +303,12 @@ export function App({
         messageCount: targetSession.messageCount,
       });
     },
-    [history.selectedSession, history.selectedSessionId, history.sortedSessions],
+    [
+      history.selectedSession,
+      history.selectedSessionId,
+      history.sortedSessions,
+      history.treeProjectSessionsByProjectId,
+    ],
   );
   const handleConfirmHistoryDelete = useCallback(async () => {
     if (!pendingHistoryDelete || historyDeletePending) {
@@ -570,6 +603,7 @@ export function App({
     selectPreviousProject: () => history.selectAdjacentProject("previous"),
     selectNextProject: () => history.selectAdjacentProject("next"),
     handleProjectTreeArrow: history.handleProjectTreeArrow,
+    handleProjectTreeEnter: history.handleProjectTreeEnter,
     pageHistoryMessagesUp: history.pageHistoryMessagesUp,
     pageHistoryMessagesDown: history.pageHistoryMessagesDown,
     pageSearchResultsUp: search.pageSearchResultsUp,

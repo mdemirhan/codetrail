@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { App } from "./App";
-import { SEARCH_PLACEHOLDERS } from "./lib/searchPlaceholders";
+import { SEARCH_PLACEHOLDERS } from "./lib/searchLabels";
 import {
   createHistoryNavigationClient,
   createProjectSwitchBookmarksDelayClient,
@@ -18,6 +18,21 @@ function expectDefined<T>(value: T | null | undefined, message: string): NonNull
     throw new Error(message);
   }
   return value as NonNullable<T>;
+}
+
+async function expandHistoryPanes() {
+  const expandProjectsButton = screen.queryByRole("button", { name: "Expand Projects pane" });
+  if (expandProjectsButton) {
+    fireEvent.click(expandProjectsButton);
+  }
+  const expandSessionsButton = screen.queryByRole("button", { name: "Expand Sessions pane" });
+  if (expandSessionsButton) {
+    fireEvent.click(expandSessionsButton);
+  }
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Collapse Projects pane" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse Sessions pane" })).toBeInTheDocument();
+  });
 }
 
 describe("App history navigation", () => {
@@ -33,6 +48,8 @@ describe("App history navigation", () => {
     await waitFor(() => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
+
+    await expandHistoryPanes();
 
     await user.click(await screen.findByText("Session one"));
     await waitFor(() => {
@@ -52,15 +69,29 @@ describe("App history navigation", () => {
     });
 
     fireEvent.keyDown(window, { key: "ArrowDown", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "ArrowDown", ctrlKey: true });
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
-      expect(document.activeElement).toBe(projectList());
+      expect(projectList()?.contains(document.activeElement)).toBe(true);
+      expect(
+        document.activeElement?.getAttribute("data-project-nav-id") ??
+          document.activeElement
+            ?.closest("[data-project-nav-id]")
+            ?.getAttribute("data-project-nav-id"),
+      ).toBe("project_2");
     });
 
     fireEvent.keyDown(window, { key: "ArrowUp", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "ArrowUp", ctrlKey: true });
     await waitFor(() => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
-      expect(document.activeElement).toBe(projectList());
+      expect(projectList()?.contains(document.activeElement)).toBe(true);
+      expect(
+        document.activeElement?.getAttribute("data-project-nav-id") ??
+          document.activeElement
+            ?.closest("[data-project-nav-id]")
+            ?.getAttribute("data-project-nav-id"),
+      ).toBe("project_1");
     });
   });
 
@@ -77,6 +108,8 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
 
+    await expandHistoryPanes();
+
     await user.click(await screen.findByText("Session one"));
     await waitFor(() => {
       expect(screen.getByText("Session one message")).toBeInTheDocument();
@@ -86,16 +119,23 @@ describe("App history navigation", () => {
     sessionPane.focus();
     fireEvent.keyDown(sessionPane, { key: "ArrowUp" });
     await waitFor(() => {
-      expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyBookmarks)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages)).toBeInTheDocument();
       expect(document.activeElement).toBe(sessionList());
     });
 
     const projectPane = expectDefined(projectList(), "Expected project list");
     projectPane.focus();
     fireEvent.keyDown(projectPane, { key: "ArrowDown" });
+    fireEvent.keyDown(projectPane, { key: "ArrowDown" });
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
-      expect(document.activeElement).toBe(projectList());
+      expect(projectList()?.contains(document.activeElement)).toBe(true);
+      expect(
+        document.activeElement?.getAttribute("data-project-nav-id") ??
+          document.activeElement
+            ?.closest("[data-project-nav-id]")
+            ?.getAttribute("data-project-nav-id"),
+      ).toBe("project_2");
     });
   });
 
@@ -149,16 +189,32 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
+    const expandProjectsButton = screen.queryByRole("button", { name: "Expand Projects pane" });
+    const expandSessionsButton = screen.queryByRole("button", { name: "Expand Sessions pane" });
+    if (expandProjectsButton) {
+      fireEvent.click(expandProjectsButton);
+    }
+    if (expandSessionsButton) {
+      fireEvent.click(expandSessionsButton);
+    }
 
-    expectDefined(sessionList(), "Expected session list");
-    expectDefined(messageList(), "Expected message list");
-    expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Collapse Projects pane" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse Sessions pane" })).toBeInTheDocument();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse Sessions pane" }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Expand Sessions pane" })).toBeInTheDocument();
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
+    });
+
+    expectDefined(sessionList(), "Expected session list");
+    expectDefined(messageList(), "Expected message list");
   });
 
   it("includes All Sessions and Bookmarked Messages when moving up from the first session", async () => {
@@ -173,6 +229,8 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
 
+    await expandHistoryPanes();
+
     await user.click(screen.getByText("Session one"));
     await waitFor(() => {
       expect(screen.getByText("Session one message")).toBeInTheDocument();
@@ -180,15 +238,13 @@ describe("App history navigation", () => {
 
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
     await waitFor(() => {
-      expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyBookmarks)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages)).toBeInTheDocument();
       expect(document.activeElement).toBe(sessionList());
     });
 
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
     await waitFor(() => {
-      expect(
-        screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.historyProjectSessions),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages)).toBeInTheDocument();
       expect(document.activeElement).toBe(sessionList());
     });
   });

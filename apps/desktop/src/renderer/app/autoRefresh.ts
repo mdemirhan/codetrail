@@ -9,7 +9,7 @@ export const REFRESH_STRATEGY_OPTIONS: ReadonlyArray<{
   label: string;
   value: RefreshStrategy;
 }> = [
-  { label: "Off", value: "off" },
+  { label: "Manual", value: "off" },
   { label: "Watch (1s debounce)", value: "watch-1s" },
   { label: "Watch (3s debounce)", value: "watch-3s" },
   { label: "Watch (5s debounce)", value: "watch-5s" },

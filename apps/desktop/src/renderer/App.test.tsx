@@ -2,11 +2,26 @@
 
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const { copyTextToClipboard, openInFileManager, openPath } = vi.hoisted(() => ({
+  copyTextToClipboard: vi.fn(async () => true),
+  openInFileManager: vi.fn(async () => ({ ok: true, error: null })),
+  openPath: vi.fn(async () => ({ ok: true, error: null })),
+}));
+
+vi.mock("./lib/clipboard", () => ({
+  copyTextToClipboard,
+}));
+
+vi.mock("./lib/pathActions", () => ({
+  openInFileManager,
+  openPath,
+}));
 
 import { App } from "./App";
 import type { PaneStateSnapshot } from "./app/types";
-import { SEARCH_PLACEHOLDERS } from "./lib/searchPlaceholders";
+import { SEARCH_PLACEHOLDERS } from "./lib/searchLabels";
 import { createAppClient, installScrollIntoViewMock } from "./test/appTestFixtures";
 import { renderWithClient } from "./test/renderWithClient";
 
@@ -153,7 +168,7 @@ describe("App shell", () => {
 
     expect(workspace.style.gridTemplateColumns).toBe("");
     expect(workspace.style.getPropertyValue("--project-pane-width")).toBe("300px");
-    expect(workspace.style.getPropertyValue("--session-pane-width")).toBe("320px");
+    expect(workspace.style.getPropertyValue("--session-pane-width")).toBe("36px");
   });
 
   it("hides disabled provider toggles and projects", async () => {
@@ -425,7 +440,7 @@ describe("App shell", () => {
     fireEvent.keyDown(window, { key: "R", metaKey: true, shiftKey: true });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent).toContain(
-        "Off",
+        "Manual",
       );
     });
 
@@ -458,7 +473,7 @@ describe("App shell", () => {
     });
 
     expect(screen.getByRole("button", { name: "Auto-refresh strategy" }).textContent).toContain(
-      "Off",
+      "Manual",
     );
 
     fireEvent.keyDown(window, { key: "R", metaKey: true, shiftKey: true });
@@ -524,11 +539,17 @@ describe("App shell", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Sort All Sessions messages ascending" }),
+        screen.getByRole("button", {
+          name: "Newest first (all sessions). Switch to oldest first",
+        }),
       ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Sort All Sessions messages ascending" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Newest first (all sessions). Switch to oldest first",
+      }),
+    );
 
     await waitFor(() => {
       const calls = client.invoke.mock.calls.filter(
@@ -540,6 +561,185 @@ describe("App shell", () => {
         ),
       ).toBe(true);
     });
+  });
+
+  it("opens bookmarks from the message header and returns to the previous session view", async () => {
+    const user = userEvent.setup();
+    const client = createAppClient({
+      "projects:list": () => ({
+        projects: [
+          {
+            id: "project_1",
+            provider: "claude",
+            name: "Project One",
+            path: "/workspace/project-one",
+            sessionCount: 1,
+            messageCount: 2,
+            bookmarkCount: 3,
+            lastActivity: "2026-03-01T10:00:05.000Z",
+          },
+        ],
+      }),
+      "sessions:list": () => ({
+        sessions: [
+          {
+            id: "session_1",
+            projectId: "project_1",
+            provider: "claude",
+            filePath: "/workspace/project-one/session-1.jsonl",
+            title: "Investigate markdown rendering",
+            modelNames: "claude-opus-4-1",
+            startedAt: "2026-03-01T10:00:00.000Z",
+            endedAt: "2026-03-01T10:00:05.000Z",
+            durationMs: 5000,
+            gitBranch: "main",
+            cwd: "/workspace/project-one",
+            messageCount: 2,
+            bookmarkCount: 2,
+            tokenInputTotal: 14,
+            tokenOutputTotal: 8,
+          },
+        ],
+      }),
+      "bookmarks:listProject": () => ({
+        projectId: "project_1",
+        totalCount: 2,
+        filteredCount: 2,
+        categoryCounts: {
+          user: 0,
+          assistant: 2,
+          tool_use: 0,
+          tool_edit: 0,
+          tool_result: 0,
+          thinking: 0,
+          system: 0,
+        },
+        results: [
+          {
+            projectId: "project_1",
+            sessionId: "session_1",
+            sessionTitle: "Investigate markdown rendering",
+            bookmarkedAt: "2026-03-01T10:10:00.000Z",
+            isOrphaned: false,
+            orphanedAt: null,
+            message: {
+              id: "bookmark_1",
+              sourceId: "bookmark_source_1",
+              sessionId: "session_1",
+              provider: "claude",
+              category: "assistant",
+              content: "Saved markdown summary",
+              createdAt: "2026-03-01T10:10:00.000Z",
+              tokenInput: null,
+              tokenOutput: null,
+              operationDurationMs: null,
+              operationDurationSource: null,
+              operationDurationConfidence: null,
+            },
+          },
+          {
+            projectId: "project_1",
+            sessionId: "session_1",
+            sessionTitle: "Investigate markdown rendering",
+            bookmarkedAt: "2026-03-01T10:11:00.000Z",
+            isOrphaned: false,
+            orphanedAt: null,
+            message: {
+              id: "bookmark_2",
+              sourceId: "bookmark_source_2",
+              sessionId: "session_1",
+              provider: "claude",
+              category: "assistant",
+              content: "Saved second summary",
+              createdAt: "2026-03-01T10:11:00.000Z",
+              tokenInput: null,
+              tokenOutput: null,
+              operationDurationMs: null,
+              operationDurationSource: null,
+              operationDurationConfidence: null,
+            },
+          },
+        ],
+      }),
+    });
+
+    renderWithClient(
+      <App
+        initialPaneState={
+          {
+            selectedProjectId: "project_1",
+            selectedSessionId: "session_1",
+            historyMode: "session",
+          } as PaneStateSnapshot
+        }
+      />,
+      client,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "2 bookmarks" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "2 bookmarks" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Close bookmarks" })).toBeInTheDocument();
+    });
+    expect(screen.getByText("Saved markdown summary")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close bookmarks" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "2 bookmarks" })).toBeInTheDocument();
+    });
+    expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+  });
+
+  it("reveals session leaves in the project tree and keeps the Sessions pane collapsed", async () => {
+    installScrollIntoViewMock();
+    const user = userEvent.setup();
+    const client = createAppClient();
+    const { container } = renderWithClient(
+      <App
+        initialPaneState={
+          {
+            selectedProjectId: "project_1",
+            historyMode: "project_all",
+          } as PaneStateSnapshot
+        }
+      />,
+      client,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Project One/i })).toBeInTheDocument();
+    });
+
+    fireEvent.doubleClick(screen.getByRole("button", { name: /Project One/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Investigate markdown rendering/i }),
+      ).toBeInTheDocument();
+    });
+
+    const treeSessionButton = container.querySelector<HTMLButtonElement>(
+      '.project-tree-session-row[data-session-id="session_1"]',
+    );
+    expect(treeSessionButton).not.toBeNull();
+    if (!treeSessionButton) {
+      throw new Error("Expected tree session button");
+    }
+
+    await user.click(treeSessionButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("2 messages")).toBeInTheDocument();
+    });
+
+    const workspace = container.querySelector<HTMLElement>(".workspace.history-layout");
+    expect(workspace?.style.getPropertyValue("--session-pane-width")).toBe("36px");
+    expect(screen.queryByRole("button", { name: /Switch to All Sessions/i })).toBeNull();
   });
 
   it("opens the project delete dialog with JSONL-specific guidance and invokes project deletion", async () => {
@@ -734,5 +934,68 @@ describe("App shell", () => {
       "This project no longer exists in the database.",
     );
     expect(screen.getByText("Delete Project From Code Trail?")).toBeInTheDocument();
+  });
+
+  it("routes tree session context menu actions through the real session handlers", async () => {
+    installScrollIntoViewMock();
+    installDialogMock();
+
+    copyTextToClipboard.mockClear();
+    openPath.mockClear();
+
+    const user = userEvent.setup();
+    const client = createAppClient();
+    const { container } = renderWithClient(
+      <App
+        initialPaneState={
+          {
+            projectViewMode: "tree",
+            selectedProjectId: "project_1",
+            historyMode: "project_all",
+          } as PaneStateSnapshot
+        }
+      />,
+      client,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Project One/i })).toBeInTheDocument();
+    });
+
+    fireEvent.doubleClick(screen.getByRole("button", { name: /Project One/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Investigate markdown rendering/i }),
+      ).toBeInTheDocument();
+    });
+
+    const treeSessionButton = container.querySelector<HTMLButtonElement>(
+      '.project-tree-session-row[data-session-id="session_1"]',
+    );
+    expect(treeSessionButton).not.toBeNull();
+    if (!treeSessionButton) {
+      throw new Error("Expected tree session button");
+    }
+
+    fireEvent.contextMenu(treeSessionButton);
+    await user.click(screen.getByRole("menuitem", { name: "Copy" }));
+
+    expect(copyTextToClipboard).toHaveBeenCalledWith(
+      expect.stringContaining("Title: Investigate markdown rendering"),
+    );
+
+    fireEvent.contextMenu(treeSessionButton);
+    await user.click(screen.getByRole("menuitem", { name: "Open Folder" }));
+
+    expect(openPath).toHaveBeenCalledWith("/workspace/project-one/session-1.jsonl");
+
+    fireEvent.contextMenu(treeSessionButton);
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+
+    expect(screen.getByText("Delete Session From Code Trail?")).toBeInTheDocument();
+    expect(document.querySelector(".delete-history-dialog-target-title")?.textContent).toContain(
+      "Investigate markdown rendering",
+    );
   });
 });

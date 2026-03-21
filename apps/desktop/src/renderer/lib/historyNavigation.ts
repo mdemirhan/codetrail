@@ -10,21 +10,28 @@ const PROJECT_NAV_SELECTOR = "[data-project-nav-kind]";
 
 export type ProjectNavigationTarget =
   | { kind: "project"; id: string }
-  | { kind: "folder"; id: string };
+  | { kind: "folder"; id: string }
+  | { kind: "session"; id: string; projectId: string };
 
 export type VisibleProjectNavigationTarget =
   | {
       kind: "project";
       id: string;
-      element: HTMLButtonElement;
+      element: HTMLElement;
     }
   | {
       kind: "folder";
       id: string;
-      element: HTMLButtonElement;
+      element: HTMLElement;
       firstProjectId: string;
       lastProjectId: string;
       expanded: boolean;
+    }
+  | {
+      kind: "session";
+      id: string;
+      projectId: string;
+      element: HTMLElement;
     };
 
 export function getAdjacentItemId<T extends ItemLike>(
@@ -136,6 +143,12 @@ export function getProjectNavigationTargetFromElement(
     return folderId ? { kind: "folder", id: folderId } : null;
   }
 
+  if (navElement.dataset.projectNavKind === "session") {
+    const sessionId = navElement.dataset.sessionId ?? "";
+    const projectId = navElement.dataset.projectId ?? "";
+    return sessionId && projectId ? { kind: "session", id: sessionId, projectId } : null;
+  }
+
   return null;
 }
 
@@ -153,7 +166,7 @@ function getVisibleProjectNavigationTargetFromElement(
   element: HTMLElement | null,
 ): VisibleProjectNavigationTarget | null {
   const navElement = element?.closest<HTMLElement>(PROJECT_NAV_SELECTOR) ?? null;
-  if (!navElement || !(navElement instanceof HTMLButtonElement)) {
+  if (!navElement) {
     return null;
   }
 
@@ -178,6 +191,19 @@ function getVisibleProjectNavigationTargetFromElement(
           firstProjectId: navElement.dataset.folderFirstProjectId ?? "",
           lastProjectId: navElement.dataset.folderLastProjectId ?? "",
           expanded: navElement.getAttribute("aria-expanded") === "true",
+        }
+      : null;
+  }
+
+  if (navElement.dataset.projectNavKind === "session") {
+    const sessionId = navElement.dataset.sessionId ?? "";
+    const projectId = navElement.dataset.projectId ?? "";
+    return sessionId && projectId
+      ? {
+          kind: "session",
+          id: sessionId,
+          projectId,
+          element: navElement,
         }
       : null;
   }

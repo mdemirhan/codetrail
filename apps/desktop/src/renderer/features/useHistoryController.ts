@@ -110,20 +110,26 @@ function compareProjectsByField(
     );
   }
 
-  if (sortField === "sessions") {
-    return (
-      left.sessionCount - right.sessionCount ||
-      compareRecent(left.lastActivity, right.lastActivity) ||
-      compareProjectName(left, right) ||
-      left.id.localeCompare(right.id)
-    );
-  }
-
   return (
     compareRecent(left.lastActivity, right.lastActivity) ||
     compareProjectName(left, right) ||
     left.id.localeCompare(right.id)
   );
+}
+
+function sortSessionSummaries(
+  sessions: SessionSummary[],
+  sortDirection: SortDirection,
+): SessionSummary[] {
+  const next = [...sessions];
+  next.sort((left, right) => {
+    const byRecent =
+      compareRecent(sessionActivityOf(left), sessionActivityOf(right)) ||
+      left.messageCount - right.messageCount ||
+      left.id.localeCompare(right.id);
+    return sortDirection === "asc" ? byRecent : -byRecent;
+  });
+  return next;
 }
 
 // ── Periodic-refresh scroll policy ──────────────────────────────────────────
@@ -204,6 +210,11 @@ export function useHistoryController({
     createHistorySelectionFromPaneState(initialPaneState),
   );
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [treeProjectSessionsByProjectId, setTreeProjectSessionsByProjectId] = useState<
+    Record<string, SessionSummary[]>
+  >({});
+  const [treeProjectSessionsLoadingByProjectId, setTreeProjectSessionsLoadingByProjectId] =
+    useState<Record<string, boolean>>({});
   const [sessionsLoadedProjectId, setSessionsLoadedProjectId] = useState<string | null>(null);
   const [bookmarksLoadedProjectId, setBookmarksLoadedProjectId] = useState<string | null>(null);
   const [sessionPaneStableProjectId, setSessionPaneStableProjectId] = useState<string | null>(
@@ -223,7 +234,7 @@ export function useHistoryController({
       : EMPTY_SYSTEM_MESSAGE_REGEX_RULES,
   );
   const [projectViewMode, setProjectViewMode] = useState<ProjectViewMode>(
-    initialPaneState?.projectViewMode ?? "list",
+    initialPaneState?.projectViewMode ?? "tree",
   );
   const [projectSortField, setProjectSortField] = useState<ProjectSortField>(
     initialPaneState?.projectSortField ?? "last_active",
@@ -259,7 +270,16 @@ export function useHistoryController({
     initialPaneState?.projectPaneCollapsed ?? false,
   );
   const [sessionPaneCollapsed, setSessionPaneCollapsed] = useState(
-    initialPaneState?.sessionPaneCollapsed ?? false,
+    initialPaneState?.sessionPaneCollapsed ?? true,
+  );
+  const [singleClickFoldersExpand, setSingleClickFoldersExpand] = useState(
+    initialPaneState?.singleClickFoldersExpand ?? true,
+  );
+  const [singleClickProjectsExpand, setSingleClickProjectsExpand] = useState(
+    initialPaneState?.singleClickProjectsExpand ?? false,
+  );
+  const [bookmarkReturnSelection, setBookmarkReturnSelection] = useState<HistorySelection | null>(
+    null,
   );
   const [bulkExpandScope, setBulkExpandScope] = useState<BulkExpandScope>("all");
   const [messageExpanded, setMessageExpanded] = useState<Record<string, boolean>>({});
@@ -317,6 +337,9 @@ export function useHistoryController({
   const prevMessageIdsRef = useRef("");
   const refreshContextRef = useRef<RefreshContext | null>(null);
   const refreshIdCounterRef = useRef(0);
+  const treeProjectSessionsLoadTokenRef = useRef<Record<string, number>>({});
+  const treeProjectSessionsByProjectIdRef = useRef<Record<string, SessionSummary[]>>({});
+  const treeProjectSessionsLoadingByProjectIdRef = useRef<Record<string, boolean>>({});
   const initialHistoryPaneFocusAppliedRef = useRef(false);
   const projectsRef = useRef<ProjectSummary[]>([]);
   const projectUpdateTimeoutsRef = useRef<Map<string, number>>(new Map());
@@ -398,19 +421,115 @@ export function useHistoryController({
       .filter((project): project is ProjectSummary => project !== null);
   }, [naturallySortedProjects, projectOrderIds]);
 
-  const sortedSessions = useMemo(() => {
-    const next = [...sessions];
-    next.sort((left, right) => {
-      const byRecent =
-        compareRecent(sessionActivityOf(right), sessionActivityOf(left)) ||
-        right.messageCount - left.messageCount;
-      return sessionSortDirection === "desc" ? byRecent : -byRecent;
-    });
-    return next;
-  }, [sessionSortDirection, sessions]);
+  const sortedSessions = useMemo(
+    () => sortSessionSummaries(sessions, sessionSortDirection),
+    [sessionSortDirection, sessions],
+  );
+  const sortedTreeProjectSessionsByProjectId = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(treeProjectSessionsByProjectId).map(([projectId, projectSessions]) => [
+          projectId,
+          sortSessionSummaries(projectSessions, sessionSortDirection),
+        ]),
+      ) as Record<string, SessionSummary[]>,
+    [sessionSortDirection, treeProjectSessionsByProjectId],
+  );
 
   const selectedProjectId = rawSelectedProjectId || sortedProjects[0]?.id || "";
   const selectedSessionId = rawSelectedSessionId;
+
+  useEffect(() => {
+    treeProjectSessionsByProjectIdRef.current = treeProjectSessionsByProjectId;
+  }, [treeProjectSessionsByProjectId]);
+
+  useEffect(() => {
+    treeProjectSessionsLoadingByProjectIdRef.current = treeProjectSessionsLoadingByProjectId;
+  }, [treeProjectSessionsLoadingByProjectId]);
+
+  useEffect(() => {
+    const visibleProjectIds = new Set(sortedProjects.map((project) => project.id));
+    setTreeProjectSessionsByProjectId((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([projectId]) => visibleProjectIds.has(projectId)),
+      ),
+    );
+    setTreeProjectSessionsLoadingByProjectId((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([projectId]) => visibleProjectIds.has(projectId)),
+      ),
+    );
+  }, [sortedProjects]);
+
+  const ensureTreeProjectSessionsLoaded = useCallback(
+    async (projectId: string) => {
+      if (
+        !projectId ||
+        treeProjectSessionsLoadingByProjectIdRef.current[projectId] ||
+        treeProjectSessionsByProjectIdRef.current[projectId]
+      ) {
+        return;
+      }
+
+      const requestToken = (treeProjectSessionsLoadTokenRef.current[projectId] ?? 0) + 1;
+      treeProjectSessionsLoadTokenRef.current[projectId] = requestToken;
+      setTreeProjectSessionsLoadingByProjectId((current) => ({
+        ...current,
+        [projectId]: true,
+      }));
+      try {
+        const response = await codetrail.invoke("sessions:list", { projectId });
+        if (treeProjectSessionsLoadTokenRef.current[projectId] !== requestToken) {
+          return;
+        }
+        setTreeProjectSessionsByProjectId((current) => ({
+          ...current,
+          [projectId]: response.sessions,
+        }));
+      } catch (error) {
+        logError("Failed loading tree sessions", error);
+      } finally {
+        if (treeProjectSessionsLoadTokenRef.current[projectId] === requestToken) {
+          setTreeProjectSessionsLoadingByProjectId((current) => {
+            const next = { ...current };
+            delete next[projectId];
+            return next;
+          });
+        }
+      }
+    },
+    [codetrail, logError],
+  );
+
+  const refreshTreeProjectSessions = useCallback(async () => {
+    const projectIds = Object.keys(treeProjectSessionsByProjectIdRef.current);
+    if (projectIds.length === 0) {
+      return;
+    }
+    const responses = await Promise.allSettled(
+      projectIds.map(
+        async (projectId) =>
+          [projectId, (await codetrail.invoke("sessions:list", { projectId })).sessions] as const,
+      ),
+    );
+    const successfulResponses = responses.flatMap((response, index) => {
+      if (response.status === "fulfilled") {
+        return [response.value];
+      }
+      logError(
+        `Failed refreshing tree sessions for project ${projectIds[index] ?? "(unknown project)"}`,
+        response.reason,
+      );
+      return [];
+    });
+    if (successfulResponses.length === 0) {
+      return;
+    }
+    setTreeProjectSessionsByProjectId((current) => ({
+      ...current,
+      ...Object.fromEntries(successfulResponses),
+    }));
+  }, [codetrail, logError]);
 
   const paneAppearanceState = useMemo(
     () => ({
@@ -437,6 +556,8 @@ export function useHistoryController({
       sessionPaneWidth,
       projectPaneCollapsed,
       sessionPaneCollapsed,
+      singleClickFoldersExpand,
+      singleClickProjectsExpand,
       sessionScrollTop,
       projectViewMode,
     }),
@@ -447,6 +568,8 @@ export function useHistoryController({
       sessionPaneCollapsed,
       sessionPaneWidth,
       sessionScrollTop,
+      singleClickFoldersExpand,
+      singleClickProjectsExpand,
     ],
   );
 
@@ -556,6 +679,8 @@ export function useHistoryController({
     setSessionPaneWidth,
     setProjectPaneCollapsed,
     setSessionPaneCollapsed,
+    setSingleClickFoldersExpand,
+    setSingleClickProjectsExpand,
     setProjectProviders,
     setHistoryCategories,
     setExpandedByDefaultCategories,
@@ -714,6 +839,7 @@ export function useHistoryController({
     visibleSessionPaneSessions,
     visibleSessionPaneBookmarksCount,
     visibleSessionPaneAllSessionsCount,
+    currentViewBookmarkCount,
     sessionPaneNavigationItems,
     messagePathRoots,
     projectProviderCounts,
@@ -943,10 +1069,13 @@ export function useHistoryController({
     handleHistorySearchKeyDown,
     selectProjectAllMessages,
     selectBookmarksView,
+    openProjectBookmarksView,
+    closeBookmarksView,
     selectSessionView,
     selectAdjacentSession,
     selectAdjacentProject,
     handleProjectTreeArrow,
+    handleProjectTreeEnter,
     goToPreviousHistoryPage,
     goToNextHistoryPage,
     focusAdjacentHistoryMessage,
@@ -965,6 +1094,8 @@ export function useHistoryController({
     setSessionPage,
     isExpandedByDefault,
     historyMode,
+    selection,
+    bookmarkReturnSelection,
     bookmarksResponse,
     activeHistoryMessages,
     selectedProjectId,
@@ -981,6 +1112,7 @@ export function useHistoryController({
     setPendingMessageAreaFocus,
     setPendingMessagePageNavigation,
     setHistorySelection,
+    setBookmarkReturnSelection,
     sessionListRef,
     selectedSessionId,
     sessionPaneNavigationItems,
@@ -1003,6 +1135,7 @@ export function useHistoryController({
     setProjectQueryInput,
     prettyProvider: formatPrettyProvider,
     refreshContextRef,
+    refreshTreeProjectSessions,
   });
 
   const pageHistoryMessages = useCallback((direction: "up" | "down") => {
@@ -1129,6 +1262,8 @@ export function useHistoryController({
     sortedProjects,
     projectUpdates,
     sortedSessions,
+    treeProjectSessionsByProjectId: sortedTreeProjectSessionsByProjectId,
+    treeProjectSessionsLoadingByProjectId,
     selectedProject,
     selectedSession,
     enabledProviders,
@@ -1166,12 +1301,17 @@ export function useHistoryController({
     setProjectPaneCollapsed,
     sessionPaneCollapsed,
     setSessionPaneCollapsed,
+    singleClickFoldersExpand,
+    setSingleClickFoldersExpand,
+    singleClickProjectsExpand,
+    setSingleClickProjectsExpand,
     beginResize,
     workspaceStyle,
     sessionPaneNavigationItems,
     visibleSessionPaneSessions,
     visibleSessionPaneBookmarksCount,
     visibleSessionPaneAllSessionsCount,
+    currentViewBookmarkCount,
     allSessionsCount,
     sessionDetail,
     projectCombinedDetail,
@@ -1228,10 +1368,14 @@ export function useHistoryController({
     historyExportState,
     selectProjectAllMessages,
     selectBookmarksView,
+    openProjectBookmarksView,
+    closeBookmarksView,
     selectSessionView,
+    ensureTreeProjectSessionsLoaded,
     selectAdjacentSession,
     selectAdjacentProject,
     handleProjectTreeArrow,
+    handleProjectTreeEnter,
     goToPreviousHistoryPage,
     goToNextHistoryPage,
     handleRefresh,

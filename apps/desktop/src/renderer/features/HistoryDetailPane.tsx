@@ -9,7 +9,11 @@ import { HistoryExportMenu } from "../components/HistoryExportMenu";
 import { ToolbarIcon } from "../components/ToolbarIcon";
 import { ZoomPercentInput } from "../components/ZoomPercentInput";
 import { MessageCard } from "../components/messages/MessagePresentation";
-import { SEARCH_PLACEHOLDERS } from "../lib/searchPlaceholders";
+import {
+  getAdvancedSearchToggleTitle,
+  getSearchQueryPlaceholder,
+  getSearchQueryTooltip,
+} from "../lib/searchLabels";
 import { toggleValue } from "../lib/viewUtils";
 import type { useHistoryController } from "./useHistoryController";
 
@@ -84,6 +88,18 @@ export function HistoryDetailPane({
   const exportCurrentPageCount = history.activeHistoryMessages.length;
   const exportSortLabel =
     history.activeMessageSortDirection === "asc" ? "Oldest to newest" : "Newest to oldest";
+  const messageSortScopeSuffix =
+    history.historyMode === "project_all"
+      ? "all sessions"
+      : history.historyMode === "bookmarks"
+        ? "bookmarks"
+        : "session";
+  const messageSortAriaLabel =
+    history.activeMessageSortDirection === "asc"
+      ? `Oldest first (${messageSortScopeSuffix}). Switch to newest first`
+      : `Newest first (${messageSortScopeSuffix}). Switch to oldest first`;
+  const historySearchPlaceholder = getSearchQueryPlaceholder(advancedSearchEnabled);
+  const historySearchTooltip = getSearchQueryTooltip(advancedSearchEnabled);
 
   return (
     <div className="history-view">
@@ -91,6 +107,30 @@ export function HistoryDetailPane({
         <div className="msg-header-top">
           <div className="msg-header-info">
             <span className="summary-count">{history.selectedSummaryMessageCount}</span>
+            {history.historyMode === "bookmarks" ? (
+              <button
+                type="button"
+                className="msg-header-action-button msg-header-action-button-close"
+                onClick={history.closeBookmarksView}
+                aria-label="Close bookmarks"
+                title="Close bookmarks and return to the previous view"
+              >
+                <ToolbarIcon name="closeFocus" />
+                Close bookmarks
+              </button>
+            ) : history.currentViewBookmarkCount > 0 ? (
+              <button
+                type="button"
+                className="msg-header-action-button"
+                onClick={history.selectBookmarksView}
+                aria-label={`${history.currentViewBookmarkCount} ${history.currentViewBookmarkCount === 1 ? "bookmark" : "bookmarks"}`}
+                title={`Open ${history.currentViewBookmarkCount} bookmarked messages`}
+              >
+                <ToolbarIcon name="bookmark" />
+                {history.currentViewBookmarkCount}{" "}
+                {history.currentViewBookmarkCount === 1 ? "bookmark" : "bookmarks"}
+              </button>
+            ) : null}
           </div>
           <div className="msg-toolbar">
             <HistoryExportMenu
@@ -106,7 +146,7 @@ export function HistoryDetailPane({
             />
             <button
               type="button"
-              className="toolbar-btn sort-btn msg-sort-btn"
+              className="toolbar-btn msg-sort-btn"
               onClick={() => {
                 if (history.historyMode === "project_all") {
                   history.setProjectAllSortDirection((value) => (value === "asc" ? "desc" : "asc"));
@@ -120,11 +160,7 @@ export function HistoryDetailPane({
                 history.setMessageSortDirection((value) => (value === "asc" ? "desc" : "asc"));
                 history.setSessionPage(0);
               }}
-              aria-label={
-                history.activeMessageSortDirection === "asc"
-                  ? `Sort ${history.messageSortScopeLabel} descending`
-                  : `Sort ${history.messageSortScopeLabel} ascending`
-              }
+              aria-label={messageSortAriaLabel}
               title={history.messageSortTooltip}
             >
               <ToolbarIcon
@@ -244,27 +280,18 @@ export function HistoryDetailPane({
                 history.setSessionQueryInput(event.target.value);
                 history.setSessionPage(0);
               }}
-              placeholder={
-                history.historyMode === "bookmarks"
-                  ? SEARCH_PLACEHOLDERS.historyBookmarks
-                  : history.historyMode === "project_all"
-                    ? SEARCH_PLACEHOLDERS.historyProjectSessions
-                    : SEARCH_PLACEHOLDERS.historySession
-              }
-              title={history.historyQueryError ?? undefined}
+              placeholder={historySearchPlaceholder}
+              title={history.historyQueryError ?? historySearchTooltip}
             />
           </div>
           <AdvancedSearchToggleButton
             enabled={advancedSearchEnabled}
+            variant="history"
             onToggle={() => {
               setAdvancedSearchEnabled((value) => !value);
               history.setSessionPage(0);
             }}
-            title={
-              advancedSearchEnabled
-                ? "Advanced search is on. You can use quoted phrases, AND/OR/NOT, parentheses, and postfix wildcard syntax like term*. Turn this off to go back to plain text search. Refer to Help for more."
-                : "Advanced search is off. Search works like plain text matching, with optional postfix wildcard syntax like term*. Turn this on if you want quoted phrases, AND/OR/NOT, and grouped expressions with parentheses. Refer to Help for more."
-            }
+            title={getAdvancedSearchToggleTitle(advancedSearchEnabled)}
           />
         </div>
         {history.historyQueryError ? (

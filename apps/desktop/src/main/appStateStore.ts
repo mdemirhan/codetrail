@@ -79,7 +79,7 @@ const MONO_FONT_SIZE_VALUES: MonoFontSize[] = [...UI_MONO_FONT_SIZE_VALUES];
 const REGULAR_FONT_SIZE_VALUES: RegularFontSize[] = [...UI_REGULAR_FONT_SIZE_VALUES];
 const HISTORY_MODE_VALUES = ["session", "bookmarks", "project_all"] as const;
 const PROJECT_VIEW_MODE_VALUES = ["list", "tree"] as const;
-const PROJECT_SORT_FIELD_VALUES = ["last_active", "name", "sessions"] as const;
+const PROJECT_SORT_FIELD_VALUES = ["last_active", "name"] as const;
 const SORT_DIRECTION_VALUES = ["asc", "desc"] as const;
 const AUTO_REFRESH_STRATEGY_VALUES = [
   "watch-1s",
@@ -261,6 +261,8 @@ function sanitizePaneState(
   }
   const projectPaneCollapsed = sanitizeOptionalBoolean(record.projectPaneCollapsed);
   const sessionPaneCollapsed = sanitizeOptionalBoolean(record.sessionPaneCollapsed);
+  const singleClickFoldersExpand = sanitizeOptionalBoolean(record.singleClickFoldersExpand);
+  const singleClickProjectsExpand = sanitizeOptionalBoolean(record.singleClickProjectsExpand);
   // Provider arrays are healed to include newly-added providers so older settings files do not hide
   // data just because they were saved before a provider existed.
   const enabledProviders = enabledProviderScope ?? PROVIDER_VALUES;
@@ -325,6 +327,8 @@ function sanitizePaneState(
     sessionPaneWidth,
     ...(projectPaneCollapsed === null ? {} : { projectPaneCollapsed }),
     ...(sessionPaneCollapsed === null ? {} : { sessionPaneCollapsed }),
+    ...(singleClickFoldersExpand === null ? {} : { singleClickFoldersExpand }),
+    ...(singleClickProjectsExpand === null ? {} : { singleClickProjectsExpand }),
     ...(projectProviders ? { projectProviders } : {}),
     ...(historyCategories ? { historyCategories } : {}),
     ...(expandedByDefaultCategories ? { expandedByDefaultCategories } : {}),
