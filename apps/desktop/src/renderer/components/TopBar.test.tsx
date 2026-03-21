@@ -16,7 +16,7 @@ describe("TopBar", () => {
     const onToggleHelp = vi.fn();
     const onToggleSettings = vi.fn();
 
-    render(
+    const { container } = render(
       <TopBar
         mainView="history"
         theme="light"
@@ -37,6 +37,8 @@ describe("TopBar", () => {
       />,
     );
 
+    expect(screen.getByText("Code Trail")).toBeInTheDocument();
+    expect(container.querySelector(".app-title-suffix")).toBeNull();
     expect(screen.getByRole("button", { name: "Global Search" })).toHaveAttribute(
       "title",
       "Open global search (Cmd/Ctrl+Shift+F)",
@@ -44,6 +46,10 @@ describe("TopBar", () => {
     expect(screen.getByRole("button", { name: "Enter focus mode" })).toHaveAttribute(
       "title",
       "Enter focus mode (Cmd/Ctrl+Shift+M)",
+    );
+    expect(screen.getByRole("button", { name: "Open settings" })).toHaveAttribute(
+      "title",
+      "Open settings (Cmd/Ctrl+,)",
     );
 
     await user.click(screen.getByRole("button", { name: "Global Search" }));
@@ -95,7 +101,59 @@ describe("TopBar", () => {
     expect(screen.getByRole("button", { name: "Indexing in progress" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Exit focus mode" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Choose theme" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open settings" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open settings" })).toHaveAttribute(
+      "title",
+      "Open settings (Cmd/Ctrl+,)",
+    );
+  });
+
+  it("shows contextual toolbar title suffixes for settings and help", () => {
+    const { container, rerender } = render(
+      <TopBar
+        mainView="settings"
+        theme="dark"
+        indexing={false}
+        focusMode={false}
+        focusDisabled={false}
+        onToggleSearchView={vi.fn()}
+        onThemeChange={vi.fn()}
+        onIncrementalRefresh={vi.fn()}
+        refreshStrategy="off"
+        onRefreshStrategyChange={vi.fn()}
+        autoRefreshStatusLabel={null}
+        autoRefreshStatusTone={null}
+        autoRefreshStatusTooltip={null}
+        onToggleFocus={vi.fn()}
+        onToggleHelp={vi.fn()}
+        onToggleSettings={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Code Trail")).toBeInTheDocument();
+    expect(container.querySelector(".app-title-suffix-settings")?.textContent).toBe("Settings");
+
+    rerender(
+      <TopBar
+        mainView="help"
+        theme="dark"
+        indexing={false}
+        focusMode={false}
+        focusDisabled={false}
+        onToggleSearchView={vi.fn()}
+        onThemeChange={vi.fn()}
+        onIncrementalRefresh={vi.fn()}
+        refreshStrategy="off"
+        onRefreshStrategyChange={vi.fn()}
+        autoRefreshStatusLabel={null}
+        autoRefreshStatusTone={null}
+        autoRefreshStatusTooltip={null}
+        onToggleFocus={vi.fn()}
+        onToggleHelp={vi.fn()}
+        onToggleSettings={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector(".app-title-suffix-help")?.textContent).toBe("Help");
   });
 
   it("shows the mixed watch and scan auto-refresh options", async () => {

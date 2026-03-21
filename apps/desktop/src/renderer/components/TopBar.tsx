@@ -170,11 +170,17 @@ export function TopBar({
   onToggleHelp: () => void;
   onToggleSettings: () => void;
 }) {
+  const activeTitleSuffix =
+    mainView === "settings" ? "Settings" : mainView === "help" ? "Help" : null;
+
   return (
     <header className="titlebar">
       <div className="titlebar-left">
         <div className="app-title">
           <strong>Code Trail</strong>
+          {activeTitleSuffix ? (
+            <span className={`app-title-suffix app-title-suffix-${mainView}`}>{activeTitleSuffix}</span>
+          ) : null}
         </div>
       </div>
       <div className="titlebar-actions">
@@ -240,7 +246,9 @@ export function TopBar({
           className={mainView === "settings" ? "tb-btn tb-btn-icon active" : "tb-btn tb-btn-icon"}
           onClick={onToggleSettings}
           aria-label={mainView === "settings" ? "Return to history view" : "Open settings"}
-          title={mainView === "settings" ? "Return to history view (Esc)" : "Open settings"}
+          title={
+            mainView === "settings" ? "Return to history view (Esc)" : "Open settings (Cmd/Ctrl+,)"
+          }
         >
           <ToolbarIcon name="settings" />
         </button>

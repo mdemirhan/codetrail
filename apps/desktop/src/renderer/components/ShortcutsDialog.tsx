@@ -24,15 +24,6 @@ export function ShortcutsDialog({
   return (
     <div className="help-view">
       <div className="help-page">
-        <header className="help-header">
-          <div className="help-header-left">
-            <span className="help-header-eyebrow">Code Trail</span>
-            <h2>Help &amp; Reference</h2>
-            <p>Keyboard shortcuts and search syntax guide</p>
-          </div>
-          <span className="help-header-badge">Built-in Guide</span>
-        </header>
-
         <div className="help-grid">
           <section className="help-card">
             <div className="help-card-header">

@@ -22,8 +22,6 @@ describe("ShortcutsDialog", () => {
       />,
     );
 
-    expect(screen.getByText("Help & Reference")).toBeInTheDocument();
-    expect(screen.getByText("Code Trail")).toBeInTheDocument();
     expect(screen.getByText("Keyboard Shortcuts")).toBeInTheDocument();
     expect(screen.getByText("Search Syntax")).toBeInTheDocument();
     expect(screen.getByText("Common")).toBeInTheDocument();
@@ -44,7 +42,6 @@ describe("ShortcutsDialog", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Boolean OR")).toBeInTheDocument();
     expect(screen.getAllByText("Advanced mode").length).toBeGreaterThan(0);
-    expect(screen.getByText("Built-in Guide")).toBeInTheDocument();
     expect(container.querySelector(".help-card-icon.success")).toBeInTheDocument();
     expect(container.querySelector(".help-card-title-shortcuts")).toBeInTheDocument();
   });

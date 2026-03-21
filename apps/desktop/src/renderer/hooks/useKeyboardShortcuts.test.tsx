@@ -77,6 +77,7 @@ describe("useKeyboardShortcuts", () => {
 
     render(<Harness {...props} />);
 
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true, shiftKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "=", metaKey: true }));
@@ -107,6 +108,7 @@ describe("useKeyboardShortcuts", () => {
 
     expect(props.focusGlobalSearch).toHaveBeenCalledTimes(1);
     expect(props.focusSessionSearch).toHaveBeenCalledTimes(1);
+    expect(props.setMainView).toHaveBeenCalledWith("settings");
     expect(props.applyZoomAction).toHaveBeenCalledWith("in");
     expect(props.toggleFocusMode).toHaveBeenCalledTimes(1);
     expect(props.toggleScopedMessagesExpanded).toHaveBeenCalledTimes(1);

@@ -176,6 +176,7 @@ export const SHORTCUT_ITEMS = [
     shortcut: "Cmd/Ctrl+Shift+R",
     description: "Toggle auto-refresh",
   },
+  { group: "System", shortcut: "Cmd/Ctrl+,", description: "Open settings" },
   { group: "System", shortcut: "Cmd/Ctrl++", description: "Zoom in" },
   { group: "System", shortcut: "Cmd/Ctrl+-", description: "Zoom out" },
   { group: "System", shortcut: "Cmd/Ctrl+0", description: "Reset zoom" },

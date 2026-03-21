@@ -135,6 +135,7 @@ export function useKeyboardShortcuts(args: {
 type ShortcutHandler = (context: ShortcutContext) => boolean;
 
 const SHORTCUT_HANDLERS: readonly ShortcutHandler[] = [
+  handleSettingsShortcut,
   handleHelpShortcut,
   handleEscapeShortcut,
   handleSearchShortcut,
@@ -145,6 +146,15 @@ const SHORTCUT_HANDLERS: readonly ShortcutHandler[] = [
   handlePageNavigationShortcut,
   handleHistoryCommandShortcut,
 ];
+
+function handleSettingsShortcut(context: ShortcutContext): boolean {
+  if (!context.command || context.shift || context.event.altKey || context.key !== ",") {
+    return false;
+  }
+  context.event.preventDefault();
+  context.setMainView("settings");
+  return true;
+}
 
 function handleHelpShortcut(context: ShortcutContext): boolean {
   if (context.event.key !== "?" || isEditableTarget(context.event.target)) {

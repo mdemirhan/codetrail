@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   type MessageCategory,
@@ -24,7 +24,7 @@ import {
 import type { SettingsInfoResponse, WatchStatsResponse } from "../app/types";
 import { copyTextToClipboard } from "../lib/clipboard";
 import { openPath } from "../lib/pathActions";
-import { prettyCategory, toErrorMessage } from "../lib/viewUtils";
+import { compactPath, prettyCategory, toErrorMessage } from "../lib/viewUtils";
 import { ToolbarIcon } from "./ToolbarIcon";
 import { ZoomPercentInput } from "./ZoomPercentInput";
 
@@ -82,6 +82,24 @@ const MONO_FONT_SIZE_OPTIONS: Array<{ value: MonoFontSize; label: string }> =
 const REGULAR_FONT_SIZE_OPTIONS: Array<{ value: RegularFontSize; label: string }> =
   UI_REGULAR_FONT_SIZE_VALUES.map((value) => ({ value, label: value }));
 
+const PROVIDER_ICONS: Record<Provider, string> = {
+  claude: "C",
+  codex: "X",
+  gemini: "G",
+  cursor: "U",
+  copilot: "P",
+};
+
+const MESSAGE_CATEGORY_ICONS: Record<MessageCategory, string> = {
+  user: "U",
+  assistant: "A",
+  tool_edit: "W",
+  tool_use: "T",
+  tool_result: "R",
+  thinking: "Q",
+  system: "S",
+};
+
 export function SettingsView({
   info,
   loading,
@@ -110,7 +128,7 @@ export function SettingsView({
     ? [
         { label: "Settings file", value: info.storage.settingsFile },
         { label: "Database file", value: info.storage.databaseFile },
-        { label: "Bookmarks database file", value: info.storage.bookmarksDatabaseFile },
+        { label: "Bookmarks database", value: info.storage.bookmarksDatabaseFile },
         { label: "User data directory", value: info.storage.userDataDir },
       ]
     : [];
@@ -128,78 +146,73 @@ export function SettingsView({
   return (
     <div className="settings-view">
       <div className="settings-page">
-        <header className="settings-page-header">
-          <div className="settings-page-header-left">
-            <span className="settings-page-eyebrow">Code Trail</span>
-            <h2>Settings</h2>
-            <p>Application preferences and configuration</p>
+        <div className="settings-page-body">
+          <div className="settings-tab-bar" role="tablist" aria-label="Settings sections">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "settings"}
+              className={`settings-tab${activeTab === "settings" ? " active" : ""}`}
+              onClick={() => setActiveTab("settings")}
+            >
+              Application Settings
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "diagnostics"}
+              className={`settings-tab${activeTab === "diagnostics" ? " active" : ""}`}
+              onClick={() => setActiveTab("diagnostics")}
+            >
+              Diagnostics
+            </button>
           </div>
-        </header>
-        <div className="settings-tab-bar" role="tablist" aria-label="Settings sections">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "settings"}
-            className={`settings-tab${activeTab === "settings" ? " active" : ""}`}
-            onClick={() => setActiveTab("settings")}
-          >
-            Application Settings
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "diagnostics"}
-            className={`settings-tab${activeTab === "diagnostics" ? " active" : ""}`}
-            onClick={() => setActiveTab("diagnostics")}
-          >
-            Diagnostics
-          </button>
-        </div>
 
-        {activeTab === "settings" ? (
-          <>
-            <section className="settings-section">
-              <div className="settings-section-header">
-                <div className="settings-section-icon settings-section-icon-theme" aria-hidden>
-                  ◐
-                </div>
-                <div>
-                  <h3>Appearance</h3>
-                  <p>Theme and zoom used across history, search, help, and settings.</p>
-                </div>
-              </div>
-              <div className="settings-section-body">
-                <div className="settings-font-grid">
-                  <label className="settings-field">
-                    <span className="settings-field-label">Application theme</span>
-                    <select
-                      className="settings-select"
-                      aria-label="Theme"
-                      value={appearance.theme}
-                      onChange={(event) =>
-                        appearance.onThemeChange(
-                          selectValueOrFallback(
-                            event.target.value,
-                            UI_THEME_VALUES,
-                            appearance.theme,
-                          ),
-                        )
-                      }
-                    >
-                      {THEME_GROUPS.map((group) => (
-                        <optgroup key={group.value} label={group.label}>
-                          {group.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </label>
+          {activeTab === "settings" ? (
+            <>
+              <SectionCard>
+                <SectionHeader
+                  tone="theme"
+                  icon="◑"
+                  title="Appearance"
+                  subtitle="Theme and zoom used across history, search, help, and settings."
+                />
+                <div className="settings-field-grid">
+                  <SettingsField label="Application theme">
+                    <div className="settings-select-wrap">
+                      <select
+                        className="settings-select"
+                        aria-label="Theme"
+                        value={appearance.theme}
+                        onChange={(event) =>
+                          appearance.onThemeChange(
+                            selectValueOrFallback(
+                              event.target.value,
+                              UI_THEME_VALUES,
+                              appearance.theme,
+                            ),
+                          )
+                        }
+                      >
+                        {THEME_GROUPS.map((group) => (
+                          <optgroup key={group.value} label={group.label}>
+                            {group.options.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <span className="settings-select-chevron" aria-hidden>
+                        <svg viewBox="0 0 12 12">
+                          <path d="M3 4.5L6 7.5L9 4.5" />
+                        </svg>
+                      </span>
+                    </div>
+                  </SettingsField>
 
-                  <div className="settings-field">
-                    <span className="settings-field-label">Zoom</span>
+                  <SettingsField label="Zoom">
                     <ZoomPercentInput
                       value={appearance.zoomPercent}
                       onCommit={appearance.onZoomPercentChange}
@@ -208,253 +221,261 @@ export function SettingsView({
                       wrapperClassName="settings-zoom-control"
                       inputClassName="settings-zoom-input"
                     />
-                  </div>
+                  </SettingsField>
                 </div>
-              </div>
-            </section>
+              </SectionCard>
 
-            <section className="settings-section">
-              <div className="settings-section-header">
-                <div className="settings-section-icon settings-section-icon-fonts" aria-hidden>
-                  Aa
+              <SectionCard>
+                <SectionHeader
+                  tone="fonts"
+                  icon="Aa"
+                  title="Fonts"
+                  subtitle="Regular and monospaced fonts used in the UI and message content."
+                />
+                <div className="settings-field-grid">
+                  <SettingsField label="Monospaced font">
+                    <div className="settings-select-wrap">
+                      <select
+                        className="settings-select"
+                        value={appearance.monoFontFamily}
+                        onChange={(event) =>
+                          appearance.onMonoFontFamilyChange(
+                            selectValueOrFallback(
+                              event.target.value,
+                              UI_MONO_FONT_VALUES,
+                              appearance.monoFontFamily,
+                            ),
+                          )
+                        }
+                      >
+                        {MONO_FONT_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="settings-select-chevron" aria-hidden>
+                        <svg viewBox="0 0 12 12">
+                          <path d="M3 4.5L6 7.5L9 4.5" />
+                        </svg>
+                      </span>
+                    </div>
+                  </SettingsField>
+
+                  <SettingsField label="Monospaced size">
+                    <div className="settings-select-wrap">
+                      <select
+                        className="settings-select"
+                        value={appearance.monoFontSize}
+                        onChange={(event) =>
+                          appearance.onMonoFontSizeChange(
+                            selectValueOrFallback(
+                              event.target.value,
+                              UI_MONO_FONT_SIZE_VALUES,
+                              appearance.monoFontSize,
+                            ),
+                          )
+                        }
+                      >
+                        {MONO_FONT_SIZE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="settings-select-chevron" aria-hidden>
+                        <svg viewBox="0 0 12 12">
+                          <path d="M3 4.5L6 7.5L9 4.5" />
+                        </svg>
+                      </span>
+                    </div>
+                  </SettingsField>
+
+                  <SettingsField label="Regular font">
+                    <div className="settings-select-wrap">
+                      <select
+                        className="settings-select"
+                        value={appearance.regularFontFamily}
+                        onChange={(event) =>
+                          appearance.onRegularFontFamilyChange(
+                            selectValueOrFallback(
+                              event.target.value,
+                              UI_REGULAR_FONT_VALUES,
+                              appearance.regularFontFamily,
+                            ),
+                          )
+                        }
+                      >
+                        {REGULAR_FONT_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="settings-select-chevron" aria-hidden>
+                        <svg viewBox="0 0 12 12">
+                          <path d="M3 4.5L6 7.5L9 4.5" />
+                        </svg>
+                      </span>
+                    </div>
+                  </SettingsField>
+
+                  <SettingsField label="Regular size">
+                    <div className="settings-select-wrap">
+                      <select
+                        className="settings-select"
+                        value={appearance.regularFontSize}
+                        onChange={(event) =>
+                          appearance.onRegularFontSizeChange(
+                            selectValueOrFallback(
+                              event.target.value,
+                              UI_REGULAR_FONT_SIZE_VALUES,
+                              appearance.regularFontSize,
+                            ),
+                          )
+                        }
+                      >
+                        {REGULAR_FONT_SIZE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="settings-select-chevron" aria-hidden>
+                        <svg viewBox="0 0 12 12">
+                          <path d="M3 4.5L6 7.5L9 4.5" />
+                        </svg>
+                      </span>
+                    </div>
+                  </SettingsField>
                 </div>
-                <div>
-                  <h3>Fonts</h3>
-                  <p>Regular and monospaced fonts used in the UI and message content.</p>
-                </div>
-              </div>
-              <div className="settings-section-body">
-                <div className="settings-font-grid">
-                  <label className="settings-field">
-                    <span className="settings-field-label">Monospaced font</span>
-                    <select
-                      className="settings-select"
-                      value={appearance.monoFontFamily}
-                      onChange={(event) =>
-                        appearance.onMonoFontFamilyChange(
-                          selectValueOrFallback(
-                            event.target.value,
-                            UI_MONO_FONT_VALUES,
-                            appearance.monoFontFamily,
-                          ),
-                        )
-                      }
-                    >
-                      {MONO_FONT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
 
-                  <label className="settings-field">
-                    <span className="settings-field-label">Monospaced size</span>
-                    <select
-                      className="settings-select"
-                      value={appearance.monoFontSize}
-                      onChange={(event) =>
-                        appearance.onMonoFontSizeChange(
-                          selectValueOrFallback(
-                            event.target.value,
-                            UI_MONO_FONT_SIZE_VALUES,
-                            appearance.monoFontSize,
-                          ),
-                        )
-                      }
-                    >
-                      {MONO_FONT_SIZE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <InlineSwitchRow label="Use monospaced fonts for all messages">
+                  <SettingsSwitch
+                    checked={appearance.useMonospaceForAllMessages}
+                    onChange={appearance.onUseMonospaceForAllMessagesChange}
+                    ariaLabel="Use monospaced fonts for all messages"
+                  />
+                </InlineSwitchRow>
+              </SectionCard>
 
-                  <label className="settings-field">
-                    <span className="settings-field-label">Regular font</span>
-                    <select
-                      className="settings-select"
-                      value={appearance.regularFontFamily}
-                      onChange={(event) =>
-                        appearance.onRegularFontFamilyChange(
-                          selectValueOrFallback(
-                            event.target.value,
-                            UI_REGULAR_FONT_VALUES,
-                            appearance.regularFontFamily,
-                          ),
-                        )
-                      }
-                    >
-                      {REGULAR_FONT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="settings-field">
-                    <span className="settings-field-label">Regular size</span>
-                    <select
-                      className="settings-select"
-                      value={appearance.regularFontSize}
-                      onChange={(event) =>
-                        appearance.onRegularFontSizeChange(
-                          selectValueOrFallback(
-                            event.target.value,
-                            UI_REGULAR_FONT_SIZE_VALUES,
-                            appearance.regularFontSize,
-                          ),
-                        )
-                      }
-                    >
-                      {REGULAR_FONT_SIZE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="settings-checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={appearance.useMonospaceForAllMessages}
-                      onChange={(event) =>
-                        appearance.onUseMonospaceForAllMessagesChange(event.target.checked)
-                      }
-                    />
-                    <span>Use monospaced fonts for all messages</span>
-                  </label>
-                </div>
-              </div>
-            </section>
-
-            <section className="settings-section">
-              <div className="settings-section-header">
-                <div className="settings-section-icon settings-section-icon-expansion" aria-hidden>
-                  []
-                </div>
-                <div>
-                  <h3>Default Expansion</h3>
-                  <p>Which message types should start expanded in session view.</p>
-                </div>
-              </div>
-              <div className="settings-section-body">
-                <div className="settings-category-row">
+              <SectionCard>
+                <SectionHeader
+                  tone="expansion"
+                  icon="⊞"
+                  title="Default Expansion"
+                  subtitle="Which message types should start expanded in session view."
+                />
+                <div className="settings-token-grid">
                   {UI_MESSAGE_CATEGORY_VALUES.map((category) => {
                     const active = messageRules.expandedByDefaultCategories.includes(category);
                     return (
                       <button
                         key={category}
                         type="button"
-                        className={`settings-chip${active ? " active" : ""}`}
+                        className={`settings-token${active ? " is-active" : ""}`}
                         onClick={() => messageRules.onToggleExpandedByDefault(category)}
                         aria-pressed={active}
+                        aria-label={prettyCategory(category)}
                         title={`Toggle default expansion for ${prettyCategory(category)}`}
                       >
-                        <span className="settings-chip-check" aria-hidden>
-                          <svg viewBox="0 0 24 24">
-                            <title>Selected</title>
-                            <path d="M20 6L9 17l-5-5" />
+                        <span className="settings-token-icon" aria-hidden>
+                          {MESSAGE_CATEGORY_ICONS[category]}
+                        </span>
+                        <span className="settings-token-label">{prettyCategory(category)}</span>
+                        <span className="settings-token-check" aria-hidden>
+                          <svg viewBox="0 0 14 14">
+                            <path d="M3 7l3 3 5-5" />
                           </svg>
                         </span>
-                        <span>{prettyCategory(category)}</span>
                       </button>
                     );
                   })}
                 </div>
-              </div>
-            </section>
+              </SectionCard>
 
-            <section className="settings-section">
-              <div className="settings-section-header">
-                <div className="settings-section-icon settings-section-icon-provider" aria-hidden>
-                  AI
-                </div>
-                <div>
-                  <h3>Providers</h3>
-                  <p>
-                    Choose which providers stay active in Codetrail. Disabled providers stop
-                    watching, indexing, and showing up in history until re-enabled.
-                  </p>
-                </div>
-              </div>
-              <div className="settings-section-body">
-                <div className="settings-provider-summary">
-                  <div className="settings-provider-summary-count">
-                    <span className="settings-provider-summary-value">
-                      {indexing.enabledProviders.length}
-                    </span>
-                    <span className="settings-provider-summary-label">
-                      of {PROVIDER_LIST.length} active
-                    </span>
+              <SectionCard padded={false}>
+                <div className="settings-section-block">
+                  <SectionHeader
+                    tone="provider"
+                    icon="AI"
+                    title="Providers"
+                    subtitle="Choose which providers stay active in Code Trail. Disabled providers stop watching, indexing, and showing up in history until re-enabled."
+                  />
+                  <div className="settings-provider-summary">
+                    <div className="settings-provider-summary-copy">
+                      <span className="settings-provider-summary-value">
+                        {indexing.enabledProviders.length}
+                      </span>
+                      <span className="settings-provider-summary-label">
+                        of {PROVIDER_LIST.length} active
+                      </span>
+                    </div>
+                    <div className="settings-provider-summary-dots" aria-hidden>
+                      {PROVIDER_LIST.map(({ id }) => (
+                        <span
+                          key={id}
+                          className={`settings-provider-dot settings-provider-dot-${id}${
+                            indexing.enabledProviders.includes(id) ? " is-active" : ""
+                          }`}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <p>
-                    Turning a provider off removes its indexed history and bookmarks on the next
-                    refresh, but never touches the raw transcript files on disk.
-                  </p>
                 </div>
-                <div className="settings-provider-grid">
+
+                <div className="settings-provider-list">
                   {PROVIDER_LIST.map(({ id: provider, label }) => {
                     const enabled = indexing.enabledProviders.includes(provider);
                     return (
-                      <label
+                      <div
                         key={provider}
-                        className={`settings-provider-card settings-provider-card-${provider}${
-                          enabled ? " enabled" : ""
+                        className={`settings-provider-row settings-provider-row-${provider}${
+                          enabled ? " is-enabled" : ""
                         }`}
                       >
-                        <div className="settings-provider-card-top">
-                          <span className={`settings-provider-badge settings-provider-${provider}`}>
-                            {label}
-                          </span>
+                        <div className="settings-provider-row-main">
                           <span
-                            className={`settings-provider-state${
-                              enabled ? " enabled" : " disabled"
-                            }`}
+                            className={`settings-provider-avatar settings-provider-${provider}`}
+                            aria-hidden
                           >
-                            {enabled ? "Enabled" : "Disabled"}
+                            {PROVIDER_ICONS[provider]}
                           </span>
+                          <span className="settings-provider-name">{label}</span>
                         </div>
-                        <div className="settings-provider-card-copy">
-                          <strong>
-                            {enabled ? "Watching and indexing now" : "Currently paused"}
-                          </strong>
-                        </div>
-                        <span className="settings-provider-toggle">
-                          <input
-                            type="checkbox"
-                            aria-label={label}
-                            checked={enabled}
-                            onChange={() => indexing.onToggleProviderEnabled(provider)}
-                          />
-                          <span>{enabled ? "Active" : "Inactive"}</span>
+                        <span
+                          className={`settings-provider-row-state${
+                            enabled ? " is-enabled" : ""
+                          }`}
+                        >
+                          {enabled ? "Watching" : "Disabled"}
                         </span>
-                      </label>
+                        <SettingsSwitch
+                          checked={enabled}
+                          onChange={() => indexing.onToggleProviderEnabled(provider)}
+                          ariaLabel={label}
+                          tone={provider}
+                        />
+                      </div>
                     );
                   })}
                 </div>
-              </div>
-            </section>
 
-            <section className="settings-section">
-              <div className="settings-section-header">
-                <div className="settings-section-icon settings-section-icon-warning" aria-hidden>
-                  DB
+                <div className="settings-section-note">
+                  Turning a provider off removes its indexed history and bookmarks on the next
+                  refresh, but never touches the raw transcript files on disk.
                 </div>
-                <div>
-                  <h3>Database Maintenance</h3>
-                  <p>
-                    Rebuild or clean indexed history without touching the raw transcript files on
-                    disk.
-                  </p>
-                </div>
-              </div>
-              <div className="settings-section-body">
-                <div className="settings-maintenance-row">
-                  <div className="settings-maintenance-copy">
+              </SectionCard>
+
+              <SectionCard>
+                <SectionHeader
+                  tone="warning"
+                  icon="DB"
+                  title="Database Maintenance"
+                  subtitle="Rebuild or clean indexed history without touching the raw transcript files on disk."
+                />
+                <div className="settings-callout-row">
+                  <div className="settings-callout-copy">
                     <strong>Force reindex</strong>
                     <p>
                       Re-read all enabled provider session files from scratch and rebuild indexed
@@ -463,7 +484,7 @@ export function SettingsView({
                   </div>
                   <button
                     type="button"
-                    className="tb-btn destructive settings-maintenance-action"
+                    className="settings-primary-button"
                     onClick={indexing.onForceReindex}
                     disabled={!indexing.canForceReindex}
                     aria-label="Force reindex"
@@ -474,134 +495,119 @@ export function SettingsView({
                     }
                   >
                     <ToolbarIcon name="reindex" />
-                    Reindex
+                    <span>Reindex</span>
                   </button>
                 </div>
-                <label className="settings-checkbox-row">
-                  <input
-                    type="checkbox"
+
+                <InlineSwitchRow label="Remove indexed sessions when source files disappear during incremental refresh">
+                  <SettingsSwitch
                     checked={indexing.removeMissingSessionsDuringIncrementalIndexing}
-                    onChange={(event) =>
-                      indexing.onRemoveMissingSessionsDuringIncrementalIndexingChange(
-                        event.target.checked,
-                      )
-                    }
+                    onChange={indexing.onRemoveMissingSessionsDuringIncrementalIndexingChange}
+                    ariaLabel="Remove indexed sessions when source files disappear during incremental refresh"
                   />
-                  <span>
-                    Remove indexed sessions when source files disappear during incremental refresh
-                  </span>
-                </label>
-              </div>
-            </section>
+                </InlineSwitchRow>
+              </SectionCard>
 
-            <section className="settings-section">
-              <div className="settings-section-header">
-                <div className="settings-section-icon settings-section-icon-rules" aria-hidden>
-                  {"//"}
-                </div>
-                <div>
-                  <h3>System Message Rules</h3>
-                  <p>
-                    Regex patterns applied during ingestion to classify messages. Run Reindex after
-                    changes.
-                  </p>
-                </div>
-              </div>
-              <div className="settings-section-body">
-                {PROVIDER_LIST.map(({ id: provider, label }) => {
-                  const patterns = messageRules.systemMessageRegexRules[provider] ?? [];
-                  return (
-                    <div key={provider} className="settings-rule-group">
-                      <div className="settings-rule-group-header">
-                        <span className={`settings-provider-badge settings-provider-${provider}`}>
-                          {label}
-                        </span>
-                        <button
-                          type="button"
-                          className="settings-rule-button settings-rule-add-button"
-                          onClick={() => messageRules.onAddSystemMessageRegexRule(provider)}
-                          aria-label={`Add ${provider} regex rule`}
-                          title={`Add ${provider} regex rule`}
-                        >
-                          Add Pattern
-                        </button>
-                      </div>
-                      {patterns.length === 0 ? (
-                        <p className="settings-rule-empty">No regex rules configured.</p>
-                      ) : (
-                        <div className="settings-rule-list">
-                          {patterns.map((pattern, index) => {
-                            const duplicateCount = patterns
-                              .slice(0, index)
-                              .filter((existingPattern) => existingPattern === pattern).length;
-                            return (
-                              <div
-                                key={`${provider}-rule-${pattern}-${duplicateCount}`}
-                                className="settings-rule-row"
-                              >
-                                <input
-                                  className="settings-rule-input"
-                                  type="text"
-                                  value={pattern}
-                                  onChange={(event) =>
-                                    messageRules.onUpdateSystemMessageRegexRule(
-                                      provider,
-                                      index,
-                                      event.target.value,
-                                    )
-                                  }
-                                  placeholder="Regex pattern"
-                                  aria-label={`${provider} regex rule ${index + 1}`}
-                                />
-                                <button
-                                  type="button"
-                                  className="settings-rule-button settings-rule-remove-button"
-                                  onClick={() =>
-                                    messageRules.onRemoveSystemMessageRegexRule(provider, index)
-                                  }
-                                  aria-label={`Remove ${provider} regex rule ${index + 1}`}
-                                  title={`Remove ${provider} regex rule ${index + 1}`}
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            );
-                          })}
+              <SectionCard>
+                <SectionHeader
+                  tone="rules"
+                  icon="//"
+                  title="System Message Rules"
+                  subtitle="Regex patterns applied during ingestion to classify messages. Run Reindex after changes."
+                />
+                <div className="settings-rule-groups">
+                  {PROVIDER_LIST.map(({ id: provider, label }) => {
+                    const patterns = messageRules.systemMessageRegexRules[provider] ?? [];
+                    return (
+                      <div key={provider} className="settings-rule-group">
+                        <div className="settings-rule-group-header">
+                          <div className="settings-rule-group-title">
+                            <span className={`settings-provider-pill settings-provider-${provider}`}>
+                              {label}
+                            </span>
+                            {patterns.length > 0 ? (
+                              <span className="settings-rule-count">
+                                {patterns.length} rule{patterns.length === 1 ? "" : "s"}
+                              </span>
+                            ) : null}
+                          </div>
+                          <button
+                            type="button"
+                            className="settings-rule-button"
+                            onClick={() => messageRules.onAddSystemMessageRegexRule(provider)}
+                            aria-label={`Add ${provider} regex rule`}
+                            title={`Add ${provider} regex rule`}
+                          >
+                            <span aria-hidden>+</span>
+                            <span>Add Pattern</span>
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
 
-            {loading ? (
-              <section className="settings-section settings-status-card">
-                <p className="empty-state">Loading settings...</p>
-              </section>
-            ) : null}
-            {!loading && error ? (
-              <section className="settings-section settings-status-card">
-                <p className="empty-state">{error}</p>
-              </section>
-            ) : null}
-            {!loading && !error && info ? (
-              <>
-                <section className="settings-section">
-                  <div className="settings-section-header">
-                    <div
-                      className="settings-section-icon settings-section-icon-storage"
-                      aria-hidden
-                    >
-                      DB
+                        {patterns.length === 0 ? (
+                          <p className="settings-rule-empty">No regex rules configured.</p>
+                        ) : (
+                          <div className="settings-rule-list">
+                            {patterns.map((pattern, index) => {
+                              const duplicateCount = patterns
+                                .slice(0, index)
+                                .filter((existingPattern) => existingPattern === pattern).length;
+
+                              return (
+                                <div
+                                  key={`${provider}-rule-${pattern}-${duplicateCount}`}
+                                  className="settings-rule-row"
+                                >
+                                  <input
+                                    className="settings-rule-input"
+                                    type="text"
+                                    value={pattern}
+                                    onChange={(event) =>
+                                      messageRules.onUpdateSystemMessageRegexRule(
+                                        provider,
+                                        index,
+                                        event.target.value,
+                                      )
+                                    }
+                                    placeholder="^regex pattern"
+                                    aria-label={`${provider} regex rule ${index + 1}`}
+                                    spellCheck={false}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="settings-rule-remove"
+                                    onClick={() =>
+                                      messageRules.onRemoveSystemMessageRegexRule(provider, index)
+                                    }
+                                    aria-label={`Remove ${provider} regex rule ${index + 1}`}
+                                    title={`Remove ${provider} regex rule ${index + 1}`}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </SectionCard>
+
+              {loading ? <StatusCard message="Loading settings..." /> : null}
+              {!loading && error ? <StatusCard message={error} /> : null}
+              {!loading && !error && info ? (
+                <>
+                  <SectionCard padded={false}>
+                    <div className="settings-section-block">
+                      <SectionHeader
+                        tone="storage"
+                        icon="DB"
+                        title="Storage"
+                        subtitle="File and directory locations used by the application."
+                      />
                     </div>
-                    <div>
-                      <h3>Storage</h3>
-                      <p>File and directory locations used by the application.</p>
-                    </div>
-                  </div>
-                  <div className="settings-section-body">
-                    <div className="settings-grid">
+                    <div className="settings-path-list">
                       {storageRows.map((row) => (
                         <SettingsInfoRow
                           key={row.label}
@@ -611,26 +617,21 @@ export function SettingsView({
                         />
                       ))}
                     </div>
-                  </div>
-                </section>
-                <section className="settings-section">
-                  <div className="settings-section-header">
-                    <div
-                      className="settings-section-icon settings-section-icon-discovery"
-                      aria-hidden
-                    >
-                      /\
+                  </SectionCard>
+
+                  <SectionCard padded={false}>
+                    <div className="settings-section-block">
+                      <SectionHeader
+                        tone="discovery"
+                        icon="/\\"
+                        title="Discovery Roots"
+                        subtitle="Session and project directories scanned for each provider."
+                      />
                     </div>
-                    <div>
-                      <h3>Discovery Roots</h3>
-                      <p>Session and project directories scanned for each provider.</p>
-                    </div>
-                  </div>
-                  <div className="settings-section-body">
-                    <div className="settings-grid">
+                    <div className="settings-path-list">
                       {discoveryRows.map((row) => (
                         <SettingsInfoRow
-                          key={row.label}
+                          key={`${row.provider}-${row.label}-${row.value}`}
                           label={row.label}
                           value={row.value}
                           provider={row.provider}
@@ -638,20 +639,116 @@ export function SettingsView({
                         />
                       ))}
                     </div>
-                  </div>
-                </section>
-              </>
-            ) : null}
-          </>
-        ) : (
-          <DiagnosticsTab
-            diagnostics={diagnostics}
-            loading={diagnosticsLoading}
-            error={diagnosticsError}
-          />
-        )}
+                  </SectionCard>
+                </>
+              ) : null}
+            </>
+          ) : (
+            <DiagnosticsTab
+              diagnostics={diagnostics}
+              loading={diagnosticsLoading}
+              error={diagnosticsError}
+            />
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function SectionCard({
+  children,
+  padded = true,
+}: {
+  children: ReactNode;
+  padded?: boolean;
+}) {
+  return <section className={`settings-section${padded ? "" : " no-padding"}`}>{children}</section>;
+}
+
+function SectionHeader({
+  icon,
+  title,
+  subtitle,
+  tone,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+  tone:
+    | "theme"
+    | "fonts"
+    | "provider"
+    | "expansion"
+    | "warning"
+    | "rules"
+    | "storage"
+    | "discovery"
+    | "diagnostics"
+    | "breakdown";
+}) {
+  return (
+    <div className="settings-section-header">
+      <div className={`settings-section-icon settings-section-icon-${tone}`} aria-hidden>
+        {icon}
+      </div>
+      <div className="settings-section-heading">
+        <h3>{title}</h3>
+        <p>{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function SettingsField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="settings-field">
+      <span className="settings-field-label">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function InlineSwitchRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="settings-inline-switch-row">
+      <span>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function SettingsSwitch({
+  checked,
+  onChange,
+  ariaLabel,
+  tone,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  ariaLabel: string;
+  tone?: Provider;
+}) {
+  return (
+    <label className={`settings-switch${tone ? ` settings-switch-${tone}` : ""}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        aria-label={ariaLabel}
+      />
+      <span className="settings-switch-track" aria-hidden>
+        <span className="settings-switch-thumb" />
+      </span>
+    </label>
+  );
+}
+
+function StatusCard({ message }: { message: string }) {
+  return (
+    <SectionCard>
+      <p className="empty-state">{message}</p>
+    </SectionCard>
   );
 }
 
@@ -667,14 +764,16 @@ function SettingsInfoRow({
   onActionError?: ((context: string, error: unknown) => void) | undefined;
 }) {
   return (
-    <div className={`settings-row${provider ? " settings-row-discovery" : ""}`}>
-      {provider ? (
-        <span className={`settings-provider-badge settings-provider-${provider}`}>{label}</span>
-      ) : (
-        <span className="settings-key">{label}</span>
-      )}
-      <code className="settings-value" title={value}>
-        {value}
+    <div className="settings-path-row">
+      <div className="settings-path-label">
+        {provider ? (
+          <span className={`settings-provider-pill settings-provider-${provider}`}>{label}</span>
+        ) : (
+          <span className="settings-path-key">{label}</span>
+        )}
+      </div>
+      <code className="settings-path-value" title={value}>
+        {compactPath(value)}
       </code>
       <div className="settings-actions">
         <button
@@ -691,11 +790,11 @@ function SettingsInfoRow({
                   );
                 }
               })
-              .catch((error: unknown) => {
+              .catch((copyError: unknown) => {
                 reportSettingsActionError(
                   onActionError,
                   `Failed copying settings value for '${label}'`,
-                  error,
+                  copyError,
                 );
               });
           }}
@@ -718,11 +817,11 @@ function SettingsInfoRow({
                   );
                 }
               })
-              .catch((error: unknown) => {
+              .catch((openError: unknown) => {
                 reportSettingsActionError(
                   onActionError,
                   `Failed opening settings path '${label}'`,
-                  error,
+                  openError,
                 );
               });
           }}
@@ -730,7 +829,6 @@ function SettingsInfoRow({
           title={`Open ${label}`}
         >
           <svg className="settings-action-icon" viewBox="0 0 24 24" aria-hidden>
-            <title>Open in file manager</title>
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
             <path d="M15 3h6v6" />
             <path d="m10 14 11-11" />
@@ -771,189 +869,164 @@ function DiagnosticsTab({
   error: string | null;
 }) {
   if (loading && !diagnostics) {
-    return (
-      <section className="settings-section settings-status-card">
-        <p className="empty-state">Loading diagnostics...</p>
-      </section>
-    );
+    return <StatusCard message="Loading diagnostics..." />;
   }
 
   if (error && !diagnostics) {
-    return (
-      <section className="settings-section settings-status-card">
-        <p className="empty-state">{error}</p>
-      </section>
-    );
+    return <StatusCard message={error} />;
   }
 
   if (!diagnostics) {
-    return (
-      <section className="settings-section settings-status-card">
-        <p className="empty-state">Diagnostics are not available yet.</p>
-      </section>
-    );
+    return <StatusCard message="Diagnostics are not available yet." />;
   }
 
   return (
     <>
-      {error ? (
-        <section className="settings-section settings-status-card">
-          <p className="empty-state">{error}</p>
-        </section>
-      ) : null}
+      {error ? <StatusCard message={error} /> : null}
 
-      <section className="settings-section">
-        <div className="settings-section-header">
-          <div className="settings-section-icon settings-section-icon-diagnostics" aria-hidden>
-            DI
-          </div>
-          <div>
-            <h3>Overview</h3>
-            <p>In-memory refresh and watcher counters for this app run.</p>
-          </div>
+      <SectionCard>
+        <SectionHeader
+          tone="diagnostics"
+          icon="DI"
+          title="Overview"
+          subtitle="In-memory refresh and watcher counters for this app run."
+        />
+        <div className="settings-metric-grid">
+          <MetricCard
+            label="Manual Incremental Scans"
+            value={formatUnitCount(diagnostics.jobs.manualIncremental.runs, "run")}
+            detail={`average ${formatDurationPerRun(diagnostics.jobs.manualIncremental.averageDurationMs)}`}
+          />
+          <MetricCard
+            label="Watch Fallback Scans"
+            value={formatUnitCount(diagnostics.watcher.fallbackToIncrementalScans, "scan")}
+            detail={`${formatUnitCount(diagnostics.jobs.watchFallbackIncremental.runs, "fallback incremental run")} executed`}
+          />
+          <MetricCard
+            label="Watch-Based Triggers"
+            value={formatUnitCount(diagnostics.watcher.watchBasedTriggers, "trigger")}
+            detail={`${formatUnitCount(diagnostics.jobs.watchTargeted.runs, "targeted run")} | ${formatUnitCount(diagnostics.jobs.watchFallbackIncremental.runs, "fallback run")}`}
+          />
+          <MetricCard
+            label="Completed Runs"
+            value={formatUnitCount(diagnostics.jobs.totals.completedRuns, "run")}
+            detail={`${formatUnitCount(diagnostics.jobs.totals.failedRuns, "failed run")} recorded`}
+          />
         </div>
-        <div className="settings-section-body">
-          <div className="settings-metric-grid">
-            <MetricCard
-              label="Manual Incremental Scans"
-              value={formatUnitCount(diagnostics.jobs.manualIncremental.runs, "run")}
-              detail={`average ${formatDurationPerRun(diagnostics.jobs.manualIncremental.averageDurationMs)}`}
-            />
-            <MetricCard
-              label="Watch Fallback Scans"
-              value={formatUnitCount(diagnostics.watcher.fallbackToIncrementalScans, "scan")}
-              detail={`${formatUnitCount(diagnostics.jobs.watchFallbackIncremental.runs, "fallback incremental run")} executed`}
-            />
-            <MetricCard
-              label="Watch-Based Triggers"
-              value={formatUnitCount(diagnostics.watcher.watchBasedTriggers, "trigger")}
-              detail={`${formatUnitCount(diagnostics.jobs.watchTargeted.runs, "targeted run")} | ${formatUnitCount(diagnostics.jobs.watchFallbackIncremental.runs, "fallback run")}`}
-            />
-            <MetricCard
-              label="Completed Runs"
-              value={formatUnitCount(diagnostics.jobs.totals.completedRuns, "run")}
-              detail={`${formatUnitCount(diagnostics.jobs.totals.failedRuns, "failed run")} recorded`}
-            />
-          </div>
-        </div>
-      </section>
+      </SectionCard>
 
-      <section className="settings-section">
-        <div className="settings-section-header">
-          <div className="settings-section-icon settings-section-icon-breakdown" aria-hidden>
-            RB
-          </div>
-          <div>
-            <h3>Run Breakdown</h3>
-            <p>Run counts and durations grouped by refresh source.</p>
-          </div>
+      <SectionCard padded={false}>
+        <div className="settings-section-block">
+          <SectionHeader
+            tone="breakdown"
+            icon="RB"
+            title="Run Breakdown"
+            subtitle="Run counts and durations grouped by refresh source."
+          />
         </div>
-        <div className="settings-section-body">
-          <div className="settings-diagnostics-table">
-            <div className="settings-diagnostics-row settings-diagnostics-row-header">
-              <span className="settings-diagnostics-label">Trigger type</span>
-              <span className="settings-diagnostics-number">Runs</span>
-              <span className="settings-diagnostics-number">Avg duration</span>
-              <span className="settings-diagnostics-number">Max duration</span>
-            </div>
-            <DiagnosticsRow
-              label="Startup incremental"
-              runs={diagnostics.jobs.startupIncremental.runs}
-              averageDurationMs={diagnostics.jobs.startupIncremental.averageDurationMs}
-              maxDurationMs={diagnostics.jobs.startupIncremental.maxDurationMs}
-            />
-            <DiagnosticsRow
-              label="Manual incremental"
-              runs={diagnostics.jobs.manualIncremental.runs}
-              averageDurationMs={diagnostics.jobs.manualIncremental.averageDurationMs}
-              maxDurationMs={diagnostics.jobs.manualIncremental.maxDurationMs}
-            />
-            <DiagnosticsRow
-              label="Manual force reindex"
-              runs={diagnostics.jobs.manualForceReindex.runs}
-              averageDurationMs={diagnostics.jobs.manualForceReindex.averageDurationMs}
-              maxDurationMs={diagnostics.jobs.manualForceReindex.maxDurationMs}
-            />
-            <DiagnosticsRow
-              label="Watch-triggered total"
-              runs={diagnostics.jobs.watchTriggered.runs}
-              averageDurationMs={diagnostics.jobs.watchTriggered.averageDurationMs}
-              maxDurationMs={diagnostics.jobs.watchTriggered.maxDurationMs}
-            />
-            <DiagnosticsRow
-              label="Watch targeted"
-              runs={diagnostics.jobs.watchTargeted.runs}
-              averageDurationMs={diagnostics.jobs.watchTargeted.averageDurationMs}
-              maxDurationMs={diagnostics.jobs.watchTargeted.maxDurationMs}
-            />
-            <DiagnosticsRow
-              label="Watch fallback incremental"
-              runs={diagnostics.jobs.watchFallbackIncremental.runs}
-              averageDurationMs={diagnostics.jobs.watchFallbackIncremental.averageDurationMs}
-              maxDurationMs={diagnostics.jobs.watchFallbackIncremental.maxDurationMs}
-            />
-            <DiagnosticsRow
-              label="Watch initial scan"
-              runs={diagnostics.jobs.watchInitialScan.runs}
-              averageDurationMs={diagnostics.jobs.watchInitialScan.averageDurationMs}
-              maxDurationMs={diagnostics.jobs.watchInitialScan.maxDurationMs}
-            />
+        <div className="settings-breakdown-table">
+          <div className="settings-breakdown-header">
+            <span className="settings-breakdown-label">Trigger type</span>
+            <span className="settings-breakdown-number">Runs</span>
+            <span className="settings-breakdown-number">Avg duration</span>
+            <span className="settings-breakdown-number">Max duration</span>
           </div>
+          <DiagnosticsRow
+            label="Startup incremental"
+            runs={diagnostics.jobs.startupIncremental.runs}
+            averageDurationMs={diagnostics.jobs.startupIncremental.averageDurationMs}
+            maxDurationMs={diagnostics.jobs.startupIncremental.maxDurationMs}
+          />
+          <DiagnosticsRow
+            label="Manual incremental"
+            runs={diagnostics.jobs.manualIncremental.runs}
+            averageDurationMs={diagnostics.jobs.manualIncremental.averageDurationMs}
+            maxDurationMs={diagnostics.jobs.manualIncremental.maxDurationMs}
+          />
+          <DiagnosticsRow
+            label="Manual force reindex"
+            runs={diagnostics.jobs.manualForceReindex.runs}
+            averageDurationMs={diagnostics.jobs.manualForceReindex.averageDurationMs}
+            maxDurationMs={diagnostics.jobs.manualForceReindex.maxDurationMs}
+          />
+          <DiagnosticsRow
+            label="Watch-triggered total"
+            runs={diagnostics.jobs.watchTriggered.runs}
+            averageDurationMs={diagnostics.jobs.watchTriggered.averageDurationMs}
+            maxDurationMs={diagnostics.jobs.watchTriggered.maxDurationMs}
+          />
+          <DiagnosticsRow
+            label="Watch targeted"
+            runs={diagnostics.jobs.watchTargeted.runs}
+            averageDurationMs={diagnostics.jobs.watchTargeted.averageDurationMs}
+            maxDurationMs={diagnostics.jobs.watchTargeted.maxDurationMs}
+          />
+          <DiagnosticsRow
+            label="Watch fallback incremental"
+            runs={diagnostics.jobs.watchFallbackIncremental.runs}
+            averageDurationMs={diagnostics.jobs.watchFallbackIncremental.averageDurationMs}
+            maxDurationMs={diagnostics.jobs.watchFallbackIncremental.maxDurationMs}
+          />
+          <DiagnosticsRow
+            label="Watch initial scan"
+            runs={diagnostics.jobs.watchInitialScan.runs}
+            averageDurationMs={diagnostics.jobs.watchInitialScan.averageDurationMs}
+            maxDurationMs={diagnostics.jobs.watchInitialScan.maxDurationMs}
+          />
         </div>
-      </section>
+      </SectionCard>
 
-      <section className="settings-section">
-        <div className="settings-section-header">
-          <div className="settings-section-icon settings-section-icon-discovery" aria-hidden>
-            RT
-          </div>
-          <div>
-            <h3>Runtime</h3>
-            <p>Watcher backend, run durations, and the most recent indexing job.</p>
-          </div>
-        </div>
-        <div className="settings-section-body">
-          <div className="settings-runtime-grid">
-            <RuntimeStat label="Started" value={formatTimestamp(diagnostics.startedAt)} />
-            <RuntimeStat
-              label="Watcher backend"
-              value={diagnostics.watcher.backend ?? "not started"}
-            />
-            <RuntimeStat
-              label="Watched roots"
-              value={formatUnitCount(diagnostics.watcher.watchedRootCount, "root")}
-            />
-            <RuntimeStat
-              label="Last trigger"
-              value={formatOptionalTrigger(
-                diagnostics.watcher.lastTriggerAt,
-                diagnostics.watcher.lastTriggerPathCount,
-              )}
-            />
-            <RuntimeStat
-              label="Manual avg duration"
-              value={formatDurationPerRun(diagnostics.jobs.manualIncremental.averageDurationMs)}
-            />
-            <RuntimeStat
-              label="Watch avg duration"
-              value={formatDurationPerRun(diagnostics.jobs.watchTriggered.averageDurationMs)}
-            />
-          </div>
-          <div className="settings-last-run">
-            <div className="settings-last-run-label">Last run</div>
-            {diagnostics.lastRun ? (
-              <div className="settings-last-run-value">
-                <strong>{formatSourceLabel(diagnostics.lastRun.source)}</strong>
-                <span>{formatTimestamp(diagnostics.lastRun.completedAt)}</span>
-                <span>duration {formatDuration(diagnostics.lastRun.durationMs)}</span>
-                <span>{diagnostics.lastRun.success ? "completed successfully" : "failed"}</span>
-              </div>
-            ) : (
-              <div className="settings-last-run-value">No indexing jobs recorded yet.</div>
+      <SectionCard>
+        <SectionHeader
+          tone="discovery"
+          icon="RT"
+          title="Runtime"
+          subtitle="Watcher backend, run durations, and the most recent indexing job."
+        />
+        <div className="settings-runtime-grid">
+          <RuntimeStat label="Started" value={formatTimestamp(diagnostics.startedAt)} />
+          <RuntimeStat label="Watcher backend" value={diagnostics.watcher.backend ?? "not started"} />
+          <RuntimeStat
+            label="Watched roots"
+            value={formatUnitCount(diagnostics.watcher.watchedRootCount, "root")}
+          />
+          <RuntimeStat
+            label="Last trigger"
+            value={formatOptionalTrigger(
+              diagnostics.watcher.lastTriggerAt,
+              diagnostics.watcher.lastTriggerPathCount,
             )}
-          </div>
+          />
+          <RuntimeStat
+            label="Manual avg duration"
+            value={formatDurationPerRun(diagnostics.jobs.manualIncremental.averageDurationMs)}
+          />
+          <RuntimeStat
+            label="Watch avg duration"
+            value={formatDurationPerRun(diagnostics.jobs.watchTriggered.averageDurationMs)}
+          />
         </div>
-      </section>
+
+        <div className="settings-last-run">
+          <div className="settings-last-run-label">Last run</div>
+          {diagnostics.lastRun ? (
+            <div className="settings-last-run-value">
+              <strong>{formatSourceLabel(diagnostics.lastRun.source)}</strong>
+              <span>{formatTimestamp(diagnostics.lastRun.completedAt)}</span>
+              <span>duration {formatDuration(diagnostics.lastRun.durationMs)}</span>
+              <span
+                className={`settings-last-run-status${
+                  diagnostics.lastRun.success ? " success" : " failure"
+                }`}
+              >
+                {diagnostics.lastRun.success ? "completed successfully" : "failed"}
+              </span>
+            </div>
+          ) : (
+            <div className="settings-last-run-value">No indexing jobs recorded yet.</div>
+          )}
+        </div>
+      </SectionCard>
     </>
   );
 }
@@ -988,11 +1061,11 @@ function DiagnosticsRow({
   maxDurationMs: number;
 }) {
   return (
-    <div className="settings-diagnostics-row">
-      <span className="settings-diagnostics-label">{label}</span>
-      <span className="settings-diagnostics-number">{formatCount(runs)}</span>
-      <span className="settings-diagnostics-number">{formatDuration(averageDurationMs)}</span>
-      <span className="settings-diagnostics-number">{formatDuration(maxDurationMs)}</span>
+    <div className="settings-breakdown-row">
+      <span className="settings-breakdown-label">{label}</span>
+      <span className="settings-breakdown-number">{formatCount(runs)}</span>
+      <span className="settings-breakdown-number">{formatDuration(averageDurationMs)}</span>
+      <span className="settings-breakdown-number">{formatDuration(maxDurationMs)}</span>
     </div>
   );
 }
