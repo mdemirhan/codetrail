@@ -9,6 +9,8 @@ import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useCodetrailClient } from "../lib/codetrailClient";
 import { countProviders } from "../lib/viewUtils";
 
+const SEARCH_RESULT_PAGE_SCROLL_OVERLAP_PX = 20;
+
 export function useSearchController({
   searchMode,
   searchProviders,
@@ -26,11 +28,18 @@ export function useSearchController({
 }) {
   const codetrail = useCodetrailClient();
   const globalSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const advancedSearchToggleRef = useRef<HTMLButtonElement | null>(null);
+  const searchCollapseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const searchProjectFilterInputRef = useRef<HTMLInputElement | null>(null);
+  const searchProjectSelectRef = useRef<HTMLButtonElement | null>(null);
+  const searchResultsScrollRef = useRef<HTMLDivElement | null>(null);
+  const searchResultRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const searchLoadTokenRef = useRef(0);
   const [searchQueryInput, setSearchQueryInput] = useState("");
   const [searchProjectQueryInput, setSearchProjectQueryInput] = useState("");
   const [searchProjectId, setSearchProjectId] = useState("");
   const [searchPage, setSearchPage] = useState(0);
+  const [focusedSearchResultIndex, setFocusedSearchResultIndex] = useState(-1);
   const [searchResponse, setSearchResponse] = useState<SearchQueryResponse>({
     query: "",
     queryError: null,
@@ -116,6 +125,13 @@ export function useSearchController({
     setSearchPage((value) => Math.min(value, searchTotalPages - 1));
   }, [searchTotalPages]);
 
+  useEffect(() => {
+    searchResultRefs.current = searchResultRefs.current.slice(0, searchResponse.results.length);
+    setFocusedSearchResultIndex((value) =>
+      value >= 0 && value < searchResponse.results.length ? value : -1,
+    );
+  }, [searchResponse.results.length]);
+
   const goToPreviousSearchPage = useCallback(() => {
     setSearchPage((value) => Math.max(0, value - 1));
   }, []);
@@ -131,8 +147,84 @@ export function useSearchController({
     }, 0);
   }, []);
 
+  const focusSearchResultsPane = useCallback(() => {
+    window.setTimeout(() => {
+      setFocusedSearchResultIndex(-1);
+      searchResultsScrollRef.current?.focus({ preventScroll: true });
+    }, 0);
+  }, []);
+
+  const setSearchResultRef = useCallback((index: number, element: HTMLButtonElement | null) => {
+    searchResultRefs.current[index] = element;
+  }, []);
+
+  const focusSearchResultAtIndex = useCallback((index: number) => {
+    const button = searchResultRefs.current[index];
+    if (!button) {
+      return;
+    }
+    setFocusedSearchResultIndex(index);
+    button.focus({ preventScroll: true });
+    button.scrollIntoView({ block: "nearest" });
+  }, []);
+
+  const resolveFocusedSearchResultIndex = useCallback(() => {
+    if (focusedSearchResultIndex >= 0 && focusedSearchResultIndex < searchResponse.results.length) {
+      return focusedSearchResultIndex;
+    }
+    return searchResultRefs.current.findIndex((button) => button === document.activeElement);
+  }, [focusedSearchResultIndex, searchResponse.results.length]);
+
+  const focusAdjacentSearchResult = useCallback(
+    (direction: "previous" | "next") => {
+      const total = searchResponse.results.length;
+      if (total === 0) {
+        return;
+      }
+      const currentIndex = resolveFocusedSearchResultIndex();
+      const fallbackIndex = direction === "next" ? 0 : total - 1;
+      const nextIndex =
+        currentIndex < 0
+          ? fallbackIndex
+          : direction === "next"
+            ? Math.min(total - 1, currentIndex + 1)
+            : Math.max(0, currentIndex - 1);
+      focusSearchResultAtIndex(nextIndex);
+    },
+    [focusSearchResultAtIndex, resolveFocusedSearchResultIndex, searchResponse.results.length],
+  );
+
+  const pageSearchResults = useCallback((direction: "up" | "down") => {
+    const container = searchResultsScrollRef.current;
+    if (!container) {
+      return;
+    }
+
+    const styles = window.getComputedStyle(container);
+    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+    const visibleContentHeight = container.clientHeight - paddingTop - paddingBottom;
+    const pageSize = Math.max(0, visibleContentHeight - SEARCH_RESULT_PAGE_SCROLL_OVERLAP_PX);
+    if (pageSize <= 0) {
+      return;
+    }
+
+    const delta = direction === "down" ? pageSize : -pageSize;
+    const nextScrollTop = Math.max(0, container.scrollTop + delta);
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top: nextScrollTop });
+    } else {
+      container.scrollTop = nextScrollTop;
+    }
+  }, []);
+
   return {
     globalSearchInputRef,
+    advancedSearchToggleRef,
+    searchCollapseButtonRef,
+    searchProjectFilterInputRef,
+    searchProjectSelectRef,
+    searchResultsScrollRef,
     searchQueryInput,
     setSearchQueryInput,
     searchProjectQueryInput,
@@ -141,6 +233,9 @@ export function useSearchController({
     setSearchProjectId,
     searchPage,
     setSearchPage,
+    focusedSearchResultIndex,
+    setFocusedSearchResultIndex,
+    setSearchResultRef,
     searchResponse,
     searchProviderCounts,
     searchProviders,
@@ -154,6 +249,10 @@ export function useSearchController({
     goToPreviousSearchPage,
     goToNextSearchPage,
     focusGlobalSearch,
+    focusSearchResultsPane,
+    focusAdjacentSearchResult,
+    pageSearchResultsUp: () => pageSearchResults("up"),
+    pageSearchResultsDown: () => pageSearchResults("down"),
     reloadSearch: loadSearch,
   };
 }

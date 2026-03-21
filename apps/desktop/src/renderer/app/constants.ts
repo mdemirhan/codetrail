@@ -72,23 +72,53 @@ export const SHORTCUT_ITEMS = [
   {
     group: "Search & Navigation",
     shortcut: "Cmd/Ctrl+Shift+F",
-    description: "Open global search",
+    description: "Open search",
   },
   { group: "Search & Navigation", shortcut: "Cmd/Ctrl+Left", description: "Previous page" },
   { group: "Search & Navigation", shortcut: "Cmd/Ctrl+Right", description: "Next page" },
-  { group: "Search & Navigation", shortcut: "Cmd+Up", description: "Focus previous message" },
-  { group: "Search & Navigation", shortcut: "Cmd+Down", description: "Focus next message" },
+  {
+    group: "Search & Navigation",
+    shortcut: "Cmd+Up",
+    description: "Focus previous message or search result",
+  },
+  {
+    group: "Search & Navigation",
+    shortcut: "Cmd+Down",
+    description: "Focus next message or search result",
+  },
   { group: "Search & Navigation", shortcut: "Option+Up", description: "Select previous session" },
   { group: "Search & Navigation", shortcut: "Option+Down", description: "Select next session" },
   { group: "Search & Navigation", shortcut: "Ctrl+Up", description: "Select previous project" },
   { group: "Search & Navigation", shortcut: "Ctrl+Down", description: "Select next project" },
-  { group: "Search & Navigation", shortcut: "Ctrl+U", description: "Page message view up" },
-  { group: "Search & Navigation", shortcut: "Ctrl+D", description: "Page message view down" },
-  { group: "Search & Navigation", shortcut: "Cmd+Shift+Up", description: "Page message view up" },
+  {
+    group: "Search & Navigation",
+    shortcut: "Ctrl+U",
+    description: "Page current message or search-result list up",
+  },
+  {
+    group: "Search & Navigation",
+    shortcut: "Ctrl+D",
+    description: "Page current message or search-result list down",
+  },
+  {
+    group: "Search & Navigation",
+    shortcut: "Page Up",
+    description: "Page current message or search-result list up",
+  },
+  {
+    group: "Search & Navigation",
+    shortcut: "Page Down",
+    description: "Page current message or search-result list down",
+  },
+  {
+    group: "Search & Navigation",
+    shortcut: "Cmd+Shift+Up",
+    description: "Page current message or search-result list up",
+  },
   {
     group: "Search & Navigation",
     shortcut: "Cmd+Shift+Down",
-    description: "Page message view down",
+    description: "Page current message or search-result list down",
   },
   { group: "Search & Navigation", shortcut: "Tab", description: "Cycle pane focus forward" },
   { group: "Search & Navigation", shortcut: "Shift+Tab", description: "Cycle pane focus backward" },
@@ -103,7 +133,7 @@ export const SHORTCUT_ITEMS = [
   {
     group: "Message Filters",
     shortcut: "Cmd/Ctrl+1",
-    description: "Toggle User button on session messages",
+    description: "Toggle User message filter",
   },
   {
     group: "Message Filters",
@@ -113,7 +143,7 @@ export const SHORTCUT_ITEMS = [
   {
     group: "Message Filters",
     shortcut: "Cmd/Ctrl+2",
-    description: "Toggle Assistant button on session messages",
+    description: "Toggle Assistant message filter",
   },
   {
     group: "Message Filters",
@@ -123,7 +153,7 @@ export const SHORTCUT_ITEMS = [
   {
     group: "Message Filters",
     shortcut: "Cmd/Ctrl+3",
-    description: "Toggle Write button on session messages",
+    description: "Toggle Write message filter",
   },
   {
     group: "Message Filters",
@@ -133,7 +163,7 @@ export const SHORTCUT_ITEMS = [
   {
     group: "Message Filters",
     shortcut: "Cmd/Ctrl+4",
-    description: "Toggle Tool Use button on session messages",
+    description: "Toggle Tool Use message filter",
   },
   {
     group: "Message Filters",
@@ -143,7 +173,7 @@ export const SHORTCUT_ITEMS = [
   {
     group: "Message Filters",
     shortcut: "Cmd/Ctrl+5",
-    description: "Toggle Tool Result button on session messages",
+    description: "Toggle Tool Result message filter",
   },
   {
     group: "Message Filters",
@@ -153,7 +183,7 @@ export const SHORTCUT_ITEMS = [
   {
     group: "Message Filters",
     shortcut: "Cmd/Ctrl+6",
-    description: "Toggle Thinking button on session messages",
+    description: "Toggle Thinking message filter",
   },
   {
     group: "Message Filters",
@@ -163,7 +193,7 @@ export const SHORTCUT_ITEMS = [
   {
     group: "Message Filters",
     shortcut: "Cmd/Ctrl+7",
-    description: "Toggle System button on session messages",
+    description: "Toggle System message filter",
   },
   {
     group: "Message Filters",

@@ -206,6 +206,7 @@ export function SettingsView({
                       </select>
                       <span className="settings-select-chevron" aria-hidden>
                         <svg viewBox="0 0 12 12">
+                          <title>Open menu</title>
                           <path d="M3 4.5L6 7.5L9 4.5" />
                         </svg>
                       </span>
@@ -256,6 +257,7 @@ export function SettingsView({
                       </select>
                       <span className="settings-select-chevron" aria-hidden>
                         <svg viewBox="0 0 12 12">
+                          <title>Open menu</title>
                           <path d="M3 4.5L6 7.5L9 4.5" />
                         </svg>
                       </span>
@@ -285,6 +287,7 @@ export function SettingsView({
                       </select>
                       <span className="settings-select-chevron" aria-hidden>
                         <svg viewBox="0 0 12 12">
+                          <title>Open menu</title>
                           <path d="M3 4.5L6 7.5L9 4.5" />
                         </svg>
                       </span>
@@ -314,6 +317,7 @@ export function SettingsView({
                       </select>
                       <span className="settings-select-chevron" aria-hidden>
                         <svg viewBox="0 0 12 12">
+                          <title>Open menu</title>
                           <path d="M3 4.5L6 7.5L9 4.5" />
                         </svg>
                       </span>
@@ -343,6 +347,7 @@ export function SettingsView({
                       </select>
                       <span className="settings-select-chevron" aria-hidden>
                         <svg viewBox="0 0 12 12">
+                          <title>Open menu</title>
                           <path d="M3 4.5L6 7.5L9 4.5" />
                         </svg>
                       </span>
@@ -385,6 +390,7 @@ export function SettingsView({
                         <span className="settings-token-label">{prettyCategory(category)}</span>
                         <span className="settings-token-check" aria-hidden>
                           <svg viewBox="0 0 14 14">
+                            <title>Selected</title>
                             <path d="M3 7l3 3 5-5" />
                           </svg>
                         </span>
@@ -444,9 +450,7 @@ export function SettingsView({
                           <span className="settings-provider-name">{label}</span>
                         </div>
                         <span
-                          className={`settings-provider-row-state${
-                            enabled ? " is-enabled" : ""
-                          }`}
+                          className={`settings-provider-row-state${enabled ? " is-enabled" : ""}`}
                         >
                           {enabled ? "Watching" : "Disabled"}
                         </span>
@@ -522,7 +526,9 @@ export function SettingsView({
                       <div key={provider} className="settings-rule-group">
                         <div className="settings-rule-group-header">
                           <div className="settings-rule-group-title">
-                            <span className={`settings-provider-pill settings-provider-${provider}`}>
+                            <span
+                              className={`settings-provider-pill settings-provider-${provider}`}
+                            >
                               {label}
                             </span>
                             {patterns.length > 0 ? (
@@ -702,10 +708,10 @@ function SectionHeader({
 
 function SettingsField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="settings-field">
+    <div className="settings-field">
       <span className="settings-field-label">{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -828,11 +834,7 @@ function SettingsInfoRow({
           aria-label={`Open ${label}`}
           title={`Open ${label}`}
         >
-          <svg className="settings-action-icon" viewBox="0 0 24 24" aria-hidden>
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-            <path d="M15 3h6v6" />
-            <path d="m10 14 11-11" />
-          </svg>
+          <ToolbarIcon name="folderOpen" />
         </button>
       </div>
     </div>
@@ -985,7 +987,10 @@ function DiagnosticsTab({
         />
         <div className="settings-runtime-grid">
           <RuntimeStat label="Started" value={formatTimestamp(diagnostics.startedAt)} />
-          <RuntimeStat label="Watcher backend" value={diagnostics.watcher.backend ?? "not started"} />
+          <RuntimeStat
+            label="Watcher backend"
+            value={diagnostics.watcher.backend ?? "not started"}
+          />
           <RuntimeStat
             label="Watched roots"
             value={formatUnitCount(diagnostics.watcher.watchedRootCount, "root")}

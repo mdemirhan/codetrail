@@ -39,9 +39,9 @@ describe("TopBar", () => {
 
     expect(screen.getByText("Code Trail")).toBeInTheDocument();
     expect(container.querySelector(".app-title-suffix")).toBeNull();
-    expect(screen.getByRole("button", { name: "Global Search" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Search" })).toHaveAttribute(
       "title",
-      "Open global search (Cmd/Ctrl+Shift+F)",
+      "Open search (Cmd/Ctrl+Shift+F)",
     );
     expect(screen.getByRole("button", { name: "Enter focus mode" })).toHaveAttribute(
       "title",
@@ -52,7 +52,7 @@ describe("TopBar", () => {
       "Open settings (Cmd/Ctrl+,)",
     );
 
-    await user.click(screen.getByRole("button", { name: "Global Search" }));
+    await user.click(screen.getByRole("button", { name: "Search" }));
     await user.click(screen.getByRole("button", { name: "Incremental refresh" }));
     await user.click(screen.getByRole("button", { name: "Enter focus mode" }));
     await user.click(screen.getByRole("button", { name: "Open help" }));
@@ -90,7 +90,7 @@ describe("TopBar", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Global Search" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Search" })).toHaveAttribute(
       "title",
       "Return to history view (Esc)",
     );
@@ -107,8 +107,32 @@ describe("TopBar", () => {
     );
   });
 
-  it("shows contextual toolbar title suffixes for settings and help", () => {
+  it("shows contextual toolbar title suffixes for search, settings, and help", () => {
     const { container, rerender } = render(
+      <TopBar
+        mainView="search"
+        theme="dark"
+        indexing={false}
+        focusMode={false}
+        focusDisabled={false}
+        onToggleSearchView={vi.fn()}
+        onThemeChange={vi.fn()}
+        onIncrementalRefresh={vi.fn()}
+        refreshStrategy="off"
+        onRefreshStrategyChange={vi.fn()}
+        autoRefreshStatusLabel={null}
+        autoRefreshStatusTone={null}
+        autoRefreshStatusTooltip={null}
+        onToggleFocus={vi.fn()}
+        onToggleHelp={vi.fn()}
+        onToggleSettings={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Code Trail")).toBeInTheDocument();
+    expect(container.querySelector(".app-title-suffix-search")?.textContent).toBe("Search");
+
+    rerender(
       <TopBar
         mainView="settings"
         theme="dark"
@@ -129,7 +153,6 @@ describe("TopBar", () => {
       />,
     );
 
-    expect(screen.getByText("Code Trail")).toBeInTheDocument();
     expect(container.querySelector(".app-title-suffix-settings")?.textContent).toBe("Settings");
 
     rerender(

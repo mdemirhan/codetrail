@@ -26,7 +26,6 @@ import type {
 import {
   compareRecent,
   countProviders,
-  deriveSessionTitle,
   formatDate,
   prettyCategory,
   prettyProvider,
@@ -307,32 +306,12 @@ export function useHistoryDerivedState({
     scopedActionLabel,
     scopedExpandCollapseLabel,
     workspaceStyle,
-    selectedSummaryProvider:
-      historyMode === "session"
-        ? (selectedSession?.provider ?? null)
-        : (selectedProject?.provider ?? null),
     selectedSummaryMessageCount:
       historyMode === "bookmarks"
         ? `${bookmarksResponse.filteredCount} of ${bookmarksResponse.totalCount} bookmarked messages`
         : historyMode === "project_all"
           ? `${projectCombinedDetail?.totalCount ?? 0} messages`
           : `${sessionDetail?.totalCount ?? 0} messages`,
-    selectedTitle:
-      historyMode === "bookmarks"
-        ? "Bookmarks"
-        : historyMode === "project_all"
-          ? "All Sessions"
-          : selectedSession
-            ? deriveSessionTitle(selectedSession)
-            : "Session Detail",
-    selectedProviderLabel:
-      historyMode === "session"
-        ? selectedSession
-          ? prettyProvider(selectedSession.provider)
-          : "-"
-        : selectedProject
-          ? prettyProvider(selectedProject.provider)
-          : "-",
     historyCategoryExpandShortcutMap: HISTORY_CATEGORY_EXPAND_SHORTCUTS,
     historyCategoriesShortcutMap: HISTORY_CATEGORY_SHORTCUTS,
     prettyCategory,

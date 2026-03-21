@@ -216,8 +216,8 @@ function buildFilters(
 
   const projectPatterns = buildWildcardFilterPatterns(input.projectQuery ?? "");
   for (const pattern of projectPatterns) {
-    conditions.push("(LOWER(p.name) LIKE ? ESCAPE '\\' OR LOWER(p.path) LIKE ? ESCAPE '\\')");
-    params.push(pattern, pattern);
+    conditions.push("LOWER(p.name) LIKE ? ESCAPE '\\'");
+    params.push(pattern);
   }
 
   return { conditions, params };

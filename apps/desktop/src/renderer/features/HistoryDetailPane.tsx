@@ -89,7 +89,9 @@ export function HistoryDetailPane({
     <div className="history-view">
       <div className="msg-header">
         <div className="msg-header-top">
-          <div className="msg-header-title">{history.selectedTitle}</div>
+          <div className="msg-header-info">
+            <span className="summary-count">{history.selectedSummaryMessageCount}</span>
+          </div>
           <div className="msg-toolbar">
             <HistoryExportMenu
               disabled={exportCurrentPageCount === 0}
@@ -191,10 +193,6 @@ export function HistoryDetailPane({
               </button>
             </div>
           </div>
-        </div>
-        <div className="msg-header-info">
-          <span className="provider">{history.selectedProviderLabel}</span>
-          <span>{history.selectedSummaryMessageCount}</span>
         </div>
       </div>
 

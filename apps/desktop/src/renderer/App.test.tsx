@@ -52,8 +52,8 @@ describe("App shell", () => {
       expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Global Search" }));
-    expect(screen.getByRole("heading", { name: "Global Search" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages)).toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages), "markdown");
     await waitFor(() => {
@@ -86,15 +86,15 @@ describe("App shell", () => {
       expect(screen.getByText("Page 2 / 3 (250 messages)")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Global Search" }));
+    await user.click(screen.getByRole("button", { name: "Search" }));
     await user.type(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages), "markdown");
     await waitFor(() => {
-      expect(screen.getByText("Page 1 / 3 (250 matches)")).toBeInTheDocument();
+      expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
     });
 
     fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true });
     await waitFor(() => {
-      expect(screen.getByText("Page 2 / 3 (250 matches)")).toBeInTheDocument();
+      expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
     });
 
     await waitFor(() => {
@@ -106,7 +106,7 @@ describe("App shell", () => {
 
     fireEvent.keyDown(window, { key: "ArrowLeft", ctrlKey: true });
     await waitFor(() => {
-      expect(screen.getByText("Page 1 / 3 (250 matches)")).toBeInTheDocument();
+      expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
     });
   });
 

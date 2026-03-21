@@ -32,6 +32,12 @@ export function useKeyboardShortcuts(args: {
   projectListRef: RefObject<HTMLDivElement | null>;
   sessionListRef: RefObject<HTMLDivElement | null>;
   messageListRef: RefObject<HTMLDivElement | null>;
+  searchInputRef: RefObject<HTMLInputElement | null>;
+  searchAdvancedToggleRef: RefObject<HTMLButtonElement | null>;
+  searchCollapseButtonRef: RefObject<HTMLButtonElement | null>;
+  searchProjectFilterInputRef: RefObject<HTMLInputElement | null>;
+  searchProjectSelectRef: RefObject<HTMLButtonElement | null>;
+  searchResultsViewRef: RefObject<HTMLDivElement | null>;
   setMainView: (view: MainView | ((value: MainView) => MainView)) => void;
   clearFocusedHistoryMessage: () => void;
   focusGlobalSearch: () => void;
@@ -44,12 +50,16 @@ export function useKeyboardShortcuts(args: {
   toggleSessionPaneCollapsed: () => void;
   focusPreviousHistoryMessage: () => void;
   focusNextHistoryMessage: () => void;
+  focusPreviousSearchResult: () => void;
+  focusNextSearchResult: () => void;
   selectPreviousSession: () => void;
   selectNextSession: () => void;
   selectPreviousProject: () => void;
   selectNextProject: () => void;
   pageHistoryMessagesUp: () => void;
   pageHistoryMessagesDown: () => void;
+  pageSearchResultsUp: () => void;
+  pageSearchResultsDown: () => void;
   goToPreviousHistoryPage: () => void;
   goToNextHistoryPage: () => void;
   goToPreviousSearchPage: () => void;
@@ -138,6 +148,7 @@ const SHORTCUT_HANDLERS: readonly ShortcutHandler[] = [
   handleSettingsShortcut,
   handleHelpShortcut,
   handleEscapeShortcut,
+  handleSearchTabShortcut,
   handleSearchShortcut,
   handleZoomShortcut,
   handleFocusedPaneArrowShortcut,
@@ -191,7 +202,7 @@ function handleSearchShortcut(context: ShortcutContext): boolean {
     return false;
   }
   context.event.preventDefault();
-  if (context.shift) {
+  if (context.mainView === "search" || context.shift) {
     context.focusGlobalSearch();
   } else {
     context.focusSessionSearch();
@@ -280,10 +291,50 @@ function handleTabFocusShortcut(context: ShortcutContext): boolean {
   return true;
 }
 
-function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
-  if (context.mainView !== "history" || isEditableTarget(context.event.target)) {
+function handleSearchTabShortcut(context: ShortcutContext): boolean {
+  if (context.mainView !== "search" || context.event.key !== "Tab") {
     return false;
   }
+  const targets = [
+    context.searchInputRef.current,
+    context.searchAdvancedToggleRef.current,
+    context.searchCollapseButtonRef.current,
+    context.searchProjectFilterInputRef.current,
+    context.searchProjectSelectRef.current,
+    context.searchResultsViewRef.current,
+  ].filter(isSequentialSearchTarget);
+  if (targets.length === 0) {
+    return false;
+  }
+
+  const currentTarget =
+    context.shortcutTarget?.closest(".search-results-scroll") ?? context.shortcutTarget;
+  const currentIndex = targets.findIndex((target) => target === currentTarget);
+  const fallbackIndex = context.shift ? targets.length - 1 : 0;
+  const nextIndex =
+    currentIndex < 0
+      ? fallbackIndex
+      : (currentIndex + (context.shift ? -1 : 1) + targets.length) % targets.length;
+  context.event.preventDefault();
+  targets[nextIndex]?.focus();
+  return true;
+}
+
+function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
+  if (context.mainView !== "history" && context.mainView !== "search") {
+    return false;
+  }
+  const pageUp =
+    context.mainView === "history" ? context.pageHistoryMessagesUp : context.pageSearchResultsUp;
+  const pageDown =
+    context.mainView === "history"
+      ? context.pageHistoryMessagesDown
+      : context.pageSearchResultsDown;
+  const editableTarget = isEditableTarget(context.event.target);
+  if (context.mainView === "history" && editableTarget) {
+    return false;
+  }
+
   if (
     context.event.ctrlKey &&
     !context.event.metaKey &&
@@ -292,7 +343,7 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.key === "u"
   ) {
     context.event.preventDefault();
-    context.pageHistoryMessagesUp();
+    pageUp();
     return true;
   }
   if (
@@ -303,7 +354,29 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.key === "d"
   ) {
     context.event.preventDefault();
-    context.pageHistoryMessagesDown();
+    pageDown();
+    return true;
+  }
+  if (
+    !context.event.metaKey &&
+    !context.event.ctrlKey &&
+    !context.event.altKey &&
+    !context.shift &&
+    context.event.key === "PageUp"
+  ) {
+    context.event.preventDefault();
+    pageUp();
+    return true;
+  }
+  if (
+    !context.event.metaKey &&
+    !context.event.ctrlKey &&
+    !context.event.altKey &&
+    !context.shift &&
+    context.event.key === "PageDown"
+  ) {
+    context.event.preventDefault();
+    pageDown();
     return true;
   }
   if (
@@ -314,7 +387,7 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.event.key === "ArrowUp"
   ) {
     context.event.preventDefault();
-    context.pageHistoryMessagesUp();
+    pageUp();
     return true;
   }
   if (
@@ -325,8 +398,33 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.event.key === "ArrowDown"
   ) {
     context.event.preventDefault();
-    context.pageHistoryMessagesDown();
+    pageDown();
     return true;
+  }
+  if (context.mainView === "search") {
+    if (
+      context.event.metaKey &&
+      !context.event.altKey &&
+      !context.event.ctrlKey &&
+      !context.shift &&
+      context.event.key === "ArrowUp"
+    ) {
+      context.event.preventDefault();
+      context.focusPreviousSearchResult();
+      return true;
+    }
+    if (
+      context.event.metaKey &&
+      !context.event.altKey &&
+      !context.event.ctrlKey &&
+      !context.shift &&
+      context.event.key === "ArrowDown"
+    ) {
+      context.event.preventDefault();
+      context.focusNextSearchResult();
+      return true;
+    }
+    return false;
   }
   if (!context.isHistoryArrowNavigation) {
     return false;
@@ -453,7 +551,13 @@ function handleHistoryCategoryShortcut(args: {
   code: string;
   onToggleCategory: (category: MessageCategory) => void;
 }): boolean {
-  if (args.mainView !== "history" || !args.command) {
+  if (!args.command) {
+    return false;
+  }
+  const allowedInCurrentView = args.requireAlt
+    ? args.mainView === "history"
+    : args.mainView === "history" || args.mainView === "search";
+  if (!allowedInCurrentView) {
     return false;
   }
   if (args.requireAlt !== args.event.altKey || args.event.shiftKey) {
@@ -479,6 +583,20 @@ function isEditableTarget(target: EventTarget | null): boolean {
   }
   const tagName = target.tagName;
   return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
+}
+
+function isSequentialSearchTarget(
+  target: HTMLElement | null,
+): target is HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLDivElement {
+  if (!target) {
+    return false;
+  }
+  return (
+    target.isConnected &&
+    target.style.display !== "none" &&
+    target.style.visibility !== "hidden" &&
+    !target.hasAttribute("disabled")
+  );
 }
 
 function resolveShortcutTarget(target: EventTarget | null): HTMLElement | null {

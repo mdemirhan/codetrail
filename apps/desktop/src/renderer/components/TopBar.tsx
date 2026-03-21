@@ -171,7 +171,13 @@ export function TopBar({
   onToggleSettings: () => void;
 }) {
   const activeTitleSuffix =
-    mainView === "settings" ? "Settings" : mainView === "help" ? "Help" : null;
+    mainView === "search"
+      ? "Search"
+      : mainView === "settings"
+        ? "Settings"
+        : mainView === "help"
+          ? "Help"
+          : null;
 
   return (
     <header className="titlebar">
@@ -179,7 +185,9 @@ export function TopBar({
         <div className="app-title">
           <strong>Code Trail</strong>
           {activeTitleSuffix ? (
-            <span className={`app-title-suffix app-title-suffix-${mainView}`}>{activeTitleSuffix}</span>
+            <span className={`app-title-suffix app-title-suffix-${mainView}`}>
+              {activeTitleSuffix}
+            </span>
           ) : null}
         </div>
       </div>
@@ -188,15 +196,15 @@ export function TopBar({
           type="button"
           className={mainView === "search" ? "tb-btn active" : "tb-btn"}
           onClick={onToggleSearchView}
-          aria-label="Global Search"
+          aria-label="Search"
           title={
             mainView === "search"
               ? "Return to history view (Esc)"
-              : "Open global search (Cmd/Ctrl+Shift+F)"
+              : "Open search (Cmd/Ctrl+Shift+F)"
           }
         >
           <ToolbarIcon name="search" />
-          Global Search
+          Search
         </button>
         <button
           type="button"

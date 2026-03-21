@@ -10,6 +10,20 @@ function Harness(args: Parameters<typeof useKeyboardShortcuts>[0]) {
   useKeyboardShortcuts(args);
   return (
     <div>
+      <input ref={args.searchInputRef} />
+      <button ref={args.searchAdvancedToggleRef} type="button">
+        advanced
+      </button>
+      <button ref={args.searchCollapseButtonRef} type="button">
+        collapse
+      </button>
+      <input ref={args.searchProjectFilterInputRef} />
+      <button ref={args.searchProjectSelectRef} type="button">
+        project-select
+      </button>
+      <div ref={args.searchResultsViewRef} tabIndex={-1}>
+        search-results
+      </div>
       <div className="history-focus-pane">
         <button type="button">project-toggle</button>
         <div ref={args.projectListRef} tabIndex={-1}>
@@ -42,6 +56,12 @@ function createProps(
     projectListRef: createRef<HTMLDivElement>(),
     sessionListRef: createRef<HTMLDivElement>(),
     messageListRef: createRef<HTMLDivElement>(),
+    searchInputRef: createRef<HTMLInputElement>(),
+    searchAdvancedToggleRef: createRef<HTMLButtonElement>(),
+    searchCollapseButtonRef: createRef<HTMLButtonElement>(),
+    searchProjectFilterInputRef: createRef<HTMLInputElement>(),
+    searchProjectSelectRef: createRef<HTMLButtonElement>(),
+    searchResultsViewRef: createRef<HTMLDivElement>(),
     setMainView: vi.fn(),
     clearFocusedHistoryMessage: vi.fn(),
     focusGlobalSearch: vi.fn(),
@@ -54,12 +74,16 @@ function createProps(
     toggleSessionPaneCollapsed: vi.fn(),
     focusPreviousHistoryMessage: vi.fn(),
     focusNextHistoryMessage: vi.fn(),
+    focusPreviousSearchResult: vi.fn(),
+    focusNextSearchResult: vi.fn(),
     selectPreviousSession: vi.fn(),
     selectNextSession: vi.fn(),
     selectPreviousProject: vi.fn(),
     selectNextProject: vi.fn(),
     pageHistoryMessagesUp: vi.fn(),
     pageHistoryMessagesDown: vi.fn(),
+    pageSearchResultsUp: vi.fn(),
+    pageSearchResultsDown: vi.fn(),
     goToPreviousHistoryPage: vi.fn(),
     goToNextHistoryPage: vi.fn(),
     goToPreviousSearchPage: vi.fn(),
@@ -136,13 +160,79 @@ describe("useKeyboardShortcuts", () => {
 
     render(<Harness {...props} />);
 
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", code: "Digit1", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "u", ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", metaKey: true }));
 
+    expect(props.focusGlobalSearch).toHaveBeenCalledTimes(1);
+    expect(props.focusSessionSearch).not.toHaveBeenCalled();
+    expect(props.toggleHistoryCategory).toHaveBeenCalledWith("user");
+    expect(props.pageSearchResultsUp).toHaveBeenCalledTimes(2);
+    expect(props.pageSearchResultsDown).toHaveBeenCalledTimes(2);
+    expect(props.focusPreviousSearchResult).toHaveBeenCalledTimes(1);
+    expect(props.focusNextSearchResult).toHaveBeenCalledTimes(1);
     expect(props.goToPreviousSearchPage).toHaveBeenCalledTimes(1);
     expect(props.goToNextSearchPage).toHaveBeenCalledTimes(1);
     expect(props.goToPreviousHistoryPage).not.toHaveBeenCalled();
     expect(props.goToNextHistoryPage).not.toHaveBeenCalled();
+    expect(props.toggleHistoryCategoryExpanded).not.toHaveBeenCalled();
+    expect(props.pageHistoryMessagesUp).not.toHaveBeenCalled();
+    expect(props.pageHistoryMessagesDown).not.toHaveBeenCalled();
+  });
+
+  it("keeps search paging shortcuts active from search inputs and cycles the search tab order", () => {
+    const props = createProps({ mainView: "search" });
+
+    render(<Harness {...props} />);
+
+    const searchInput = props.searchInputRef.current;
+    const advancedToggle = props.searchAdvancedToggleRef.current;
+    const collapseButton = props.searchCollapseButtonRef.current;
+    const projectInput = props.searchProjectFilterInputRef.current;
+    const projectSelect = props.searchProjectSelectRef.current;
+    const resultsView = props.searchResultsViewRef.current;
+    if (
+      !searchInput ||
+      !advancedToggle ||
+      !collapseButton ||
+      !projectInput ||
+      !projectSelect ||
+      !resultsView
+    ) {
+      throw new Error("Expected search refs to be attached");
+    }
+
+    searchInput.focus();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "u", ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", ctrlKey: true }));
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    expect(document.activeElement).toBe(advancedToggle);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    expect(document.activeElement).toBe(collapseButton);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    expect(document.activeElement).toBe(projectInput);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    expect(document.activeElement).toBe(projectSelect);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    expect(document.activeElement).toBe(resultsView);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true }));
+    expect(document.activeElement).toBe(projectSelect);
+
+    expect(props.pageSearchResultsUp).toHaveBeenCalledTimes(1);
+    expect(props.pageSearchResultsDown).toHaveBeenCalledTimes(1);
   });
 
   it("handles escape and question-mark help shortcuts", () => {

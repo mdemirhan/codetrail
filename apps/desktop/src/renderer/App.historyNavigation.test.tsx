@@ -125,7 +125,7 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
 
-    const globalSearchButton = screen.getByRole("button", { name: "Global Search" });
+    const globalSearchButton = screen.getByRole("button", { name: "Search" });
     globalSearchButton.focus();
     fireEvent.keyDown(document.activeElement ?? window, { key: "Tab" });
     await waitFor(() => {

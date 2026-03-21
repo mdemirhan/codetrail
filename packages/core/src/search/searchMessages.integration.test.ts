@@ -250,12 +250,14 @@ describe("searchMessages", () => {
 
     const projectMatch = searchMessages(db, { query: "bug", projectQuery: "project" });
     const projectWildcard = searchMessages(db, { query: "bug", projectQuery: "project*" });
+    const projectPathOnlyMatch = searchMessages(db, { query: "bug", projectQuery: "workspace" });
     const projectMiss = searchMessages(db, {
       query: "bug",
       projectQuery: "definitely-missing-project",
     });
     expect(projectMatch.totalCount).toBeGreaterThanOrEqual(1);
     expect(projectWildcard.totalCount).toBeGreaterThanOrEqual(1);
+    expect(projectPathOnlyMatch.totalCount).toBe(0);
     expect(projectMiss.totalCount).toBe(0);
 
     const all = searchMessages(db, { query: "bug" });

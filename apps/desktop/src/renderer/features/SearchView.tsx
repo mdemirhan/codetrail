@@ -1,17 +1,26 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 
-import type { Provider } from "@codetrail/core/browser";
+import type { MessageCategory, Provider } from "@codetrail/core/browser";
 
-import { CATEGORIES } from "../app/constants";
+import { CATEGORIES, HISTORY_CATEGORY_SHORTCUTS } from "../app/constants";
 import type { ProjectSummary } from "../app/types";
 import { AdvancedSearchToggleButton } from "../components/AdvancedSearchToggleButton";
 import { ToolbarIcon } from "../components/ToolbarIcon";
 import { HighlightedText } from "../components/messages/MessagePresentation";
+import { useClickOutside } from "../hooks/useClickOutside";
 import { SEARCH_PLACEHOLDERS } from "../lib/searchPlaceholders";
-import { formatDate, prettyCategory, prettyProvider, toggleValue } from "../lib/viewUtils";
+import {
+  compactPath,
+  formatDate,
+  prettyCategory,
+  prettyProvider,
+  toggleValue,
+} from "../lib/viewUtils";
 import type { useSearchController } from "./useSearchController";
 
 type SearchController = ReturnType<typeof useSearchController>;
+type SearchResult = SearchController["searchResponse"]["results"][number];
 
 export function SearchView({
   search,
@@ -26,166 +35,438 @@ export function SearchView({
   projects: ProjectSummary[];
   advancedSearchEnabled: boolean;
   setAdvancedSearchEnabled: Dispatch<SetStateAction<boolean>>;
-  onSelectResult: (result: SearchController["searchResponse"]["results"][number]) => void;
+  onSelectResult: (result: SearchResult) => void;
 }) {
+  const [controlsCollapsed, setControlsCollapsed] = useState(false);
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const projectMenuRef = useRef<HTMLDivElement | null>(null);
+  const queryPlaceholder = advancedSearchEnabled
+    ? 'Advanced search: try "build error" AND deploy* or auth AND (timeout OR retry)'
+    : SEARCH_PLACEHOLDERS.globalMessages;
+  const queryTitle = advancedSearchEnabled
+    ? 'Advanced search is enabled. Use quoted phrases, AND/OR/NOT, parentheses, and postfix wildcard syntax like term*. Example: "build error" AND deploy*. Refer to Help for more examples and syntax details.'
+    : "Standard search is enabled. Type plain words to match message text, and use postfix wildcard syntax like term* when needed. Turn on Advanced Search for quoted phrases, boolean operators, and grouping. Refer to Help for more.";
+  const sortedProjects = [...projects].sort(compareProjectsByNameThenProvider);
+  const selectedProject = useMemo(
+    () => sortedProjects.find((project) => project.id === search.searchProjectId) ?? null,
+    [search.searchProjectId, sortedProjects],
+  );
+  const closeProjectMenu = useCallback(() => {
+    setProjectMenuOpen(false);
+  }, []);
+  useClickOutside(projectMenuRef, projectMenuOpen, closeProjectMenu);
+
   return (
     <section className="pane content-pane">
       <div className="search-view">
-        <div className="content-head">
-          <h2>Global Search</h2>
-          <p>{search.searchResponse.totalCount} matches</p>
-        </div>
-        <div className="search-controls">
-          <div className={search.searchResponse.queryError ? "search-box invalid" : "search-box"}>
-            <div className="search-input-shell">
-              <ToolbarIcon name="search" />
-              <input
-                ref={search.globalSearchInputRef}
-                className="search-input"
-                value={search.searchQueryInput}
-                onChange={(event) => {
-                  search.setSearchQueryInput(event.target.value);
-                  search.setSearchPage(0);
-                }}
-                placeholder={SEARCH_PLACEHOLDERS.globalMessages}
-                title={search.searchResponse.queryError ?? undefined}
-              />
-            </div>
-            <AdvancedSearchToggleButton
-              enabled={advancedSearchEnabled}
-              onToggle={() => {
-                setAdvancedSearchEnabled((value) => !value);
-                search.setSearchPage(0);
-              }}
-            />
-          </div>
-          {search.searchResponse.queryError ? (
-            <p className="search-error" title={search.searchResponse.queryError}>
-              {search.searchResponse.queryError}
-            </p>
-          ) : null}
-          <input
-            value={search.searchProjectQueryInput}
-            onChange={(event) => {
-              search.setSearchProjectQueryInput(event.target.value);
-              search.setSearchPage(0);
-            }}
-            placeholder={SEARCH_PLACEHOLDERS.globalProjects}
-          />
-          <select
-            className="search-select"
-            value={search.searchProjectId}
-            onChange={(event) => {
-              search.setSearchProjectId(event.target.value);
-              search.setSearchPage(0);
-            }}
-          >
-            <option value="">All projects</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {prettyProvider(project.provider)}:{" "}
-                {project.name || project.path || "(unknown project)"}
-              </option>
-            ))}
-          </select>
-          <div className="chip-row">
-            {enabledProviders.map((provider) => (
-              <button
-                key={provider}
-                type="button"
-                className={`chip provider-chip provider-${provider}${
-                  search.searchProviders.includes(provider) ? " active" : ""
-                }`}
-                onClick={() => {
-                  search.setSearchProviders((value) => toggleValue(value, provider));
-                  search.setSearchPage(0);
-                }}
-              >
-                {prettyProvider(provider)} ({search.searchProviderCounts[provider]})
-              </button>
-            ))}
-          </div>
-          <div className="chip-row">
-            {CATEGORIES.map((category) => (
-              <button
-                key={category}
-                type="button"
-                className={`chip category-chip category-${category}${
-                  search.historyCategories.includes(category) ? " active" : ""
-                }`}
-                onClick={() => {
-                  search.setHistoryCategories((value) => toggleValue(value, category));
-                  search.setSearchPage(0);
-                }}
-              >
-                {prettyCategory(category)} ({search.searchResponse.categoryCounts[category]})
-              </button>
-            ))}
-          </div>
-        </div>
+        <div className="search-page">
+          <div className="search-page-body">
+            <div className="search-panel">
+              <div className={`search-panel-top${controlsCollapsed ? " is-collapsed" : ""}`}>
+                <div className="search-query-row">
+                  <div
+                    className={`search-query-shell${
+                      search.searchResponse.queryError ? " invalid" : ""
+                    }`}
+                  >
+                    <ToolbarIcon name="search" />
+                    <input
+                      ref={search.globalSearchInputRef}
+                      className="search-query-input"
+                      value={search.searchQueryInput}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter") {
+                          return;
+                        }
+                        event.preventDefault();
+                        search.focusSearchResultsPane();
+                      }}
+                      onChange={(event) => {
+                        search.setSearchQueryInput(event.target.value);
+                        search.setSearchPage(0);
+                      }}
+                      placeholder={queryPlaceholder}
+                      title={search.searchResponse.queryError ?? queryTitle}
+                    />
+                  </div>
 
-        <div className="search-result-list">
-          {search.searchResponse.results.length === 0 ? (
-            <p className="empty-state">No search results.</p>
-          ) : (
-            search.searchResponse.results.map((result) => (
-              <button
-                type="button"
-                key={result.messageId}
-                className={`search-result category-${result.category}`}
-                onClick={() => onSelectResult(result)}
+                  <AdvancedSearchToggleButton
+                    buttonRef={search.advancedSearchToggleRef}
+                    enabled={advancedSearchEnabled}
+                    onToggle={() => {
+                      setAdvancedSearchEnabled((value) => !value);
+                      search.setSearchPage(0);
+                    }}
+                    title={
+                      advancedSearchEnabled
+                        ? 'Advanced search is on. You can use quoted phrases, AND/OR/NOT, parentheses, and postfix wildcard syntax like term*. Example: "rate limit" AND retry*. Turn this off to go back to plain text search. Refer to Help for more.'
+                        : "Advanced search is off. Search works like plain text matching, with optional postfix wildcard syntax like term*. Turn this on if you want quoted phrases, AND/OR/NOT, and grouped expressions with parentheses. Refer to Help for more."
+                    }
+                  />
+
+                  <div
+                    className={`search-match-count${
+                      search.hasActiveSearchQuery ? " is-active" : ""
+                    }`}
+                  >
+                    {formatResultCount(search.searchResponse.totalCount)}
+                  </div>
+
+                  <button
+                    ref={search.searchCollapseButtonRef}
+                    type="button"
+                    className="search-panel-collapse-btn"
+                    aria-expanded={!controlsCollapsed}
+                    aria-label={
+                      controlsCollapsed ? "Expand search filters" : "Collapse search filters"
+                    }
+                    title={
+                      controlsCollapsed
+                        ? "Expand the search controls"
+                        : "Collapse filters and keep only the search box and match count visible"
+                    }
+                    onClick={() => setControlsCollapsed((value) => !value)}
+                  >
+                    <span className="search-panel-collapse-glyph" aria-hidden>
+                      {controlsCollapsed ? "▾" : "▴"}
+                    </span>
+                  </button>
+                </div>
+
+                {!controlsCollapsed && search.searchResponse.queryError ? (
+                  <p className="search-error" title={search.searchResponse.queryError}>
+                    {search.searchResponse.queryError}
+                  </p>
+                ) : null}
+
+                {!controlsCollapsed ? (
+                  <>
+                    <div className="search-secondary-row">
+                      <label className="search-filter-input-shell">
+                        <span className="search-filter-icon" aria-hidden>
+                          <svg viewBox="0 0 16 16">
+                            <title>Filter</title>
+                            <path d="M3 4h10M5 8h6M7 12h2" />
+                          </svg>
+                        </span>
+                        <input
+                          ref={search.searchProjectFilterInputRef}
+                          className="search-filter-input"
+                          value={search.searchProjectQueryInput}
+                          onChange={(event) => {
+                            search.setSearchProjectQueryInput(event.target.value);
+                            search.setSearchPage(0);
+                          }}
+                          placeholder={SEARCH_PLACEHOLDERS.globalProjects}
+                          title="Filter visible search results by project name only. Refer to Help for search syntax details."
+                        />
+                      </label>
+
+                      <div className="search-project-select-wrap" ref={projectMenuRef}>
+                        <div className="search-project-select-shell">
+                          <span className="search-filter-icon" aria-hidden>
+                            <svg viewBox="0 0 16 16">
+                              <title>Project</title>
+                              <rect x="2" y="3" width="12" height="10" rx="2" />
+                              <path d="M5 7h6" />
+                            </svg>
+                          </span>
+                          <button
+                            ref={search.searchProjectSelectRef}
+                            type="button"
+                            className="search-project-select-trigger"
+                            aria-haspopup="menu"
+                            aria-expanded={projectMenuOpen}
+                            title={
+                              selectedProject
+                                ? `${getProjectOptionLabel(selectedProject)} — ${selectedProject.path || "(unknown path)"}`
+                                : "All projects"
+                            }
+                            onClick={() => setProjectMenuOpen((value) => !value)}
+                          >
+                            <span className="search-project-select-label">
+                              {selectedProject
+                                ? getProjectOptionLabel(selectedProject)
+                                : "All projects"}
+                            </span>
+                            {selectedProject?.path ? (
+                              <span className="search-project-select-path">
+                                {compactPath(selectedProject.path)}
+                              </span>
+                            ) : null}
+                          </button>
+                          <span className="search-select-chevron" aria-hidden>
+                            <svg viewBox="0 0 10 10">
+                              <title>Open menu</title>
+                              <path d="M2 4l3 3 3-3" />
+                            </svg>
+                          </span>
+                        </div>
+                        {projectMenuOpen ? (
+                          <div
+                            className="search-project-menu tb-dropdown-menu tb-dropdown-menu-scrollable"
+                            role="menu"
+                            aria-label="Projects"
+                          >
+                            <button
+                              type="button"
+                              className={`search-project-menu-item tb-dropdown-item tb-dropdown-item-checkable${
+                                search.searchProjectId === "" ? " selected" : ""
+                              }`}
+                              onClick={() => {
+                                search.setSearchProjectId("");
+                                search.setSearchPage(0);
+                                setProjectMenuOpen(false);
+                              }}
+                            >
+                              <span className="search-project-menu-main">All projects</span>
+                              {search.searchProjectId === "" ? (
+                                <span className="tb-dropdown-check">✓</span>
+                              ) : null}
+                            </button>
+                            {sortedProjects.map((project) => (
+                              <button
+                                key={project.id}
+                                type="button"
+                                className={`search-project-menu-item tb-dropdown-item tb-dropdown-item-checkable${
+                                  search.searchProjectId === project.id ? " selected" : ""
+                                }`}
+                                title={project.path || undefined}
+                                onClick={() => {
+                                  search.setSearchProjectId(project.id);
+                                  search.setSearchPage(0);
+                                  setProjectMenuOpen(false);
+                                }}
+                              >
+                                <span className="search-project-menu-main">
+                                  {getProjectOptionLabel(project)}
+                                </span>
+                                <span className="search-project-menu-path">
+                                  {project.path ? compactPath(project.path) : "(unknown path)"}
+                                </span>
+                                {search.searchProjectId === project.id ? (
+                                  <span className="tb-dropdown-check">✓</span>
+                                ) : null}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <SearchFilterGroup label="Agent">
+                      {enabledProviders.map((provider) => (
+                        <button
+                          key={provider}
+                          type="button"
+                          tabIndex={-1}
+                          className={`msg-filter search-filter-chip search-filter-chip-provider search-filter-chip-provider-${provider}${
+                            search.searchProviders.includes(provider) ? " is-active" : ""
+                          }`}
+                          onClick={() => {
+                            search.setSearchProviders((value) => toggleValue(value, provider));
+                            search.setSearchPage(0);
+                          }}
+                        >
+                          <span className="filter-label">
+                            {prettyProvider(provider)}
+                            <span className="filter-count search-filter-chip-count">
+                              {search.searchProviderCounts[provider]}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </SearchFilterGroup>
+
+                    <SearchFilterGroup label="Role">
+                      {CATEGORIES.map((category) => (
+                        <button
+                          key={category}
+                          type="button"
+                          tabIndex={-1}
+                          className={`msg-filter search-filter-chip search-filter-chip-category search-filter-chip-category-${category}${
+                            search.historyCategories.includes(category) ? " is-active" : ""
+                          }`}
+                          title={getSearchCategoryTooltip(category)}
+                          onClick={() => {
+                            search.setHistoryCategories((value) => toggleValue(value, category));
+                            search.setSearchPage(0);
+                          }}
+                        >
+                          <span className="filter-shortcut" aria-hidden="true">
+                            {getSearchCategoryShortcutDigit(category)}
+                          </span>
+                          <span className="filter-label">
+                            {prettyCategory(category)}
+                            <span className="filter-count search-filter-chip-count">
+                              {search.searchResponse.categoryCounts[category]}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </SearchFilterGroup>
+                  </>
+                ) : null}
+              </div>
+
+              <div
+                ref={search.searchResultsScrollRef}
+                className="search-results-scroll"
+                tabIndex={-1}
+                onFocus={(event) => {
+                  if (event.target === event.currentTarget) {
+                    search.setFocusedSearchResultIndex(-1);
+                  }
+                }}
               >
-                <header>
-                  <span className={`category-badge category-${result.category}`}>
-                    {prettyCategory(result.category)}
+                {search.searchResponse.results.length === 0 ? (
+                  <div className="search-empty-state">
+                    {search.hasActiveSearchQuery
+                      ? "No search results."
+                      : "Type to search all messages."}
+                  </div>
+                ) : (
+                  search.searchResponse.results.map((result, index) => (
+                    <button
+                      type="button"
+                      key={`${result.messageId}-${result.messageSourceId}`}
+                      ref={(element) => search.setSearchResultRef(index, element)}
+                      tabIndex={-1}
+                      className={`search-result-card search-result-card-${result.provider}${
+                        search.focusedSearchResultIndex === index ? " is-focused" : ""
+                      }`}
+                      onFocus={() => search.setFocusedSearchResultIndex(index)}
+                      onClick={() => onSelectResult(result)}
+                    >
+                      <span className="search-result-accent" aria-hidden />
+                      <div className="search-result-content">
+                        <div className="search-result-meta">
+                          <span
+                            className={`search-result-provider search-result-provider-${result.provider}`}
+                          >
+                            {prettyProvider(result.provider)}
+                          </span>
+                          <span
+                            className={`search-result-category search-result-category-${result.category}`}
+                          >
+                            {prettyCategory(result.category)}
+                          </span>
+                          <span className="search-result-time">{formatDate(result.createdAt)}</span>
+                          <span className="search-result-project">
+                            {getSearchResultProjectLabel(result)}
+                          </span>
+                        </div>
+                        <p className="search-result-snippet">
+                          <HighlightedText text={result.snippet} query="" allowMarks />
+                        </p>
+                        <div className="search-result-footer">
+                          {getSearchResultProjectMeta(result)}
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              {search.hasActiveSearchQuery ? (
+                <div className="search-footer">
+                  <span className="search-footer-page">
+                    Page {search.searchPage + 1} of {search.searchTotalPages}
                   </span>
-                  <small>
-                    <span className={`provider-label provider-${result.provider}`}>
-                      {prettyProvider(result.provider)}
-                    </span>{" "}
-                    | {formatDate(result.createdAt)}
-                  </small>
-                </header>
-                <p className="snippet">
-                  <HighlightedText text={result.snippet} query="" allowMarks />
-                </p>
-                <footer>
-                  <small>{result.projectName || result.projectPath || "(unknown project)"}</small>
-                </footer>
-              </button>
-            ))
-          )}
-        </div>
-
-        {search.hasActiveSearchQuery ? (
-          <div className="pagination-row">
-            <button
-              type="button"
-              className="page-btn"
-              onClick={search.goToPreviousSearchPage}
-              disabled={!search.canGoToPreviousSearchPage}
-              title="Previous page (Cmd/Ctrl+Left)"
-              aria-label="Previous search page"
-            >
-              Previous
-            </button>
-            <span className="page-info">
-              Page {search.searchPage + 1} / {search.searchTotalPages} (
-              {search.searchResponse.totalCount} matches)
-            </span>
-            <button
-              type="button"
-              className="page-btn"
-              onClick={search.goToNextSearchPage}
-              disabled={!search.canGoToNextSearchPage}
-              title="Next page (Cmd/Ctrl+Right)"
-              aria-label="Next search page"
-            >
-              Next
-            </button>
+                  <div className="search-footer-actions">
+                    <button
+                      type="button"
+                      className="page-btn"
+                      tabIndex={-1}
+                      onClick={search.goToPreviousSearchPage}
+                      disabled={!search.canGoToPreviousSearchPage}
+                      title="Previous page (Cmd/Ctrl+Left)"
+                      aria-label="Previous search page"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      type="button"
+                      className="page-btn"
+                      tabIndex={-1}
+                      onClick={search.goToNextSearchPage}
+                      disabled={!search.canGoToNextSearchPage}
+                      title="Next page (Cmd/Ctrl+Right)"
+                      aria-label="Next search page"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <span className="search-footer-shortcut">
+                    Cmd/Ctrl+Left/Right • Cmd+Up/Down • Ctrl+D/U • Page Up/Down
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
-        ) : null}
+        </div>
       </div>
     </section>
   );
+}
+
+function SearchFilterGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="search-filter-group">
+      <span className="search-filter-group-label">{label}</span>
+      <div className="search-filter-group-items">{children}</div>
+    </div>
+  );
+}
+
+function getSearchResultProjectLabel(result: SearchResult): string {
+  return result.projectName || compactPath(result.projectPath) || "(unknown project)";
+}
+
+function getSearchResultProjectMeta(result: SearchResult): string {
+  if (result.projectName && result.projectPath) {
+    return compactPath(result.projectPath);
+  }
+  return result.projectName || compactPath(result.projectPath) || "(unknown project)";
+}
+
+function formatResultCount(value: number): string {
+  const formatted = new Intl.NumberFormat().format(value);
+  return `${formatted} ${value === 1 ? "match" : "matches"}`;
+}
+
+function getSearchCategoryShortcutDigit(category: MessageCategory): string {
+  const match = HISTORY_CATEGORY_SHORTCUTS[category].match(/\d$/);
+  return match?.[0] ?? "";
+}
+
+function getSearchCategoryTooltip(category: MessageCategory): string {
+  const label = prettyCategory(category);
+  return `Toggle ${label} filter (${HISTORY_CATEGORY_SHORTCUTS[category]})`;
+}
+
+function compareProjectsByNameThenProvider(a: ProjectSummary, b: ProjectSummary): number {
+  const nameCompare = getProjectDisplayName(a).localeCompare(getProjectDisplayName(b), undefined, {
+    sensitivity: "base",
+  });
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+  return prettyProvider(a.provider).localeCompare(prettyProvider(b.provider), undefined, {
+    sensitivity: "base",
+  });
+}
+
+function getProjectDisplayName(project: ProjectSummary): string {
+  return project.name || compactPath(project.path) || "(unknown project)";
+}
+
+function getProjectOptionLabel(project: ProjectSummary): string {
+  return `${getProjectDisplayName(project)}: ${prettyProvider(project.provider)}`;
 }
