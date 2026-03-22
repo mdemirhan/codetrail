@@ -97,7 +97,7 @@ type PendingSelectionCommit =
 const MESSAGE_PAGE_SCROLL_OVERLAP_PX = 20;
 const PROJECT_UPDATE_HIGHLIGHT_MS = 8_000;
 const PROJECT_SELECTION_COMMIT_DEBOUNCE_MS = 140;
-const SESSION_SELECTION_COMMIT_DEBOUNCE_MS = 120;
+const SESSION_SELECTION_COMMIT_DEBOUNCE_MS = 140;
 const PROJECT_NAME_COLLATOR = new Intl.Collator(undefined, {
   sensitivity: "base",
   numeric: true,
