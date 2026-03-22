@@ -1808,15 +1808,24 @@ body.platform-macos .titlebar-left {
 }
 
 .project-folder-label {
+  display: block;
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  direction: rtl;
+  text-align: left;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-secondary);
+}
+
+.project-folder-label-text {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .project-folder-main {
@@ -1833,21 +1842,6 @@ body.platform-macos .titlebar-left {
 
 .project-folder-row.active .project-folder-label {
   color: var(--text-primary);
-}
-
-.project-folder-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  margin-left: auto;
-  border-radius: 999px;
-  padding: 1px 6px;
-  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 .project-folder-children {

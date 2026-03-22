@@ -129,12 +129,12 @@ export function HistoryLayout({
       <ProjectPane
         data={{
           sortedProjects: history.sortedProjects,
-          selectedProjectId: history.selectedProjectId,
-          selectedSessionId: history.selectedSessionId,
+          selectedProjectId: history.uiSelectedProjectId,
+          selectedSessionId: history.uiSelectedSessionId,
           listRef: history.refs.projectListRef,
           viewMode: history.projectViewMode,
           updateSource: history.projectListUpdateSource,
-          historyMode: history.historyMode,
+          historyMode: history.uiHistoryMode,
           collapsed: history.projectPaneCollapsed,
           projectQueryInput: history.projectQueryInput,
           projectProviders: history.projectProviders,
@@ -176,10 +176,13 @@ export function HistoryLayout({
             history.setSingleClickProjectsExpand((value) => !value),
           onCopyProjectDetails: (projectId) => copyProjectDetailsById(history, logError, projectId),
           onCopySession: (sessionId) => copySessionDetailsById(history, logError, sessionId),
-          onSelectProject: history.selectProjectAllMessages,
-          onSelectProjectSession: (projectId, sessionId) =>
-            history.selectSessionView(sessionId, projectId),
+          onSelectProject: (projectId, options) =>
+            history.selectProjectAllMessages(projectId, options),
+          onSelectProjectSession: (projectId, sessionId, options) =>
+            history.selectSessionView(sessionId, projectId, options),
           onSelectProjectBookmarks: history.openProjectBookmarksView,
+          consumeFocusSelectionBehavior: history.consumeProjectPaneFocusSelectionBehavior,
+          onQueueProjectTreeNoopCommit: history.queueProjectTreeNoopCommit,
           onEnsureTreeProjectSessionsLoaded: history.ensureTreeProjectSessionsLoaded,
           onDeleteProject,
           onOpenProjectLocation: (projectId) =>
@@ -199,14 +202,16 @@ export function HistoryLayout({
 
       <SessionPane
         sortedSessions={history.visibleSessionPaneSessions}
-        selectedSessionId={history.selectedSessionId}
+        selectedSessionId={history.uiSelectedSessionId}
         listRef={history.refs.sessionListRef}
         sortDirection={history.sessionSortDirection}
         allSessionsCount={history.visibleSessionPaneAllSessionsCount}
-        allSessionsSelected={history.historyMode === "project_all"}
+        allSessionsSelected={history.uiHistoryMode === "project_all"}
         bookmarksCount={history.visibleSessionPaneBookmarksCount}
-        bookmarksSelected={history.historyMode === "bookmarks"}
+        bookmarksSelected={history.uiHistoryMode === "bookmarks"}
         collapsed={history.sessionPaneCollapsed}
+        // Session actions should only operate on committed data, even while the list highlight
+        // moves ahead during keyboard debounce.
         canCopySession={history.historyMode === "session" && !!history.selectedSession}
         canOpenSessionLocation={
           history.historyMode === "session" && Boolean(history.selectedSession?.filePath?.trim())

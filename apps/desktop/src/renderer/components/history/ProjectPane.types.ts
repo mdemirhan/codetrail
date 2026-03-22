@@ -2,6 +2,7 @@ import type { Provider } from "@codetrail/core/browser";
 import type { Ref } from "react";
 
 import type {
+  HistorySelectionCommitMode,
   ProjectSortField,
   ProjectSummary,
   ProjectViewMode,
@@ -60,6 +61,11 @@ export type ProjectPanePreferences = {
   singleClickProjectsExpand?: boolean;
 };
 
+export type ProjectPaneSelectionOptions = {
+  commitMode?: HistorySelectionCommitMode;
+  waitForKeyboardIdle?: boolean;
+};
+
 export type ProjectPaneCapabilities = {
   canCopyProjectDetails: boolean;
   canOpenProjectLocation: boolean;
@@ -78,9 +84,15 @@ export type ProjectPaneActions = {
   onToggleSingleClickProjectsExpand: () => void;
   onCopyProjectDetails: (projectId?: string) => void;
   onCopySession: (sessionId?: string) => void;
-  onSelectProject: (projectId: string) => void;
-  onSelectProjectSession?: (projectId: string, sessionId: string) => void;
+  onSelectProject: (projectId: string, options?: ProjectPaneSelectionOptions) => void;
+  onSelectProjectSession?: (
+    projectId: string,
+    sessionId: string,
+    options?: ProjectPaneSelectionOptions,
+  ) => void;
   onSelectProjectBookmarks?: (projectId: string) => void;
+  consumeFocusSelectionBehavior?: () => ProjectPaneSelectionOptions;
+  onQueueProjectTreeNoopCommit?: (options?: ProjectPaneSelectionOptions) => void;
   onEnsureTreeProjectSessionsLoaded?: (projectId: string) => void;
   onOpenProjectLocation: (projectId?: string) => void;
   onOpenSessionLocation: (sessionId?: string) => void;

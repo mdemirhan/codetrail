@@ -36,7 +36,10 @@ import { HistoryDetailPane } from "./features/HistoryDetailPane";
 import { HistoryLayout } from "./features/HistoryLayout";
 import { SearchView } from "./features/SearchView";
 import { useAppearanceController } from "./features/useAppearanceController";
-import { useHistoryController } from "./features/useHistoryController";
+import {
+  setTestHistorySelectionDebounceOverrides,
+  useHistoryController,
+} from "./features/useHistoryController";
 import { useSearchController } from "./features/useSearchController";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useReconcileProviderSelection } from "./hooks/useReconcileProviderSelection";
@@ -56,6 +59,7 @@ export function setTestStrategyIntervalOverrides(
 ): void {
   _testStrategyIntervalOverrides = overrides;
 }
+export { setTestHistorySelectionDebounceOverrides };
 
 type PendingHistoryDelete =
   | (Extract<DeleteTarget, { kind: "project" }> & { projectId: string })

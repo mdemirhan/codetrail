@@ -28,6 +28,7 @@ import type {
   HistoryExportScope,
   HistorySearchNavigation,
   HistorySelection,
+  HistorySelectionCommitMode,
   PaneStateSnapshot,
   PendingMessagePageNavigation,
   PendingRevealTarget,
@@ -82,12 +83,54 @@ type ProjectUpdateState = {
   updatedAt: number;
 };
 
+type PendingSelectionCommit =
+  | {
+      kind: "selection";
+      selection: HistorySelection;
+      delayMs: number;
+    }
+  | {
+      kind: "noop";
+      delayMs: number;
+    };
+
 const MESSAGE_PAGE_SCROLL_OVERLAP_PX = 20;
 const PROJECT_UPDATE_HIGHLIGHT_MS = 8_000;
+const PROJECT_SELECTION_COMMIT_DEBOUNCE_MS = 140;
+const SESSION_SELECTION_COMMIT_DEBOUNCE_MS = 120;
 const PROJECT_NAME_COLLATOR = new Intl.Collator(undefined, {
   sensitivity: "base",
   numeric: true,
 });
+
+let _testHistorySelectionDebounceOverrides: { project: number; session: number } | null = null;
+
+function getHistorySelectionCommitDebounceMs(kind: "project" | "session"): number {
+  if (_testHistorySelectionDebounceOverrides) {
+    return kind === "project"
+      ? _testHistorySelectionDebounceOverrides.project
+      : _testHistorySelectionDebounceOverrides.session;
+  }
+  return kind === "project"
+    ? PROJECT_SELECTION_COMMIT_DEBOUNCE_MS
+    : SESSION_SELECTION_COMMIT_DEBOUNCE_MS;
+}
+
+export function setTestHistorySelectionDebounceOverrides(
+  overrides: { project: number; session: number } | null,
+): void {
+  _testHistorySelectionDebounceOverrides = overrides;
+}
+
+function historySelectionsEqual(left: HistorySelection, right: HistorySelection): boolean {
+  if (left.mode !== right.mode || left.projectId !== right.projectId) {
+    return false;
+  }
+  if (left.mode !== "session" && right.mode !== "session") {
+    return true;
+  }
+  return left.mode === "session" && right.mode === "session" && left.sessionId === right.sessionId;
+}
 
 function getProjectSortLabel(project: ProjectSummary): string {
   return project.name.trim() || project.path.trim() || project.id;
@@ -207,6 +250,9 @@ export function useHistoryController({
   const [projectUpdates, setProjectUpdates] = useState<Record<string, ProjectUpdateState>>({});
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [selection, setHistorySelection] = useState<HistorySelection>(() =>
+    createHistorySelectionFromPaneState(initialPaneState),
+  );
+  const [committedSelection, setCommittedSelection] = useState<HistorySelection>(() =>
     createHistorySelectionFromPaneState(initialPaneState),
   );
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -337,6 +383,12 @@ export function useHistoryController({
   const prevMessageIdsRef = useRef("");
   const refreshContextRef = useRef<RefreshContext | null>(null);
   const refreshIdCounterRef = useRef(0);
+  const selectionRef = useRef(selection);
+  const committedSelectionRef = useRef(committedSelection);
+  const selectionCommitTimerRef = useRef<number | null>(null);
+  const pendingDebouncedSelectionRef = useRef<PendingSelectionCommit | null>(null);
+  const pendingProjectPaneFocusCommitModeRef = useRef<HistorySelectionCommitMode>("immediate");
+  const pendingProjectPaneFocusWaitForKeyboardIdleRef = useRef(false);
   const treeProjectSessionsLoadTokenRef = useRef<Record<string, number>>({});
   const treeProjectSessionsByProjectIdRef = useRef<Record<string, SessionSummary[]>>({});
   const treeProjectSessionsLoadingByProjectIdRef = useRef<Record<string, boolean>>({});
@@ -367,9 +419,9 @@ export function useHistoryController({
     initialSessionPaneWidth,
   });
 
-  const rawSelectedProjectId = selection.projectId;
-  const rawSelectedSessionId = selection.mode === "session" ? selection.sessionId : "";
-  const historyMode = selection.mode;
+  const rawUiSelectedProjectId = selection.projectId;
+  const rawUiSelectedSessionId = selection.mode === "session" ? selection.sessionId : "";
+  const uiHistoryMode = selection.mode;
 
   const naturallySortedProjects = useMemo(() => {
     const next = projects.filter((project) => enabledProviders.includes(project.provider));
@@ -436,8 +488,14 @@ export function useHistoryController({
     [sessionSortDirection, treeProjectSessionsByProjectId],
   );
 
+  const rawSelectedProjectId = committedSelection.projectId;
+  const rawSelectedSessionId =
+    committedSelection.mode === "session" ? committedSelection.sessionId : "";
+  const historyMode = committedSelection.mode;
   const selectedProjectId = rawSelectedProjectId || sortedProjects[0]?.id || "";
   const selectedSessionId = rawSelectedSessionId;
+  const uiSelectedProjectId = rawUiSelectedProjectId || sortedProjects[0]?.id || "";
+  const uiSelectedSessionId = rawUiSelectedSessionId;
 
   useEffect(() => {
     treeProjectSessionsByProjectIdRef.current = treeProjectSessionsByProjectId;
@@ -446,6 +504,176 @@ export function useHistoryController({
   useEffect(() => {
     treeProjectSessionsLoadingByProjectIdRef.current = treeProjectSessionsLoadingByProjectId;
   }, [treeProjectSessionsLoadingByProjectId]);
+
+  useEffect(() => {
+    selectionRef.current = selection;
+  }, [selection]);
+
+  useEffect(() => {
+    committedSelectionRef.current = committedSelection;
+  }, [committedSelection]);
+
+  const clearSelectionCommitTimer = useCallback(() => {
+    if (selectionCommitTimerRef.current === null) {
+      return;
+    }
+    window.clearTimeout(selectionCommitTimerRef.current);
+    selectionCommitTimerRef.current = null;
+  }, []);
+
+  const commitHistorySelection = useCallback(
+    (nextSelection: HistorySelection) => {
+      clearSelectionCommitTimer();
+      selectionRef.current = nextSelection;
+      setHistorySelection((current) =>
+        historySelectionsEqual(current, nextSelection) ? current : nextSelection,
+      );
+      committedSelectionRef.current = nextSelection;
+      setCommittedSelection((current) =>
+        historySelectionsEqual(current, nextSelection) ? current : nextSelection,
+      );
+    },
+    [clearSelectionCommitTimer],
+  );
+
+  const scheduleCommittedSelection = useCallback(
+    (nextSelection: HistorySelection, delayMs: number) => {
+      pendingDebouncedSelectionRef.current = null;
+      clearSelectionCommitTimer();
+      selectionCommitTimerRef.current = window.setTimeout(() => {
+        selectionCommitTimerRef.current = null;
+        commitHistorySelection(nextSelection);
+      }, delayMs);
+    },
+    [clearSelectionCommitTimer, commitHistorySelection],
+  );
+
+  const scheduleNoopCommit = useCallback(
+    (delayMs: number) => {
+      pendingDebouncedSelectionRef.current = null;
+      clearSelectionCommitTimer();
+      selectionCommitTimerRef.current = window.setTimeout(() => {
+        selectionCommitTimerRef.current = null;
+      }, delayMs);
+    },
+    [clearSelectionCommitTimer],
+  );
+
+  const flushPendingDebouncedSelection = useCallback(() => {
+    const pendingCommit = pendingDebouncedSelectionRef.current;
+    if (!pendingCommit) {
+      return;
+    }
+    if (pendingCommit.kind === "selection") {
+      scheduleCommittedSelection(pendingCommit.selection, pendingCommit.delayMs);
+      return;
+    }
+    scheduleNoopCommit(pendingCommit.delayMs);
+  }, [scheduleCommittedSelection, scheduleNoopCommit]);
+
+  const queueProjectTreeNoopCommit = useCallback(
+    ({
+      commitMode = "immediate",
+      waitForKeyboardIdle = false,
+    }: {
+      commitMode?: HistorySelectionCommitMode;
+      waitForKeyboardIdle?: boolean;
+    } = {}) => {
+      pendingProjectPaneFocusCommitModeRef.current = "immediate";
+      pendingProjectPaneFocusWaitForKeyboardIdleRef.current = false;
+
+      if (commitMode === "immediate") {
+        pendingDebouncedSelectionRef.current = null;
+        clearSelectionCommitTimer();
+        return;
+      }
+
+      const delayMs = getHistorySelectionCommitDebounceMs(
+        commitMode === "debounced_project" ? "project" : "session",
+      );
+      if (waitForKeyboardIdle) {
+        pendingDebouncedSelectionRef.current = {
+          kind: "noop",
+          delayMs,
+        };
+        clearSelectionCommitTimer();
+        return;
+      }
+      scheduleNoopCommit(delayMs);
+    },
+    [clearSelectionCommitTimer, scheduleNoopCommit],
+  );
+
+  const setHistorySelectionWithCommitMode = useCallback(
+    (
+      value: SetStateAction<HistorySelection>,
+      commitMode: HistorySelectionCommitMode = "immediate",
+      waitForKeyboardIdle = false,
+    ) => {
+      const nextSelection = typeof value === "function" ? value(selectionRef.current) : value;
+      selectionRef.current = nextSelection;
+      setHistorySelection((current) =>
+        historySelectionsEqual(current, nextSelection) ? current : nextSelection,
+      );
+
+      if (commitMode === "immediate") {
+        pendingDebouncedSelectionRef.current = null;
+        commitHistorySelection(nextSelection);
+        return;
+      }
+
+      const delayMs = getHistorySelectionCommitDebounceMs(
+        commitMode === "debounced_project" ? "project" : "session",
+      );
+      if (waitForKeyboardIdle) {
+        pendingDebouncedSelectionRef.current = {
+          kind: "selection",
+          selection: nextSelection,
+          delayMs,
+        };
+        clearSelectionCommitTimer();
+        return;
+      }
+      scheduleCommittedSelection(nextSelection, delayMs);
+    },
+    [clearSelectionCommitTimer, commitHistorySelection, scheduleCommittedSelection],
+  );
+
+  const setHistorySelectionImmediate = useCallback(
+    (value: SetStateAction<HistorySelection>) => {
+      setHistorySelectionWithCommitMode(value, "immediate");
+    },
+    [setHistorySelectionWithCommitMode],
+  );
+
+  const consumeProjectPaneFocusSelectionBehavior = useCallback(() => {
+    const nextCommitMode = pendingProjectPaneFocusCommitModeRef.current;
+    const waitForKeyboardIdle = pendingProjectPaneFocusWaitForKeyboardIdleRef.current;
+    pendingProjectPaneFocusCommitModeRef.current = "immediate";
+    pendingProjectPaneFocusWaitForKeyboardIdleRef.current = false;
+    return {
+      commitMode: nextCommitMode,
+      waitForKeyboardIdle,
+    };
+  }, []);
+
+  useEffect(() => {
+    const flushOnArrowRelease = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+        return;
+      }
+      flushPendingDebouncedSelection();
+    };
+    const flushOnBlur = () => {
+      flushPendingDebouncedSelection();
+    };
+    window.addEventListener("keyup", flushOnArrowRelease);
+    window.addEventListener("blur", flushOnBlur);
+    return () => {
+      window.removeEventListener("keyup", flushOnArrowRelease);
+      window.removeEventListener("blur", flushOnBlur);
+    };
+  }, [flushPendingDebouncedSelection]);
 
   useEffect(() => {
     const visibleProjectIds = new Set(sortedProjects.map((project) => project.id));
@@ -638,28 +866,34 @@ export function useHistoryController({
     [paneAppearanceState, paneFilterState, paneLayoutState, paneSelectionState, paneSortState],
   );
 
-  const setSelectedProjectIdForPaneStateSync = useCallback((value: SetStateAction<string>) => {
-    setHistorySelection((selectionState) =>
-      typeof value === "function"
-        ? setHistorySelectionProjectId(selectionState, value(selectionState.projectId))
-        : setHistorySelectionProjectId(selectionState, value),
-    );
-  }, []);
+  const setSelectedProjectIdForPaneStateSync = useCallback(
+    (value: SetStateAction<string>) => {
+      setHistorySelectionImmediate((selectionState) =>
+        typeof value === "function"
+          ? setHistorySelectionProjectId(selectionState, value(selectionState.projectId))
+          : setHistorySelectionProjectId(selectionState, value),
+      );
+    },
+    [setHistorySelectionImmediate],
+  );
 
-  const setSelectedSessionIdForPaneStateSync = useCallback((value: SetStateAction<string>) => {
-    setHistorySelection((selectionState) =>
-      typeof value === "function"
-        ? setHistorySelectionSessionId(
-            selectionState,
-            value(selectionState.mode === "session" ? selectionState.sessionId : ""),
-          )
-        : setHistorySelectionSessionId(selectionState, value),
-    );
-  }, []);
+  const setSelectedSessionIdForPaneStateSync = useCallback(
+    (value: SetStateAction<string>) => {
+      setHistorySelectionImmediate((selectionState) =>
+        typeof value === "function"
+          ? setHistorySelectionSessionId(
+              selectionState,
+              value(selectionState.mode === "session" ? selectionState.sessionId : ""),
+            )
+          : setHistorySelectionSessionId(selectionState, value),
+      );
+    },
+    [setHistorySelectionImmediate],
+  );
 
   const setHistoryModeForPaneStateSync = useCallback(
     (value: SetStateAction<HistorySelection["mode"]>) => {
-      setHistorySelection((selectionState) =>
+      setHistorySelectionImmediate((selectionState) =>
         createHistorySelection(
           typeof value === "function" ? value(selectionState.mode) : value,
           selectionState.projectId,
@@ -667,7 +901,7 @@ export function useHistoryController({
         ),
       );
     },
-    [],
+    [setHistorySelectionImmediate],
   );
 
   const { paneStateHydrated } = usePaneStateSync({
@@ -693,7 +927,7 @@ export function useHistoryController({
     setMonoFontSize: appearance.setMonoFontSize,
     setRegularFontSize: appearance.setRegularFontSize,
     setUseMonospaceForAllMessages: appearance.setUseMonospaceForAllMessages,
-    setHistorySelection,
+    setHistorySelection: setHistorySelectionImmediate,
     setSelectedProjectId: setSelectedProjectIdForPaneStateSync,
     setSelectedSessionId: setSelectedSessionIdForPaneStateSync,
     setHistoryMode: setHistoryModeForPaneStateSync,
@@ -757,14 +991,14 @@ export function useHistoryController({
     logError,
     projectProviders,
     projectQuery,
-    rawSelectedProjectId,
+    rawSelectedProjectId: rawUiSelectedProjectId,
     selectedProjectId,
     selectedSessionId,
     sortedProjects,
     sortedSessions,
     pendingSearchNavigation,
     setPendingSearchNavigation,
-    setHistorySelection,
+    setHistorySelection: setHistorySelectionImmediate,
     setProjects,
     projectsRef,
     setProjectListUpdateSource,
@@ -808,12 +1042,13 @@ export function useHistoryController({
       if (sessionScrollSyncTimerRef.current !== null) {
         window.clearTimeout(sessionScrollSyncTimerRef.current);
       }
+      clearSelectionCommitTimer();
       for (const timeoutId of projectUpdateTimeoutsRef.current.values()) {
         window.clearTimeout(timeoutId);
       }
       projectUpdateTimeoutsRef.current.clear();
     };
-  }, []);
+  }, [clearSelectionCommitTimer]);
 
   useEffect(() => {
     if (initialHistoryPaneFocusAppliedRef.current || !isHistoryLayout || !paneStateHydrated) {
@@ -1093,12 +1328,12 @@ export function useHistoryController({
     setHistoryCategories,
     setSessionPage,
     isExpandedByDefault,
-    historyMode,
+    historyMode: uiHistoryMode,
     selection,
     bookmarkReturnSelection,
     bookmarksResponse,
     activeHistoryMessages,
-    selectedProjectId,
+    selectedProjectId: uiSelectedProjectId,
     historyCategories,
     setPendingSearchNavigation,
     setSessionQueryInput,
@@ -1111,10 +1346,15 @@ export function useHistoryController({
     messageListRef,
     setPendingMessageAreaFocus,
     setPendingMessagePageNavigation,
-    setHistorySelection,
+    setHistorySelection: (value, options) =>
+      setHistorySelectionWithCommitMode(
+        value,
+        options?.commitMode ?? "immediate",
+        options?.waitForKeyboardIdle ?? false,
+      ),
     setBookmarkReturnSelection,
     sessionListRef,
-    selectedSessionId,
+    selectedSessionId: uiSelectedSessionId,
     sessionPaneNavigationItems,
     projectListRef,
     canNavigatePages,
@@ -1134,6 +1374,8 @@ export function useHistoryController({
     setProjectQueryInput,
     refreshContextRef,
     refreshTreeProjectSessions,
+    pendingProjectPaneFocusCommitModeRef,
+    pendingProjectPaneFocusWaitForKeyboardIdleRef,
   });
 
   const pageHistoryMessages = useCallback(
@@ -1261,6 +1503,10 @@ export function useHistoryController({
     historyMode,
     selectedProjectId,
     selectedSessionId,
+    uiHistoryMode,
+    uiSelectedProjectId,
+    uiSelectedSessionId,
+    consumeProjectPaneFocusSelectionBehavior,
     paneStateHydrated,
     sortedProjects,
     projectUpdates,
@@ -1376,6 +1622,7 @@ export function useHistoryController({
     openProjectBookmarksView,
     closeBookmarksView,
     selectSessionView,
+    queueProjectTreeNoopCommit,
     ensureTreeProjectSessionsLoaded,
     selectAdjacentSession,
     selectAdjacentProject,

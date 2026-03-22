@@ -18,6 +18,7 @@ import type {
   HistoryMessage,
   HistorySearchNavigation,
   HistorySelection,
+  HistorySelectionCommitMode,
   PendingMessagePageNavigation,
   PendingRevealTarget,
   ProjectSummary,
@@ -49,6 +50,11 @@ function focusVisibleProjectTarget(
   element.focus({ preventScroll: true });
   element.scrollIntoView?.({ block: "nearest" });
 }
+
+type HistorySelectionOptions = {
+  commitMode?: HistorySelectionCommitMode;
+  waitForKeyboardIdle?: boolean;
+};
 
 // Interaction handlers are collected here so keyboard/mouse behavior can share the same
 // state-transition rules without being spread across components.
@@ -102,6 +108,8 @@ export function useHistoryInteractions({
   setProjectQueryInput,
   refreshContextRef,
   refreshTreeProjectSessions,
+  pendingProjectPaneFocusCommitModeRef,
+  pendingProjectPaneFocusWaitForKeyboardIdleRef,
 }: {
   codetrail: CodetrailClient;
   logError: (context: string, error: unknown) => void;
@@ -135,7 +143,10 @@ export function useHistoryInteractions({
   messageListRef: RefObject<HTMLDivElement | null>;
   setPendingMessageAreaFocus: Dispatch<SetStateAction<boolean>>;
   setPendingMessagePageNavigation: Dispatch<SetStateAction<PendingMessagePageNavigation | null>>;
-  setHistorySelection: Dispatch<SetStateAction<HistorySelection>>;
+  setHistorySelection: (
+    value: SetStateAction<HistorySelection>,
+    options?: HistorySelectionOptions,
+  ) => void;
   setBookmarkReturnSelection: Dispatch<SetStateAction<HistorySelection | null>>;
   sessionListRef: RefObject<HTMLDivElement | null>;
   selectedSessionId: string;
@@ -158,6 +169,8 @@ export function useHistoryInteractions({
   setProjectQueryInput: Dispatch<SetStateAction<string>>;
   refreshContextRef: MutableRefObject<RefreshContext | null>;
   refreshTreeProjectSessions: () => Promise<void>;
+  pendingProjectPaneFocusCommitModeRef: MutableRefObject<HistorySelectionCommitMode>;
+  pendingProjectPaneFocusWaitForKeyboardIdleRef: MutableRefObject<boolean>;
 }) {
   const handleToggleScopedMessagesExpanded = useCallback(() => {
     if (scopedMessages.length === 0) {
@@ -325,6 +338,23 @@ export function useHistoryInteractions({
     [messageListRef],
   );
 
+  const focusProjectTargetWithCommitMode = useCallback(
+    (target: ReturnType<typeof getAdjacentVisibleProjectTarget>) => {
+      if (!target) {
+        return;
+      }
+      pendingProjectPaneFocusCommitModeRef.current =
+        target.kind === "session" ? "debounced_session" : "debounced_project";
+      pendingProjectPaneFocusWaitForKeyboardIdleRef.current = true;
+      focusVisibleProjectTarget(projectListRef.current, target.element);
+    },
+    [
+      pendingProjectPaneFocusCommitModeRef,
+      pendingProjectPaneFocusWaitForKeyboardIdleRef,
+      projectListRef,
+    ],
+  );
+
   const resetHistorySelectionState = useCallback(() => {
     // Changing history scope should clear any transient focus/navigation state carried over from a
     // previous scope.
@@ -350,29 +380,44 @@ export function useHistoryInteractions({
   }, [setBookmarkReturnSelection]);
 
   const selectProjectAllMessages = useCallback(
-    (projectId: string) => {
+    (
+      projectId: string,
+      { commitMode = "immediate", waitForKeyboardIdle = false }: HistorySelectionOptions = {},
+    ) => {
       resetHistorySelectionState();
       clearBookmarkReturnSelection();
-      setHistorySelection(createHistorySelection("project_all", projectId, ""));
+      setHistorySelection(createHistorySelection("project_all", projectId, ""), {
+        commitMode,
+        waitForKeyboardIdle,
+      });
     },
     [clearBookmarkReturnSelection, resetHistorySelectionState, setHistorySelection],
   );
 
-  const selectBookmarksView = useCallback(() => {
-    resetHistorySelectionState();
-    setBookmarkReturnSelection((current) => (historyMode === "bookmarks" ? current : selection));
-    setHistorySelection(createHistorySelection("bookmarks", selectedProjectId, ""));
-  }, [
-    historyMode,
-    resetHistorySelectionState,
-    selectedProjectId,
-    selection,
-    setBookmarkReturnSelection,
-    setHistorySelection,
-  ]);
+  const selectBookmarksView = useCallback(
+    ({ commitMode = "immediate", waitForKeyboardIdle = false }: HistorySelectionOptions = {}) => {
+      resetHistorySelectionState();
+      setBookmarkReturnSelection((current) => (historyMode === "bookmarks" ? current : selection));
+      setHistorySelection(createHistorySelection("bookmarks", selectedProjectId, ""), {
+        commitMode,
+        waitForKeyboardIdle,
+      });
+    },
+    [
+      historyMode,
+      resetHistorySelectionState,
+      selectedProjectId,
+      selection,
+      setBookmarkReturnSelection,
+      setHistorySelection,
+    ],
+  );
 
   const openProjectBookmarksView = useCallback(
-    (projectId: string) => {
+    (
+      projectId: string,
+      { commitMode = "immediate", waitForKeyboardIdle = false }: HistorySelectionOptions = {},
+    ) => {
       if (!projectId) {
         return;
       }
@@ -381,12 +426,15 @@ export function useHistoryInteractions({
         const nextSelection =
           bookmarkReturnSelection ?? createHistorySelection("project_all", projectId, "");
         setBookmarkReturnSelection(null);
-        setHistorySelection(nextSelection);
+        setHistorySelection(nextSelection, { commitMode, waitForKeyboardIdle });
         return;
       }
       resetHistorySelectionState();
       setBookmarkReturnSelection((current) => (historyMode === "bookmarks" ? current : selection));
-      setHistorySelection(createHistorySelection("bookmarks", projectId, ""));
+      setHistorySelection(createHistorySelection("bookmarks", projectId, ""), {
+        commitMode,
+        waitForKeyboardIdle,
+      });
     },
     [
       bookmarkReturnSelection,
@@ -404,7 +452,7 @@ export function useHistoryInteractions({
     const nextSelection =
       bookmarkReturnSelection ?? createHistorySelection("project_all", selectedProjectId, "");
     setBookmarkReturnSelection(null);
-    setHistorySelection(nextSelection);
+    setHistorySelection(nextSelection, { commitMode: "immediate" });
   }, [
     bookmarkReturnSelection,
     resetHistorySelectionState,
@@ -414,10 +462,17 @@ export function useHistoryInteractions({
   ]);
 
   const selectSessionView = useCallback(
-    (sessionId: string, projectId = selectedProjectId) => {
+    (
+      sessionId: string,
+      projectId = selectedProjectId,
+      { commitMode = "immediate", waitForKeyboardIdle = false }: HistorySelectionOptions = {},
+    ) => {
       resetHistorySelectionState();
       clearBookmarkReturnSelection();
-      setHistorySelection(createHistorySelection("session", projectId, sessionId));
+      setHistorySelection(createHistorySelection("session", projectId, sessionId), {
+        commitMode,
+        waitForKeyboardIdle,
+      });
     },
     [
       clearBookmarkReturnSelection,
@@ -445,14 +500,20 @@ export function useHistoryInteractions({
       }
       focusHistoryList(sessionListRef.current);
       if (nextNavigationId === PROJECT_ALL_NAV_ID) {
-        selectProjectAllMessages(selectedProjectId);
+        selectProjectAllMessages(selectedProjectId, {
+          commitMode: "debounced_session",
+          waitForKeyboardIdle: true,
+        });
         return;
       }
       if (nextNavigationId === BOOKMARKS_NAV_ID) {
-        selectBookmarksView();
+        selectBookmarksView({ commitMode: "debounced_session", waitForKeyboardIdle: true });
         return;
       }
-      selectSessionView(nextNavigationId, selectedProjectId);
+      selectSessionView(nextNavigationId, selectedProjectId, {
+        commitMode: "debounced_session",
+        waitForKeyboardIdle: true,
+      });
     },
     [
       historyMode,
@@ -477,18 +538,13 @@ export function useHistoryInteractions({
         currentTarget,
         direction,
       );
-      if (visibleTarget?.kind === "folder") {
-        focusVisibleProjectTarget(projectListRef.current, visibleTarget.element);
-        return;
-      }
-
       if (!visibleTarget) {
         return;
       }
 
-      focusVisibleProjectTarget(projectListRef.current, visibleTarget.element);
+      focusProjectTargetWithCommitMode(visibleTarget);
     },
-    [projectListRef],
+    [focusProjectTargetWithCommitMode, projectListRef],
   );
 
   const handleProjectTreeArrow = useCallback(
@@ -529,7 +585,7 @@ export function useHistoryInteractions({
         if (direction === "right" && expanded) {
           const childTarget = getAdjacentVisibleProjectTarget(container, currentTarget, "next");
           if (childTarget) {
-            focusVisibleProjectTarget(container, childTarget.element);
+            focusProjectTargetWithCommitMode(childTarget);
           }
         }
         return;
@@ -543,6 +599,8 @@ export function useHistoryInteractions({
           if (!projectElement) {
             return;
           }
+          pendingProjectPaneFocusCommitModeRef.current = "debounced_project";
+          pendingProjectPaneFocusWaitForKeyboardIdleRef.current = true;
           focusVisibleProjectTarget(container, projectElement);
         }
         return;
@@ -572,7 +630,7 @@ export function useHistoryInteractions({
         if (!childTarget) {
           return;
         }
-        focusVisibleProjectTarget(container, childTarget.element);
+        focusProjectTargetWithCommitMode(childTarget);
         return;
       }
       if (direction === "left") {
@@ -580,10 +638,15 @@ export function useHistoryInteractions({
         if (!parentFolder || parentFolder.kind !== "folder") {
           return;
         }
-        focusVisibleProjectTarget(container, parentFolder.element);
+        focusProjectTargetWithCommitMode(parentFolder);
       }
     },
-    [projectListRef],
+    [
+      focusProjectTargetWithCommitMode,
+      pendingProjectPaneFocusCommitModeRef,
+      pendingProjectPaneFocusWaitForKeyboardIdleRef,
+      projectListRef,
+    ],
   );
 
   const handleProjectTreeEnter = useCallback(() => {

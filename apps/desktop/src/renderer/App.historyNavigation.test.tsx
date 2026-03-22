@@ -2,9 +2,9 @@
 
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { App } from "./App";
+import { App, setTestHistorySelectionDebounceOverrides } from "./App";
 import { SEARCH_PLACEHOLDERS } from "./lib/searchLabels";
 import {
   createHistoryNavigationClient,
@@ -36,6 +36,14 @@ async function expandHistoryPanes() {
 }
 
 describe("App history navigation", () => {
+  beforeEach(() => {
+    setTestHistorySelectionDebounceOverrides({ project: 1, session: 1 });
+  });
+
+  afterEach(() => {
+    setTestHistorySelectionDebounceOverrides(null);
+  });
+
   it("navigates sessions with Option+Up/Down and projects with Ctrl+Up/Down", async () => {
     installScrollIntoViewMock();
 
@@ -57,12 +65,14 @@ describe("App history navigation", () => {
     });
 
     fireEvent.keyDown(window, { key: "ArrowDown", altKey: true });
+    fireEvent.keyUp(window, { key: "ArrowDown", altKey: true });
     await waitFor(() => {
       expect(screen.getByText("Session two message")).toBeInTheDocument();
       expect(document.activeElement).toBe(sessionList());
     });
 
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    fireEvent.keyUp(window, { key: "ArrowUp", altKey: true });
     await waitFor(() => {
       expect(screen.getByText("Session one message")).toBeInTheDocument();
       expect(document.activeElement).toBe(sessionList());
@@ -70,6 +80,7 @@ describe("App history navigation", () => {
 
     fireEvent.keyDown(window, { key: "ArrowDown", ctrlKey: true });
     fireEvent.keyDown(window, { key: "ArrowDown", ctrlKey: true });
+    fireEvent.keyUp(window, { key: "ArrowDown", ctrlKey: true });
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
       expect(projectList()?.contains(document.activeElement)).toBe(true);
@@ -83,6 +94,7 @@ describe("App history navigation", () => {
 
     fireEvent.keyDown(window, { key: "ArrowUp", ctrlKey: true });
     fireEvent.keyDown(window, { key: "ArrowUp", ctrlKey: true });
+    fireEvent.keyUp(window, { key: "ArrowUp", ctrlKey: true });
     await waitFor(() => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
       expect(projectList()?.contains(document.activeElement)).toBe(true);
@@ -118,6 +130,7 @@ describe("App history navigation", () => {
     const sessionPane = expectDefined(sessionList(), "Expected session list");
     sessionPane.focus();
     fireEvent.keyDown(sessionPane, { key: "ArrowUp" });
+    fireEvent.keyUp(window, { key: "ArrowUp" });
     await waitFor(() => {
       expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages)).toBeInTheDocument();
       expect(document.activeElement).toBe(sessionList());
@@ -127,6 +140,7 @@ describe("App history navigation", () => {
     projectPane.focus();
     fireEvent.keyDown(projectPane, { key: "ArrowDown" });
     fireEvent.keyDown(projectPane, { key: "ArrowDown" });
+    fireEvent.keyUp(window, { key: "ArrowDown" });
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
       expect(projectList()?.contains(document.activeElement)).toBe(true);
@@ -237,12 +251,14 @@ describe("App history navigation", () => {
     });
 
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    fireEvent.keyUp(window, { key: "ArrowUp", altKey: true });
     await waitFor(() => {
       expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages)).toBeInTheDocument();
       expect(document.activeElement).toBe(sessionList());
     });
 
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    fireEvent.keyUp(window, { key: "ArrowUp", altKey: true });
     await waitFor(() => {
       expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages)).toBeInTheDocument();
       expect(document.activeElement).toBe(sessionList());

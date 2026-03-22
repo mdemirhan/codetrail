@@ -122,7 +122,7 @@ export function HistoryDetailPane({
               <button
                 type="button"
                 className="msg-header-action-button"
-                onClick={history.selectBookmarksView}
+                onClick={() => history.selectBookmarksView()}
                 aria-label={`${history.currentViewBookmarkCount} ${history.currentViewBookmarkCount === 1 ? "bookmark" : "bookmarks"}`}
                 title={`Open ${history.currentViewBookmarkCount} bookmarked messages`}
               >

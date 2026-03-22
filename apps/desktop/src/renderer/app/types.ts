@@ -37,6 +37,7 @@ export type SessionPaneNavigationItem =
   | { id: string; kind: "session"; sessionId: string };
 
 export type HistorySelectionMode = HistorySelection["mode"];
+export type HistorySelectionCommitMode = "immediate" | "debounced_project" | "debounced_session";
 export type HistorySearchNavigation = {
   projectId: string;
   sessionId: string;

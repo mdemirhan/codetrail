@@ -500,6 +500,32 @@ describe("ProjectPane", () => {
     expect(onSelectProject).toHaveBeenCalledWith("project_1");
   });
 
+  it("queues a no-op debounced tree navigation step when a folder row receives focus", () => {
+    const onQueueProjectTreeNoopCommit = vi.fn();
+    const consumeFocusSelectionBehavior = vi.fn(() => ({
+      commitMode: "debounced_project" as const,
+      waitForKeyboardIdle: true,
+    }));
+
+    renderProjectPane({
+      data: {
+        viewMode: "tree",
+      },
+      actions: {
+        onQueueProjectTreeNoopCommit,
+        consumeFocusSelectionBehavior,
+      },
+    });
+
+    fireEvent.focus(screen.getByRole("button", { name: "~/project-one, 1 projects" }));
+
+    expect(consumeFocusSelectionBehavior).toHaveBeenCalledTimes(1);
+    expect(onQueueProjectTreeNoopCommit).toHaveBeenCalledWith({
+      commitMode: "debounced_project",
+      waitForKeyboardIdle: true,
+    });
+  });
+
   it("lets the overflow toggles control single-click expansion behavior", async () => {
     const user = userEvent.setup();
     const onSelectProject = vi.fn();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProjectSummary, SessionSummary } from "../../app/types";
 import { getProjectGroupId } from "../../lib/projectTree";
@@ -19,6 +19,70 @@ function isTreeRowActionTarget(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement &&
     Boolean(target.closest(".project-tree-toggle-btn, .project-tree-bookmark-btn"))
+  );
+}
+
+function OverflowAwareLabel({
+  text,
+  className,
+  innerClassName,
+}: {
+  text: string;
+  className: string;
+  innerClassName?: string;
+}) {
+  const containerRef = useRef<HTMLSpanElement | null>(null);
+  const [showTitle, setShowTitle] = useState(false);
+  const updateOverflowState = useCallback(() => {
+    const element = containerRef.current;
+    if (!element) {
+      return;
+    }
+    setShowTitle(element.scrollWidth > element.clientWidth + 1);
+  }, []);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) {
+      return;
+    }
+
+    updateOverflowState();
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            updateOverflowState();
+          })
+        : null;
+    resizeObserver?.observe(element);
+    window.addEventListener("resize", updateOverflowState);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateOverflowState);
+    };
+  }, [updateOverflowState]);
+
+  useEffect(() => {
+    void text;
+    updateOverflowState();
+  }, [text, updateOverflowState]);
+
+  if (innerClassName) {
+    return (
+      <span ref={containerRef} className={className}>
+        <span className={innerClassName} title={showTitle ? text : undefined}>
+          {text}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span ref={containerRef} className={className} title={showTitle ? text : undefined}>
+      {text}
+    </span>
   );
 }
 
@@ -64,6 +128,8 @@ export function ProjectPane({
     onSelectProject,
     onSelectProjectSession = () => {},
     onSelectProjectBookmarks = () => {},
+    consumeFocusSelectionBehavior = () => ({ commitMode: "immediate", waitForKeyboardIdle: false }),
+    onQueueProjectTreeNoopCommit = () => {},
     onEnsureTreeProjectSessionsLoaded = () => {},
     onOpenProjectLocation,
     onOpenSessionLocation,
@@ -122,8 +188,31 @@ export function ProjectPane({
   const getFolderUpdateDelta = (projects: ProjectSummary[]): number =>
     projects.reduce((total, project) => total + (projectUpdates[project.id]?.messageDelta ?? 0), 0);
 
+  const handleProjectFocusSelection = (projectId: string) => {
+    const selectionOptions = consumeFocusSelectionBehavior();
+    if (selectionOptions.commitMode === "immediate" && !selectionOptions.waitForKeyboardIdle) {
+      onSelectProject(projectId);
+      return;
+    }
+    onSelectProject(projectId, selectionOptions);
+  };
+
+  const handleSessionFocusSelection = (projectId: string, sessionId: string) => {
+    const selectionOptions = consumeFocusSelectionBehavior();
+    if (selectionOptions.commitMode === "immediate" && !selectionOptions.waitForKeyboardIdle) {
+      onSelectProjectSession(projectId, sessionId);
+      return;
+    }
+    onSelectProjectSession(projectId, sessionId, selectionOptions);
+  };
+
+  const handleFolderFocusSelection = () => {
+    onQueueProjectTreeNoopCommit(consumeFocusSelectionBehavior());
+  };
+
   const renderFlatProjectRow = (project: ProjectSummary) => {
     const update = projectUpdates[project.id];
+    const projectLabel = getProjectLabel(project);
     return (
       <button
         key={project.id}
@@ -134,7 +223,7 @@ export function ProjectPane({
         className={`list-item project-item${project.id === selectedProjectId ? " active" : ""}${
           update ? " recently-updated" : ""
         }`}
-        onFocus={() => onSelectProject(project.id)}
+        onFocus={() => handleProjectFocusSelection(project.id)}
         onClick={() => {
           setContextMenu(null);
         }}
@@ -151,7 +240,7 @@ export function ProjectPane({
       >
         <div className="list-item-name">
           {project.id === selectedProjectId ? <span className="active-dot" /> : null}
-          <span className="project-item-label">{getProjectLabel(project)}</span>
+          <OverflowAwareLabel text={projectLabel} className="project-item-label" />
           <span
             className={`project-update-badge${update ? " visible" : ""}`}
             aria-label={update ? `${update.messageDelta} new messages` : undefined}
@@ -174,6 +263,7 @@ export function ProjectPane({
 
   const renderTreeSessionRow = (project: ProjectSummary, session: SessionSummary) => {
     const isActive = treeFocusedRow?.kind === "session" && treeFocusedRow.id === session.id;
+    const sessionTitle = deriveSessionTitle(session);
     return (
       <button
         key={session.id}
@@ -184,7 +274,7 @@ export function ProjectPane({
         className={`project-tree-session-row${isActive ? " active" : ""}`}
         onFocus={() => {
           setTreeFocusedRow({ kind: "session", id: session.id, projectId: project.id });
-          onSelectProjectSession(project.id, session.id);
+          handleSessionFocusSelection(project.id, session.id);
         }}
         onClick={() => {
           setContextMenu(null);
@@ -214,7 +304,7 @@ export function ProjectPane({
           projectRow?.focus();
         }}
       >
-        <span className="project-tree-session-title">{deriveSessionTitle(session)}</span>
+        <span className="project-tree-session-title">{sessionTitle}</span>
         <span className="project-tree-session-count">{session.messageCount} msgs</span>
       </button>
     );
@@ -222,6 +312,7 @@ export function ProjectPane({
 
   const renderTreeProjectRow = (project: ProjectSummary) => {
     const update = projectUpdates[project.id];
+    const projectLabel = getProjectLabel(project);
     const isActive = treeFocusedRow?.kind === "project" && treeFocusedRow.id === project.id;
     const hasSessions = project.sessionCount > 0;
     const isExpanded = expandedProjectIds.includes(project.id);
@@ -306,7 +397,7 @@ export function ProjectPane({
             className={`project-tree-select-btn${isActive ? " active" : ""}`}
             onFocus={() => {
               setTreeFocusedRow({ kind: "project", id: project.id });
-              onSelectProject(project.id);
+              handleProjectFocusSelection(project.id);
             }}
             onClick={() => {
               selectProjectRow();
@@ -346,7 +437,7 @@ export function ProjectPane({
           >
             <div className="project-tree-row-main">
               <div className="project-tree-name-group">
-                <span className="project-tree-name">{getProjectLabel(project)}</span>
+                <OverflowAwareLabel text={projectLabel} className="project-tree-name" />
                 <span
                   className={`project-update-badge project-tree-update-badge${
                     update ? " visible" : ""
@@ -479,8 +570,14 @@ export function ProjectPane({
                     className={`project-folder-row${isFolderActive ? " active" : ""}${
                       folderUpdateDelta > 0 ? " recently-updated" : ""
                     }${isExpanded && folderUpdateDelta > 0 ? " expanded-with-updates" : ""}`}
-                    onFocus={() => setTreeFocusedRow({ kind: "folder", id: group.id })}
+                    onFocus={() => {
+                      handleFolderFocusSelection();
+                      setTreeFocusedRow({ kind: "folder", id: group.id });
+                    }}
                     onClick={(event) => {
+                      // Mouse selection on folders should win immediately over any in-flight
+                      // keyboard debounce so we never commit a stale project after a click.
+                      onQueueProjectTreeNoopCommit();
                       setTreeFocusedRow({ kind: "folder", id: group.id });
                       if (
                         event.target instanceof HTMLElement &&
@@ -526,7 +623,11 @@ export function ProjectPane({
                       <ProjectPaneFolderIcon />
                     </span>
                     <span className="project-folder-main">
-                      <span className="project-folder-label">{group.label}</span>
+                      <OverflowAwareLabel
+                        text={group.label}
+                        className="project-folder-label"
+                        innerClassName="project-folder-label-text"
+                      />
                       {folderUpdateDelta > 0 ? (
                         <span
                           className={`project-update-badge project-folder-update-badge visible${
@@ -538,7 +639,6 @@ export function ProjectPane({
                         </span>
                       ) : null}
                     </span>
-                    <span className="project-folder-count">{group.projectCount}</span>
                   </button>
                   {isExpanded ? (
                     <div className="project-folder-children">
