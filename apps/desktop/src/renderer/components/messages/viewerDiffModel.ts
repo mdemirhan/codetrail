@@ -171,17 +171,57 @@ export function buildDiffViewModel(
 
   const parsedFilePath = filePath ?? extractDiffFilePath(lines);
   const normalizedFilePath = parsedFilePath ? parsedFilePath : null;
-  const absoluteFilePath = normalizedFilePath?.startsWith("/") ? normalizedFilePath : null;
+  const absoluteFilePath = resolveAbsoluteDiffFilePath(normalizedFilePath, pathRoots);
   return {
     rows,
     displayFilePath: normalizedFilePath
-      ? trimProjectPrefixFromPath(normalizedFilePath, pathRoots)
+      ? trimProjectPrefixFromPath(absoluteFilePath ?? normalizedFilePath, pathRoots)
       : "Diff",
     absoluteFilePath,
-    sourceLanguage: detectLanguageFromFilePath(normalizedFilePath),
+    sourceLanguage: detectLanguageFromFilePath(absoluteFilePath ?? normalizedFilePath),
     addedLineCount,
     removedLineCount,
   };
+}
+
+function resolveAbsoluteDiffFilePath(
+  filePath: string | null,
+  pathRoots: string[],
+): string | null {
+  if (!filePath) {
+    return null;
+  }
+
+  const normalizedAbsolutePath = normalizeAbsolutePath(filePath);
+  if (normalizedAbsolutePath) {
+    return normalizedAbsolutePath;
+  }
+
+  const normalizedRelativePath = normalizeRelativePath(filePath);
+  if (!normalizedRelativePath) {
+    return null;
+  }
+
+  const candidates = new Set<string>();
+  for (const root of pathRoots) {
+    const normalizedRoot = normalizeAbsolutePath(root);
+    if (!normalizedRoot) {
+      continue;
+    }
+
+    const joinedPath = normalizeAbsolutePath(
+      `${trimTrailingSeparators(normalizedRoot)}/${normalizedRelativePath}`,
+    );
+    if (!joinedPath || !isPathWithinRoot(joinedPath, normalizedRoot)) {
+      continue;
+    }
+    candidates.add(joinedPath);
+  }
+
+  if (candidates.size !== 1) {
+    return null;
+  }
+  return Array.from(candidates)[0] ?? null;
 }
 
 function collectChangedDiffBlock(
@@ -267,6 +307,88 @@ export function trimProjectPrefixFromPath(filePath: string, pathRoots: string[])
   }
 
   return normalizedFilePath;
+}
+
+function normalizeAbsolutePath(value: string): string | null {
+  const normalized = value.replace(/\\/g, "/");
+  const windowsPrefix = /^([A-Za-z]):\//.exec(normalized);
+
+  if (!windowsPrefix && !normalized.startsWith("/")) {
+    return null;
+  }
+
+  const rootPrefix = windowsPrefix ? `${windowsPrefix[1] ?? ""}:` : "/";
+  const suffix = windowsPrefix ? normalized.slice(2) : normalized;
+  const parts: string[] = [];
+
+  for (const part of suffix.split("/")) {
+    if (part.length === 0 || part === ".") {
+      continue;
+    }
+    if (part === "..") {
+      parts.pop();
+      continue;
+    }
+    parts.push(part);
+  }
+
+  if (windowsPrefix) {
+    return parts.length > 0 ? `${rootPrefix}/${parts.join("/")}` : `${rootPrefix}/`;
+  }
+
+  return parts.length > 0 ? `/${parts.join("/")}` : "/";
+}
+
+function normalizeRelativePath(value: string): string | null {
+  const normalized = value.replace(/\\/g, "/");
+  if (normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized)) {
+    return null;
+  }
+
+  const parts: string[] = [];
+  for (const part of normalized.split("/")) {
+    if (part.length === 0 || part === ".") {
+      continue;
+    }
+    if (part === "..") {
+      parts.pop();
+      continue;
+    }
+    parts.push(part);
+  }
+
+  return parts.length > 0 ? parts.join("/") : null;
+}
+
+function isPathWithinRoot(path: string, root: string): boolean {
+  const normalizedPath = normalizePathForComparison(path);
+  const normalizedRoot = normalizePathForComparison(root);
+  if (!normalizedPath || !normalizedRoot) {
+    return false;
+  }
+
+  if (normalizedRoot === "/" || /^[a-z]:\/$/.test(normalizedRoot)) {
+    return normalizedPath.startsWith(normalizedRoot);
+  }
+
+  return normalizedPath === normalizedRoot || normalizedPath.startsWith(`${normalizedRoot}/`);
+}
+
+function normalizePathForComparison(value: string): string | null {
+  const normalizedAbsolute = normalizeAbsolutePath(value);
+  if (!normalizedAbsolute) {
+    return null;
+  }
+
+  const trimmedPath = trimTrailingSeparators(normalizedAbsolute);
+  return /^[A-Za-z]:\//.test(trimmedPath) ? trimmedPath.toLowerCase() : trimmedPath;
+}
+
+function trimTrailingSeparators(value: string): string {
+  if (value === "/" || /^[A-Za-z]:\/$/.test(value)) {
+    return value;
+  }
+  return value.replace(/\/+$/, "");
 }
 
 function diffInlineSegments(

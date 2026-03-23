@@ -30,4 +30,21 @@ describe("viewerDiffModel", () => {
       }),
     ]);
   });
+
+  it("resolves relative diff header paths against the selected project root", () => {
+    const diff = [
+      "diff --git a/src/a.ts b/src/a.ts",
+      "--- a/src/a.ts",
+      "+++ b/src/a.ts",
+      "@@ -1,1 +1,1 @@",
+      "-before",
+      "+after",
+    ].join("\n");
+
+    const model = buildDiffViewModel(diff, undefined, ["/Users/acme/repo"]);
+
+    expect(model.displayFilePath).toBe("src/a.ts");
+    expect(model.absoluteFilePath).toBe("/Users/acme/repo/src/a.ts");
+    expect(model.sourceLanguage).toBe("typescript");
+  });
 });
