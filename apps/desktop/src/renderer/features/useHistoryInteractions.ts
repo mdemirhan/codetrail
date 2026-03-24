@@ -12,7 +12,7 @@ import type { RefreshContext } from "./useHistoryController";
 
 import type { MessageCategory, Provider } from "@codetrail/core/browser";
 
-import { BOOKMARKS_NAV_ID, PROJECT_ALL_NAV_ID, PROVIDERS } from "../app/constants";
+import { BOOKMARKS_NAV_ID, CATEGORIES, PROJECT_ALL_NAV_ID, PROVIDERS } from "../app/constants";
 import { createHistorySelection, setHistorySelectionProjectId } from "../app/historySelection";
 import type {
   HistoryMessage,
@@ -69,8 +69,6 @@ type AdjacentSelectionOptions = {
 export function useHistoryInteractions({
   codetrail,
   logError,
-  scopedMessages,
-  areScopedMessagesExpanded,
   setMessageExpanded,
   setHistoryCategories,
   setExpandedByDefaultCategories,
@@ -135,8 +133,6 @@ export function useHistoryInteractions({
 }: {
   codetrail: CodetrailClient;
   logError: (context: string, error: unknown) => void;
-  scopedMessages: HistoryMessage[];
-  areScopedMessagesExpanded: boolean;
   setMessageExpanded: Dispatch<SetStateAction<Record<string, boolean>>>;
   setHistoryCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setExpandedByDefaultCategories: Dispatch<SetStateAction<MessageCategory[]>>;
@@ -233,21 +229,31 @@ export function useHistoryInteractions({
     [bookmarksResponse.results],
   );
 
-  const handleToggleScopedMessagesExpanded = useCallback(() => {
-    if (scopedMessages.length === 0) {
-      return;
-    }
-    const expanded = !areScopedMessagesExpanded;
-    setMessageExpanded((value) => {
-      const next = { ...value };
-      for (const message of scopedMessages) {
-        applyExpansionOverride(next, message.id, message.category, expanded, {
-          isExpandedByDefault,
-        });
-      }
-      return next;
-    });
-  }, [areScopedMessagesExpanded, isExpandedByDefault, scopedMessages, setMessageExpanded]);
+  const setCategoryDefaultExpansion = useCallback(
+    (category: MessageCategory, expanded: boolean) => {
+      setExpandedByDefaultCategories((value) => {
+        const alreadyExpanded = value.includes(category);
+        if (expanded === alreadyExpanded) {
+          return value;
+        }
+        return expanded ? [...value, category] : value.filter((item) => item !== category);
+      });
+      const categoryMessages = messagesByCategory.get(category) ?? [];
+      setMessageExpanded((value) => {
+        let changed = false;
+        const next = { ...value };
+        for (const message of categoryMessages) {
+          if (!(message.id in next)) {
+            continue;
+          }
+          delete next[message.id];
+          changed = true;
+        }
+        return changed ? next : value;
+      });
+    },
+    [messagesByCategory, setExpandedByDefaultCategories, setMessageExpanded],
+  );
 
   const handleToggleHistoryCategoryShortcut = useCallback(
     (category: MessageCategory) => {
@@ -293,23 +299,32 @@ export function useHistoryInteractions({
 
   const handleToggleCategoryDefaultExpansion = useCallback(
     (category: MessageCategory) => {
-      const categoryMessages = messagesByCategory.get(category) ?? [];
-      setExpandedByDefaultCategories((value) => toggleValue<MessageCategory>(value, category));
-      setMessageExpanded((value) => {
-        const next = { ...value };
-        let changed = false;
-        for (const message of categoryMessages) {
-          if (!(message.id in next)) {
-            continue;
-          }
-          delete next[message.id];
-          changed = true;
-        }
-        return changed ? next : value;
-      });
+      setCategoryDefaultExpansion(category, !isExpandedByDefault(category));
     },
-    [messagesByCategory, setExpandedByDefaultCategories, setMessageExpanded],
+    [isExpandedByDefault, setCategoryDefaultExpansion],
   );
+
+  const handleToggleAllCategoryDefaultExpansion = useCallback(() => {
+    const expanded = !CATEGORIES.every((category) => isExpandedByDefault(category));
+    setExpandedByDefaultCategories(expanded ? [...CATEGORIES] : []);
+    setMessageExpanded((value) => {
+      let changed = false;
+      const next = { ...value };
+      for (const message of activeHistoryMessages) {
+        if (!(message.id in next)) {
+          continue;
+        }
+        delete next[message.id];
+        changed = true;
+      }
+      return changed ? next : value;
+    });
+  }, [
+    activeHistoryMessages,
+    isExpandedByDefault,
+    setExpandedByDefaultCategories,
+    setMessageExpanded,
+  ]);
 
   const handleRevealInSession = useCallback(
     (messageId: string, sourceId: string) => {
@@ -1058,10 +1073,10 @@ export function useHistoryInteractions({
   );
 
   return {
-    handleToggleScopedMessagesExpanded,
     handleToggleHistoryCategoryShortcut,
     handleToggleVisibleCategoryMessagesExpanded,
     handleToggleCategoryDefaultExpansion,
+    handleToggleAllCategoryDefaultExpansion,
     handleToggleMessageExpanded,
     handleRevealInSession,
     handleToggleBookmark,

@@ -45,7 +45,7 @@ export function useKeyboardShortcuts(args: {
   focusGlobalSearch: () => void;
   focusSessionSearch: () => void;
   toggleFocusMode: () => void;
-  toggleScopedMessagesExpanded: () => void;
+  toggleAllMessagesExpanded: () => void;
   toggleHistoryCategory: (category: MessageCategory) => void;
   toggleHistoryCategoryDefaultExpansion: (category: MessageCategory) => void;
   toggleProjectPaneCollapsed: () => void;
@@ -592,7 +592,7 @@ function handleHistoryCommandShortcut(context: ShortcutContext): boolean {
   }
   if (context.mainView === "history" && context.key === "e") {
     context.event.preventDefault();
-    context.toggleScopedMessagesExpanded();
+    context.toggleAllMessagesExpanded();
     return true;
   }
   if (context.mainView === "history" && context.shift && context.key === "b") {

@@ -696,7 +696,7 @@ export function App({
     focusGlobalSearch,
     focusSessionSearch,
     toggleFocusMode,
-    toggleScopedMessagesExpanded: history.handleToggleScopedMessagesExpanded,
+    toggleAllMessagesExpanded: history.handleToggleAllCategoryDefaultExpansion,
     toggleHistoryCategory: history.handleToggleHistoryCategoryShortcut,
     toggleHistoryCategoryDefaultExpansion: history.handleToggleCategoryDefaultExpansion,
     toggleProjectPaneCollapsed: () => history.setProjectPaneCollapsed((value) => !value),

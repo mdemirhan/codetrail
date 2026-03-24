@@ -3,7 +3,7 @@ import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from
 import type { MessageCategory } from "@codetrail/core/browser";
 
 import { CATEGORIES } from "../app/constants";
-import type { BulkExpandScope, WatchLiveStatusResponse } from "../app/types";
+import type { WatchLiveStatusResponse } from "../app/types";
 import { AdvancedSearchToggleButton } from "../components/AdvancedSearchToggleButton";
 import { HistoryExportMenu } from "../components/HistoryExportMenu";
 import { ToolbarIcon } from "../components/ToolbarIcon";
@@ -51,13 +51,6 @@ function getHistoryCategoryExpansionDefaultTooltip(
     `${nextAction} ${label} messages`,
     history.historyCategoryExpandShortcutMap[category],
   );
-}
-
-function parseBulkExpandScope(value: string): BulkExpandScope {
-  if (value === "all") {
-    return "all";
-  }
-  return CATEGORIES.find((category) => category === value) ?? "all";
 }
 
 function formatHistoryCategorySelection(history: HistoryController): string {
@@ -249,32 +242,13 @@ export function HistoryDetailPane({
               <button
                 type="button"
                 className="toolbar-btn expand-scope-action"
-                onClick={history.handleToggleScopedMessagesExpanded}
-                disabled={history.scopedMessages.length === 0}
-                aria-label={history.scopedExpandCollapseLabel}
-                title={formatTooltip(history.scopedExpandCollapseLabel, "Cmd+E")}
+                onClick={history.handleToggleAllCategoryDefaultExpansion}
+                aria-label={`${history.globalExpandCollapseLabel} all messages`}
+                title={formatTooltip(`${history.globalExpandCollapseLabel} all messages`, "Cmd+E")}
               >
-                <ToolbarIcon
-                  name={history.areScopedMessagesExpanded ? "collapseAll" : "expandAll"}
-                />
-                {history.scopedActionLabel}
+                <ToolbarIcon name={history.areAllMessagesExpanded ? "collapseAll" : "expandAll"} />
+                {history.globalExpandCollapseLabel}
               </button>
-              <select
-                className="expand-scope-select"
-                value={history.bulkExpandScope}
-                onChange={(event) => {
-                  history.setBulkExpandScope(parseBulkExpandScope(event.target.value));
-                }}
-                aria-label="Select expand and collapse scope"
-                title="Choose what Expand/Collapse affects"
-              >
-                <option value="all">All</option>
-                {CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {history.prettyCategory(category)}
-                  </option>
-                ))}
-              </select>
             </div>
             <div className="toolbar-zoom-group">
               <button

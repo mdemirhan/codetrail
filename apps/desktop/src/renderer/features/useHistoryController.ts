@@ -22,7 +22,6 @@ import {
 } from "../app/historySelection";
 import type {
   BookmarkListResponse,
-  BulkExpandScope,
   HistoryExportScope,
   HistorySearchNavigation,
   HistorySelection,
@@ -333,7 +332,6 @@ export function useHistoryController({
   const [bookmarkReturnSelection, setBookmarkReturnSelection] = useState<HistorySelection | null>(
     null,
   );
-  const [bulkExpandScope, setBulkExpandScope] = useState<BulkExpandScope>("all");
   const [messageExpansionOverrides, setMessageExpansionOverrides] = useState<
     Record<string, boolean>
   >({});
@@ -986,7 +984,6 @@ export function useHistoryController({
 
   const {
     activeMessageSortDirection,
-    messageSortScopeLabel,
     messageSortTooltip,
     bookmarkOrphanedByMessageId,
     bookmarkedMessageIds,
@@ -1012,10 +1009,8 @@ export function useHistoryController({
     historyQueryError,
     historyHighlightPatterns,
     isExpandedByDefault,
-    scopedMessages,
-    areScopedMessagesExpanded,
-    scopedActionLabel,
-    scopedExpandCollapseLabel,
+    areAllMessagesExpanded,
+    globalExpandCollapseLabel,
     workspaceStyle,
     selectedSummaryMessageCount,
     historyCategoryExpandShortcutMap,
@@ -1041,8 +1036,6 @@ export function useHistoryController({
     sessionPage,
     messagePageSize: appearance.messagePageSize,
     expandedByDefaultCategories,
-    bulkExpandScope,
-    messageExpansionOverrides,
     isHistoryLayout,
     projectPaneCollapsed,
     projectPaneWidth,
@@ -1152,10 +1145,10 @@ export function useHistoryController({
   });
 
   const {
-    handleToggleScopedMessagesExpanded,
     handleToggleHistoryCategoryShortcut,
     handleToggleVisibleCategoryMessagesExpanded,
     handleToggleCategoryDefaultExpansion,
+    handleToggleAllCategoryDefaultExpansion,
     handleToggleMessageExpanded,
     handleRevealInSession,
     handleToggleBookmark,
@@ -1181,8 +1174,6 @@ export function useHistoryController({
   } = useHistoryInteractions({
     codetrail,
     logError,
-    scopedMessages,
-    areScopedMessagesExpanded,
     setMessageExpanded: setMessageExpansionOverrides,
     setHistoryCategories,
     setExpandedByDefaultCategories,
@@ -1481,20 +1472,15 @@ export function useHistoryController({
     canGoToNextHistoryPage,
     activeMessageSortDirection,
     messageSortTooltip,
-    messageSortScopeLabel,
-    bulkExpandScope,
-    setBulkExpandScope,
-    scopedMessages,
-    areScopedMessagesExpanded,
-    scopedActionLabel,
-    scopedExpandCollapseLabel,
+    areAllMessagesExpanded,
+    globalExpandCollapseLabel,
     messageExpansionOverrides,
     messagePathRoots,
     isExpandedByDefault,
-    handleToggleScopedMessagesExpanded,
     handleToggleHistoryCategoryShortcut,
     handleToggleVisibleCategoryMessagesExpanded,
     handleToggleCategoryDefaultExpansion,
+    handleToggleAllCategoryDefaultExpansion,
     handleToggleMessageExpanded,
     handleToggleBookmark,
     handleRevealInSession,

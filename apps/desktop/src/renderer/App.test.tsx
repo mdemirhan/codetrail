@@ -353,6 +353,126 @@ describe("App shell", () => {
     });
   });
 
+  it("uses the toolbar expand and collapse button to align all message types with the shared default-expansion model", async () => {
+    installScrollIntoViewMock();
+
+    const user = userEvent.setup();
+    const client = createAppClient({
+      "sessions:getDetail": () => ({
+        session: {
+          id: "session_1",
+          projectId: "project_1",
+          provider: "claude",
+          filePath: "/workspace/project-one/session-1.jsonl",
+          title: "Investigate markdown rendering",
+          modelNames: "claude-opus-4-1",
+          startedAt: "2026-03-01T10:00:00.000Z",
+          endedAt: "2026-03-01T10:00:05.000Z",
+          durationMs: 5000,
+          gitBranch: "main",
+          cwd: "/workspace/project-one",
+          messageCount: 3,
+          tokenInputTotal: 14,
+          tokenOutputTotal: 8,
+        },
+        totalCount: 3,
+        categoryCounts: {
+          user: 1,
+          assistant: 0,
+          tool_use: 2,
+          tool_edit: 0,
+          tool_result: 0,
+          thinking: 0,
+          system: 0,
+        },
+        page: 0,
+        pageSize: 100,
+        focusIndex: null,
+        messages: [
+          {
+            id: "user_1",
+            sourceId: "user_src_1",
+            sessionId: "session_1",
+            provider: "claude",
+            category: "user",
+            content: "User body",
+            createdAt: "2026-03-01T10:00:00.000Z",
+            tokenInput: null,
+            tokenOutput: null,
+            operationDurationMs: null,
+            operationDurationSource: null,
+            operationDurationConfidence: null,
+          },
+          {
+            id: "tool_1",
+            sourceId: "tool_src_1",
+            sessionId: "session_1",
+            provider: "claude",
+            category: "tool_use",
+            content: JSON.stringify({
+              tool_name: "Read",
+              input: { file_path: "/workspace/project-one/src/app.ts" },
+            }),
+            createdAt: "2026-03-01T10:00:02.000Z",
+            tokenInput: null,
+            tokenOutput: null,
+            operationDurationMs: null,
+            operationDurationSource: null,
+            operationDurationConfidence: null,
+          },
+          {
+            id: "tool_2",
+            sourceId: "tool_src_2",
+            sessionId: "session_1",
+            provider: "claude",
+            category: "tool_use",
+            content: JSON.stringify({
+              tool_name: "Write",
+              input: { file_path: "/workspace/project-one/src/app.ts" },
+            }),
+            createdAt: "2026-03-01T10:00:05.000Z",
+            tokenInput: null,
+            tokenOutput: null,
+            operationDurationMs: null,
+            operationDurationSource: null,
+            operationDurationConfidence: null,
+          },
+        ],
+      }),
+    });
+
+    const { container } = renderWithClient(
+      <App
+        initialPaneState={
+          {
+            selectedProjectId: "project_1",
+            selectedSessionId: "session_1",
+            historyMode: "session",
+          } as PaneStateSnapshot
+        }
+      />,
+      client,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("User body")).toBeInTheDocument();
+      expect(container.querySelectorAll(".message.expanded")).toHaveLength(1);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Expand all messages" }));
+    await waitFor(() => {
+      expect(container.querySelectorAll(".message.expanded")).toHaveLength(3);
+    });
+
+    await user.click(screen.getAllByRole("button", { name: "Collapse message" })[0]!);
+    expect(container.querySelectorAll(".message.expanded")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Collapse all messages" }));
+    await waitFor(() => {
+      expect(container.querySelectorAll(".message.expanded")).toHaveLength(0);
+    });
+  });
+
   it("Cmd+click on a message header toggles all visible messages of the same type", async () => {
     installScrollIntoViewMock();
 

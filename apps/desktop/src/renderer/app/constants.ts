@@ -130,7 +130,7 @@ export const SHORTCUT_ITEMS = [
     shortcut: "Cmd+Shift+B",
     description: "Toggle Sessions pane",
   },
-  { group: "Panels", shortcut: "Cmd+E", description: "Expand or collapse current messages" },
+  { group: "Panels", shortcut: "Cmd+E", description: "Expand or collapse all messages" },
   { group: "Panels", shortcut: "Cmd+Shift+M", description: "Toggle focus mode" },
   {
     group: "Message Filters",

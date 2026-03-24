@@ -5,6 +5,7 @@ import type { MessageCategory } from "@codetrail/core/browser";
 
 import {
   BOOKMARKS_NAV_ID,
+  CATEGORIES,
   COLLAPSED_PANE_WIDTH,
   EMPTY_CATEGORY_COUNTS,
   HISTORY_CATEGORY_EXPAND_SHORTCUTS,
@@ -13,7 +14,6 @@ import {
 } from "../app/constants";
 import type {
   BookmarkListResponse,
-  BulkExpandScope,
   HistoryMessage,
   ProjectCombinedDetail,
   ProjectSummary,
@@ -59,8 +59,6 @@ export function useHistoryDerivedState({
   sessionPage,
   messagePageSize,
   expandedByDefaultCategories,
-  bulkExpandScope,
-  messageExpansionOverrides,
   isHistoryLayout,
   projectPaneCollapsed,
   projectPaneWidth,
@@ -84,8 +82,6 @@ export function useHistoryDerivedState({
   sessionPage: number;
   messagePageSize: number;
   expandedByDefaultCategories: MessageCategory[];
-  bulkExpandScope: BulkExpandScope;
-  messageExpansionOverrides: Record<string, boolean>;
   isHistoryLayout: boolean;
   projectPaneCollapsed: boolean;
   projectPaneWidth: number;
@@ -108,12 +104,6 @@ export function useHistoryDerivedState({
       : historyMode === "bookmarks"
         ? bookmarkSortDirection
         : messageSortDirection;
-  const messageSortScopeLabel =
-    historyMode === "project_all"
-      ? "all sessions"
-      : historyMode === "bookmarks"
-        ? "bookmarks"
-        : "session";
   const messageSortTooltip = activeMessageSortDirection === "asc" ? "Oldest first" : "Newest first";
 
   const bookmarkOrphanedByMessageId = useMemo(
@@ -288,27 +278,11 @@ export function useHistoryDerivedState({
     [expandedByDefaultCategories],
   );
 
-  const scopedMessages = useMemo(
-    () =>
-      bulkExpandScope === "all"
-        ? activeHistoryMessages
-        : activeHistoryMessages.filter((message) => message.category === bulkExpandScope),
-    [activeHistoryMessages, bulkExpandScope],
+  const areAllMessagesExpanded = useMemo(
+    () => CATEGORIES.every((category) => isExpandedByDefault(category)),
+    [isExpandedByDefault],
   );
-  const areScopedMessagesExpanded = useMemo(
-    () =>
-      scopedMessages.length > 0 &&
-      scopedMessages.every(
-        (message) => messageExpansionOverrides[message.id] ?? isExpandedByDefault(message.category),
-      ),
-    [isExpandedByDefault, messageExpansionOverrides, scopedMessages],
-  );
-  const bulkScopeLabel = useMemo(
-    () => (bulkExpandScope === "all" ? "All" : prettyCategory(bulkExpandScope)),
-    [bulkExpandScope],
-  );
-  const scopedActionLabel = areScopedMessagesExpanded ? "Collapse" : "Expand";
-  const scopedExpandCollapseLabel = `${scopedActionLabel} ${bulkScopeLabel}`;
+  const globalExpandCollapseLabel = areAllMessagesExpanded ? "Collapse" : "Expand";
   const workspaceStyle = isHistoryLayout
     ? ({
         // Keep user-resized widths in CSS variables so responsive media queries can still take
@@ -326,7 +300,6 @@ export function useHistoryDerivedState({
 
   return {
     activeMessageSortDirection,
-    messageSortScopeLabel,
     messageSortTooltip,
     bookmarkOrphanedByMessageId,
     bookmarkedMessageIds,
@@ -352,10 +325,8 @@ export function useHistoryDerivedState({
     historyQueryError,
     historyHighlightPatterns,
     isExpandedByDefault,
-    scopedMessages,
-    areScopedMessagesExpanded,
-    scopedActionLabel,
-    scopedExpandCollapseLabel,
+    areAllMessagesExpanded,
+    globalExpandCollapseLabel,
     workspaceStyle,
     selectedSummaryMessageCount:
       historyMode === "bookmarks"

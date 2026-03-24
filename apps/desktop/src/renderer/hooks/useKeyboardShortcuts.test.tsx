@@ -67,7 +67,7 @@ function createProps(
     focusGlobalSearch: vi.fn(),
     focusSessionSearch: vi.fn(),
     toggleFocusMode: vi.fn(),
-    toggleScopedMessagesExpanded: vi.fn(),
+    toggleAllMessagesExpanded: vi.fn(),
     toggleHistoryCategory: vi.fn(),
     toggleHistoryCategoryDefaultExpansion: vi.fn(),
     toggleProjectPaneCollapsed: vi.fn(),
@@ -141,7 +141,7 @@ describe("useKeyboardShortcuts", () => {
     expect(props.setMainView).toHaveBeenCalledWith("settings");
     expect(props.applyZoomAction).toHaveBeenCalledWith("in");
     expect(props.toggleFocusMode).toHaveBeenCalledTimes(1);
-    expect(props.toggleScopedMessagesExpanded).toHaveBeenCalledTimes(1);
+    expect(props.toggleAllMessagesExpanded).toHaveBeenCalledTimes(1);
     expect(props.toggleHistoryCategory).toHaveBeenCalledWith("user");
     expect(props.toggleHistoryCategoryDefaultExpansion).toHaveBeenCalledWith("user");
     expect(props.toggleProjectPaneCollapsed).toHaveBeenCalledTimes(1);

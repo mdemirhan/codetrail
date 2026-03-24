@@ -28,7 +28,6 @@ export type MainView = "history" | "search" | "settings" | "help";
 export type SortDirection = "asc" | "desc";
 export type ProjectViewMode = "list" | "tree";
 export type ProjectSortField = "last_active" | "name";
-export type BulkExpandScope = "all" | MessageCategory;
 
 export type HistorySelection =
   | { mode: "project_all"; projectId: string }
