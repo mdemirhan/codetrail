@@ -30,3 +30,30 @@ export function mergeStableProjectOrder(previousIds: string[], nextIds: string[]
   const appendedIds = nextIds.filter((id) => !retainedIdSet.has(id));
   return [...retainedIds, ...appendedIds];
 }
+
+export function resolveProjectRefreshSource(
+  refreshSource: "manual" | "auto",
+  startupWatchResortPending: boolean,
+): {
+  projectSource: "auto" | "resort";
+  clearStartupWatchResort: boolean;
+} {
+  if (refreshSource === "manual") {
+    return {
+      projectSource: "resort",
+      clearStartupWatchResort: startupWatchResortPending,
+    };
+  }
+
+  if (startupWatchResortPending) {
+    return {
+      projectSource: "resort",
+      clearStartupWatchResort: true,
+    };
+  }
+
+  return {
+    projectSource: "auto",
+    clearStartupWatchResort: false,
+  };
+}

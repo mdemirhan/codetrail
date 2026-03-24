@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProjectSummary } from "../app/types";
-import { collectProjectMessageDeltas, mergeStableProjectOrder } from "./projectUpdates";
+import {
+  collectProjectMessageDeltas,
+  mergeStableProjectOrder,
+  resolveProjectRefreshSource,
+} from "./projectUpdates";
 
 describe("projectUpdates", () => {
   it("collects positive project message deltas", () => {
@@ -27,6 +31,34 @@ describe("projectUpdates", () => {
         ["project_2", "project_1", "project_4"],
       ),
     ).toEqual(["project_1", "project_2", "project_4"]);
+  });
+
+  it("forces a one-time resort for the first auto refresh after startup watch restore", () => {
+    expect(resolveProjectRefreshSource("auto", true)).toEqual({
+      projectSource: "resort",
+      clearStartupWatchResort: true,
+    });
+  });
+
+  it("keeps later auto refreshes stable after the startup watch resort is consumed", () => {
+    expect(resolveProjectRefreshSource("auto", false)).toEqual({
+      projectSource: "auto",
+      clearStartupWatchResort: false,
+    });
+  });
+
+  it("clears the pending startup watch resort when a manual refresh already resorted", () => {
+    expect(resolveProjectRefreshSource("manual", true)).toEqual({
+      projectSource: "resort",
+      clearStartupWatchResort: true,
+    });
+  });
+
+  it("keeps manual refreshes on resort without clearing anything when no startup watch resort is pending", () => {
+    expect(resolveProjectRefreshSource("manual", false)).toEqual({
+      projectSource: "resort",
+      clearStartupWatchResort: false,
+    });
   });
 });
 

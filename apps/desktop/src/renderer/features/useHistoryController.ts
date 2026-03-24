@@ -9,7 +9,11 @@ import type {
 } from "@codetrail/core/browser";
 
 import type { HistoryExportPhase, HistoryExportProgressPayload } from "../../shared/historyExport";
-import { DEFAULT_PREFERRED_REFRESH_STRATEGY, type NonOffRefreshStrategy } from "../app/autoRefresh";
+import {
+  DEFAULT_PREFERRED_REFRESH_STRATEGY,
+  type NonOffRefreshStrategy,
+  isWatchRefreshStrategy,
+} from "../app/autoRefresh";
 import {
   DEFAULT_MESSAGE_CATEGORIES,
   EMPTY_BOOKMARKS_RESPONSE,
@@ -44,7 +48,7 @@ import { usePaneStateSync } from "../hooks/usePaneStateSync";
 import { useReconcileProviderSelection } from "../hooks/useReconcileProviderSelection";
 import { useResizablePanes } from "../hooks/useResizablePanes";
 import { useCodetrailClient } from "../lib/codetrailClient";
-import { mergeStableProjectOrder } from "../lib/projectUpdates";
+import { mergeStableProjectOrder, resolveProjectRefreshSource } from "../lib/projectUpdates";
 import { clamp, compareRecent, sessionActivityOf } from "../lib/viewUtils";
 import {
   type AppearanceState,
@@ -417,6 +421,9 @@ export function useHistoryController({
   const projectsRef = useRef<ProjectSummary[]>([]);
   const projectUpdateTimeoutsRef = useRef<Map<string, number>>(new Map());
   const projectOrderControlKeyRef = useRef("");
+  const startupWatchResortPendingRef = useRef(
+    isWatchRefreshStrategy(initialPaneState?.currentAutoRefreshStrategy ?? "off"),
+  );
 
   const projectsLoadTokenRef = useRef(0);
   const sessionsLoadTokenRef = useRef(0);
@@ -1630,6 +1637,10 @@ export function useHistoryController({
           scrollPreservation,
           prevMessageIds,
         };
+        const { projectSource, clearStartupWatchResort } = resolveProjectRefreshSource(
+          source,
+          startupWatchResortPendingRef.current,
+        );
         const consumeRefreshContext = async (
           target: "bookmarks" | "session" | "project_all" | null,
         ) => {
@@ -1651,7 +1662,7 @@ export function useHistoryController({
 
         if (source === "manual") {
           const sharedLoads: Promise<unknown>[] = [
-            loadProjects("resort"),
+            loadProjects(projectSource),
             loadSessions(),
             refreshTreeProjectSessions(),
           ];
@@ -1659,6 +1670,9 @@ export function useHistoryController({
             sharedLoads.push(loadBookmarks());
           }
           await Promise.all(sharedLoads);
+          if (clearStartupWatchResort) {
+            startupWatchResortPendingRef.current = false;
+          }
           const refreshTarget =
             historyMode === "bookmarks" && selectedProjectId
               ? "bookmarks"
@@ -1673,7 +1687,10 @@ export function useHistoryController({
 
         const previousProjectFingerprint = selectedProjectRefreshFingerprintRef.current;
         const previousSessionFingerprint = selectedSessionRefreshFingerprintRef.current;
-        const nextProjects = await loadProjects("auto");
+        const nextProjects = await loadProjects(projectSource);
+        if (clearStartupWatchResort) {
+          startupWatchResortPendingRef.current = false;
+        }
         const nextSelectedProject =
           nextProjects?.find((project) => project.id === selectedProjectId) ?? null;
         const projectFingerprintChanged =
