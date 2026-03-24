@@ -47,7 +47,7 @@ export function useKeyboardShortcuts(args: {
   toggleFocusMode: () => void;
   toggleScopedMessagesExpanded: () => void;
   toggleHistoryCategory: (category: MessageCategory) => void;
-  toggleHistoryCategoryExpanded: (category: MessageCategory) => void;
+  toggleHistoryCategoryDefaultExpansion: (category: MessageCategory) => void;
   toggleProjectPaneCollapsed: () => void;
   toggleSessionPaneCollapsed: () => void;
   focusPreviousHistoryMessage: () => void;
@@ -94,7 +94,7 @@ export function useKeyboardShortcuts(args: {
               message: args.messageListRef.current,
             })
           : null;
-      const command = event.metaKey || event.ctrlKey;
+      const command = event.metaKey;
       const shift = event.shiftKey;
       const key = event.key.toLowerCase();
       const code = event.code;
@@ -120,7 +120,7 @@ export function useKeyboardShortcuts(args: {
         command,
         requireAlt: true,
         code,
-        onToggleCategory: args.toggleHistoryCategoryExpanded,
+        onToggleCategory: args.toggleHistoryCategoryDefaultExpansion,
       });
       if (handledExpandedCategory) {
         return;

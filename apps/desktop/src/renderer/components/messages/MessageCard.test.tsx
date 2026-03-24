@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -97,6 +97,28 @@ describe("MessageCard", () => {
 
     await user.click(screen.getByRole("button", { name: "Expand message" }));
     expect(onToggleExpanded).toHaveBeenCalled();
+  });
+
+  it("uses Cmd+click to toggle all messages of the same type", async () => {
+    const onToggleExpanded = vi.fn();
+    const onToggleCategoryExpanded = vi.fn();
+
+    render(
+      <MessageCard
+        message={message}
+        query=""
+        pathRoots={[]}
+        isFocused={false}
+        isExpanded={true}
+        onToggleExpanded={onToggleExpanded}
+        onToggleCategoryExpanded={onToggleCategoryExpanded}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse message" }), { metaKey: true });
+
+    expect(onToggleCategoryExpanded).toHaveBeenCalledWith("assistant");
+    expect(onToggleExpanded).not.toHaveBeenCalled();
   });
 
   it("exports default expansion behavior", () => {

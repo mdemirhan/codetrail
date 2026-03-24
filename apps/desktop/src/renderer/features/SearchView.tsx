@@ -16,6 +16,7 @@ import {
   getSearchQueryPlaceholder,
   getSearchQueryTooltip,
 } from "../lib/searchLabels";
+import { formatTooltip } from "../lib/tooltipText";
 import {
   compactPath,
   formatDate,
@@ -123,9 +124,7 @@ export function SearchView({
                       controlsCollapsed ? "Expand search filters" : "Collapse search filters"
                     }
                     title={
-                      controlsCollapsed
-                        ? "Expand the search controls"
-                        : "Collapse filters and keep only the search box and match count visible"
+                      controlsCollapsed ? "Expand search controls" : "Collapse search controls"
                     }
                     onClick={() => setControlsCollapsed((value) => !value)}
                   >
@@ -163,7 +162,7 @@ export function SearchView({
                             search.setSearchPage(0);
                           }}
                           placeholder={SEARCH_PLACEHOLDERS.globalProjects}
-                          title="Filter the visible search results by project name only. This does not search message text. Refer to Help for search syntax details."
+                          title="Filter results by project name"
                         />
                       </label>
 
@@ -184,8 +183,8 @@ export function SearchView({
                             aria-expanded={projectMenuOpen}
                             title={
                               selectedProject
-                                ? `Project filter: ${getProjectOptionLabel(selectedProject)} — ${selectedProject.path || "(unknown path)"}. Click to choose a different project scope.`
-                                : "Project filter: All projects. Click to choose a specific project."
+                                ? `Project: ${getProjectOptionLabel(selectedProject)}`
+                                : "Project: All projects"
                             }
                             onClick={() => setProjectMenuOpen((value) => !value)}
                           >
@@ -268,7 +267,7 @@ export function SearchView({
                           className={`msg-filter search-filter-chip search-filter-chip-provider search-filter-chip-provider-${provider}${
                             search.searchProviders.includes(provider) ? " is-active" : ""
                           }`}
-                          title={`Toggle ${prettyProvider(provider)} results in Search`}
+                          title={`Show or hide ${prettyProvider(provider)} results`}
                           onClick={() => {
                             search.setSearchProviders((value) => toggleValue(value, provider));
                             search.setSearchPage(0);
@@ -386,7 +385,7 @@ export function SearchView({
                       tabIndex={-1}
                       onClick={search.goToPreviousSearchPage}
                       disabled={!search.canGoToPreviousSearchPage}
-                      title="Previous page (Cmd/Ctrl+Left)"
+                      title={formatTooltip("Previous page", "Cmd+Left")}
                       aria-label="Previous search page"
                     >
                       Prev
@@ -397,14 +396,14 @@ export function SearchView({
                       tabIndex={-1}
                       onClick={search.goToNextSearchPage}
                       disabled={!search.canGoToNextSearchPage}
-                      title="Next page (Cmd/Ctrl+Right)"
+                      title={formatTooltip("Next page", "Cmd+Right")}
                       aria-label="Next search page"
                     >
                       Next
                     </button>
                   </div>
                   <span className="search-footer-shortcut">
-                    Cmd/Ctrl+Left/Right • Cmd+Up/Down • Ctrl+D/U • Page Up/Down
+                    Cmd+Left/Right • Cmd+Up/Down • Ctrl+D/U • Page Up/Down
                   </span>
                 </div>
               ) : null}
@@ -453,7 +452,7 @@ function getSearchCategoryShortcutDigit(category: MessageCategory): string {
 
 function getSearchCategoryTooltip(category: MessageCategory): string {
   const label = prettyCategory(category);
-  return `Toggle ${label} filter (${HISTORY_CATEGORY_SHORTCUTS[category]})`;
+  return formatTooltip(`Show or hide ${label} results`, HISTORY_CATEGORY_SHORTCUTS[category]);
 }
 
 function compareProjectsByNameThenProvider(a: ProjectSummary, b: ProjectSummary): number {

@@ -2,7 +2,7 @@
 
 import { type ComponentProps, useState } from "react";
 
-import type { IpcResponse, MessageCategory, Provider } from "@codetrail/core/browser";
+import type { IpcResponse, Provider } from "@codetrail/core/browser";
 import {
   createClaudeHookStateFixture,
   createLiveStatusFixture,
@@ -297,8 +297,6 @@ function createBaseProps(): Omit<
       onRemoveMissingSessionsDuringIncrementalIndexingChange: vi.fn(),
     },
     messageRules: {
-      expandedByDefaultCategories: ["assistant"] as MessageCategory[],
-      onToggleExpandedByDefault: vi.fn(),
       systemMessageRegexRules: {
         claude: ["^<command-name>"],
         codex: ["^<environment_context>"],
@@ -337,9 +335,7 @@ describe("SettingsView", () => {
     const sectionHeadings = screen
       .getAllByRole("heading", { level: 3 })
       .map((node) => node.textContent?.trim());
-    expect(sectionHeadings.indexOf("Default Expansion")).toBeLessThan(
-      sectionHeadings.indexOf("Providers"),
-    );
+    expect(sectionHeadings).not.toContain("Default Expansion");
     expect(sectionHeadings.indexOf("Providers")).toBeLessThan(
       sectionHeadings.indexOf("Live Watch"),
     );
@@ -428,7 +424,6 @@ describe("SettingsView", () => {
         name: "Remove indexed sessions when source files disappear during incremental refresh",
       }),
     );
-    await user.click(screen.getByRole("button", { name: "User" }));
     await user.click(screen.getByRole("button", { name: "Add claude regex rule" }));
     await user.type(screen.getByRole("textbox", { name: "claude regex rule 1" }), "$");
     await user.click(screen.getByRole("button", { name: "Remove claude regex rule 1" }));
@@ -518,7 +513,6 @@ describe("SettingsView", () => {
     expect(
       baseProps.indexing.onRemoveMissingSessionsDuringIncrementalIndexingChange,
     ).toHaveBeenCalledWith(true);
-    expect(baseProps.messageRules.onToggleExpandedByDefault).toHaveBeenCalledWith("user");
     expect(baseProps.messageRules.onAddSystemMessageRegexRule).toHaveBeenCalledWith("claude");
     expect(baseProps.messageRules.onUpdateSystemMessageRegexRule).toHaveBeenCalledWith(
       "claude",

@@ -1221,11 +1221,7 @@ function ContentViewer({
               className={`content-viewer-action message-action-button${
                 diffMode === "split" ? " is-active" : ""
               }`}
-              title={
-                diffMode === "unified"
-                  ? "Currently showing unified diff. Click to switch to split diff view."
-                  : "Currently showing split diff. Click to switch to unified diff view."
-              }
+              title={diffMode === "unified" ? "Unified diff" : "Split diff"}
               onClick={() => setDiffMode((value) => (value === "unified" ? "split" : "unified"))}
             >
               {diffMode === "unified" ? "Unified" : "Split"}
@@ -1234,11 +1230,7 @@ function ContentViewer({
           <button
             type="button"
             className="content-viewer-action message-action-button"
-            title={
-              wrap
-                ? "Currently wrapping long lines. Click to disable line wrapping."
-                : "Currently not wrapping long lines. Click to enable line wrapping."
-            }
+            title={wrap ? "Wrap lines" : "Do not wrap lines"}
             onClick={() => setWrap((value) => !value)}
           >
             {wrap ? "Wrap" : "No Wrap"}
@@ -1257,7 +1249,7 @@ function ContentViewer({
             <button
               type="button"
               className="content-viewer-action message-action-button"
-              title="Open in external editor"
+              title="Open in editor"
               onClick={() => void handleOpenFileOrContent(defaultEditorApp?.id)}
             >
               Open
@@ -1267,7 +1259,7 @@ function ContentViewer({
             <button
               type="button"
               className="content-viewer-action message-action-button"
-              title="Open in external editor"
+              title="Open in editor"
               onClick={() => void handleOpenFileOrContent()}
             >
               Open
@@ -1284,7 +1276,7 @@ function ContentViewer({
             <button
               type="button"
               className="content-viewer-action message-action-button"
-              title="Open in external diff tool"
+              title="Open in diff tool"
               onClick={() => void handleOpenDiff()}
             >
               Diff
@@ -1308,7 +1300,7 @@ function ContentViewer({
             <button
               type="button"
               className="content-viewer-action message-action-button"
-              title="Reveal in file manager"
+              title="Reveal in Finder"
               onClick={() => {
                 void openPath(absoluteFilePath);
               }}

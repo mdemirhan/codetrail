@@ -73,6 +73,7 @@ export function useHistoryInteractions({
   areScopedMessagesExpanded,
   setMessageExpanded,
   setHistoryCategories,
+  setExpandedByDefaultCategories,
   setSessionPage,
   isExpandedByDefault,
   historyMode,
@@ -138,6 +139,7 @@ export function useHistoryInteractions({
   areScopedMessagesExpanded: boolean;
   setMessageExpanded: Dispatch<SetStateAction<Record<string, boolean>>>;
   setHistoryCategories: Dispatch<SetStateAction<MessageCategory[]>>;
+  setExpandedByDefaultCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setSessionPage: Dispatch<SetStateAction<number>>;
   isExpandedByDefault: (category: MessageCategory) => boolean;
   historyMode: HistorySelection["mode"];
@@ -239,11 +241,13 @@ export function useHistoryInteractions({
     setMessageExpanded((value) => {
       const next = { ...value };
       for (const message of scopedMessages) {
-        next[message.id] = expanded;
+        applyExpansionOverride(next, message.id, message.category, expanded, {
+          isExpandedByDefault,
+        });
       }
       return next;
     });
-  }, [areScopedMessagesExpanded, scopedMessages, setMessageExpanded]);
+  }, [areScopedMessagesExpanded, isExpandedByDefault, scopedMessages, setMessageExpanded]);
 
   const handleToggleHistoryCategoryShortcut = useCallback(
     (category: MessageCategory) => {
@@ -253,7 +257,7 @@ export function useHistoryInteractions({
     [setHistoryCategories, setSessionPage],
   );
 
-  const handleToggleCategoryMessagesExpanded = useCallback(
+  const handleToggleVisibleCategoryMessagesExpanded = useCallback(
     (category: MessageCategory) => {
       const categoryMessages = messagesByCategory.get(category) ?? [];
       if (categoryMessages.length === 0) {
@@ -265,7 +269,9 @@ export function useHistoryInteractions({
         );
         const next = { ...value };
         for (const message of categoryMessages) {
-          next[message.id] = expanded;
+          applyExpansionOverride(next, message.id, message.category, expanded, {
+            isExpandedByDefault,
+          });
         }
         return next;
       });
@@ -275,12 +281,34 @@ export function useHistoryInteractions({
 
   const handleToggleMessageExpanded = useCallback(
     (messageId: string, category: MessageCategory) => {
-      setMessageExpanded((value) => ({
-        ...value,
-        [messageId]: !(value[messageId] ?? isExpandedByDefault(category)),
-      }));
+      setMessageExpanded((value) => {
+        const nextExpanded = !(value[messageId] ?? isExpandedByDefault(category));
+        const next = { ...value };
+        applyExpansionOverride(next, messageId, category, nextExpanded, { isExpandedByDefault });
+        return next;
+      });
     },
     [isExpandedByDefault, setMessageExpanded],
+  );
+
+  const handleToggleCategoryDefaultExpansion = useCallback(
+    (category: MessageCategory) => {
+      const categoryMessages = messagesByCategory.get(category) ?? [];
+      setExpandedByDefaultCategories((value) => toggleValue<MessageCategory>(value, category));
+      setMessageExpanded((value) => {
+        const next = { ...value };
+        let changed = false;
+        for (const message of categoryMessages) {
+          if (!(message.id in next)) {
+            continue;
+          }
+          delete next[message.id];
+          changed = true;
+        }
+        return changed ? next : value;
+      });
+    },
+    [messagesByCategory, setExpandedByDefaultCategories, setMessageExpanded],
   );
 
   const handleRevealInSession = useCallback(
@@ -1032,7 +1060,8 @@ export function useHistoryInteractions({
   return {
     handleToggleScopedMessagesExpanded,
     handleToggleHistoryCategoryShortcut,
-    handleToggleCategoryMessagesExpanded,
+    handleToggleVisibleCategoryMessagesExpanded,
+    handleToggleCategoryDefaultExpansion,
     handleToggleMessageExpanded,
     handleRevealInSession,
     handleToggleBookmark,
@@ -1056,4 +1085,18 @@ export function useHistoryInteractions({
     handleRefresh,
     navigateFromSearchResult,
   };
+}
+
+function applyExpansionOverride(
+  overrides: Record<string, boolean>,
+  messageId: string,
+  category: MessageCategory,
+  expanded: boolean,
+  options: { isExpandedByDefault: (category: MessageCategory) => boolean },
+): void {
+  if (expanded === options.isExpandedByDefault(category)) {
+    delete overrides[messageId];
+    return;
+  }
+  overrides[messageId] = expanded;
 }

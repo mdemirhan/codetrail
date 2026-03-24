@@ -111,7 +111,7 @@ describe("App bookmarks", () => {
     expect(screen.getByText("Investigate markdown rendering")).toBeInTheDocument();
   });
 
-  it("keeps bookmarks mode when Cmd/Ctrl+F searches messages", async () => {
+  it("keeps bookmarks mode when Cmd+F searches messages", async () => {
     const user = userEvent.setup();
     const client = createBookmarksSearchClient();
 
@@ -133,7 +133,7 @@ describe("App bookmarks", () => {
       SEARCH_PLACEHOLDERS.globalMessages,
     ) as HTMLInputElement;
 
-    await user.keyboard("{Control>}f{/Control}");
+    await user.keyboard("{Meta>}f{/Meta}");
 
     await waitFor(() => {
       expect(document.activeElement).toBe(bookmarksSearch);

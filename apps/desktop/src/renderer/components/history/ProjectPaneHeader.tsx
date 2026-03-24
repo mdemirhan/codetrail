@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 
 import type { ProjectSortField, ProjectViewMode } from "../../app/types";
 import { useClickOutside } from "../../hooks/useClickOutside";
+import { formatTooltip } from "../../lib/tooltipText";
 import { ToolbarIcon } from "../ToolbarIcon";
 import {
   ProjectPaneFolderIcon,
@@ -21,21 +22,21 @@ const PROJECT_SORT_COPY: Record<
 > = {
   last_active: {
     asc: {
-      tooltip: "Oldest activity first (projects). Click to switch to newest first.",
+      tooltip: "Oldest first",
       ariaLabel: "Oldest activity first (projects). Switch to newest first",
     },
     desc: {
-      tooltip: "Newest activity first (projects). Click to switch to oldest first.",
+      tooltip: "Newest first",
       ariaLabel: "Newest activity first (projects). Switch to oldest first",
     },
   },
   name: {
     asc: {
-      tooltip: "A to Z (projects). Click to switch to Z to A.",
+      tooltip: "A to Z",
       ariaLabel: "A to Z (projects). Switch to Z to A",
     },
     desc: {
-      tooltip: "Z to A (projects). Click to switch to A to Z.",
+      tooltip: "Z to A",
       ariaLabel: "Z to A (projects). Switch to A to Z",
     },
   },
@@ -121,11 +122,7 @@ export function ProjectPaneHeader({
                 aria-label={
                   allVisibleFoldersExpanded ? "Collapse all folders" : "Expand all folders"
                 }
-                title={
-                  allVisibleFoldersExpanded
-                    ? "Collapse all visible folders"
-                    : "Expand all visible folders"
-                }
+                title={allVisibleFoldersExpanded ? "Collapse" : "Expand"}
               >
                 <ToolbarIcon name={allVisibleFoldersExpanded ? "collapseAll" : "expandAll"} />
               </button>
@@ -137,7 +134,7 @@ export function ProjectPaneHeader({
                 aria-haspopup="menu"
                 aria-expanded={sortMenuOpen}
                 aria-label={`Project sort field: ${sortLabel}`}
-                title={`Sort field: ${sortLabel}. Click to choose a different sort field.`}
+                title={`Sort by ${sortLabel}`}
                 onClick={() => setSortMenuOpen((value) => !value)}
               >
                 <ProjectPaneSortFieldIcon />
@@ -185,11 +182,7 @@ export function ProjectPaneHeader({
               }`}
               onClick={onToggleViewMode}
               aria-label={viewMode === "list" ? "Switch to By Folder" : "Switch to List"}
-              title={
-                viewMode === "list"
-                  ? "List view enabled. Click to switch to By Folder."
-                  : "By Folder view enabled. Click to switch to List."
-              }
+              title={viewMode === "list" ? "Switch to Folder view" : "Switch to List view"}
             >
               {viewMode === "list" ? <ProjectPaneListIcon /> : <ProjectPaneFolderIcon />}
             </button>
@@ -335,7 +328,7 @@ export function ProjectPaneHeader({
           className="collapse-btn pane-collapse-btn"
           onClick={onToggleCollapsed}
           aria-label={collapsed ? "Expand Projects pane" : "Collapse Projects pane"}
-          title={collapsed ? "Expand Projects (Cmd/Ctrl+B)" : "Collapse Projects (Cmd/Ctrl+B)"}
+          title={formatTooltip(collapsed ? "Expand Projects" : "Collapse Projects", "Cmd+B")}
         >
           <ToolbarIcon name="chevronLeft" />
         </button>

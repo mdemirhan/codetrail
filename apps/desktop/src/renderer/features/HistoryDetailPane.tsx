@@ -19,6 +19,7 @@ import {
   getSearchQueryPlaceholder,
   getSearchQueryTooltip,
 } from "../lib/searchLabels";
+import { formatTooltip } from "../lib/tooltipText";
 import { toggleValue } from "../lib/viewUtils";
 import type { useHistoryController } from "./useHistoryController";
 
@@ -34,8 +35,22 @@ function getHistoryCategoryShortcutDigit(
 
 function getHistoryCategoryTooltip(history: HistoryController, category: MessageCategory): string {
   const label = history.prettyCategory(category);
-  return `Toggle ${label} messages on or off (${history.historyCategoriesShortcutMap[category]})
-(${history.historyCategoryExpandShortcutMap[category]} to expand or collapse ${label} messages)`;
+  return formatTooltip(
+    `Show or hide ${label} messages`,
+    history.historyCategoriesShortcutMap[category],
+  );
+}
+
+function getHistoryCategoryExpansionDefaultTooltip(
+  history: HistoryController,
+  category: MessageCategory,
+): string {
+  const label = history.prettyCategory(category);
+  const nextAction = history.expandedByDefaultCategories.includes(category) ? "Collapse" : "Expand";
+  return formatTooltip(
+    `${nextAction} ${label} messages`,
+    history.historyCategoryExpandShortcutMap[category],
+  );
 }
 
 function parseBulkExpandScope(value: string): BulkExpandScope {
@@ -176,7 +191,7 @@ export function HistoryDetailPane({
                 className="msg-header-action-button msg-header-action-button-close"
                 onClick={history.closeBookmarksView}
                 aria-label="Close bookmarks"
-                title="Close bookmarks and return to the previous view"
+                title="Close bookmarks"
               >
                 <ToolbarIcon name="closeFocus" />
                 Close bookmarks
@@ -187,7 +202,7 @@ export function HistoryDetailPane({
                 className="msg-header-action-button"
                 onClick={() => history.selectBookmarksView()}
                 aria-label={`${history.currentViewBookmarkCount} ${history.currentViewBookmarkCount === 1 ? "bookmark" : "bookmarks"}`}
-                title={`Open ${history.currentViewBookmarkCount} bookmarked messages`}
+                title="Open bookmarked messages"
               >
                 <ToolbarIcon name="bookmark" />
                 {history.currentViewBookmarkCount}{" "}
@@ -237,7 +252,7 @@ export function HistoryDetailPane({
                 onClick={history.handleToggleScopedMessagesExpanded}
                 disabled={history.scopedMessages.length === 0}
                 aria-label={history.scopedExpandCollapseLabel}
-                title={`${history.scopedExpandCollapseLabel} (Cmd/Ctrl+E)`}
+                title={formatTooltip(history.scopedExpandCollapseLabel, "Cmd+E")}
               >
                 <ToolbarIcon
                   name={history.areScopedMessagesExpanded ? "collapseAll" : "expandAll"}
@@ -251,7 +266,7 @@ export function HistoryDetailPane({
                   history.setBulkExpandScope(parseBulkExpandScope(event.target.value));
                 }}
                 aria-label="Select expand and collapse scope"
-                title="Choose which message type the expand/collapse action applies to"
+                title="Choose what Expand/Collapse affects"
               >
                 <option value="all">All</option>
                 {CATEGORIES.map((category) => (
@@ -268,7 +283,7 @@ export function HistoryDetailPane({
                 onClick={() => void applyZoomAction("out")}
                 disabled={!canZoomOut}
                 aria-label="Zoom out"
-                title="Zoom out (Cmd/Ctrl+-)"
+                title={formatTooltip("Zoom out", "Cmd+-")}
               >
                 <ToolbarIcon name="zoomOut" />
               </button>
@@ -276,7 +291,7 @@ export function HistoryDetailPane({
                 value={zoomPercent}
                 onCommit={(percent) => void setZoomPercent(percent)}
                 ariaLabel="Zoom percentage"
-                title="Zoom level (60%-175%; Enter applies, Cmd/Ctrl+0 resets)"
+                title={formatTooltip("Zoom level", "Cmd+0")}
                 wrapperClassName="zoom-level-control"
                 inputClassName="zoom-level-input"
               />
@@ -286,7 +301,7 @@ export function HistoryDetailPane({
                 onClick={() => void applyZoomAction("in")}
                 disabled={!canZoomIn}
                 aria-label="Zoom in"
-                title="Zoom in (Cmd/Ctrl++)"
+                title={formatTooltip("Zoom in", "Cmd++")}
               >
                 <ToolbarIcon name="zoomIn" />
               </button>
@@ -323,28 +338,52 @@ export function HistoryDetailPane({
 
       <div className="msg-filters">
         {CATEGORIES.map((category) => (
-          <button
+          <div
             key={category}
-            type="button"
             className={`msg-filter ${category}-filter${
               history.historyCategories.includes(category) ? " active" : ""
             }`}
-            title={getHistoryCategoryTooltip(history, category)}
-            onClick={() => {
-              history.setHistoryCategories((value) =>
-                toggleValue<MessageCategory>(value, category),
-              );
-              history.setSessionPage(0);
-            }}
           >
-            <span className="filter-shortcut" aria-hidden="true">
-              {getHistoryCategoryShortcutDigit(history, category)}
-            </span>
-            <span className="filter-label">
-              {history.prettyCategory(category)}
-              <span className="filter-count">{history.historyCategoryCounts[category]}</span>
-            </span>
-          </button>
+            <button
+              type="button"
+              className="msg-filter-main"
+              title={getHistoryCategoryTooltip(history, category)}
+              onClick={() => {
+                history.setHistoryCategories((value) =>
+                  toggleValue<MessageCategory>(value, category),
+                );
+                history.setSessionPage(0);
+              }}
+            >
+              <span className="filter-shortcut" aria-hidden="true">
+                {getHistoryCategoryShortcutDigit(history, category)}
+              </span>
+              <span className="filter-label">
+                {history.prettyCategory(category)}
+                <span className="filter-count">{history.historyCategoryCounts[category]}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="msg-filter-expand-toggle"
+              aria-label={getHistoryCategoryExpansionDefaultTooltip(history, category)}
+              title={getHistoryCategoryExpansionDefaultTooltip(history, category)}
+              onClick={() => {
+                history.handleToggleCategoryDefaultExpansion(category);
+              }}
+            >
+              <svg
+                className={`msg-chevron filter-expand-chevron${
+                  history.expandedByDefaultCategories.includes(category) ? "" : " is-collapsed"
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
+              </svg>
+            </button>
+          </div>
         ))}
       </div>
 
@@ -416,9 +455,11 @@ export function HistoryDetailPane({
                   : false
               }
               isExpanded={
-                history.messageExpanded[message.id] ?? history.isExpandedByDefault(message.category)
+                history.messageExpansionOverrides[message.id] ??
+                history.isExpandedByDefault(message.category)
               }
               onToggleExpanded={history.handleToggleMessageExpanded}
+              onToggleCategoryExpanded={history.handleToggleVisibleCategoryMessagesExpanded}
               onToggleBookmark={history.handleToggleBookmark}
               onRevealInSession={history.handleRevealInSession}
               cardRef={
@@ -441,7 +482,7 @@ export function HistoryDetailPane({
           className="page-btn"
           onClick={history.goToPreviousHistoryPage}
           disabled={!history.canGoToPreviousHistoryPage}
-          title="Previous page (Cmd/Ctrl+Left)"
+          title={formatTooltip("Previous page", "Cmd+Left")}
           aria-label="Previous page"
         >
           Previous
@@ -452,7 +493,7 @@ export function HistoryDetailPane({
           className="page-btn"
           onClick={history.goToNextHistoryPage}
           disabled={!history.canGoToNextHistoryPage}
-          title="Next page (Cmd/Ctrl+Right)"
+          title={formatTooltip("Next page", "Cmd+Right")}
           aria-label="Next page"
         >
           Next

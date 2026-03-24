@@ -69,7 +69,7 @@ function createProps(
     toggleFocusMode: vi.fn(),
     toggleScopedMessagesExpanded: vi.fn(),
     toggleHistoryCategory: vi.fn(),
-    toggleHistoryCategoryExpanded: vi.fn(),
+    toggleHistoryCategoryDefaultExpansion: vi.fn(),
     toggleProjectPaneCollapsed: vi.fn(),
     toggleSessionPaneCollapsed: vi.fn(),
     focusPreviousHistoryMessage: vi.fn(),
@@ -143,7 +143,7 @@ describe("useKeyboardShortcuts", () => {
     expect(props.toggleFocusMode).toHaveBeenCalledTimes(1);
     expect(props.toggleScopedMessagesExpanded).toHaveBeenCalledTimes(1);
     expect(props.toggleHistoryCategory).toHaveBeenCalledWith("user");
-    expect(props.toggleHistoryCategoryExpanded).toHaveBeenCalledWith("user");
+    expect(props.toggleHistoryCategoryDefaultExpansion).toHaveBeenCalledWith("user");
     expect(props.toggleProjectPaneCollapsed).toHaveBeenCalledTimes(1);
     expect(props.toggleSessionPaneCollapsed).toHaveBeenCalledTimes(1);
     expect(props.goToPreviousHistoryPage).toHaveBeenCalledTimes(1);
@@ -188,7 +188,7 @@ describe("useKeyboardShortcuts", () => {
     expect(props.goToNextSearchPage).toHaveBeenCalledTimes(1);
     expect(props.goToPreviousHistoryPage).not.toHaveBeenCalled();
     expect(props.goToNextHistoryPage).not.toHaveBeenCalled();
-    expect(props.toggleHistoryCategoryExpanded).not.toHaveBeenCalled();
+    expect(props.toggleHistoryCategoryDefaultExpansion).not.toHaveBeenCalled();
     expect(props.pageHistoryMessagesUp).not.toHaveBeenCalled();
     expect(props.pageHistoryMessagesDown).not.toHaveBeenCalled();
   });

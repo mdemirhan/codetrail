@@ -60,7 +60,7 @@ export function useHistoryDerivedState({
   messagePageSize,
   expandedByDefaultCategories,
   bulkExpandScope,
-  messageExpanded,
+  messageExpansionOverrides,
   isHistoryLayout,
   projectPaneCollapsed,
   projectPaneWidth,
@@ -85,7 +85,7 @@ export function useHistoryDerivedState({
   messagePageSize: number;
   expandedByDefaultCategories: MessageCategory[];
   bulkExpandScope: BulkExpandScope;
-  messageExpanded: Record<string, boolean>;
+  messageExpansionOverrides: Record<string, boolean>;
   isHistoryLayout: boolean;
   projectPaneCollapsed: boolean;
   projectPaneWidth: number;
@@ -114,10 +114,7 @@ export function useHistoryDerivedState({
       : historyMode === "bookmarks"
         ? "bookmarks"
         : "session";
-  const messageSortTooltip =
-    activeMessageSortDirection === "asc"
-      ? `Oldest first (${messageSortScopeLabel}). Click to switch to newest first.`
-      : `Newest first (${messageSortScopeLabel}). Click to switch to oldest first.`;
+  const messageSortTooltip = activeMessageSortDirection === "asc" ? "Oldest first" : "Newest first";
 
   const bookmarkOrphanedByMessageId = useMemo(
     () =>
@@ -302,9 +299,9 @@ export function useHistoryDerivedState({
     () =>
       scopedMessages.length > 0 &&
       scopedMessages.every(
-        (message) => messageExpanded[message.id] ?? isExpandedByDefault(message.category),
+        (message) => messageExpansionOverrides[message.id] ?? isExpandedByDefault(message.category),
       ),
-    [isExpandedByDefault, messageExpanded, scopedMessages],
+    [isExpandedByDefault, messageExpansionOverrides, scopedMessages],
   );
   const bulkScopeLabel = useMemo(
     () => (bulkExpandScope === "all" ? "All" : prettyCategory(bulkExpandScope)),

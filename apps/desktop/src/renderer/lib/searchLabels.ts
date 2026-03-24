@@ -15,12 +15,10 @@ export function getSearchQueryPlaceholder(advancedSearchEnabled: boolean): strin
 
 export function getSearchQueryTooltip(advancedSearchEnabled: boolean): string {
   return advancedSearchEnabled
-    ? 'Advanced search is enabled. Use quoted phrases, AND/OR/NOT, parentheses, and postfix wildcard syntax like term*. Example: "build error" AND deploy*. Refer to Help for more examples and syntax details.'
-    : "Standard search is enabled. Type plain words to match message text, and use postfix wildcard syntax like term* when needed. Turn on Advanced Search for quoted phrases, boolean operators, and grouping. Refer to Help for more.";
+    ? "Search with quotes, AND/OR/NOT, parentheses, and term*."
+    : "Search with words and term*.";
 }
 
 export function getAdvancedSearchToggleTitle(advancedSearchEnabled: boolean): string {
-  return advancedSearchEnabled
-    ? 'Advanced search is on. You can use quoted phrases, AND/OR/NOT, parentheses, and postfix wildcard syntax like term*. Example: "build error" AND deploy*. Turn this off to go back to plain text search. Refer to Help for more.'
-    : "Advanced search is off. Search works like plain text matching, with optional postfix wildcard syntax like term*. Turn this on if you want quoted phrases, AND/OR/NOT, and grouped expressions with parentheses. Refer to Help for more.";
+  return advancedSearchEnabled ? "Turn off advanced search." : "Turn on advanced search.";
 }

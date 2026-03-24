@@ -20,6 +20,7 @@ import {
 } from "../../shared/uiPreferences";
 import { REFRESH_STRATEGY_OPTIONS, type RefreshStrategy } from "../app/autoRefresh";
 import { useClickOutside } from "../hooks/useClickOutside";
+import { formatTooltip } from "../lib/tooltipText";
 import { ToolbarIcon } from "./ToolbarIcon";
 
 function wrapMenuIndex(index: number, count: number): number {
@@ -255,7 +256,7 @@ function RefreshStrategyDropdown({
         aria-label="Auto-refresh strategy"
         aria-haspopup="menu"
         aria-expanded={open}
-        title={`Auto-refresh: ${selectedLabel}. Click to change strategy (Cmd/Ctrl+Shift+R).`}
+        title={formatTooltip(`Auto-refresh: ${selectedLabel}`, "Cmd+Shift+R")}
       >
         <ToolbarIcon name="refresh" />
         {selectedLabel}
@@ -356,7 +357,7 @@ function ThemeDropdown({
         aria-label="Choose theme"
         aria-haspopup="menu"
         aria-expanded={open}
-        title={`Theme: ${getThemeLabel(value)}. Click to choose a different theme.`}
+        title={`Theme: ${getThemeLabel(value)}`}
       >
         <ToolbarIcon name="theme" />
       </button>
@@ -493,7 +494,7 @@ function ShikiThemeDropdown({
         aria-label="Choose text viewer theme"
         aria-haspopup="menu"
         aria-expanded={open}
-        title={`Text viewer theme: ${getShikiThemeLabel(value)}. Click to choose a different code theme.`}
+        title={`Code theme: ${getShikiThemeLabel(value)}`}
       >
         <ToolbarIcon name="codeTheme" />
       </button>
@@ -643,8 +644,8 @@ export function TopBar({
           aria-label="Search"
           title={
             mainView === "search"
-              ? "Search view is open. Return to history view (Esc)."
-              : "Open Search (Cmd/Ctrl+Shift+F)."
+              ? formatTooltip("Return to History", "Esc")
+              : formatTooltip("Open Search", "Cmd+Shift+F")
           }
         >
           <ToolbarIcon name="search" />
@@ -656,11 +657,7 @@ export function TopBar({
           onClick={onIncrementalRefresh}
           disabled={indexing}
           aria-label={indexing ? "Indexing in progress" : "Incremental refresh"}
-          title={
-            indexing
-              ? "Indexing is already in progress."
-              : "Run an incremental refresh now (Cmd/Ctrl+R)."
-          }
+          title={indexing ? "Indexing in progress" : formatTooltip("Refresh now", "Cmd+R")}
         >
           <ToolbarIcon name="refresh" />
           {indexing ? "Indexing..." : "Refresh"}
@@ -680,8 +677,8 @@ export function TopBar({
           aria-label={focusMode ? "Exit focus mode" : "Enter focus mode"}
           title={
             focusMode
-              ? "Exit focus mode (Cmd/Ctrl+Shift+M)."
-              : "Enter focus mode (Cmd/Ctrl+Shift+M)."
+              ? formatTooltip("Exit Focus mode", "Cmd+Shift+M")
+              : formatTooltip("Enter Focus mode", "Cmd+Shift+M")
           }
         >
           <ToolbarIcon name={focusMode ? "closeFocus" : "focus"} />
@@ -694,8 +691,8 @@ export function TopBar({
           aria-label={mainView === "help" ? "Return to history view" : "Open help"}
           title={
             mainView === "help"
-              ? "Help view is open. Return to history view (Esc)."
-              : "Open Help (?)."
+              ? formatTooltip("Return to History", "Esc")
+              : formatTooltip("Open Help", "?")
           }
         >
           <ToolbarIcon name="help" />
@@ -722,8 +719,8 @@ export function TopBar({
           aria-label={mainView === "settings" ? "Return to history view" : "Open settings"}
           title={
             mainView === "settings"
-              ? "Settings view is open. Return to history view (Esc)."
-              : "Open Settings (Cmd/Ctrl+,)."
+              ? formatTooltip("Return to History", "Esc")
+              : formatTooltip("Open Settings", "Cmd+,")
           }
         >
           <ToolbarIcon name="settings" />

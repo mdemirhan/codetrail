@@ -64,7 +64,7 @@ export function HistoryExportMenu({
         disabled={disabled || exporting}
         aria-haspopup="dialog"
         aria-expanded={menuOpen}
-        title="Export the messages shown in this pane to Markdown"
+        title="Export messages"
       >
         <ToolbarIcon name="export" />
         Export

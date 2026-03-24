@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type IpcRequest,
-  type MessageCategory,
   PROVIDER_LIST,
   type Provider,
   type SearchMode,
@@ -47,7 +46,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useReconcileProviderSelection } from "./hooks/useReconcileProviderSelection";
 import { useCodetrailClient } from "./lib/codetrailClient";
 import { findSessionSummaryById } from "./lib/historySessionLookup";
-import { toErrorMessage, toggleValue } from "./lib/viewUtils";
+import { toErrorMessage } from "./lib/viewUtils";
 import { ViewerExternalAppsProvider } from "./lib/viewerExternalAppsContext";
 
 // Module-level override for tests — keeps the component API clean
@@ -537,14 +536,6 @@ export function App({
   }, [handleRefresh]);
   const indexing = refreshing || indexingInBackground;
   const watchStrategyActive = isWatchRefreshStrategy(refreshStrategy);
-  const handleToggleExpandedByDefault = useCallback(
-    (category: MessageCategory) => {
-      history.setExpandedByDefaultCategories((value) =>
-        toggleValue<MessageCategory>(value, category),
-      );
-    },
-    [history.setExpandedByDefaultCategories],
-  );
   const handleAddSystemMessageRegexRule = useCallback(
     (provider: Provider) => {
       history.setSystemMessageRegexRules((value) => ({
@@ -707,7 +698,7 @@ export function App({
     toggleFocusMode,
     toggleScopedMessagesExpanded: history.handleToggleScopedMessagesExpanded,
     toggleHistoryCategory: history.handleToggleHistoryCategoryShortcut,
-    toggleHistoryCategoryExpanded: history.handleToggleCategoryMessagesExpanded,
+    toggleHistoryCategoryDefaultExpansion: history.handleToggleCategoryDefaultExpansion,
     toggleProjectPaneCollapsed: () => history.setProjectPaneCollapsed((value) => !value),
     toggleSessionPaneCollapsed: () => history.setSessionPaneCollapsed((value) => !value),
     focusPreviousHistoryMessage: () =>
@@ -755,11 +746,11 @@ export function App({
         : ("queued" as const)
       : null;
   const autoRefreshStatusTooltip = watchStrategyActive
-    ? "Number of changed files currently queued by the watcher before auto-refresh runs."
+    ? `Watcher queue: ${watcherPendingPathCount} files`
     : isScanRefreshStrategy(refreshStrategy)
       ? autoRefreshScanInFlight
-        ? "Automatic scan refresh is currently running."
-        : "Automatic scan refresh is enabled and waiting for the next interval."
+        ? "Auto-refresh running"
+        : "Auto-refresh waiting"
       : null;
   const viewerExternalAppsSnapshot = useMemo(
     () => ({
@@ -954,8 +945,6 @@ export function App({
                     handleMissingSessionCleanupToggle,
                 }}
                 messageRules={{
-                  expandedByDefaultCategories: history.expandedByDefaultCategories,
-                  onToggleExpandedByDefault: handleToggleExpandedByDefault,
                   systemMessageRegexRules: history.systemMessageRegexRules,
                   onAddSystemMessageRegexRule: handleAddSystemMessageRegexRule,
                   onUpdateSystemMessageRegexRule: handleUpdateSystemMessageRegexRule,

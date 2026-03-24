@@ -10,7 +10,7 @@ describe("ShortcutsDialog", () => {
     const { container } = render(
       <ShortcutsDialog
         shortcutItems={[
-          { group: "Search & Navigation", shortcut: "Cmd/Ctrl+F", description: "Search messages" },
+          { group: "Search & Navigation", shortcut: "Cmd+F", description: "Search messages" },
           { group: "System", shortcut: "Esc", description: "Return to history view" },
         ]}
         commonSyntaxItems={[
@@ -28,7 +28,7 @@ describe("ShortcutsDialog", () => {
     expect(screen.getByText("Advanced Only")).toBeInTheDocument();
     expect(screen.getByText("Search & Navigation")).toBeInTheDocument();
     expect(screen.getByText("System")).toBeInTheDocument();
-    expect(screen.getByText("Cmd/Ctrl")).toBeInTheDocument();
+    expect(screen.getByText("Cmd")).toBeInTheDocument();
     expect(screen.getByText("Search messages")).toBeInTheDocument();
     expect(screen.getByText("Esc")).toBeInTheDocument();
     expect(screen.getByText("Return to history view")).toBeInTheDocument();

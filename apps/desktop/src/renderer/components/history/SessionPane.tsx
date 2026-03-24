@@ -3,6 +3,7 @@ import { type Ref, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { SessionSummary } from "../../app/types";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { useVirtualListWindow } from "../../hooks/useVirtualListWindow";
+import { formatTooltip } from "../../lib/tooltipText";
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
 import {
   SIDEBAR_LIST_OVERSCAN,
@@ -82,10 +83,7 @@ export function SessionPane({
     : bookmarksSelected
       ? "__bookmarks__"
       : selectedSessionId;
-  const sortTooltip =
-    sortDirection === "asc"
-      ? "Oldest first (sessions). Click to switch to newest first."
-      : "Newest first (sessions). Click to switch to oldest first.";
+  const sortTooltip = sortDirection === "asc" ? "Oldest first" : "Newest first";
   const sortAriaLabel =
     sortDirection === "asc"
       ? "Oldest first (sessions). Switch to newest first"
@@ -223,11 +221,10 @@ export function SessionPane({
             className="collapse-btn pane-collapse-btn"
             onClick={onToggleCollapsed}
             aria-label={collapsed ? "Expand Sessions pane" : "Collapse Sessions pane"}
-            title={
-              collapsed
-                ? "Expand Sessions (Cmd/Ctrl+Shift+B)"
-                : "Collapse Sessions (Cmd/Ctrl+Shift+B)"
-            }
+            title={formatTooltip(
+              collapsed ? "Expand Sessions" : "Collapse Sessions",
+              "Cmd+Shift+B",
+            )}
           >
             <ToolbarIcon name="chevronLeft" />
           </button>

@@ -1,7 +1,6 @@
 import { type ReactNode, useState } from "react";
 
 import {
-  type MessageCategory,
   PROVIDER_LIST,
   type Provider,
   type SystemMessageRegexRules,
@@ -21,7 +20,6 @@ import {
   THEME_GROUPS,
   type ThemeMode,
   UI_DIFF_VIEW_MODE_VALUES,
-  UI_MESSAGE_CATEGORY_VALUES,
   UI_MESSAGE_PAGE_SIZE_VALUES,
   UI_MONO_FONT_SIZE_VALUES,
   UI_MONO_FONT_VALUES,
@@ -132,8 +130,6 @@ type SettingsIndexingProps = {
 };
 
 type SettingsMessageRulesProps = {
-  expandedByDefaultCategories: MessageCategory[];
-  onToggleExpandedByDefault: (category: MessageCategory) => void;
   systemMessageRegexRules: SystemMessageRegexRules;
   onAddSystemMessageRegexRule: (provider: Provider) => void;
   onUpdateSystemMessageRegexRule: (provider: Provider, index: number, pattern: string) => void;
@@ -176,16 +172,6 @@ const PROVIDER_ICONS: Record<Provider, string> = {
   gemini: "G",
   cursor: "U",
   copilot: "P",
-};
-
-const MESSAGE_CATEGORY_ICONS: Record<MessageCategory, string> = {
-  user: "U",
-  assistant: "A",
-  tool_edit: "W",
-  tool_use: "T",
-  tool_result: "R",
-  thinking: "Q",
-  system: "S",
 };
 
 export function SettingsView({
@@ -613,42 +599,6 @@ export function SettingsView({
                     ariaLabel="Use monospaced fonts for all messages"
                   />
                 </InlineSwitchRow>
-              </SectionCard>
-
-              <SectionCard>
-                <SectionHeader
-                  tone="expansion"
-                  icon="⊞"
-                  title="Default Expansion"
-                  subtitle="Which message types should start expanded in message view."
-                />
-                <div className="settings-token-grid">
-                  {UI_MESSAGE_CATEGORY_VALUES.map((category) => {
-                    const active = messageRules.expandedByDefaultCategories.includes(category);
-                    return (
-                      <button
-                        key={category}
-                        type="button"
-                        className={`settings-token${active ? " is-active" : ""}`}
-                        onClick={() => messageRules.onToggleExpandedByDefault(category)}
-                        aria-pressed={active}
-                        aria-label={prettyCategory(category)}
-                        title={`Toggle default expansion for ${prettyCategory(category)}`}
-                      >
-                        <span className="settings-token-icon" aria-hidden>
-                          {MESSAGE_CATEGORY_ICONS[category]}
-                        </span>
-                        <span className="settings-token-label">{prettyCategory(category)}</span>
-                        <span className="settings-token-check" aria-hidden>
-                          <svg viewBox="0 0 14 14">
-                            <title>Selected</title>
-                            <path d="M3 7l3 3 5-5" />
-                          </svg>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
               </SectionCard>
 
               <SectionCard padded={false}>

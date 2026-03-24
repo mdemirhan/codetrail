@@ -276,7 +276,7 @@ describe("ProjectPane", () => {
     expect(screen.getByText("+3")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Collapse Projects pane" })).toHaveAttribute(
       "title",
-      "Collapse Projects (Cmd/Ctrl+B)",
+      "Collapse Projects  ⌘B",
     );
 
     await user.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
@@ -326,7 +326,7 @@ describe("ProjectPane", () => {
     expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Expand Projects pane" })).toHaveAttribute(
       "title",
-      "Expand Projects (Cmd/Ctrl+B)",
+      "Expand Projects  ⌘B",
     );
     expect(screen.queryByRole("button", { name: "Project sort field: Last Active" })).toBeNull();
     expect(

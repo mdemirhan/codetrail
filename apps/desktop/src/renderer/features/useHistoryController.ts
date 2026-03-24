@@ -334,7 +334,9 @@ export function useHistoryController({
     null,
   );
   const [bulkExpandScope, setBulkExpandScope] = useState<BulkExpandScope>("all");
-  const [messageExpanded, setMessageExpanded] = useState<Record<string, boolean>>({});
+  const [messageExpansionOverrides, setMessageExpansionOverrides] = useState<
+    Record<string, boolean>
+  >({});
   const [focusMessageId, setFocusMessageId] = useState("");
   const [pendingRevealTarget, setPendingRevealTarget] = useState<PendingRevealTarget | null>(null);
   const [autoRevealSessionRequest, setAutoRevealSessionRequest] =
@@ -1040,13 +1042,29 @@ export function useHistoryController({
     messagePageSize: appearance.messagePageSize,
     expandedByDefaultCategories,
     bulkExpandScope,
-    messageExpanded,
+    messageExpansionOverrides,
     isHistoryLayout,
     projectPaneCollapsed,
     projectPaneWidth,
     sessionPaneCollapsed,
     sessionPaneWidth,
   });
+
+  useEffect(() => {
+    const visibleMessageIds = new Set(activeHistoryMessages.map((message) => message.id));
+    setMessageExpansionOverrides((current) => {
+      let changed = false;
+      const next: Record<string, boolean> = {};
+      for (const [messageId, expanded] of Object.entries(current)) {
+        if (!visibleMessageIds.has(messageId)) {
+          changed = true;
+          continue;
+        }
+        next[messageId] = expanded;
+      }
+      return changed ? next : current;
+    });
+  }, [activeHistoryMessages]);
 
   useEffect(() => {
     const bookmarkStateRefreshKey = `${bookmarkStatesRefreshNonce}:${refreshCounter}`;
@@ -1136,7 +1154,8 @@ export function useHistoryController({
   const {
     handleToggleScopedMessagesExpanded,
     handleToggleHistoryCategoryShortcut,
-    handleToggleCategoryMessagesExpanded,
+    handleToggleVisibleCategoryMessagesExpanded,
+    handleToggleCategoryDefaultExpansion,
     handleToggleMessageExpanded,
     handleRevealInSession,
     handleToggleBookmark,
@@ -1164,8 +1183,9 @@ export function useHistoryController({
     logError,
     scopedMessages,
     areScopedMessagesExpanded,
-    setMessageExpanded,
+    setMessageExpanded: setMessageExpansionOverrides,
     setHistoryCategories,
+    setExpandedByDefaultCategories,
     setSessionPage,
     isExpandedByDefault,
     historyMode: uiHistoryMode,
@@ -1468,12 +1488,13 @@ export function useHistoryController({
     areScopedMessagesExpanded,
     scopedActionLabel,
     scopedExpandCollapseLabel,
-    messageExpanded,
+    messageExpansionOverrides,
     messagePathRoots,
     isExpandedByDefault,
     handleToggleScopedMessagesExpanded,
     handleToggleHistoryCategoryShortcut,
-    handleToggleCategoryMessagesExpanded,
+    handleToggleVisibleCategoryMessagesExpanded,
+    handleToggleCategoryDefaultExpansion,
     handleToggleMessageExpanded,
     handleToggleBookmark,
     handleRevealInSession,
