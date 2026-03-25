@@ -264,6 +264,27 @@ function getRequiredHandler(handlers: HandlerMap, channel: string): Handler {
   return handler;
 }
 
+function createWatcherInvokeEvent(senderId: number) {
+  let destroyedListener: (() => void) | null = null;
+  const sender = {
+    id: senderId,
+    once: vi.fn((event: string, listener: () => void) => {
+      if (event === "destroyed") {
+        destroyedListener = listener;
+      }
+      return sender;
+    }),
+  };
+
+  return {
+    sender,
+    event: { sender },
+    destroy: () => {
+      destroyedListener?.();
+    },
+  };
+}
+
 describe("bootstrapMainProcess", () => {
   let handlers: HandlerMap;
   let flush: ReturnType<typeof vi.fn>;
@@ -1135,6 +1156,148 @@ describe("bootstrapMainProcess", () => {
       running: true,
       processing: false,
       pendingPathCount: 2,
+    });
+  });
+
+  it("deduplicates duplicate watcher starts from the same sender and keeps the watcher alive until the final stop", async () => {
+    await bootstrapMainProcess({ runStartupIndexing: false });
+    const startWatcher = getRequiredHandler(handlers, "watcher:start");
+    const stopWatcher = getRequiredHandler(handlers, "watcher:stop");
+    const invokeEvent = createWatcherInvokeEvent(101);
+
+    await startWatcher({ debounceMs: 3000 }, invokeEvent.event);
+    expect(mockFileWatcherInstances).toHaveLength(1);
+    expect(mockEnqueue).toHaveBeenCalledWith({ force: false }, { source: "watch_initial_scan" });
+
+    mockEnqueue.mockClear();
+    await startWatcher({ debounceMs: 3000 }, invokeEvent.event);
+
+    expect(mockFileWatcherInstances).toHaveLength(1);
+    expect(mockFileWatcherInstances[0]?.start).toHaveBeenCalledTimes(1);
+    expect(mockFileWatcherInstances[0]?.stop).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
+
+    await stopWatcher({}, invokeEvent.event);
+    expect(mockFileWatcherInstances[0]?.stop).not.toHaveBeenCalled();
+
+    await stopWatcher({}, invokeEvent.event);
+    expect(mockFileWatcherInstances[0]?.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("restarts the watcher when the active debounce changes", async () => {
+    await bootstrapMainProcess({ runStartupIndexing: false });
+    const startWatcher = getRequiredHandler(handlers, "watcher:start");
+    const invokeEvent = createWatcherInvokeEvent(202);
+
+    await startWatcher({ debounceMs: 1000 }, invokeEvent.event);
+    const firstWatcher = mockFileWatcherInstances[0];
+    if (!firstWatcher) {
+      throw new Error("Expected first watcher instance");
+    }
+
+    mockEnqueue.mockClear();
+    await startWatcher({ debounceMs: 5000 }, invokeEvent.event);
+
+    expect(firstWatcher.stop).toHaveBeenCalledTimes(1);
+    expect(mockFileWatcherInstances).toHaveLength(2);
+    expect(mockFileWatcherInstances[1]?.options).toEqual(
+      expect.objectContaining({ debounceMs: 5000 }),
+    );
+    expect(mockEnqueue).toHaveBeenCalledWith({ force: false }, { source: "watch_initial_scan" });
+  });
+
+  it("releases the sender lease when watcher startup fails", async () => {
+    await bootstrapMainProcess({ runStartupIndexing: false });
+    const startWatcher = getRequiredHandler(handlers, "watcher:start");
+    const stopWatcher = getRequiredHandler(handlers, "watcher:stop");
+    const failedStartEvent = createWatcherInvokeEvent(250);
+    const successfulStartEvent = createWatcherInvokeEvent(251);
+
+    const createFailingWatcher = (
+      roots: string[],
+      onFilesChanged: (batch: {
+        changedPaths: string[];
+        requiresFullScan: boolean;
+      }) => Promise<void>,
+      options: Record<string, unknown> = {},
+    ) => {
+      const instance = {
+        roots,
+        options,
+        onFilesChanged,
+        start: vi.fn(async () => {
+          throw new Error("watcher boot failed");
+        }),
+        stop: vi.fn(async () => {}),
+        getWatchedRoots: vi.fn(() => roots),
+        getStatus: vi.fn(() => ({ running: false, processing: false, pendingPathCount: 0 })),
+      };
+      mockFileWatcherInstances.push(instance);
+      return instance;
+    };
+
+    mockFileWatcherService
+      .mockImplementationOnce(createFailingWatcher)
+      .mockImplementationOnce(createFailingWatcher);
+
+    await expect(startWatcher({ debounceMs: 3000 }, failedStartEvent.event)).resolves.toEqual({
+      ok: false,
+      watchedRoots: [],
+      backend: "default",
+    });
+
+    mockEnqueue.mockClear();
+    await expect(startWatcher({ debounceMs: 3000 }, successfulStartEvent.event)).resolves.toEqual(
+      expect.objectContaining({ ok: true }),
+    );
+
+    const successfulWatcher = mockFileWatcherInstances.at(-1);
+    if (!successfulWatcher) {
+      throw new Error("Expected successful watcher instance");
+    }
+
+    await stopWatcher({}, successfulStartEvent.event);
+    expect(successfulWatcher.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the watcher running while another sender still holds a lease", async () => {
+    await bootstrapMainProcess({ runStartupIndexing: false });
+    const startWatcher = getRequiredHandler(handlers, "watcher:start");
+    const stopWatcher = getRequiredHandler(handlers, "watcher:stop");
+    const firstEvent = createWatcherInvokeEvent(301);
+    const secondEvent = createWatcherInvokeEvent(302);
+
+    await startWatcher({ debounceMs: 3000 }, firstEvent.event);
+    const firstWatcher = mockFileWatcherInstances[0];
+    if (!firstWatcher) {
+      throw new Error("Expected watcher instance");
+    }
+
+    await startWatcher({ debounceMs: 3000 }, secondEvent.event);
+    expect(mockFileWatcherInstances).toHaveLength(1);
+
+    await stopWatcher({}, firstEvent.event);
+    expect(firstWatcher.stop).not.toHaveBeenCalled();
+
+    await stopWatcher({}, secondEvent.event);
+    expect(firstWatcher.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases all leases for a sender when its webContents is destroyed", async () => {
+    await bootstrapMainProcess({ runStartupIndexing: false });
+    const startWatcher = getRequiredHandler(handlers, "watcher:start");
+    const invokeEvent = createWatcherInvokeEvent(401);
+
+    await startWatcher({ debounceMs: 3000 }, invokeEvent.event);
+    await startWatcher({ debounceMs: 3000 }, invokeEvent.event);
+    const firstWatcher = mockFileWatcherInstances[0];
+    if (!firstWatcher) {
+      throw new Error("Expected watcher instance");
+    }
+
+    invokeEvent.destroy();
+    await vi.waitFor(() => {
+      expect(firstWatcher.stop).toHaveBeenCalledTimes(1);
     });
   });
 

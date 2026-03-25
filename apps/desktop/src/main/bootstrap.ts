@@ -1,7 +1,7 @@
 import { readdir, realpath, rm, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, resolve } from "node:path";
 
-import { BrowserWindow, app, dialog, ipcMain, shell } from "electron";
+import { BrowserWindow, type WebContents, app, dialog, ipcMain, shell } from "electron";
 
 import {
   CLAUDE_HOOK_EVENT_NAME_VALUES,
@@ -70,6 +70,10 @@ type MainProcessRuntimeState = {
   fileWatcher: FileWatcherService | null;
   liveSessionStore: LiveSessionStore | null;
   watcherDebounceMs: 1000 | 3000 | 5000 | null;
+  watcherBackend: "default" | "kqueue" | null;
+  watcherLeaseCounts: Map<number, number>;
+  watcherTrackedSenderIds: Set<number>;
+  watcherTransitionQueue: Promise<void>;
 };
 
 // The main process owns long-lived resources: databases, IPC handlers, indexing workers, and the
@@ -82,6 +86,10 @@ function createRuntimeState(): MainProcessRuntimeState {
     fileWatcher: null,
     liveSessionStore: null,
     watcherDebounceMs: null,
+    watcherBackend: null,
+    watcherLeaseCounts: new Map(),
+    watcherTrackedSenderIds: new Set(),
+    watcherTransitionQueue: Promise.resolve(),
   };
 }
 
@@ -138,6 +146,10 @@ async function disposeRuntimeState(state: MainProcessRuntimeState | null): Promi
     state.liveSessionStore = null;
   }
   state.watcherDebounceMs = null;
+  state.watcherBackend = null;
+  state.watcherLeaseCounts.clear();
+  state.watcherTrackedSenderIds.clear();
+  state.watcherTransitionQueue = Promise.resolve();
   state.queryService?.close();
   state.queryService = null;
 }
@@ -260,6 +272,71 @@ export async function bootstrapMainProcess(
     return liveSessionStoreSync;
   };
 
+  // Serialize watcher transitions in the main process so stale renderer cleanups cannot race a
+  // newer start request and leave watch mode disabled.
+  const queueWatcherTransition = <T>(transition: () => Promise<T>): Promise<T> => {
+    const queuedTransition = runtime.watcherTransitionQueue.then(transition, transition);
+    runtime.watcherTransitionQueue = queuedTransition.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queuedTransition;
+  };
+
+  const hasWatcherLeases = () => runtime.watcherLeaseCounts.size > 0;
+
+  const incrementWatcherLease = (senderId: number) => {
+    runtime.watcherLeaseCounts.set(senderId, (runtime.watcherLeaseCounts.get(senderId) ?? 0) + 1);
+  };
+
+  const decrementWatcherLease = (senderId: number) => {
+    const nextLeaseCount = (runtime.watcherLeaseCounts.get(senderId) ?? 0) - 1;
+    if (nextLeaseCount > 0) {
+      runtime.watcherLeaseCounts.set(senderId, nextLeaseCount);
+      return;
+    }
+    runtime.watcherLeaseCounts.delete(senderId);
+  };
+
+  const stopActiveWatcher = async () => {
+    if (runtime.fileWatcher) {
+      await runtime.fileWatcher.stop();
+      runtime.fileWatcher = null;
+    }
+    runtime.watcherDebounceMs = null;
+    runtime.watcherBackend = null;
+    await syncLiveSessionStore();
+  };
+
+  const trackWatcherSender = (sender: Pick<WebContents, "id" | "once">) => {
+    if (runtime.watcherTrackedSenderIds.has(sender.id)) {
+      return;
+    }
+    runtime.watcherTrackedSenderIds.add(sender.id);
+    sender.once("destroyed", () => {
+      runtime.watcherTrackedSenderIds.delete(sender.id);
+      runtime.watcherLeaseCounts.delete(sender.id);
+      void queueWatcherTransition(async () => {
+        if (hasWatcherLeases() || !runtime.fileWatcher) {
+          return;
+        }
+        await stopActiveWatcher();
+      });
+    });
+  };
+
+  // Count leases per sender instead of tracking a boolean owner. React StrictMode and remounts can
+  // produce overlapping start/stop calls from the same window, and the stale stop must only
+  // release one lease instead of tearing down the watcher outright.
+  const acquireWatcherLease = (sender: Pick<WebContents, "id" | "once">) => {
+    trackWatcherSender(sender);
+    incrementWatcherLease(sender.id);
+  };
+
+  const releaseWatcherLease = (senderId: number) => {
+    decrementWatcherLease(senderId);
+  };
+
   const flushDurablePaneStateFlagsIfChanged = (
     previousPaneState: ReturnType<NonNullable<typeof options.appStateStore>["getPaneState"]>,
     nextPaneState: ReturnType<NonNullable<typeof options.appStateStore>["getPaneState"]>,
@@ -286,12 +363,6 @@ export async function bootstrapMainProcess(
   };
 
   const startWatcherWithConfig = async (debounceMs: 1000 | 3000 | 5000) => {
-    if (runtime.fileWatcher) {
-      await runtime.fileWatcher.stop();
-      runtime.fileWatcher = null;
-    }
-    await runtime.liveSessionStore?.stop();
-
     const watcherRoots = listDiscoveryWatchRoots(getEffectiveDiscoveryConfig());
     const createFileWatcher = (watcherOptions: FileWatcherOptions) =>
       new FileWatcherService(
@@ -346,6 +417,7 @@ export async function bootstrapMainProcess(
       await fileWatcher.start();
       runtime.fileWatcher = fileWatcher;
       runtime.watcherDebounceMs = debounceMs;
+      runtime.watcherBackend = backend;
       await syncLiveSessionStore();
       watchStatsStore.recordWatcherStart({
         backend,
@@ -374,6 +446,30 @@ export async function bootstrapMainProcess(
       }
     }
     throw new Error("No file watcher backend could be started.");
+  };
+
+  const ensureWatcherRunning = async (
+    debounceMs: 1000 | 3000 | 5000,
+    restartOptions: { forceRestart?: boolean } = {},
+  ) => {
+    if (
+      !restartOptions.forceRestart &&
+      runtime.fileWatcher &&
+      runtime.watcherDebounceMs === debounceMs &&
+      runtime.watcherBackend
+    ) {
+      return {
+        backend: runtime.watcherBackend,
+        watchedRoots: runtime.fileWatcher.getWatchedRoots(),
+        didRestart: false,
+      };
+    }
+    await stopActiveWatcher();
+    const startedWatcher = await startWatcherWithConfig(debounceMs);
+    return {
+      ...startedWatcher,
+      didRestart: true,
+    };
   };
 
   registerIpcHandlers(
@@ -638,11 +734,16 @@ export async function bootstrapMainProcess(
               }
             }
           }
-          if (runtime.fileWatcher && runtime.watcherDebounceMs !== null) {
+          const activeWatcherDebounceMs = runtime.watcherDebounceMs;
+          if (runtime.fileWatcher && activeWatcherDebounceMs !== null) {
             try {
-              await startWatcherWithConfig(runtime.watcherDebounceMs);
+              await queueWatcherTransition(async () =>
+                ensureWatcherRunning(activeWatcherDebounceMs, {
+                  forceRestart: true,
+                }),
+              );
             } catch {
-              runtime.watcherDebounceMs = null;
+              await stopActiveWatcher();
             }
           }
         }
@@ -680,26 +781,36 @@ export async function bootstrapMainProcess(
           percent: clampedPercent,
         };
       },
-      "watcher:start": async (payload) => {
+      "watcher:start": async (payload, event) => {
+        if (event?.sender) {
+          acquireWatcherLease(event.sender);
+        }
         try {
-          const startedWatcher = await startWatcherWithConfig(payload.debounceMs);
+          const startedWatcher = await queueWatcherTransition(async () =>
+            ensureWatcherRunning(payload.debounceMs),
+          );
 
-          // Run one full incremental scan to bring the DB up to date before relying on events
-          void indexingRunner
-            .enqueue({ force: false }, { source: "watch_initial_scan" })
-            .catch((error: unknown) => {
-              if (options.onBackgroundError) {
-                options.onBackgroundError("watcher initial scan failed", error);
-                return;
-              }
-              console.error("[codetrail] watcher initial scan failed", error);
-            });
+          if (startedWatcher.didRestart) {
+            // Run one full incremental scan to bring the DB up to date before relying on events.
+            void indexingRunner
+              .enqueue({ force: false }, { source: "watch_initial_scan" })
+              .catch((error: unknown) => {
+                if (options.onBackgroundError) {
+                  options.onBackgroundError("watcher initial scan failed", error);
+                  return;
+                }
+                console.error("[codetrail] watcher initial scan failed", error);
+              });
+          }
           return {
             ok: true,
             watchedRoots: startedWatcher.watchedRoots,
             backend: startedWatcher.backend,
           };
         } catch {
+          if (event?.sender) {
+            releaseWatcherLease(event.sender.id);
+          }
           return { ok: false, watchedRoots: [], backend: "default" as const };
         }
       },
@@ -713,13 +824,18 @@ export async function bootstrapMainProcess(
         );
       },
       "watcher:getStats": async () => watchStatsStore.snapshot(),
-      "watcher:stop": async () => {
-        if (runtime.fileWatcher) {
-          await runtime.fileWatcher.stop();
-          runtime.fileWatcher = null;
+      "watcher:stop": async (_payload, event) => {
+        if (event?.sender) {
+          releaseWatcherLease(event.sender.id);
+          await queueWatcherTransition(async () => {
+            if (hasWatcherLeases() || !runtime.fileWatcher) {
+              return;
+            }
+            await stopActiveWatcher();
+          });
+        } else {
+          await queueWatcherTransition(stopActiveWatcher);
         }
-        runtime.watcherDebounceMs = null;
-        await syncLiveSessionStore();
         return { ok: true };
       },
       "watcher:getLiveStatus": async () =>

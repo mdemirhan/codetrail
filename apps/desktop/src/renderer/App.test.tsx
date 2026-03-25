@@ -1516,6 +1516,34 @@ describe("App shell", () => {
     });
   });
 
+  it("sends watcher stop IPC on unmount when watch mode is active", async () => {
+    const client = createAppClient();
+
+    const { unmount } = renderWithClient(
+      <App
+        initialPaneState={
+          {
+            projectPaneWidth: 300,
+            sessionPaneWidth: 320,
+            currentAutoRefreshStrategy: "watch-3s",
+            preferredAutoRefreshStrategy: "watch-3s",
+          } as PaneStateSnapshot
+        }
+      />,
+      client,
+    );
+
+    await waitFor(() => {
+      expect(client.invoke).toHaveBeenCalledWith("watcher:start", { debounceMs: 3000 });
+    });
+
+    unmount();
+
+    await waitFor(() => {
+      expect(client.invoke).toHaveBeenCalledWith("watcher:stop", {});
+    });
+  });
+
   it("shows the watcher queue count on the auto-refresh control", async () => {
     const user = userEvent.setup();
     const client = createAppClient({
