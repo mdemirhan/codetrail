@@ -10,7 +10,6 @@ import {
   getPreferredExternalToolId,
 } from "../shared/uiPreferences";
 import type { PaneState } from "./appStateStore";
-import { getCurrentMainPlatformConfig } from "./platformConfig";
 import type {
   EditorDependencies,
   EditorId,
@@ -23,6 +22,7 @@ import type {
 import { resolveConfiguredToolInfo } from "./editorDetection";
 import { buildLaunchCommand } from "./editorLaunch";
 import { createEditorPlatformConfig } from "./editorPlatform";
+import { getCurrentMainPlatformConfig } from "./platformConfig";
 
 const execFileAsync = promisify(execFile);
 const DETECTION_CACHE_TTL_MS = 30_000;

@@ -43,7 +43,10 @@ function getHistoryCategoryTooltip(
 ): string {
   const label = history.prettyCategory(category);
   const count = formatInteger(history.historyCategoryCounts[category]);
-  return formatTooltipLabel(`Show or hide ${label} messages (${count})`, history.historyCategoriesShortcutMap[category]);
+  return formatTooltipLabel(
+    `Show or hide ${label} messages (${count})`,
+    history.historyCategoriesShortcutMap[category],
+  );
 }
 
 function getHistoryCategoryAriaLabel(
@@ -62,7 +65,10 @@ function getHistoryCategoryExpansionDefaultTooltip(
 ): string {
   const label = history.prettyCategory(category);
   const nextAction = history.expandedByDefaultCategories.includes(category) ? "Collapse" : "Expand";
-  return formatTooltipLabel(`${nextAction} ${label} messages`, history.historyCategoryExpandShortcutMap[category]);
+  return formatTooltipLabel(
+    `${nextAction} ${label} messages`,
+    history.historyCategoryExpandShortcutMap[category],
+  );
 }
 
 function formatHistoryCategorySelection(history: HistoryController): string {

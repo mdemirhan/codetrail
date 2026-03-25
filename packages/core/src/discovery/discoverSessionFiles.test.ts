@@ -347,4 +347,102 @@ describe("discoverSessionFiles", () => {
     expect(discovered.filter((f) => f.provider === "copilot")).toHaveLength(0);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it("discovers mixed-case transcript filenames and provider folders", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-discovery-case-insensitive-"));
+
+    const claudeProject = join(dir, ".claude", "projects", "project-a");
+    mkdirSync(claudeProject, { recursive: true });
+    writeFileSync(
+      join(claudeProject, "CLAUDE-1.JSONL"),
+      `${JSON.stringify({
+        sessionId: "claude-1",
+        cwd: "/workspace/claude",
+        type: "user",
+        message: { role: "user", content: "Hello" },
+      })}\n`,
+    );
+
+    const codexDir = join(dir, ".codex", "sessions", "2026", "03", "25");
+    mkdirSync(codexDir, { recursive: true });
+    writeFileSync(
+      join(codexDir, "CODEX-1.JSONL"),
+      `${JSON.stringify({
+        type: "session_meta",
+        payload: {
+          id: "codex-1",
+          cwd: "/workspace/codex",
+        },
+      })}\n`,
+    );
+
+    const geminiDir = join(dir, ".gemini", "tmp", "app", "chats");
+    mkdirSync(geminiDir, { recursive: true });
+    writeFileSync(join(dir, ".gemini", "tmp", "app", ".project_root"), "/workspace/gemini");
+    writeFileSync(
+      join(geminiDir, "Session-1.JSON"),
+      JSON.stringify({
+        sessionId: "gemini-1",
+        projectHash: "hash",
+      }),
+    );
+
+    const cursorTranscriptDir = join(
+      dir,
+      ".cursor",
+      "projects",
+      "Users-test-project",
+      "AGENT-TRANSCRIPTS",
+      "cursor-1",
+    );
+    mkdirSync(cursorTranscriptDir, { recursive: true });
+    writeFileSync(
+      join(cursorTranscriptDir, "CURSOR-1.JSONL"),
+      `${JSON.stringify({ role: "user", message: { content: [{ type: "text", text: "Hi" }] } })}\n`,
+    );
+
+    const copilotChatDir = join(dir, "workspaceStorage", "workspace-1", "CHATSessions");
+    mkdirSync(copilotChatDir, { recursive: true });
+    writeFileSync(
+      join(dir, "workspaceStorage", "workspace-1", "workspace.json"),
+      JSON.stringify({ folder: "file:///workspace/copilot" }),
+    );
+    writeFileSync(
+      join(copilotChatDir, "COPILOT-1.JSON"),
+      JSON.stringify({ version: 3, sessionId: "copilot-1", requests: [] }),
+    );
+
+    const discovered = discoverSessionFiles({
+      claudeRoot: join(dir, ".claude", "projects"),
+      codexRoot: join(dir, ".codex", "sessions"),
+      geminiRoot: join(dir, ".gemini", "tmp"),
+      geminiHistoryRoot: join(dir, ".gemini", "history"),
+      geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot: join(dir, "workspaceStorage"),
+      includeClaudeSubagents: false,
+    });
+
+    expect(
+      discovered.some(
+        (file) => file.provider === "claude" && file.metadata.providerSessionId === "claude-1",
+      ),
+    ).toBe(true);
+    expect(
+      discovered.some((file) => file.provider === "codex" && file.sourceSessionId === "codex-1"),
+    ).toBe(true);
+    expect(
+      discovered.some((file) => file.provider === "gemini" && file.sourceSessionId === "gemini-1"),
+    ).toBe(true);
+    expect(
+      discovered.some((file) => file.provider === "cursor" && file.sourceSessionId === "cursor-1"),
+    ).toBe(true);
+    expect(
+      discovered.some(
+        (file) => file.provider === "copilot" && file.metadata.providerSessionId === "copilot-1",
+      ),
+    ).toBe(true);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
 });

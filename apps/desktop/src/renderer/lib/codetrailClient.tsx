@@ -3,10 +3,7 @@ import { createContext, useContext, useRef } from "react";
 import type { IpcChannel, IpcRequestInput, IpcResponse } from "@codetrail/core/browser";
 
 import type { AppCommand } from "../../shared/appCommands";
-import {
-  type DesktopPlatform,
-  normalizeDesktopPlatform,
-} from "../../shared/desktopPlatform";
+import { type DesktopPlatform, normalizeDesktopPlatform } from "../../shared/desktopPlatform";
 import type { HistoryExportProgressPayload } from "../../shared/historyExport";
 
 export type CodetrailClient = {

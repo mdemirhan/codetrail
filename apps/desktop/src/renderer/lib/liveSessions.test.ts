@@ -261,4 +261,80 @@ describe("liveSessions", () => {
       }),
     ).toBeNull();
   });
+
+  it("matches Windows project and file paths case-insensitively", () => {
+    const selectedProject = {
+      id: "project_windows",
+      provider: "codex",
+      name: "Repo",
+      path: "C:\\Repo",
+      providerProjectKey: null,
+      repositoryUrl: null,
+      resolutionState: null,
+      resolutionSource: null,
+      sessionCount: 1,
+      messageCount: 1,
+      bookmarkCount: 0,
+      lastActivity: "2026-03-24T12:00:00.000Z",
+    } satisfies ProjectSummary;
+    const selectedSession = {
+      id: "session_windows",
+      projectId: "project_windows",
+      provider: "codex",
+      filePath: "c:/repo/.codex/sessions/session-1.jsonl",
+      title: "Selected session",
+      modelNames: "gpt-5",
+      startedAt: null,
+      endedAt: null,
+      durationMs: null,
+      gitBranch: null,
+      cwd: "c:/repo",
+      sessionIdentity: "session-windows",
+      providerSessionId: "session-windows",
+      sessionKind: null,
+      canonicalProjectPath: null,
+      repositoryUrl: null,
+      gitCommitHash: null,
+      lineageParentId: null,
+      providerClient: null,
+      providerSource: null,
+      providerClientVersion: null,
+      resolutionSource: null,
+      worktreeLabel: null,
+      worktreeSource: null,
+      messageCount: 1,
+      bookmarkCount: 0,
+      tokenInputTotal: 0,
+      tokenOutputTotal: 0,
+    } satisfies SessionSummary;
+    const sessions = [
+      {
+        provider: "codex",
+        sessionIdentity: "session-windows",
+        sourceSessionId: "session-windows",
+        filePath: "C:\\REPO\\.codex\\sessions\\SESSION-1.JSONL",
+        projectName: "Repo",
+        projectPath: "C:\\REPO",
+        cwd: "C:\\REPO",
+        statusKind: "working",
+        statusText: "Responding",
+        detailText: "windows path",
+        sourcePrecision: "passive",
+        lastActivityAt: "2026-03-24T12:00:20.000Z",
+        bestEffort: false,
+      },
+    ] satisfies WatchLiveStatusResponse["sessions"];
+
+    expect(
+      selectRelevantLiveSession({
+        sessions,
+        selectionMode: "session",
+        selectedProject,
+        selectedSession,
+      }),
+    ).toMatchObject({
+      sessionIdentity: "session-windows",
+      sourceSessionId: "session-windows",
+    });
+  });
 });

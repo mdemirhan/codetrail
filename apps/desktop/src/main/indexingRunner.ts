@@ -16,6 +16,7 @@ import {
   openDatabase,
   runIncrementalIndexing,
 } from "@codetrail/core";
+import { normalizeDesktopPlatform } from "../shared/desktopPlatform";
 import {
   type BookmarkStore,
   createBookmarkStore,
@@ -28,7 +29,6 @@ import {
   toChangedFilesIndexingConfig,
   toIncrementalIndexingConfig,
 } from "./indexingRequestConfig";
-import { normalizeDesktopPlatform } from "../shared/desktopPlatform";
 import { getCurrentMainPlatformConfig, shouldUseBundledIndexingWorker } from "./platformConfig";
 
 export type RefreshJobRequest = {

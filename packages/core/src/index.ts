@@ -10,5 +10,6 @@ export * from "./indexing";
 export * from "./live";
 export * from "./parsing";
 export * from "./search";
+export * from "./pathMatching";
 export * from "./tooling/editOperations";
 export * from "./testing";

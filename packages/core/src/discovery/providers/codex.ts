@@ -1,6 +1,7 @@
-import { basename, extname } from "node:path";
+import { basename } from "node:path";
 
 import { compactMetadata } from "../../metadata";
+import { hasFileExtension, stripFileExtension } from "../../pathMatching";
 import {
   type ResolvedDiscoveryDependencies,
   getDiscoveryPath,
@@ -19,7 +20,7 @@ function toDiscoveredCodexFile(
   dependencies: ResolvedDiscoveryDependencies,
 ): DiscoveredSessionFile | null {
   const codexRoot = getDiscoveryPath(config, "codex", "codexRoot");
-  if (!codexRoot || extname(filePath) !== ".jsonl" || !isUnderRoot(filePath, codexRoot)) {
+  if (!codexRoot || !hasFileExtension(filePath, ".jsonl") || !isUnderRoot(filePath, codexRoot)) {
     return null;
   }
 
@@ -29,7 +30,7 @@ function toDiscoveredCodexFile(
   }
 
   const meta = readCodexJsonlMeta(filePath, dependencies);
-  const sourceSessionId = meta.sessionId ?? basename(filePath, ".jsonl");
+  const sourceSessionId = meta.sessionId ?? basename(stripFileExtension(filePath, ".jsonl"));
   const sessionIdentity = providerSessionIdentity("codex", sourceSessionId, filePath);
   const projectPath = meta.canonicalProjectPath ?? meta.cwd ?? "";
 

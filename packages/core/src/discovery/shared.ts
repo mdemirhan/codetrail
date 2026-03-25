@@ -9,12 +9,13 @@ import {
   readdirSync,
   statSync,
 } from "node:fs";
-import { basename, isAbsolute, join, relative } from "node:path";
+import { basename, join } from "node:path";
 
 import type { Provider } from "../contracts/canonical";
 import type { PROVIDER_METADATA, ProviderDiscoveryPathKey } from "../contracts/providerMetadata";
 import { asRecord } from "../parsing/helpers";
 
+import { isPathWithinRoot, relativePathSegments } from "../pathMatching";
 import type { ResolvedDiscoveryConfig } from "./types";
 
 export type DiscoveryDirent = {
@@ -274,19 +275,11 @@ export function providerSessionIdentity(
 }
 
 export function isUnderRoot(filePath: string, root: string): boolean {
-  if (!root) {
-    return false;
-  }
-  const relativePath = relative(root, filePath);
-  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+  return root.length > 0 && isPathWithinRoot(filePath, root);
 }
 
 export function relativeSegments(filePath: string, root: string): string[] {
-  const relativePath = relative(root, filePath);
-  if (!relativePath || relativePath.startsWith("..") || isAbsolute(relativePath)) {
-    return [];
-  }
-  return relativePath.split(/[\\/]+/).filter((segment) => segment.length > 0);
+  return relativePathSegments(filePath, root);
 }
 
 export function decodeFileUrlPath(value: string): string {

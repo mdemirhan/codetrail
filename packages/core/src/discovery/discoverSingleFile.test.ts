@@ -79,6 +79,31 @@ describe("discoverSingleFile", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("accepts mixed-case Claude transcript extensions in single-file discovery", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-single-claude-case-"));
+    const config = makeConfig(dir);
+    const claudeProject = join(config.claudeRoot, "project-a");
+    mkdirSync(claudeProject, { recursive: true });
+
+    writeFileSync(
+      join(claudeProject, "SESSION-1.JSONL"),
+      `${JSON.stringify({
+        sessionId: "session-1",
+        cwd: "/workspace/app",
+        type: "user",
+        message: { role: "user", content: "Hello" },
+      })}\n`,
+    );
+
+    const result = discoverSingleFile(join(claudeProject, "SESSION-1.JSONL"), config);
+
+    expectDefined(result, "Expected Claude session result");
+    expect(result?.provider).toBe("claude");
+    expect(result?.sessionIdentity).toBe("SESSION-1");
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("falls back to decodeClaudeProjectId when sessions-index is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-single-claude-fallback-"));
     const config = makeConfig(dir);

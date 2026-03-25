@@ -1,5 +1,5 @@
 import { readdir, realpath, rm, stat } from "node:fs/promises";
-import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, normalize, resolve } from "node:path";
 
 import { BrowserWindow, app, dialog, ipcMain, shell } from "electron";
 
@@ -14,8 +14,10 @@ import {
   PROVIDER_LIST,
   type Provider,
   createProviderRecord,
+  hasFileExtension,
   indexerConfigBaseSchema,
   initializeDatabase,
+  isPathWithinRoot,
   listDiscoverySettingsPaths,
   listDiscoveryWatchRoots,
   paneStateBaseSchema,
@@ -104,7 +106,7 @@ function filterPotentialLiveTranscriptPaths(
   discoveryConfig: Pick<DiscoveryConfig, "claudeRoot" | "codexRoot">,
 ): string[] {
   return changedPaths.filter((changedPath) => {
-    if (!changedPath.endsWith(".jsonl")) {
+    if (!hasFileExtension(changedPath, ".jsonl")) {
       return false;
     }
     return (
@@ -118,14 +120,9 @@ function isPathWithinOptionalRoot(
   candidatePath: string,
   rootPath: string | null | undefined,
 ): boolean {
-  if (!rootPath) {
-    return false;
-  }
-  const normalizedRoot = normalize(rootPath);
-  const normalizedCandidate = normalize(candidatePath);
-  return (
-    normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}/`)
-  );
+  return typeof rootPath === "string" && rootPath.length > 0
+    ? isPathWithinRoot(candidatePath, rootPath)
+    : false;
 }
 
 async function disposeRuntimeState(state: MainProcessRuntimeState | null): Promise<void> {
@@ -369,7 +366,8 @@ export async function bootstrapMainProcess(
       } catch (error) {
         if (backendPlan.backend !== "default") {
           console.warn(
-            backendPlan.failureMessage ?? "[codetrail] failed to start preferred file watcher backend",
+            backendPlan.failureMessage ??
+              "[codetrail] failed to start preferred file watcher backend",
             error,
           );
         }
@@ -883,9 +881,4 @@ async function validateExternalToolCommandPath(value: string): Promise<string | 
 
 function isPathAllowedByRoots(targetPath: string, allowedRoots: string[]): boolean {
   return allowedRoots.some((root) => isPathWithinRoot(targetPath, root));
-}
-
-function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
-  const relativePath = relative(rootPath, targetPath);
-  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
 }

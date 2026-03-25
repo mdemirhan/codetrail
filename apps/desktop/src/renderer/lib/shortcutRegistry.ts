@@ -23,9 +23,7 @@ function getAlternateModifierLabel(platform: DesktopPlatform): "Option" | "Alt" 
   return isMacPlatform(platform) ? "Option" : "Alt";
 }
 
-function getHistoryCategoryShortcuts(
-  platform: DesktopPlatform,
-): Record<MessageCategory, string> {
+function getHistoryCategoryShortcuts(platform: DesktopPlatform): Record<MessageCategory, string> {
   const modifier = getPrimaryModifierLabel(platform);
   return Object.fromEntries(
     CATEGORY_DIGIT_SHORTCUTS.map(([category, digit]) => [category, `${modifier}+${digit}`]),

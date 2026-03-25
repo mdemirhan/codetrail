@@ -1,6 +1,7 @@
-import { basename, extname, join } from "node:path";
+import { basename, join } from "node:path";
 
 import { compactMetadata } from "../../metadata";
+import { equalsCaseInsensitive, hasFileExtension, stripFileExtension } from "../../pathMatching";
 import {
   type ResolvedDiscoveryDependencies,
   decodeFileUrlPath,
@@ -35,12 +36,12 @@ function toDiscoveredCopilotFile(
   dependencies: ResolvedDiscoveryDependencies,
 ): DiscoveredSessionFile | null {
   const copilotRoot = getDiscoveryPath(config, "copilot", "copilotRoot");
-  if (!copilotRoot || extname(filePath) !== ".json" || !isUnderRoot(filePath, copilotRoot)) {
+  if (!copilotRoot || !hasFileExtension(filePath, ".json") || !isUnderRoot(filePath, copilotRoot)) {
     return null;
   }
 
   const segments = relativeSegments(filePath, copilotRoot);
-  if (segments.length < 3 || segments[1] !== "chatSessions") {
+  if (segments.length < 3 || !equalsCaseInsensitive(segments[1] ?? "", "chatSessions")) {
     return null;
   }
 
@@ -58,7 +59,7 @@ function toDiscoveredCopilotFile(
   const projectPath = decodeCopilotWorkspaceProject(workspaceDir, dependencies);
   const projectName = projectPath ? projectNameFromPath(projectPath) : workspaceId;
   const unresolvedProject = !projectPath;
-  const sourceSessionId = basename(filePath, ".json");
+  const sourceSessionId = basename(stripFileExtension(filePath, ".json"));
   const sessionIdentity = providerSessionIdentity("copilot", sourceSessionId, filePath);
   const sessionContent = parseJsonFile<{
     version?: number;

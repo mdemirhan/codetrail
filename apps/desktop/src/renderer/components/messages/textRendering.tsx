@@ -17,7 +17,12 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createHighlighter } from "shiki";
 
-import { buildSearchHighlightRegex } from "@codetrail/core/browser";
+import {
+  buildSearchHighlightRegex,
+  isPathWithinRoot,
+  normalizeAbsolutePath,
+  normalizePathForComparison,
+} from "@codetrail/core/browser";
 import {
   type ExternalToolConfig,
   getDefaultShikiThemeForUiTheme,
@@ -2547,25 +2552,12 @@ function isPathUnderProjectRoots(path: string, pathRoots: string[]): boolean {
     return false;
   }
 
-  const normalizedPath = normalizePathForComparison(path);
-  if (!normalizedPath) {
+  if (!normalizePathForComparison(path)) {
     return false;
   }
 
   for (const root of pathRoots) {
-    const normalizedRoot = normalizePathForComparison(root);
-    if (!normalizedRoot) {
-      continue;
-    }
-
-    if (normalizedRoot === "/" || /^[a-z]:\/$/.test(normalizedRoot)) {
-      if (normalizedPath.startsWith(normalizedRoot)) {
-        return true;
-      }
-      continue;
-    }
-
-    if (normalizedPath === normalizedRoot || normalizedPath.startsWith(`${normalizedRoot}/`)) {
+    if (isPathWithinRoot(path, root)) {
       return true;
     }
   }
@@ -3003,53 +2995,6 @@ function containsAsciiControlChars(value: string): boolean {
     }
   }
   return false;
-}
-
-function normalizeAbsolutePath(value: string): string | null {
-  const normalized = value.replace(/\\/g, "/");
-  const windowsPrefix = /^([A-Za-z]):\//.exec(normalized);
-
-  if (!windowsPrefix && !normalized.startsWith("/")) {
-    return null;
-  }
-
-  const rootPrefix = windowsPrefix ? `${windowsPrefix[1] ?? ""}:` : "/";
-  const suffix = windowsPrefix ? normalized.slice(2) : normalized;
-  const parts: string[] = [];
-
-  for (const part of suffix.split("/")) {
-    if (part.length === 0 || part === ".") {
-      continue;
-    }
-    if (part === "..") {
-      parts.pop();
-      continue;
-    }
-    parts.push(part);
-  }
-
-  if (windowsPrefix) {
-    return parts.length > 0 ? `${rootPrefix}/${parts.join("/")}` : `${rootPrefix}/`;
-  }
-
-  return parts.length > 0 ? `/${parts.join("/")}` : "/";
-}
-
-function normalizePathForComparison(value: string): string | null {
-  const normalizedAbsolute = normalizeAbsolutePath(value);
-  if (!normalizedAbsolute) {
-    return null;
-  }
-
-  const trimmedPath = trimTrailingSeparators(normalizedAbsolute);
-  return /^[A-Za-z]:\//.test(trimmedPath) ? trimmedPath.toLowerCase() : trimmedPath;
-}
-
-function trimTrailingSeparators(value: string): string {
-  if (value === "/" || /^[A-Za-z]:\/$/.test(value)) {
-    return value;
-  }
-  return value.replace(/\/+$/, "");
 }
 
 export function tryFormatJson(value: string): string {

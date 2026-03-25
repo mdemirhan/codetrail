@@ -1,5 +1,6 @@
-import { basename, extname, join } from "node:path";
+import { basename, join } from "node:path";
 
+import { equalsCaseInsensitive, hasFileExtension } from "../../pathMatching";
 import {
   type ResolvedDiscoveryDependencies,
   getDiscoveryPath,
@@ -82,18 +83,18 @@ function toDiscoveredCursorFile(
   dependencies: ResolvedDiscoveryDependencies,
 ): DiscoveredSessionFile | null {
   const cursorRoot = getDiscoveryPath(config, "cursor", "cursorRoot");
-  if (!cursorRoot || extname(filePath) !== ".jsonl" || !isUnderRoot(filePath, cursorRoot)) {
+  if (!cursorRoot || !hasFileExtension(filePath, ".jsonl") || !isUnderRoot(filePath, cursorRoot)) {
     return null;
   }
 
   const segments = relativeSegments(filePath, cursorRoot);
-  if (segments.length < 4 || segments[1] !== "agent-transcripts") {
+  if (segments.length < 4 || !equalsCaseInsensitive(segments[1] ?? "", "agent-transcripts")) {
     return null;
   }
 
   const encodedName = segments[0];
   const uuid = segments[2];
-  if (!encodedName || !uuid || basename(filePath) !== `${uuid}.jsonl`) {
+  if (!encodedName || !uuid || !equalsCaseInsensitive(basename(filePath), `${uuid}.jsonl`)) {
     return null;
   }
 

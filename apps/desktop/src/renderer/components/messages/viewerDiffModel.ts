@@ -1,3 +1,9 @@
+import {
+  isPathWithinRoot,
+  joinPathWithinRoot,
+  normalizeAbsolutePath,
+} from "@codetrail/core/browser";
+
 import { detectLanguageFromFilePath, isAddedDiffLine, isRemovedDiffLine } from "./viewerDetection";
 
 export type DiffDisplayRow =
@@ -206,9 +212,7 @@ function resolveAbsoluteDiffFilePath(filePath: string | null, pathRoots: string[
       continue;
     }
 
-    const joinedPath = normalizeAbsolutePath(
-      `${trimTrailingSeparators(normalizedRoot)}/${normalizedRelativePath}`,
-    );
+    const joinedPath = joinPathWithinRoot(normalizedRoot, normalizedRelativePath);
     if (!joinedPath || !isPathWithinRoot(joinedPath, normalizedRoot)) {
       continue;
     }
@@ -305,36 +309,6 @@ export function trimProjectPrefixFromPath(filePath: string, pathRoots: string[])
   return normalizedFilePath;
 }
 
-function normalizeAbsolutePath(value: string): string | null {
-  const normalized = value.replace(/\\/g, "/");
-  const windowsPrefix = /^([A-Za-z]):\//.exec(normalized);
-
-  if (!windowsPrefix && !normalized.startsWith("/")) {
-    return null;
-  }
-
-  const rootPrefix = windowsPrefix ? `${windowsPrefix[1] ?? ""}:` : "/";
-  const suffix = windowsPrefix ? normalized.slice(2) : normalized;
-  const parts: string[] = [];
-
-  for (const part of suffix.split("/")) {
-    if (part.length === 0 || part === ".") {
-      continue;
-    }
-    if (part === "..") {
-      parts.pop();
-      continue;
-    }
-    parts.push(part);
-  }
-
-  if (windowsPrefix) {
-    return parts.length > 0 ? `${rootPrefix}/${parts.join("/")}` : `${rootPrefix}/`;
-  }
-
-  return parts.length > 0 ? `/${parts.join("/")}` : "/";
-}
-
 function normalizeRelativePath(value: string): string | null {
   const normalized = value.replace(/\\/g, "/");
   if (normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized)) {
@@ -357,37 +331,6 @@ function normalizeRelativePath(value: string): string | null {
   }
 
   return parts.length > 0 ? parts.join("/") : null;
-}
-
-function isPathWithinRoot(path: string, root: string): boolean {
-  const normalizedPath = normalizePathForComparison(path);
-  const normalizedRoot = normalizePathForComparison(root);
-  if (!normalizedPath || !normalizedRoot) {
-    return false;
-  }
-
-  if (normalizedRoot === "/" || /^[a-z]:\/$/.test(normalizedRoot)) {
-    return normalizedPath.startsWith(normalizedRoot);
-  }
-
-  return normalizedPath === normalizedRoot || normalizedPath.startsWith(`${normalizedRoot}/`);
-}
-
-function normalizePathForComparison(value: string): string | null {
-  const normalizedAbsolute = normalizeAbsolutePath(value);
-  if (!normalizedAbsolute) {
-    return null;
-  }
-
-  const trimmedPath = trimTrailingSeparators(normalizedAbsolute);
-  return /^[A-Za-z]:\//.test(trimmedPath) ? trimmedPath.toLowerCase() : trimmedPath;
-}
-
-function trimTrailingSeparators(value: string): string {
-  if (value === "/" || /^[A-Za-z]:\/$/.test(value)) {
-    return value;
-  }
-  return value.replace(/\/+$/, "");
 }
 
 function diffInlineSegments(

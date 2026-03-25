@@ -1,7 +1,7 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const buildHome = resolve(appDir, ".home");
@@ -35,7 +35,10 @@ function resolveRebuildPath(): string {
 }
 
 function detectInstalledNodeGypMajor(): number | null {
-  const bunDirs = [resolve(appDir, "node_modules", ".bun"), resolve(appDir, "..", "..", "node_modules", ".bun")];
+  const bunDirs = [
+    resolve(appDir, "node_modules", ".bun"),
+    resolve(appDir, "..", "..", "node_modules", ".bun"),
+  ];
   const versions = new Set<number>();
 
   for (const bunDir of bunDirs) {
@@ -48,8 +51,9 @@ function detectInstalledNodeGypMajor(): number | null {
         continue;
       }
       const match = /^node-gyp@(\d+)/.exec(entry.name);
-      if (match) {
-        versions.add(Number.parseInt(match[1], 10));
+      const majorVersion = match?.[1];
+      if (majorVersion) {
+        versions.add(Number.parseInt(majorVersion, 10));
       }
     }
   }
@@ -197,7 +201,10 @@ const result = spawnSync(rebuildPath, ["-f", "-w", "better-sqlite3,@parcel/watch
           GYP_MSVS_VERSION: "2026",
           GYP_MSVS_OVERRIDE_PATH:
             visualStudioInstallations.find((installation) => {
-              const major = Number.parseInt((installation.installationVersion ?? "").split(".")[0] ?? "", 10);
+              const major = Number.parseInt(
+                (installation.installationVersion ?? "").split(".")[0] ?? "",
+                10,
+              );
               return Number.isFinite(major) && major >= 18;
             })?.installationPath ?? "",
         }

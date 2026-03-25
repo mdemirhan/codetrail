@@ -1,5 +1,5 @@
-import type { ExternalRoleToolConfig, KnownExternalAppId } from "../shared/uiPreferences";
 import type { DesktopPlatform } from "../shared/desktopPlatform";
+import type { ExternalRoleToolConfig, KnownExternalAppId } from "../shared/uiPreferences";
 import {
   EDITOR_DEFINITIONS,
   type EditorDefinition,
@@ -8,8 +8,8 @@ import {
   type ToolRole,
   defaultCapabilitiesForRole,
 } from "./editorDefinitions";
-import { createEditorPlatformConfig } from "./editorPlatform";
 import { isExplicitCommandPath, isMacAppBundleCommand } from "./editorMacos";
+import { createEditorPlatformConfig } from "./editorPlatform";
 
 function expandUserPath(value: string): string {
   return value.replace(/%USERNAME%/g, process.env.USERNAME ?? "");

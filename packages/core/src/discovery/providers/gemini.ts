@@ -1,6 +1,11 @@
-import { basename, extname, join } from "node:path";
+import { basename, join } from "node:path";
 
 import { readString } from "../../parsing/helpers";
+import {
+  hasFileExtension,
+  startsWithCaseInsensitive,
+  stripFileExtension,
+} from "../../pathMatching";
 import {
   type ResolvedDiscoveryDependencies,
   getDiscoveryPath,
@@ -20,7 +25,10 @@ function toDiscoveredGeminiFile(
   dependencies: ResolvedDiscoveryDependencies,
   resolution: ReturnType<typeof buildGeminiProjectResolution>,
 ): DiscoveredSessionFile | null {
-  if (extname(filePath) !== ".json" || !basename(filePath).startsWith("session-")) {
+  if (
+    !hasFileExtension(filePath, ".json") ||
+    !startsWithCaseInsensitive(basename(filePath), "session-")
+  ) {
     return null;
   }
 
@@ -34,7 +42,8 @@ function toDiscoveredGeminiFile(
     return null;
   }
 
-  const sourceSessionId = readString(content.sessionId) ?? basename(filePath, ".json");
+  const sourceSessionId =
+    readString(content.sessionId) ?? basename(stripFileExtension(filePath, ".json"));
   const sessionIdentity = providerSessionIdentity("gemini", sourceSessionId, filePath);
   const projectHash = readString(content.projectHash) ?? "";
   const containerDir = geminiContainerDir(filePath);
@@ -56,7 +65,7 @@ function toDiscoveredGeminiFile(
   const projectPath = resolvedProjectPath ?? "";
   const unresolvedProject = !resolvedProjectPath;
   const fallbackProjectName =
-    basename(containerDir) || basename(filePath, extname(filePath)) || "Unknown";
+    basename(containerDir) || basename(stripFileExtension(filePath, ".json")) || "Unknown";
 
   return {
     provider: "gemini",

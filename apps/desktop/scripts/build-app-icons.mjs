@@ -1,10 +1,15 @@
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const cliPath = resolve(appDir, "node_modules", ".bin", process.platform === "win32" ? "png2icons.cmd" : "png2icons");
+const cliPath = resolve(
+  appDir,
+  "node_modules",
+  ".bin",
+  process.platform === "win32" ? "png2icons.cmd" : "png2icons",
+);
 const sourcePng = resolve(appDir, "assets", "icons", "build", "codetrail-1024.png");
 const outputBase = resolve(appDir, "assets", "icons", "build", "codetrail");
 

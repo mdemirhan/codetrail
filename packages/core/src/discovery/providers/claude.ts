@@ -1,6 +1,7 @@
-import { basename, extname, join } from "node:path";
+import { basename, join } from "node:path";
 
 import { compactMetadata } from "../../metadata";
+import { hasFileExtension, stripFileExtension } from "../../pathMatching";
 import {
   type ResolvedDiscoveryDependencies,
   getDiscoveryPath,
@@ -84,7 +85,7 @@ export function discoverClaudeFiles(
     const sessionsIndexById = readClaudeSessionsIndex(projectDir, dependencies);
 
     for (const entry of safeReadDir(projectDir, dependencies)) {
-      if (!entry.isFile() || extname(entry.name) !== ".jsonl") {
+      if (!entry.isFile() || !hasFileExtension(entry.name, ".jsonl")) {
         continue;
       }
 
@@ -93,7 +94,7 @@ export function discoverClaudeFiles(
       if (!fileStat) {
         continue;
       }
-      const sessionIdentity = entry.name.slice(0, -".jsonl".length);
+      const sessionIdentity = stripFileExtension(entry.name, ".jsonl");
       const fileMeta = readClaudeJsonlMeta(filePath, dependencies);
       const sessionIndexEntry = sessionsIndexById.get(sessionIdentity);
       const projectInfo = resolveClaudeProjectInfo({
@@ -156,7 +157,7 @@ export function discoverClaudeFiles(
       }
 
       for (const fileEntry of safeReadDir(subagentsDir, dependencies)) {
-        if (!fileEntry.isFile() || extname(fileEntry.name) !== ".jsonl") {
+        if (!fileEntry.isFile() || !hasFileExtension(fileEntry.name, ".jsonl")) {
           continue;
         }
 
@@ -167,7 +168,7 @@ export function discoverClaudeFiles(
         }
         const fileMeta = readClaudeJsonlMeta(filePath, dependencies);
         const parentSessionId = sessionDir.name;
-        const subagentName = fileEntry.name.slice(0, -".jsonl".length);
+        const subagentName = stripFileExtension(fileEntry.name, ".jsonl");
         const sessionIdentity = `${parentSessionId}:subagent:${subagentName}`;
         const sessionIndexEntry = sessionsIndexById.get(parentSessionId);
         const projectInfo = resolveClaudeProjectInfo({
@@ -225,7 +226,7 @@ export function discoverSingleClaudeFile(
   config: ResolvedDiscoveryConfig,
   dependencies: ResolvedDiscoveryDependencies,
 ): DiscoveredSessionFile | null {
-  if (extname(filePath) !== ".jsonl") {
+  if (!hasFileExtension(filePath, ".jsonl")) {
     return null;
   }
 
@@ -250,7 +251,7 @@ export function discoverSingleClaudeFile(
   }
 
   const projectDir = join(claudeRoot, projectId);
-  const sessionIdentity = basename(filePath, ".jsonl");
+  const sessionIdentity = basename(stripFileExtension(filePath, ".jsonl"));
   const sessionsIndexById = readClaudeSessionsIndex(projectDir, dependencies);
   const sessionIndexEntry = sessionsIndexById.get(sessionIdentity);
   const fileMeta = readClaudeJsonlMeta(filePath, dependencies);

@@ -1,3 +1,5 @@
+import { isPathWithinRoot, normalizePathForComparison } from "@codetrail/core/browser";
+
 import type {
   HistorySelectionMode,
   ProjectSummary,
@@ -8,22 +10,14 @@ import type {
 type LiveSession = WatchLiveStatusResponse["sessions"][number];
 
 function normalizePath(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-  return trimmed.replace(/\/+$/, "") || "/";
+  return typeof value === "string" ? normalizePathForComparison(value) : null;
 }
 
 function matchesPathPrefix(filePath: string | null | undefined, basePath: string | null): boolean {
-  const normalizedFilePath = normalizePath(filePath);
-  if (!normalizedFilePath || !basePath) {
+  if (!filePath || !basePath) {
     return false;
   }
-  return normalizedFilePath === basePath || normalizedFilePath.startsWith(`${basePath}/`);
+  return isPathWithinRoot(filePath, basePath);
 }
 
 function matchesSelectedSession(

@@ -1150,12 +1150,12 @@ describe("bootstrapMainProcess", () => {
     }
 
     await firstWatcher.onFilesChanged({
-      changedPaths: ["/codex/root/2026/03/16/session-1.jsonl"],
+      changedPaths: ["/codex/root/2026/03/16/SESSION-1.JSONL"],
       requiresFullScan: false,
     });
 
     expect(mockEnqueueChangedFiles).toHaveBeenCalledWith(
-      ["/codex/root/2026/03/16/session-1.jsonl"],
+      ["/codex/root/2026/03/16/SESSION-1.JSONL"],
       { source: "watch_targeted" },
     );
     expect(mockEnqueue).not.toHaveBeenCalledWith({ force: false }, expect.anything());

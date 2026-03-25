@@ -17,7 +17,9 @@ function createSeparatorItem(): MenuItemConstructorOptions {
   return { type: "separator" };
 }
 
-function createRoleMenuItem(role: NonNullable<MenuItemConstructorOptions["role"]>): MenuItemConstructorOptions {
+function createRoleMenuItem(
+  role: NonNullable<MenuItemConstructorOptions["role"]>,
+): MenuItemConstructorOptions {
   return { role };
 }
 

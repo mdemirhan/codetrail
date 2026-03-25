@@ -6,14 +6,14 @@ import {
 } from "../contracts/providerMetadata";
 import { PROVIDER_ADAPTER_LIST } from "../providers";
 import {
+  createDefaultDiscoveryConfig,
+  getCurrentDiscoveryPlatform,
+} from "./platformDiscoveryDefaults";
+import {
   type DiscoveryDependencies,
   getDiscoveryPath,
   resolveDiscoveryDependencies,
 } from "./shared";
-import {
-  createDefaultDiscoveryConfig,
-  getCurrentDiscoveryPlatform,
-} from "./platformDiscoveryDefaults";
 import type { DiscoveredSessionFile, DiscoveryConfig, ResolvedDiscoveryConfig } from "./types";
 
 export type { DiscoveryDependencies, DiscoveryFileSystem } from "./shared";

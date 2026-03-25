@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 
-import {
-  createDefaultExternalTools,
-  getExternalAppOptions,
-} from "../../shared/uiPreferences";
 import { isMacPlatform } from "../../shared/desktopPlatform";
+import { createDefaultExternalTools, getExternalAppOptions } from "../../shared/uiPreferences";
 import { useDesktopPlatform } from "./codetrailClient";
 
 export function useExternalToolPolicy() {

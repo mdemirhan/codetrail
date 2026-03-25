@@ -175,7 +175,9 @@ export function buildRoleToolFromCustomTool(
   };
 }
 
-export function createDefaultExternalTools(platform: DesktopPlatform = "darwin"): ExternalToolConfig[] {
+export function createDefaultExternalTools(
+  platform: DesktopPlatform = "darwin",
+): ExternalToolConfig[] {
   return getExternalAppOptions(platform).map((option) => createKnownExternalTool(option.value));
 }
 
@@ -234,7 +236,8 @@ export function normalizeExternalTools(
     ...orderedKnownToolIds
       .map((toolId) => normalizedKnownTools.get(toolId))
       .filter((tool): tool is ExternalToolConfig => tool !== undefined),
-    ...getExternalAppOptions(platform).map((option) => createKnownToolId(option.value))
+    ...getExternalAppOptions(platform)
+      .map((option) => createKnownToolId(option.value))
       .filter((toolId) => !orderedKnownToolIds.includes(toolId))
       .map((toolId) => normalizedKnownTools.get(toolId) ?? defaultKnownTools.get(toolId))
       .filter((tool): tool is ExternalToolConfig => tool !== undefined),

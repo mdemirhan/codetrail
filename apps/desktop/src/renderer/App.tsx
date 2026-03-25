@@ -17,11 +17,7 @@ import {
   isScanRefreshStrategy,
   isWatchRefreshStrategy,
 } from "./app/autoRefresh";
-import {
-  ADVANCED_SYNTAX_ITEMS,
-  COMMON_SYNTAX_ITEMS,
-  PROVIDERS,
-} from "./app/constants";
+import { ADVANCED_SYNTAX_ITEMS, COMMON_SYNTAX_ITEMS, PROVIDERS } from "./app/constants";
 import type { MainView, PaneStateSnapshot, WatchStatsResponse } from "./app/types";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import {
@@ -947,7 +943,7 @@ export function App({
             />
           ) : mainView === "help" ? (
             <section className="pane content-pane">
-                <ShortcutsDialog
+              <ShortcutsDialog
                 shortcutItems={[...shortcuts.shortcutItems]}
                 commonSyntaxItems={[...COMMON_SYNTAX_ITEMS]}
                 advancedSyntaxItems={[...ADVANCED_SYNTAX_ITEMS]}
