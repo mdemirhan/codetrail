@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProjectSummary, SessionSummary } from "../../app/types";
 import { useVirtualListWindow } from "../../hooks/useVirtualListWindow";
+import { formatCompactInteger, formatInteger } from "../../lib/numberFormatting";
 import { getProjectGroupId } from "../../lib/projectTree";
 import { SEARCH_PLACEHOLDERS } from "../../lib/searchLabels";
 import { compactPath, deriveSessionTitle, formatDate, prettyProvider } from "../../lib/viewUtils";
@@ -306,7 +307,12 @@ export function ProjectPane({
         }}
       >
         <span className="project-tree-session-title">{sessionTitle}</span>
-        <span className="project-tree-session-count">{session.messageCount}</span>
+        <span
+          className="project-tree-session-count"
+          title={`${formatInteger(session.messageCount)} messages`}
+        >
+          {formatCompactInteger(session.messageCount)}
+        </span>
       </button>
     );
   };
@@ -462,17 +468,17 @@ export function ProjectPane({
                 }}
                 title={
                   bookmarkButtonActive
-                    ? `Close ${project.bookmarkCount} bookmarked messages`
-                    : `Open ${project.bookmarkCount} bookmarked messages`
+                    ? `Close ${formatInteger(project.bookmarkCount ?? 0)} bookmarked messages`
+                    : `Open ${formatInteger(project.bookmarkCount ?? 0)} bookmarked messages`
                 }
                 aria-label={
                   bookmarkButtonActive
-                    ? `Close ${project.bookmarkCount} bookmarked messages`
-                    : `Open ${project.bookmarkCount} bookmarked messages`
+                    ? `Close ${formatInteger(project.bookmarkCount ?? 0)} bookmarked messages`
+                    : `Open ${formatInteger(project.bookmarkCount ?? 0)} bookmarked messages`
                 }
               >
                 <ToolbarIcon name="bookmark" />
-                <span>{project.bookmarkCount}</span>
+                <span>{formatCompactInteger(project.bookmarkCount ?? 0)}</span>
               </button>
             ) : null}
             <span className={`meta-tag project-tree-provider-badge ${project.provider}`}>

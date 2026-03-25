@@ -15,6 +15,7 @@ import {
   getNextCompactLiveAgeUpdateDelayMs,
   selectRelevantLiveSession,
 } from "../lib/liveSessions";
+import { formatCompactInteger, formatInteger } from "../lib/numberFormatting";
 import {
   getAdvancedSearchToggleTitle,
   getSearchQueryPlaceholder,
@@ -36,10 +37,20 @@ function getHistoryCategoryShortcutDigit(
 
 function getHistoryCategoryTooltip(history: HistoryController, category: MessageCategory): string {
   const label = history.prettyCategory(category);
+  const count = formatInteger(history.historyCategoryCounts[category]);
   return formatTooltip(
-    `Show or hide ${label} messages`,
+    `Show or hide ${label} messages (${count})`,
     history.historyCategoriesShortcutMap[category],
   );
+}
+
+function getHistoryCategoryAriaLabel(
+  history: HistoryController,
+  category: MessageCategory,
+): string {
+  const label = history.prettyCategory(category);
+  const count = formatInteger(history.historyCategoryCounts[category]);
+  return `Show or hide ${label} messages (${count})`;
 }
 
 function getHistoryCategoryExpansionDefaultTooltip(
@@ -388,6 +399,7 @@ export function HistoryDetailPane({
             <button
               type="button"
               className="msg-filter-main"
+              aria-label={getHistoryCategoryAriaLabel(history, category)}
               title={getHistoryCategoryTooltip(history, category)}
               onClick={() => {
                 history.setHistoryCategories((value) =>
@@ -402,7 +414,9 @@ export function HistoryDetailPane({
               </span>
               <span className="filter-label">
                 {history.prettyCategory(category)}
-                <span className="filter-count">{history.historyCategoryCounts[category]}</span>
+                <span className="filter-count" aria-hidden="true">
+                  {formatCompactInteger(history.historyCategoryCounts[category])}
+                </span>
               </span>
             </button>
             <button

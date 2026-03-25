@@ -3,6 +3,7 @@ import { type Ref, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { SessionSummary } from "../../app/types";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { useVirtualListWindow } from "../../hooks/useVirtualListWindow";
+import { formatCompactInteger, formatInteger } from "../../lib/numberFormatting";
 import { formatTooltip } from "../../lib/tooltipText";
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
 import {
@@ -259,7 +260,9 @@ export function SessionPane({
               >
                 <div className="session-preview">All Sessions</div>
                 <div className="session-meta">
-                  <span className="msg-count">{allSessionsCount} msgs</span>
+                  <span className="msg-count" title={`${formatInteger(allSessionsCount)} msgs`}>
+                    {formatCompactInteger(allSessionsCount)} msgs
+                  </span>
                   <span className="session-time">Project-wide</span>
                 </div>
               </button>
@@ -281,7 +284,9 @@ export function SessionPane({
               >
                 <div className="session-preview">Bookmarked Messages</div>
                 <div className="session-meta">
-                  <span className="msg-count">{bookmarksCount} msgs</span>
+                  <span className="msg-count" title={`${formatInteger(bookmarksCount)} msgs`}>
+                    {formatCompactInteger(bookmarksCount)} msgs
+                  </span>
                   <span className="session-time">Project-wide</span>
                 </div>
               </button>
@@ -317,7 +322,9 @@ export function SessionPane({
             >
               <div className="session-preview">{deriveSessionTitle(session)}</div>
               <div className="session-meta">
-                <span className="msg-count">{session.messageCount} msgs</span>
+                <span className="msg-count" title={`${formatInteger(session.messageCount)} msgs`}>
+                  {formatCompactInteger(session.messageCount)} msgs
+                </span>
                 <span className="session-time">{formatDate(sessionActivityOf(session))}</span>
               </div>
             </button>

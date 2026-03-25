@@ -53,6 +53,70 @@ function installDialogMock(): void {
 }
 
 describe("App shell", () => {
+  it("compacts large message-type pill counts while keeping the exact count in the tooltip", async () => {
+    installDialogMock();
+    installScrollIntoViewMock();
+
+    const client = createAppClient({
+      "sessions:getDetail": () => ({
+        session: {
+          id: "session_1",
+          projectId: "project_1",
+          provider: "claude",
+          filePath: "/workspace/project-one/session-1.jsonl",
+          title: "Investigate markdown rendering",
+          modelNames: "claude-opus-4-1",
+          startedAt: "2026-03-01T10:00:00.000Z",
+          endedAt: "2026-03-01T10:00:05.000Z",
+          durationMs: 5000,
+          gitBranch: "main",
+          cwd: "/workspace/project-one",
+          messageCount: 18_457,
+          bookmarkCount: 0,
+          tokenInputTotal: 14,
+          tokenOutputTotal: 8,
+        },
+        totalCount: 18_457,
+        categoryCounts: {
+          user: 18_457,
+          assistant: 0,
+          tool_use: 0,
+          tool_edit: 0,
+          tool_result: 0,
+          thinking: 0,
+          system: 0,
+        },
+        page: 0,
+        pageSize: 100,
+        focusIndex: null,
+        messages: [],
+      }),
+    });
+
+    const { container } = renderWithClient(
+      <App
+        initialPaneState={
+          {
+            selectedProjectId: "project_1",
+            selectedSessionId: "session_1",
+            historyMode: "session",
+          } as PaneStateSnapshot
+        }
+      />,
+      client,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Show or hide User messages (18,457)" }),
+      ).toBeInTheDocument();
+    });
+
+    expect(container.querySelector(".msg-filter.user-filter .filter-count")).toHaveTextContent(
+      "18.5K",
+    );
+  });
+
   it("loads history, supports global search navigation, and opens settings", async () => {
     installScrollIntoViewMock();
 

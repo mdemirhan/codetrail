@@ -9,7 +9,7 @@ import { AdvancedSearchToggleButton } from "../components/AdvancedSearchToggleBu
 import { ToolbarIcon } from "../components/ToolbarIcon";
 import { HighlightedText } from "../components/messages/MessagePresentation";
 import { useClickOutside } from "../hooks/useClickOutside";
-import { formatInteger } from "../lib/numberFormatting";
+import { formatCompactInteger, formatInteger } from "../lib/numberFormatting";
 import {
   SEARCH_PLACEHOLDERS,
   getAdvancedSearchToggleTitle,
@@ -276,7 +276,7 @@ export function SearchView({
                           <span className="filter-label">
                             {prettyProvider(provider)}
                             <span className="filter-count search-filter-chip-count">
-                              {search.searchProviderCounts[provider]}
+                              {formatCompactInteger(search.searchProviderCounts[provider])}
                             </span>
                           </span>
                         </button>
@@ -304,7 +304,7 @@ export function SearchView({
                           <span className="filter-label">
                             {prettyCategory(category)}
                             <span className="filter-count search-filter-chip-count">
-                              {search.searchResponse.categoryCounts[category]}
+                              {formatCompactInteger(search.searchResponse.categoryCounts[category])}
                             </span>
                           </span>
                         </button>
