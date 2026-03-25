@@ -1,0 +1,94 @@
+# Playwright + Electron E2E on GitHub Actions (cross-platform matrix)
+#
+# Linux: no physical display — xvfb-run gives a virtual X11 framebuffer for Electron.
+# Windows / macOS: GitHub-hosted runners can drive GUI apps without Xvfb.
+#
+# fail-fast: false — one OS failing does not cancel the others (easier triage).
+# Artifacts use ${{ matrix.os }} so reports from each OS stay separate.
+#
+# Failure debugging: upload steps use if: always() so reports/traces survive test failures.
+
+name: E2E
+
+on:
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-e2e:
+    name: E2E (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build desktop app
+        run: bun run desktop:build
+
+      # better-sqlite3 / @parcel/watcher — scripts use POSIX env syntax (ELECTRON_RUN_AS_NODE=1, …)
+      - name: Verify native modules
+        shell: bash
+        run: bun run --cwd apps/desktop fix:native
+
+      # System libraries for Electron/Chromium (implementation differs per OS)
+      - name: Install Playwright system dependencies
+        run: npx playwright install-deps
+
+      - name: Install Xvfb (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Run E2E tests (Linux / Xvfb)
+        if: matrix.os == 'ubuntu-latest'
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" bun run e2e
+        env:
+          CI: "true"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+      - name: Run E2E tests (Windows & macOS)
+        if: matrix.os != 'ubuntu-latest'
+        run: bun run e2e
+        env:
+          CI: "true"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+      - name: Upload Playwright HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.os }}
+          path: e2e/playwright-report/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload test results (traces, screenshots)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results-${{ matrix.os }}
+          path: e2e/test-results/
+          retention-days: 7
+          if-no-files-found: warn

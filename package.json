@@ -31,11 +31,16 @@
     "desktop:make:mac": "bun run --cwd apps/desktop make:mac",
     "desktop:make:mac:x64": "bun run --cwd apps/desktop make:mac:x64",
     "desktop:make:mac:arm64": "bun run --cwd apps/desktop make:mac:arm64",
+    "e2e": "npx playwright test --config e2e/playwright.config.ts",
+    "e2e:headed": "HEADED=1 npx playwright test --config e2e/playwright.config.ts",
+    "e2e:report": "npx playwright show-report e2e/playwright-report",
+    "ci": "bun run lint && bun run typecheck && bun run test && bun run test:coverage"
     "desktop:make:win": "bun run --cwd apps/desktop make:win",
     "ci": "bun run lint && bun run check:platform-boundaries && bun run typecheck && bun run test && bun run test:coverage"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
