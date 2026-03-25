@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,7 +50,7 @@ function materializeForPackage(packagePath) {
     const targetPath = join(nestedNodeModulesPath, depName);
     mkdirSync(dirname(targetPath), { recursive: true });
     if (!existsSync(targetPath)) {
-      cpSync(sourcePath, targetPath, { recursive: true });
+      materializeDependency(sourcePath, targetPath);
     }
 
     materializeForPackage(sourcePath);
@@ -66,5 +66,18 @@ function resolveDependencyPath(packageRequire, depName) {
     return dirname(packageRequire.resolve(`${depName}/package.json`));
   } catch {
     return "";
+  }
+}
+
+function materializeDependency(sourcePath, targetPath) {
+  if (process.platform === "win32") {
+    cpSync(sourcePath, targetPath, { recursive: true });
+    return;
+  }
+
+  try {
+    symlinkSync(sourcePath, targetPath);
+  } catch {
+    cpSync(sourcePath, targetPath, { recursive: true });
   }
 }

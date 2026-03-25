@@ -189,7 +189,7 @@ mkdirSync(gypDir, { recursive: true });
 const result = spawnSync(rebuildPath, ["-f", "-w", "better-sqlite3,@parcel/watcher"], {
   cwd: appDir,
   stdio: "inherit",
-  shell: false,
+  shell: process.platform === "win32",
   env: {
     ...process.env,
     HOME: buildHome,

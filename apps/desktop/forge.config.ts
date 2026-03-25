@@ -20,7 +20,6 @@ const forgeConfig = {
       name: "codetrail",
       setupExe: "CodeTrailSetup.exe",
       setupIcon: "./assets/icons/build/codetrail.ico",
-      iconUrl: "",
     }),
     new MakerZIP({}, ["win32"]),
   ],

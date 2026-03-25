@@ -523,16 +523,6 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.selectNextProject();
     return true;
   }
-  if (context.shortcuts.matches.isPageTraversalShortcut(context.event, "up")) {
-    context.event.preventDefault();
-    pageUp();
-    return true;
-  }
-  if (context.shortcuts.matches.isPageTraversalShortcut(context.event, "down")) {
-    context.event.preventDefault();
-    pageDown();
-    return true;
-  }
   return false;
 }
 
