@@ -1146,6 +1146,14 @@ describe("App shell", () => {
 
     expect(screen.getByText("Previous page")).toBeInTheDocument();
     expect(screen.getByText("Next page")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Previous session, or previous project when Sessions pane is collapsed or hidden",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Next session, or next project when Sessions pane is collapsed or hidden"),
+    ).toBeInTheDocument();
   });
 
   it("stores pane widths in CSS variables instead of inline grid columns", async () => {

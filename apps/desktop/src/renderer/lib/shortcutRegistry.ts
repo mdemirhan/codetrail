@@ -95,12 +95,12 @@ function getShortcutItems(platform: DesktopPlatform) {
     {
       group: "Search & Navigation",
       shortcut: `${alternateModifier}+Up`,
-      description: "Previous session",
+      description: "Previous session, or previous project when Sessions pane is collapsed or hidden",
     },
     {
       group: "Search & Navigation",
       shortcut: `${alternateModifier}+Down`,
-      description: "Next session",
+      description: "Next session, or next project when Sessions pane is collapsed or hidden",
     },
     {
       group: "Search & Navigation",

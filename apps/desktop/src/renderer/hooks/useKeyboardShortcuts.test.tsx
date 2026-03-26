@@ -535,4 +535,24 @@ describe("useKeyboardShortcuts", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(clearFocusedHistoryMessage).toHaveBeenCalledTimes(1);
   });
+
+  it("routes Option+Arrow navigation through session shortcuts", () => {
+    const selectPreviousSession = vi.fn();
+    const selectNextSession = vi.fn();
+
+    render(
+      <Harness
+        {...createProps({
+          selectPreviousSession,
+          selectNextSession,
+        })}
+      />,
+    );
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", altKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true }));
+
+    expect(selectPreviousSession).toHaveBeenCalledTimes(1);
+    expect(selectNextSession).toHaveBeenCalledTimes(1);
+  });
 });

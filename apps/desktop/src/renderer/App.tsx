@@ -41,6 +41,7 @@ import { useSearchController } from "./features/useSearchController";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useReconcileProviderSelection } from "./hooks/useReconcileProviderSelection";
 import { useCodetrailClient } from "./lib/codetrailClient";
+import { isSessionsPaneVisible } from "./lib/historyPaneVisibility";
 import { findSessionSummaryById } from "./lib/historySessionLookup";
 import { useShortcutRegistry } from "./lib/shortcutRegistry";
 import { toErrorMessage } from "./lib/viewUtils";
@@ -672,10 +673,13 @@ export function App({
 
   const selectAdjacentSessionWithoutFocus = useCallback(
     (direction: "previous" | "next") => {
-      const sessionPaneVisible =
-        !history.sessionPaneCollapsed &&
-        !(history.projectViewMode === "tree" && history.hideSessionsPaneForTreeView);
-      if (!sessionPaneVisible) {
+      if (
+        !isSessionsPaneVisible({
+          sessionPaneCollapsed: history.sessionPaneCollapsed,
+          projectViewMode: history.projectViewMode,
+          hideSessionsPaneForTreeView: history.hideSessionsPaneForTreeView,
+        })
+      ) {
         return;
       }
       const activeElement = document.activeElement;
@@ -713,6 +717,29 @@ export function App({
       history.selectAdjacentProject(direction, { preserveFocus: true });
     },
     [history.projectPaneCollapsed, history.refs.projectListRef, history.selectAdjacentProject],
+  );
+
+  const selectAdjacentSessionShortcut = useCallback(
+    (direction: "previous" | "next") => {
+      if (
+        isSessionsPaneVisible({
+          sessionPaneCollapsed: history.sessionPaneCollapsed,
+          projectViewMode: history.projectViewMode,
+          hideSessionsPaneForTreeView: history.hideSessionsPaneForTreeView,
+        })
+      ) {
+        selectAdjacentSessionWithoutFocus(direction);
+        return;
+      }
+      selectAdjacentProjectWithoutFocus(direction);
+    },
+    [
+      history.hideSessionsPaneForTreeView,
+      history.projectViewMode,
+      history.sessionPaneCollapsed,
+      selectAdjacentProjectWithoutFocus,
+      selectAdjacentSessionWithoutFocus,
+    ],
   );
 
   const refreshingRef = useRef(false);
@@ -788,8 +815,8 @@ export function App({
       history.focusAdjacentHistoryMessage("next", { preserveFocus: true }),
     focusPreviousSearchResult: () => search.focusAdjacentSearchResult("previous"),
     focusNextSearchResult: () => search.focusAdjacentSearchResult("next"),
-    selectPreviousSession: () => selectAdjacentSessionWithoutFocus("previous"),
-    selectNextSession: () => selectAdjacentSessionWithoutFocus("next"),
+    selectPreviousSession: () => selectAdjacentSessionShortcut("previous"),
+    selectNextSession: () => selectAdjacentSessionShortcut("next"),
     selectPreviousProject: () => selectAdjacentProjectWithoutFocus("previous"),
     selectNextProject: () => selectAdjacentProjectWithoutFocus("next"),
     selectPreviousFocusedSession: () => history.selectAdjacentSession("previous"),
