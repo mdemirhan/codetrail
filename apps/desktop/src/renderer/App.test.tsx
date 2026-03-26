@@ -1934,6 +1934,7 @@ describe("App shell", () => {
     await waitFor(() => {
       expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
     });
+    expect(screen.queryByRole("button", { name: "Reveal this message in project" })).toBeNull();
     const [revealButton] = screen.getAllByRole("button", {
       name: "Reveal this message in session",
     });
@@ -1978,6 +1979,7 @@ describe("App shell", () => {
       expect(buttons.length).toBeGreaterThan(0);
       revealInProjectButton = buttons[0] ?? null;
     });
+    expect(screen.queryByRole("button", { name: "Reveal this message in session" })).toBeNull();
 
     if (!revealInProjectButton) {
       throw new Error("Expected reveal-in-project button");
