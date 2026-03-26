@@ -41,7 +41,6 @@ import {
 } from "../lib/historyNavigation";
 import type { StableListUpdateSource } from "../lib/projectUpdates";
 import { toggleValue } from "../lib/viewUtils";
-import { SIDEBAR_LIST_ROW_HEIGHT, scrollVirtualListIndexIntoView } from "../lib/virtualList";
 import { formatProjectDetails, formatSessionDetails } from "./historyCopyFormat";
 
 function focusVisibleProjectTarget(
@@ -785,19 +784,7 @@ export function useHistoryInteractions({
         const targetElement = container.querySelector<HTMLElement>(selector);
         if (targetElement) {
           focusVisibleProjectTarget(container, targetElement);
-          return;
         }
-
-        const targetIndex = sortedProjects.findIndex((project) => project.id === nextProjectId);
-        if (targetIndex < 0) {
-          return;
-        }
-
-        scrollVirtualListIndexIntoView(container, targetIndex, SIDEBAR_LIST_ROW_HEIGHT);
-        window.requestAnimationFrame(() => {
-          const nextTargetElement = container.querySelector<HTMLElement>(selector);
-          focusVisibleProjectTarget(container, nextTargetElement);
-        });
         return;
       }
 

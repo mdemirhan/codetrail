@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProjectSummary, SessionSummary } from "../../app/types";
-import { useVirtualListWindow } from "../../hooks/useVirtualListWindow";
 import { formatCompactInteger, formatInteger } from "../../lib/numberFormatting";
 import { usePaneFocus } from "../../lib/paneFocusController";
 import { getProjectGroupId } from "../../lib/projectTree";
 import { SEARCH_PLACEHOLDERS } from "../../lib/searchLabels";
 import { compactPath, deriveSessionTitle, formatDate, prettyProvider } from "../../lib/viewUtils";
-import {
-  SIDEBAR_LIST_OVERSCAN,
-  SIDEBAR_LIST_ROW_HEIGHT,
-  SIDEBAR_LIST_VIRTUALIZATION_THRESHOLD,
-} from "../../lib/virtualList";
 import { ToolbarIcon } from "../ToolbarIcon";
 import { HistoryListContextMenu } from "./HistoryListContextMenu";
 import type { ProjectPaneContextMenuState, ProjectPaneProps } from "./ProjectPane.types";
@@ -120,10 +114,6 @@ export function ProjectPane({
   const projectListContainerRef = useRef<HTMLDivElement | null>(null);
   const selectedProjectRef = useRef<HTMLButtonElement | null>(null);
   const [contextMenu, setContextMenu] = useState<ProjectPaneContextMenuState>(null);
-  const flatProjectActiveIndex = useMemo(
-    () => sortedProjects.findIndex((project) => project.id === selectedProjectId),
-    [selectedProjectId, sortedProjects],
-  );
 
   const setProjectListRefs = useCallback(
     (element: HTMLDivElement | null) => {
@@ -140,22 +130,6 @@ export function ProjectPane({
     },
     [listRef, paneFocus],
   );
-  const {
-    setContainerRef,
-    handleScroll,
-    startIndex: flatListStartIndex,
-    endIndex: flatListEndIndex,
-    topSpacerHeight: flatListTopSpacerHeight,
-    bottomSpacerHeight: flatListBottomSpacerHeight,
-    isVirtualized: isFlatListVirtualized,
-  } = useVirtualListWindow({
-    itemCount: sortedProjects.length,
-    itemHeight: SIDEBAR_LIST_ROW_HEIGHT,
-    overscan: SIDEBAR_LIST_OVERSCAN,
-    activeIndex: flatProjectActiveIndex,
-    enabled: viewMode === "list" && sortedProjects.length > SIDEBAR_LIST_VIRTUALIZATION_THRESHOLD,
-    externalRef: setProjectListRefs,
-  });
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -570,32 +544,11 @@ export function ProjectPane({
       </div>
       <div
         className={`list-scroll project-list${viewMode === "tree" ? " project-list-tree" : ""}`}
-        ref={setContainerRef}
+        ref={setProjectListRefs}
         tabIndex={-1}
-        onScroll={viewMode === "list" ? handleScroll : undefined}
       >
         {viewMode === "list"
-          ? [
-              isFlatListVirtualized && flatListTopSpacerHeight > 0 ? (
-                <div
-                  key="top-spacer"
-                  aria-hidden
-                  className="virtual-list-spacer"
-                  style={{ height: `${flatListTopSpacerHeight}px` }}
-                />
-              ) : null,
-              ...sortedProjects
-                .slice(flatListStartIndex, flatListEndIndex)
-                .map((project) => renderFlatProjectRow(project)),
-              isFlatListVirtualized && flatListBottomSpacerHeight > 0 ? (
-                <div
-                  key="bottom-spacer"
-                  aria-hidden
-                  className="virtual-list-spacer"
-                  style={{ height: `${flatListBottomSpacerHeight}px` }}
-                />
-              ) : null,
-            ]
+          ? sortedProjects.map((project) => renderFlatProjectRow(project))
           : folderGroups.map((group) => {
               const isExpanded = expandedFolderIdSet.has(group.id);
               const folderUpdateDelta = getFolderUpdateDelta(group.projects);

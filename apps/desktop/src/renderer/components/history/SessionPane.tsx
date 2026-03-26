@@ -2,17 +2,11 @@ import { type Ref, useCallback, useEffect, useMemo, useRef, useState } from "rea
 
 import type { SessionSummary } from "../../app/types";
 import { useClickOutside } from "../../hooks/useClickOutside";
-import { useVirtualListWindow } from "../../hooks/useVirtualListWindow";
 import { formatCompactInteger, formatInteger } from "../../lib/numberFormatting";
 import { usePaneFocus, usePaneFocusOverlay } from "../../lib/paneFocusController";
 import { useShortcutRegistry } from "../../lib/shortcutRegistry";
 import { useTooltipFormatter } from "../../lib/tooltipText";
 import { deriveSessionTitle, formatDate, sessionActivityOf } from "../../lib/viewUtils";
-import {
-  SIDEBAR_LIST_OVERSCAN,
-  SIDEBAR_LIST_ROW_HEIGHT,
-  SIDEBAR_LIST_VIRTUALIZATION_THRESHOLD,
-} from "../../lib/virtualList";
 import { ToolbarIcon } from "../ToolbarIcon";
 import { HistoryListContextMenu } from "./HistoryListContextMenu";
 import { scheduleSelectedSessionScroll } from "./sessionAutoScroll";
@@ -106,29 +100,19 @@ export function SessionPane({
     ],
     [bookmarksCount, sortedSessions],
   );
-  const activeIndex = sessionRows.findIndex((row) => row.id === selectedItemId);
-  const {
-    setContainerRef,
-    handleScroll,
-    startIndex,
-    endIndex,
-    topSpacerHeight,
-    bottomSpacerHeight,
-    isVirtualized,
-  } = useVirtualListWindow({
-    itemCount: sessionRows.length,
-    itemHeight: SIDEBAR_LIST_ROW_HEIGHT,
-    overscan: SIDEBAR_LIST_OVERSCAN,
-    activeIndex,
-    enabled: sessionRows.length > SIDEBAR_LIST_VIRTUALIZATION_THRESHOLD,
-    externalRef: listRef,
-  });
   const setSessionListRefs = useCallback(
     (element: HTMLDivElement | null) => {
       paneFocus.registerHistoryPaneTarget("session", element);
-      setContainerRef(element);
+      if (!listRef) {
+        return;
+      }
+      if (typeof listRef === "function") {
+        listRef(element);
+        return;
+      }
+      listRef.current = element;
     },
-    [paneFocus, setContainerRef],
+    [listRef, paneFocus],
   );
   const selectedSessionRef = useCallback((node: HTMLButtonElement | null) => {
     setSelectedSessionElement(node);
@@ -256,16 +240,8 @@ export function SessionPane({
         className="list-scroll session-list"
         ref={setSessionListRefs}
         tabIndex={-1}
-        onScroll={handleScroll}
       >
-        {isVirtualized && topSpacerHeight > 0 ? (
-          <div
-            aria-hidden
-            className="virtual-list-spacer"
-            style={{ height: `${topSpacerHeight}px` }}
-          />
-        ) : null}
-        {sessionRows.slice(startIndex, endIndex).map((row) => {
+        {sessionRows.map((row) => {
           if (row.kind === "all") {
             return (
               <button
@@ -354,13 +330,6 @@ export function SessionPane({
             </button>
           );
         })}
-        {isVirtualized && bottomSpacerHeight > 0 ? (
-          <div
-            aria-hidden
-            className="virtual-list-spacer"
-            style={{ height: `${bottomSpacerHeight}px` }}
-          />
-        ) : null}
       </div>
       <HistoryListContextMenu
         open={Boolean(contextMenu)}
