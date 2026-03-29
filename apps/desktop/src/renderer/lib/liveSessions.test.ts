@@ -162,10 +162,10 @@ describe("liveSessions", () => {
     });
   });
 
-  it("prefers the richer fresher workspace match even when it comes from another provider", () => {
+  it("does not leak a live session across provider-specific project rows that share a path", () => {
     const selectedProject = {
       id: "project_1",
-      provider: "codex",
+      provider: "claude",
       name: "Project One",
       path: "/workspace/project-one",
       providerProjectKey: null,
@@ -194,18 +194,18 @@ describe("liveSessions", () => {
         bestEffort: false,
       },
       {
-        provider: "claude",
-        sessionIdentity: "claude-rich",
-        sourceSessionId: "claude-rich",
-        filePath: "/workspace/project-one/.claude/projects/project-one/session.jsonl",
+        provider: "gemini",
+        sessionIdentity: "gemini-other",
+        sourceSessionId: "gemini-other",
+        filePath: "/workspace/project-one/.gemini/session.jsonl",
         projectName: "Project One",
         projectPath: "/workspace/project-one",
         cwd: "/workspace/project-one",
-        statusKind: "working",
-        statusText: "Tool finished",
-        detailText: "Grep",
-        sourcePrecision: "hook",
-        lastActivityAt: "2026-03-24T12:00:20.000Z",
+        statusKind: "running_tool",
+        statusText: "Running command",
+        detailText: "npm test",
+        sourcePrecision: "passive",
+        lastActivityAt: "2026-03-24T12:00:22.000Z",
         bestEffort: false,
       },
     ] satisfies WatchLiveStatusResponse["sessions"];
@@ -217,11 +217,7 @@ describe("liveSessions", () => {
         selectedProject,
         selectedSession: null,
       }),
-    ).toMatchObject({
-      provider: "claude",
-      sessionIdentity: "claude-rich",
-      detailText: "Grep",
-    });
+    ).toBeNull();
   });
 
   it("prefers active_recently with detail over generic working with no detail", () => {
@@ -256,10 +252,10 @@ describe("liveSessions", () => {
         bestEffort: false,
       },
       {
-        provider: "claude",
+        provider: "codex",
         sessionIdentity: "recent-with-detail",
         sourceSessionId: "recent-with-detail",
-        filePath: "/workspace/project-one/.claude/projects/project-one/session.jsonl",
+        filePath: "/workspace/project-one/.codex/sessions/recent-with-detail.jsonl",
         projectName: "Project One",
         projectPath: "/workspace/project-one",
         cwd: "/workspace/project-one",
@@ -280,7 +276,7 @@ describe("liveSessions", () => {
         selectedSession: null,
       }),
     ).toMatchObject({
-      provider: "claude",
+      provider: "codex",
       sessionIdentity: "recent-with-detail",
     });
   });
@@ -317,10 +313,10 @@ describe("liveSessions", () => {
         bestEffort: false,
       },
       {
-        provider: "claude",
+        provider: "codex",
         sessionIdentity: "hook-working",
         sourceSessionId: "hook-working",
-        filePath: "/workspace/project-one/.claude/projects/project-one/session.jsonl",
+        filePath: "/workspace/project-one/.codex/sessions/hook.jsonl",
         projectName: "Project One",
         projectPath: "/workspace/project-one",
         cwd: "/workspace/project-one",
@@ -341,7 +337,7 @@ describe("liveSessions", () => {
         selectedSession: null,
       }),
     ).toMatchObject({
-      provider: "claude",
+      provider: "codex",
       sessionIdentity: "hook-working",
     });
   });
@@ -378,10 +374,10 @@ describe("liveSessions", () => {
         bestEffort: true,
       },
       {
-        provider: "claude",
+        provider: "codex",
         sessionIdentity: "clean",
         sourceSessionId: "clean",
-        filePath: "/workspace/project-one/.claude/projects/project-one/session.jsonl",
+        filePath: "/workspace/project-one/.codex/sessions/clean.jsonl",
         projectName: "Project One",
         projectPath: "/workspace/project-one",
         cwd: "/workspace/project-one",
@@ -402,7 +398,7 @@ describe("liveSessions", () => {
         selectedSession: null,
       }),
     ).toMatchObject({
-      provider: "claude",
+      provider: "codex",
       sessionIdentity: "clean",
     });
   });

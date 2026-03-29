@@ -68,6 +68,9 @@ function matchesSelectedProject(
   if (!selectedProject) {
     return false;
   }
+  if (session.provider !== selectedProject.provider) {
+    return false;
+  }
   const projectPath = normalizePath(selectedProject.path);
   if (!projectPath) {
     return false;
@@ -79,10 +82,9 @@ function matchesSelectedProject(
   );
 }
 
-// Project-level live view is intentionally workspace-scoped rather than provider-scoped.
-// If multiple providers are active in the same project path, we pick the freshest, richest
-// signal so users see the best live activity for that workspace instead of a weaker match from
-// the currently selected provider record.
+// Project-level live view follows the selected project record, not just the workspace path.
+// Multiple providers can index the same path as separate project rows, so project matching must
+// stay provider-scoped or the live row leaks activity across sibling project entries.
 
 export function selectRelevantLiveSession({
   sessions,
