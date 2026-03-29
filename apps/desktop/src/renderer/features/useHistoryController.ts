@@ -361,6 +361,11 @@ export function useHistoryController({
   const [historyCategories, setHistoryCategories] = useState<MessageCategory[]>(
     initialPaneState?.historyCategories ?? [...DEFAULT_MESSAGE_CATEGORIES],
   );
+  const historyCategoriesRef = useRef<MessageCategory[]>(historyCategories);
+  const historyCategorySoloRestoreRef = useRef<{
+    mode: `solo:${MessageCategory}` | "preset:primary" | "preset:all";
+    categories: MessageCategory[];
+  } | null>(null);
   const [expandedByDefaultCategories, setExpandedByDefaultCategories] = useState<MessageCategory[]>(
     initialPaneState?.expandedByDefaultCategories ?? [...DEFAULT_MESSAGE_CATEGORIES],
   );
@@ -1158,6 +1163,7 @@ export function useHistoryController({
     selectedSummaryMessageCount,
     historyCategoryExpandShortcutMap,
     historyCategoriesShortcutMap,
+    historyCategorySoloShortcutMap,
     prettyCategory,
     prettyProvider: formatPrettyProvider,
     formatDate,
@@ -1185,6 +1191,10 @@ export function useHistoryController({
     sessionPaneCollapsed,
     sessionPaneWidth,
   });
+
+  useEffect(() => {
+    historyCategoriesRef.current = historyCategories;
+  }, [historyCategories]);
 
   useEffect(() => {
     selectedProjectRefreshFingerprintRef.current = getProjectRefreshFingerprint(selectedProject);
@@ -1296,6 +1306,11 @@ export function useHistoryController({
 
   const {
     handleToggleHistoryCategoryShortcut,
+    handleSoloHistoryCategoryShortcut,
+    handleTogglePrimaryHistoryCategoriesShortcut,
+    handleToggleAllHistoryCategoriesShortcut,
+    handleFocusPrimaryHistoryCategoriesShortcut,
+    handleFocusAllHistoryCategoriesShortcut,
     handleToggleVisibleCategoryMessagesExpanded,
     handleToggleCategoryDefaultExpansion,
     handleToggleAllCategoryDefaultExpansion,
@@ -1330,6 +1345,8 @@ export function useHistoryController({
     logError,
     setMessageExpanded: setMessageExpansionOverrides,
     setHistoryCategories,
+    historyCategoriesRef,
+    historyCategorySoloRestoreRef,
     setExpandedByDefaultCategories,
     setSessionPage,
     isExpandedByDefault,
@@ -1635,6 +1652,11 @@ export function useHistoryController({
     messagePathRoots,
     isExpandedByDefault,
     handleToggleHistoryCategoryShortcut,
+    handleSoloHistoryCategoryShortcut,
+    handleTogglePrimaryHistoryCategoriesShortcut,
+    handleToggleAllHistoryCategoriesShortcut,
+    handleFocusPrimaryHistoryCategoriesShortcut,
+    handleFocusAllHistoryCategoriesShortcut,
     handleToggleVisibleCategoryMessagesExpanded,
     handleToggleCategoryDefaultExpansion,
     handleToggleAllCategoryDefaultExpansion,
@@ -1677,6 +1699,7 @@ export function useHistoryController({
     selectedSummaryMessageCount,
     historyCategoryExpandShortcutMap,
     historyCategoriesShortcutMap,
+    historyCategorySoloShortcutMap,
     prettyCategory,
     prettyProvider: formatPrettyProvider,
     formatDate,

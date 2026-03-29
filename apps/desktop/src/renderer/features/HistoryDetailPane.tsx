@@ -46,10 +46,16 @@ function getHistoryCategoryTooltip(
 ): string {
   const label = history.prettyCategory(category);
   const count = formatInteger(history.historyCategoryCounts[category]);
-  return formatTooltipLabel(
-    `Show or hide ${label} messages (${count})`,
-    history.historyCategoriesShortcutMap[category],
-  );
+  return [
+    formatTooltipLabel(
+      `Show or hide ${label} messages (${count})`,
+      history.historyCategoriesShortcutMap[category],
+    ),
+    formatTooltipLabel(
+      `Focus only ${label} messages`,
+      history.historyCategorySoloShortcutMap[category],
+    ),
+  ].join("\n");
 }
 
 function getHistoryCategoryAriaLabel(
@@ -457,10 +463,7 @@ export function HistoryDetailPane({
               aria-label={getHistoryCategoryAriaLabel(history, category)}
               title={getHistoryCategoryTooltip(history, category, formatTooltipLabel)}
               onClick={() => {
-                history.setHistoryCategories((value) =>
-                  toggleValue<MessageCategory>(value, category),
-                );
-                history.setSessionPage(0);
+                history.handleToggleHistoryCategoryShortcut(category);
                 focusMessagePane();
               }}
             >

@@ -338,6 +338,7 @@ export function useHistoryDerivedState({
         : formatSelectedSummaryMessageCount(filteredMessageCount, totalMessageCount, "messages"),
     historyCategoryExpandShortcutMap: shortcuts.historyCategoryExpandShortcuts,
     historyCategoriesShortcutMap: shortcuts.historyCategoryShortcuts,
+    historyCategorySoloShortcutMap: shortcuts.historyCategorySoloShortcuts,
     prettyCategory,
     prettyProvider,
     formatDate,

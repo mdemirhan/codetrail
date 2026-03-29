@@ -4,6 +4,7 @@ import { render } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { CodetrailClientProvider } from "../lib/codetrailClient";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
 function Harness(args: Parameters<typeof useKeyboardShortcuts>[0]) {
@@ -76,7 +77,12 @@ function createProps(
     toggleFocusMode: vi.fn(),
     toggleAllMessagesExpanded: vi.fn(),
     toggleHistoryCategory: vi.fn(),
+    soloHistoryCategory: vi.fn(),
     toggleHistoryCategoryDefaultExpansion: vi.fn(),
+    togglePrimaryHistoryCategoriesVisibility: vi.fn(),
+    toggleAllHistoryCategoriesVisibility: vi.fn(),
+    focusPrimaryHistoryCategoriesVisibility: vi.fn(),
+    focusAllHistoryCategoriesVisibility: vi.fn(),
     toggleProjectPaneCollapsed: vi.fn(),
     toggleSessionPaneCollapsed: vi.fn(),
     focusPreviousHistoryMessage: vi.fn(),
@@ -108,11 +114,31 @@ function createProps(
   };
 }
 
+function renderHarness(
+  props: Parameters<typeof useKeyboardShortcuts>[0],
+  platform: "darwin" | "win32" = "darwin",
+) {
+  return render(
+    <CodetrailClientProvider
+      value={{
+        platform,
+        invoke: vi.fn(async () => {
+          throw new Error("not used");
+        }),
+        onHistoryExportProgress: () => () => undefined,
+        onAppCommand: () => () => undefined,
+      }}
+    >
+      <Harness {...props} />
+    </CodetrailClientProvider>,
+  );
+}
+
 describe("useKeyboardShortcuts", () => {
   it("routes search, zoom, and history shortcuts", () => {
     const props = createProps();
 
-    render(<Harness {...props} />);
+    renderHarness(props);
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true, shiftKey: true }));
@@ -121,9 +147,14 @@ describe("useKeyboardShortcuts", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "m", metaKey: true, shiftKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "e", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", code: "Digit1", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", code: "Digit1", ctrlKey: true }));
     window.dispatchEvent(
       new KeyboardEvent("keydown", { key: "1", code: "Digit1", metaKey: true, altKey: true }),
     );
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "8", code: "Digit8", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "9", code: "Digit9", metaKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "8", code: "Digit8", ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "9", code: "Digit9", ctrlKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "b", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "b", metaKey: true, shiftKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", metaKey: true }));
@@ -150,7 +181,12 @@ describe("useKeyboardShortcuts", () => {
     expect(props.toggleFocusMode).toHaveBeenCalledTimes(1);
     expect(props.toggleAllMessagesExpanded).toHaveBeenCalledTimes(1);
     expect(props.toggleHistoryCategory).toHaveBeenCalledWith("user");
+    expect(props.soloHistoryCategory).toHaveBeenCalledWith("user");
     expect(props.toggleHistoryCategoryDefaultExpansion).toHaveBeenCalledWith("user");
+    expect(props.togglePrimaryHistoryCategoriesVisibility).toHaveBeenCalledTimes(1);
+    expect(props.toggleAllHistoryCategoriesVisibility).toHaveBeenCalledTimes(1);
+    expect(props.focusPrimaryHistoryCategoriesVisibility).toHaveBeenCalledTimes(1);
+    expect(props.focusAllHistoryCategoriesVisibility).toHaveBeenCalledTimes(1);
     expect(props.toggleProjectPaneCollapsed).toHaveBeenCalledTimes(1);
     expect(props.toggleSessionPaneCollapsed).toHaveBeenCalledTimes(1);
     expect(props.goToPreviousHistoryPage).toHaveBeenCalledTimes(1);
@@ -171,7 +207,7 @@ describe("useKeyboardShortcuts", () => {
   it("routes page shortcuts to global search pagination in search view", () => {
     const props = createProps({ mainView: "search" });
 
-    render(<Harness {...props} />);
+    renderHarness(props);
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", code: "Digit1", metaKey: true }));
@@ -200,10 +236,95 @@ describe("useKeyboardShortcuts", () => {
     expect(props.pageHistoryMessagesDown).not.toHaveBeenCalled();
   });
 
+  it("uses Windows-specific category solo and preset shortcuts", () => {
+    const props = createProps();
+
+    renderHarness(props, "win32");
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", code: "Digit1", ctrlKey: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "1",
+        code: "Digit1",
+        ctrlKey: true,
+        shiftKey: true,
+      }),
+    );
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "1",
+        code: "Digit1",
+        ctrlKey: true,
+        altKey: true,
+      }),
+    );
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "8", code: "Digit8", ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "9", code: "Digit9", ctrlKey: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "8",
+        code: "Digit8",
+        ctrlKey: true,
+        shiftKey: true,
+      }),
+    );
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "9",
+        code: "Digit9",
+        ctrlKey: true,
+        shiftKey: true,
+      }),
+    );
+
+    expect(props.toggleHistoryCategory).toHaveBeenCalledWith("user");
+    expect(props.soloHistoryCategory).toHaveBeenCalledWith("user");
+    expect(props.toggleHistoryCategoryDefaultExpansion).toHaveBeenCalledWith("user");
+    expect(props.togglePrimaryHistoryCategoriesVisibility).toHaveBeenCalledTimes(1);
+    expect(props.toggleAllHistoryCategoriesVisibility).toHaveBeenCalledTimes(1);
+    expect(props.focusPrimaryHistoryCategoriesVisibility).toHaveBeenCalledTimes(1);
+    expect(props.focusAllHistoryCategoriesVisibility).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores repeated category and preset keydown events", () => {
+    const props = createProps();
+
+    renderHarness(props);
+
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "1",
+        code: "Digit1",
+        ctrlKey: true,
+        repeat: true,
+      }),
+    );
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "8",
+        code: "Digit8",
+        metaKey: true,
+        repeat: true,
+      }),
+    );
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "8",
+        code: "Digit8",
+        ctrlKey: true,
+        repeat: true,
+      }),
+    );
+
+    expect(props.soloHistoryCategory).not.toHaveBeenCalled();
+    expect(props.togglePrimaryHistoryCategoriesVisibility).not.toHaveBeenCalled();
+    expect(props.focusPrimaryHistoryCategoriesVisibility).not.toHaveBeenCalled();
+  });
+
   it("pages the currently focused history pane with bare PageUp and PageDown", () => {
     const props = createProps({ activeHistoryPane: "project", lastHistoryPane: "project" });
 
-    const { rerender } = render(<Harness {...props} />);
+    const { rerender } = renderHarness(props);
 
     const projectList = props.projectListRef.current;
     const sessionList = props.sessionListRef.current;
@@ -236,7 +357,18 @@ describe("useKeyboardShortcuts", () => {
     expect(messageList.scrollTop).toBe(40);
 
     rerender(
-      <Harness {...{ ...props, activeHistoryPane: "session", lastHistoryPane: "session" }} />,
+      <CodetrailClientProvider
+        value={{
+          platform: "darwin",
+          invoke: vi.fn(async () => {
+            throw new Error("not used");
+          }),
+          onHistoryExportProgress: () => () => undefined,
+          onAppCommand: () => () => undefined,
+        }}
+      >
+        <Harness {...{ ...props, activeHistoryPane: "session", lastHistoryPane: "session" }} />
+      </CodetrailClientProvider>,
     );
     sessionList.dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp", bubbles: true }));
     expect(sessionList.scrollTop).toBe(0);
@@ -250,7 +382,7 @@ describe("useKeyboardShortcuts", () => {
   it("pages project and session panes when a toolbar button inside that pane is focused", () => {
     const props = createProps({ activeHistoryPane: "project", lastHistoryPane: "project" });
 
-    const { getByText, rerender } = render(<Harness {...props} />);
+    const { getByText, rerender } = renderHarness(props);
 
     const projectList = props.projectListRef.current;
     const sessionList = props.sessionListRef.current;
@@ -283,7 +415,18 @@ describe("useKeyboardShortcuts", () => {
     expect(sessionList.scrollTop).toBe(40);
 
     rerender(
-      <Harness {...{ ...props, activeHistoryPane: "session", lastHistoryPane: "session" }} />,
+      <CodetrailClientProvider
+        value={{
+          platform: "darwin",
+          invoke: vi.fn(async () => {
+            throw new Error("not used");
+          }),
+          onHistoryExportProgress: () => () => undefined,
+          onAppCommand: () => () => undefined,
+        }}
+      >
+        <Harness {...{ ...props, activeHistoryPane: "session", lastHistoryPane: "session" }} />
+      </CodetrailClientProvider>,
     );
     sessionToggle.dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp", bubbles: true }));
     expect(sessionList.scrollTop).toBe(0);
@@ -293,7 +436,7 @@ describe("useKeyboardShortcuts", () => {
   it("falls back to paging the message pane when no history pane is focused", () => {
     const props = createProps();
 
-    render(<Harness {...props} />);
+    renderHarness(props);
 
     const messageList = props.messageListRef.current;
     if (!messageList) {
@@ -325,7 +468,7 @@ describe("useKeyboardShortcuts", () => {
   it("keeps search paging shortcuts active from search inputs and cycles the search tab order", () => {
     const props = createProps({ mainView: "search" });
 
-    render(<Harness {...props} />);
+    renderHarness(props);
 
     const searchInput = props.searchInputRef.current;
     const advancedToggle = props.searchAdvancedToggleRef.current;
@@ -373,7 +516,7 @@ describe("useKeyboardShortcuts", () => {
   it("suppresses app-level search shortcuts while a search overlay is open", () => {
     const props = createProps({ mainView: "search", overlayOpen: true });
 
-    render(<Harness {...props} />);
+    renderHarness(props);
 
     const searchInput = props.searchInputRef.current;
     const advancedToggle = props.searchAdvancedToggleRef.current;
@@ -526,7 +669,7 @@ describe("useKeyboardShortcuts", () => {
   it("cycles pane focus with Tab and routes plain Up/Down on focused project and session panes", () => {
     const props = createProps({ activeHistoryPane: "project", lastHistoryPane: "project" });
 
-    const { rerender } = render(<Harness {...props} />);
+    const { rerender } = renderHarness(props);
 
     const projectList = props.projectListRef.current;
     const sessionList = props.sessionListRef.current;
@@ -538,7 +681,18 @@ describe("useKeyboardShortcuts", () => {
     projectList.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     projectList.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
     rerender(
-      <Harness {...{ ...props, activeHistoryPane: "session", lastHistoryPane: "session" }} />,
+      <CodetrailClientProvider
+        value={{
+          platform: "darwin",
+          invoke: vi.fn(async () => {
+            throw new Error("not used");
+          }),
+          onHistoryExportProgress: () => () => undefined,
+          onAppCommand: () => () => undefined,
+        }}
+      >
+        <Harness {...{ ...props, activeHistoryPane: "session", lastHistoryPane: "session" }} />
+      </CodetrailClientProvider>,
     );
     sessionList.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
 
@@ -563,7 +717,7 @@ describe("useKeyboardShortcuts", () => {
   it("routes Enter on the focused project pane to the tree enter handler", () => {
     const props = createProps({ activeHistoryPane: "project", lastHistoryPane: "project" });
 
-    render(<Harness {...props} />);
+    renderHarness(props);
 
     const projectList = props.projectListRef.current;
     if (!projectList) {
@@ -579,7 +733,7 @@ describe("useKeyboardShortcuts", () => {
   it("does not route project pane arrow shortcuts while a project text input is focused", () => {
     const props = createProps({ activeHistoryPane: "project", lastHistoryPane: "project" });
 
-    render(<Harness {...props} />);
+    renderHarness(props);
 
     const input = document.getElementById("project-search-input");
     if (!(input instanceof HTMLInputElement)) {
@@ -601,7 +755,7 @@ describe("useKeyboardShortcuts", () => {
   it("skips collapsed pane targets when cycling with Tab", () => {
     const props = createProps();
 
-    render(<Harness {...props} />);
+    renderHarness(props);
 
     const projectList = props.projectListRef.current;
     const sessionList = props.sessionListRef.current;

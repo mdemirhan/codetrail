@@ -115,6 +115,131 @@ describe("App shell", () => {
     expect(container.querySelector(".msg-filter.user-filter .filter-count")).toHaveTextContent(
       "18.5K",
     );
+    expect(
+      screen.getByRole("button", { name: "Show or hide User messages (18,457)" }),
+    ).toHaveAttribute(
+      "title",
+      "Show or hide User messages (18,457)  ⌘1\nFocus only User messages  ⌃1",
+    );
+  });
+
+  it("uses plain preset toggles for Cmd shortcuts and reversible focus for Ctrl shortcuts", async () => {
+    installScrollIntoViewMock();
+
+    const client = createAppClient();
+    const { container } = renderWithClient(
+      <App
+        initialPaneState={
+          {
+            selectedProjectId: "project_1",
+            selectedSessionId: "session_1",
+            historyMode: "session",
+            historyCategories: ["user", "assistant", "tool_result"],
+          } as PaneStateSnapshot
+        }
+      />,
+      client,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "1", code: "Digit1", ctrlKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).not.toHaveClass("active");
+    });
+
+    fireEvent.keyDown(window, { key: "1", code: "Digit1", ctrlKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).not.toHaveClass("active");
+    });
+
+    fireEvent.keyDown(window, { key: "8", code: "Digit8", metaKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_use-filter")).not.toHaveClass("active");
+    });
+
+    fireEvent.keyDown(window, { key: "8", code: "Digit8", metaKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_use-filter")).not.toHaveClass("active");
+    });
+
+    fireEvent.keyDown(window, { key: "8", code: "Digit8", ctrlKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_use-filter")).not.toHaveClass("active");
+    });
+
+    fireEvent.keyDown(window, { key: "8", code: "Digit8", ctrlKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_use-filter")).not.toHaveClass("active");
+    });
+
+    fireEvent.keyDown(window, { key: "9", code: "Digit9", metaKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_use-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.thinking-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.system-filter")).toHaveClass("active");
+    });
+
+    fireEvent.keyDown(window, { key: "9", code: "Digit9", metaKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_use-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.thinking-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.system-filter")).not.toHaveClass("active");
+    });
+
+    fireEvent.keyDown(window, { key: "9", code: "Digit9", ctrlKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_use-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.thinking-filter")).toHaveClass("active");
+      expect(container.querySelector(".msg-filter.system-filter")).toHaveClass("active");
+    });
+
+    fireEvent.keyDown(window, { key: "9", code: "Digit9", ctrlKey: true });
+    await waitFor(() => {
+      expect(container.querySelector(".msg-filter.user-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.assistant-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_edit-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_result-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.tool_use-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.thinking-filter")).not.toHaveClass("active");
+      expect(container.querySelector(".msg-filter.system-filter")).not.toHaveClass("active");
+    });
   });
 
   it("loads history, supports global search navigation, and opens settings", async () => {

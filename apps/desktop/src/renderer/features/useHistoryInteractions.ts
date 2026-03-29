@@ -63,6 +63,28 @@ type AdjacentSelectionOptions = {
   preserveFocus?: boolean;
 };
 
+type HistoryCategoryFilterRestoreState = {
+  mode: `solo:${MessageCategory}` | "preset:primary" | "preset:all";
+  categories: MessageCategory[];
+};
+
+const USER_ASSISTANT_WRITE_CATEGORIES: readonly MessageCategory[] = [
+  "user",
+  "assistant",
+  "tool_edit",
+];
+
+function areSameCategorySets(left: MessageCategory[], right: MessageCategory[]): boolean {
+  return left.length === right.length && left.every((category, index) => category === right[index]);
+}
+
+function areAllCategoriesVisible(
+  currentCategories: MessageCategory[],
+  targetCategories: readonly MessageCategory[],
+): boolean {
+  return targetCategories.every((category) => currentCategories.includes(category));
+}
+
 // Interaction handlers are collected here so keyboard/mouse behavior can share the same
 // state-transition rules without being spread across components.
 export function useHistoryInteractions({
@@ -70,6 +92,8 @@ export function useHistoryInteractions({
   logError,
   setMessageExpanded,
   setHistoryCategories,
+  historyCategoriesRef,
+  historyCategorySoloRestoreRef,
   setExpandedByDefaultCategories,
   setSessionPage,
   isExpandedByDefault,
@@ -135,6 +159,8 @@ export function useHistoryInteractions({
   logError: (context: string, error: unknown) => void;
   setMessageExpanded: Dispatch<SetStateAction<Record<string, boolean>>>;
   setHistoryCategories: Dispatch<SetStateAction<MessageCategory[]>>;
+  historyCategoriesRef: MutableRefObject<MessageCategory[]>;
+  historyCategorySoloRestoreRef: MutableRefObject<HistoryCategoryFilterRestoreState | null>;
   setExpandedByDefaultCategories: Dispatch<SetStateAction<MessageCategory[]>>;
   setSessionPage: Dispatch<SetStateAction<number>>;
   isExpandedByDefault: (category: MessageCategory) => boolean;
@@ -258,11 +284,125 @@ export function useHistoryInteractions({
 
   const handleToggleHistoryCategoryShortcut = useCallback(
     (category: MessageCategory) => {
-      setHistoryCategories((value) => toggleValue<MessageCategory>(value, category));
+      historyCategorySoloRestoreRef.current = null;
+      const nextCategories = toggleValue<MessageCategory>(historyCategoriesRef.current, category);
+      historyCategoriesRef.current = nextCategories;
+      setHistoryCategories(nextCategories);
       setSessionPage(0);
     },
-    [setHistoryCategories, setSessionPage],
+    [historyCategoriesRef, historyCategorySoloRestoreRef, setHistoryCategories, setSessionPage],
   );
+
+  const handleSoloHistoryCategoryShortcut = useCallback(
+    (category: MessageCategory) => {
+      const currentCategories = historyCategoriesRef.current;
+      const restoreState = historyCategorySoloRestoreRef.current;
+      const isCurrentSoloState =
+        currentCategories.length === 1 && currentCategories[0] === category;
+      const restoreCategories =
+        restoreState?.mode === `solo:${category}` ? restoreState.categories : null;
+      const hasUsefulRestore =
+        Array.isArray(restoreCategories) &&
+        !areSameCategorySets(restoreCategories, currentCategories);
+
+      const nextCategories = isCurrentSoloState
+        ? hasUsefulRestore
+          ? [...restoreCategories]
+          : [...CATEGORIES]
+        : [category];
+
+      historyCategorySoloRestoreRef.current = isCurrentSoloState
+        ? null
+        : {
+            mode: `solo:${category}`,
+            categories: [...currentCategories],
+          };
+      historyCategoriesRef.current = nextCategories;
+      setHistoryCategories(nextCategories);
+      setSessionPage(0);
+    },
+    [historyCategoriesRef, historyCategorySoloRestoreRef, setHistoryCategories, setSessionPage],
+  );
+
+  const handleTogglePrimaryHistoryCategoriesShortcut = useCallback(() => {
+    const currentCategories = historyCategoriesRef.current;
+    historyCategorySoloRestoreRef.current = null;
+    const targetCategories = new Set(USER_ASSISTANT_WRITE_CATEGORIES);
+    const nextCategories = areAllCategoriesVisible(
+      currentCategories,
+      USER_ASSISTANT_WRITE_CATEGORIES,
+    )
+      ? currentCategories.filter((category) => !targetCategories.has(category))
+      : [
+          ...currentCategories.filter((category) => !targetCategories.has(category)),
+          ...USER_ASSISTANT_WRITE_CATEGORIES,
+        ];
+    historyCategoriesRef.current = nextCategories;
+    setHistoryCategories(nextCategories);
+    setSessionPage(0);
+  }, [historyCategoriesRef, historyCategorySoloRestoreRef, setHistoryCategories, setSessionPage]);
+
+  const handleToggleAllHistoryCategoriesShortcut = useCallback(() => {
+    const currentCategories = historyCategoriesRef.current;
+    historyCategorySoloRestoreRef.current = null;
+    const nextCategories = areSameCategorySets(currentCategories, [...CATEGORIES])
+      ? []
+      : [...CATEGORIES];
+    historyCategoriesRef.current = nextCategories;
+    setHistoryCategories(nextCategories);
+    setSessionPage(0);
+  }, [historyCategoriesRef, historyCategorySoloRestoreRef, setHistoryCategories, setSessionPage]);
+
+  const handleFocusPrimaryHistoryCategoriesShortcut = useCallback(() => {
+    const currentCategories = historyCategoriesRef.current;
+    const restoreState = historyCategorySoloRestoreRef.current;
+    const isCurrentPreset = areSameCategorySets(currentCategories, [
+      ...USER_ASSISTANT_WRITE_CATEGORIES,
+    ]);
+    const restoreCategories =
+      restoreState?.mode === "preset:primary" ? restoreState.categories : null;
+    const hasUsefulRestore =
+      Array.isArray(restoreCategories) &&
+      !areSameCategorySets(restoreCategories, currentCategories);
+    const nextCategories = isCurrentPreset
+      ? hasUsefulRestore
+        ? [...restoreCategories]
+        : [...CATEGORIES]
+      : [...USER_ASSISTANT_WRITE_CATEGORIES];
+    historyCategorySoloRestoreRef.current = isCurrentPreset
+      ? null
+      : {
+          mode: "preset:primary",
+          categories: [...currentCategories],
+        };
+    historyCategoriesRef.current = nextCategories;
+    setHistoryCategories(nextCategories);
+    setSessionPage(0);
+  }, [historyCategoriesRef, historyCategorySoloRestoreRef, setHistoryCategories, setSessionPage]);
+
+  const handleFocusAllHistoryCategoriesShortcut = useCallback(() => {
+    const currentCategories = historyCategoriesRef.current;
+    const restoreState = historyCategorySoloRestoreRef.current;
+    const isCurrentPreset = areSameCategorySets(currentCategories, [...CATEGORIES]);
+    const restoreCategories = restoreState?.mode === "preset:all" ? restoreState.categories : null;
+    const hasUsefulRestore =
+      Array.isArray(restoreCategories) &&
+      !areSameCategorySets(restoreCategories, currentCategories);
+    const nextCategories = isCurrentPreset
+      ? hasUsefulRestore
+        ? [...restoreCategories]
+        : [...CATEGORIES]
+      : [...CATEGORIES];
+    historyCategorySoloRestoreRef.current = isCurrentPreset
+      ? null
+      : {
+          mode: "preset:all",
+          categories: [...currentCategories],
+        };
+    historyCategoriesRef.current = nextCategories;
+    setHistoryCategories(nextCategories);
+    setSessionPage(0);
+  }, [historyCategoriesRef, historyCategorySoloRestoreRef, setHistoryCategories, setSessionPage]);
 
   const handleToggleVisibleCategoryMessagesExpanded = useCallback(
     (category: MessageCategory) => {
@@ -1129,6 +1269,11 @@ export function useHistoryInteractions({
 
   return {
     handleToggleHistoryCategoryShortcut,
+    handleSoloHistoryCategoryShortcut,
+    handleTogglePrimaryHistoryCategoriesShortcut,
+    handleToggleAllHistoryCategoriesShortcut,
+    handleFocusPrimaryHistoryCategoriesShortcut,
+    handleFocusAllHistoryCategoriesShortcut,
     handleToggleVisibleCategoryMessagesExpanded,
     handleToggleCategoryDefaultExpansion,
     handleToggleAllCategoryDefaultExpansion,

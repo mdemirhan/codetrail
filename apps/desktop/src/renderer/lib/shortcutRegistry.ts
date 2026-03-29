@@ -43,9 +43,23 @@ function getHistoryCategoryExpandShortcuts(
   ) as Record<MessageCategory, string>;
 }
 
+function getHistoryCategorySoloShortcuts(
+  platform: DesktopPlatform,
+): Record<MessageCategory, string> {
+  const modifier = getPrimaryModifierLabel(platform);
+  const isMac = isMacPlatform(platform);
+  return Object.fromEntries(
+    CATEGORY_DIGIT_SHORTCUTS.map(([category, digit]) => [
+      category,
+      isMac ? `Ctrl+${digit}` : `${modifier}+Shift+${digit}`,
+    ]),
+  ) as Record<MessageCategory, string>;
+}
+
 function getShortcutItems(platform: DesktopPlatform) {
   const modifier = getPrimaryModifierLabel(platform);
   const alternateModifier = getAlternateModifierLabel(platform);
+  const soloShortcuts = getHistoryCategorySoloShortcuts(platform);
   const projectNavigationModifier = isMacPlatform(platform) ? "Ctrl" : `${modifier}+Shift`;
   const pageTraversalShortcuts = isMacPlatform(platform)
     ? [
@@ -164,8 +178,33 @@ function getShortcutItems(platform: DesktopPlatform) {
           shortcut: `${modifier}+${alternateModifier}+${digit}`,
           description: `Expand or collapse ${categoryLabel} messages`,
         },
+        {
+          group: "Message Filters",
+          shortcut: soloShortcuts[category],
+          description: `Show only ${categoryLabel} messages`,
+        },
       ];
     }),
+    {
+      group: "Message Filters",
+      shortcut: `${modifier}+8`,
+      description: "Toggle User, Assistant, and Write messages",
+    },
+    {
+      group: "Message Filters",
+      shortcut: isMacPlatform(platform) ? "Ctrl+8" : `${modifier}+Shift+8`,
+      description: "Focus User, Assistant, and Write messages",
+    },
+    {
+      group: "Message Filters",
+      shortcut: `${modifier}+9`,
+      description: "Toggle all message types",
+    },
+    {
+      group: "Message Filters",
+      shortcut: isMacPlatform(platform) ? "Ctrl+9" : `${modifier}+Shift+9`,
+      description: "Focus all message types",
+    },
     { group: "Refresh", shortcut: `${modifier}+R`, description: "Refresh now" },
     {
       group: "Refresh",
@@ -200,6 +239,7 @@ export type ShortcutRegistry = {
   searchNavigationHint: string;
   historyCategoryShortcuts: Record<MessageCategory, string>;
   historyCategoryExpandShortcuts: Record<MessageCategory, string>;
+  historyCategorySoloShortcuts: Record<MessageCategory, string>;
   shortcutItems: ReturnType<typeof getShortcutItems>;
   matches: {
     isPrimaryModifierPressed: (event: Pick<KeyboardEvent, "metaKey" | "ctrlKey">) => boolean;
@@ -211,6 +251,9 @@ export type ShortcutRegistry = {
       direction: "up" | "down",
     ) => boolean;
     isCategoryExpansionClick: (event: Pick<MouseEvent, "metaKey" | "ctrlKey">) => boolean;
+    isHistoryCategorySoloShortcut: (
+      event: Pick<KeyboardEvent, "metaKey" | "ctrlKey" | "altKey" | "shiftKey">,
+    ) => boolean;
   };
 };
 
@@ -238,6 +281,7 @@ export function createShortcutRegistry(platform: DesktopPlatform): ShortcutRegis
       : "Ctrl+Left/Right • Ctrl+Up/Down • Ctrl+D/U • Page Up/Down • Ctrl+Page Up/Down",
     historyCategoryShortcuts: getHistoryCategoryShortcuts(platform),
     historyCategoryExpandShortcuts: getHistoryCategoryExpandShortcuts(platform),
+    historyCategorySoloShortcuts: getHistoryCategorySoloShortcuts(platform),
     shortcutItems: getShortcutItems(platform),
     matches: {
       isPrimaryModifierPressed: (event) =>
@@ -266,6 +310,10 @@ export function createShortcutRegistry(platform: DesktopPlatform): ShortcutRegis
       },
       isCategoryExpansionClick: (event) =>
         isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey,
+      isHistoryCategorySoloShortcut: (event) =>
+        isMac
+          ? event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
+          : event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey,
     },
   };
 }

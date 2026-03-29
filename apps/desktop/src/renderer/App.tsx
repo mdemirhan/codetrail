@@ -953,7 +953,12 @@ export function App({
     toggleFocusMode,
     toggleAllMessagesExpanded: history.handleToggleAllCategoryDefaultExpansion,
     toggleHistoryCategory: history.handleToggleHistoryCategoryShortcut,
+    soloHistoryCategory: history.handleSoloHistoryCategoryShortcut,
     toggleHistoryCategoryDefaultExpansion: history.handleToggleCategoryDefaultExpansion,
+    togglePrimaryHistoryCategoriesVisibility: history.handleTogglePrimaryHistoryCategoriesShortcut,
+    toggleAllHistoryCategoriesVisibility: history.handleToggleAllHistoryCategoriesShortcut,
+    focusPrimaryHistoryCategoriesVisibility: history.handleFocusPrimaryHistoryCategoriesShortcut,
+    focusAllHistoryCategoriesVisibility: history.handleFocusAllHistoryCategoriesShortcut,
     toggleProjectPaneCollapsed: () => history.setProjectPaneCollapsed((value) => !value),
     toggleSessionPaneCollapsed: () => history.setSessionPaneCollapsed((value) => !value),
     focusPreviousHistoryMessage: () =>

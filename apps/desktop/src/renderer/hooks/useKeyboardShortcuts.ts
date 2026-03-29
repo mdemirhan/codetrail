@@ -56,7 +56,12 @@ export function useKeyboardShortcuts(args: {
   toggleFocusMode: () => void;
   toggleAllMessagesExpanded: () => void;
   toggleHistoryCategory: (category: MessageCategory) => void;
+  soloHistoryCategory: (category: MessageCategory) => void;
   toggleHistoryCategoryDefaultExpansion: (category: MessageCategory) => void;
+  togglePrimaryHistoryCategoriesVisibility: () => void;
+  toggleAllHistoryCategoriesVisibility: () => void;
+  focusPrimaryHistoryCategoriesVisibility: () => void;
+  focusAllHistoryCategoriesVisibility: () => void;
   toggleProjectPaneCollapsed: () => void;
   toggleSessionPaneCollapsed: () => void;
   focusPreviousHistoryMessage: () => void;
@@ -129,19 +134,52 @@ export function useKeyboardShortcuts(args: {
       const handledExpandedCategory = handleHistoryCategoryShortcut({
         event,
         mainView: args.mainView,
-        command,
-        requireAlt: true,
+        shortcuts,
+        modifierKind: "expand",
         code,
         onToggleCategory: args.toggleHistoryCategoryDefaultExpansion,
       });
       if (handledExpandedCategory) {
         return;
       }
+      const handledSoloCategory = handleHistoryCategoryShortcut({
+        event,
+        mainView: args.mainView,
+        shortcuts,
+        modifierKind: "solo",
+        code,
+        onToggleCategory: args.soloHistoryCategory,
+      });
+      if (handledSoloCategory) {
+        return;
+      }
+      const handledFocusPresetCategory = handleHistoryCategoryFocusPresetShortcut({
+        event,
+        mainView: args.mainView,
+        shortcuts,
+        code,
+        onFocusPrimaryCategories: args.focusPrimaryHistoryCategoriesVisibility,
+        onFocusAllCategories: args.focusAllHistoryCategoriesVisibility,
+      });
+      if (handledFocusPresetCategory) {
+        return;
+      }
+      const handledPresetCategory = handleHistoryCategoryPresetShortcut({
+        event,
+        mainView: args.mainView,
+        shortcuts,
+        code,
+        onTogglePrimaryCategories: args.togglePrimaryHistoryCategoriesVisibility,
+        onToggleAllCategories: args.toggleAllHistoryCategoriesVisibility,
+      });
+      if (handledPresetCategory) {
+        return;
+      }
       const handledCategory = handleHistoryCategoryShortcut({
         event,
         mainView: args.mainView,
-        command,
-        requireAlt: false,
+        shortcuts,
+        modifierKind: "toggle",
         code,
         onToggleCategory: args.toggleHistoryCategory,
       });
@@ -614,21 +652,32 @@ function handleHistoryCommandShortcut(context: ShortcutContext): boolean {
 function handleHistoryCategoryShortcut(args: {
   event: KeyboardEvent;
   mainView: MainView;
-  command: boolean;
-  requireAlt: boolean;
+  shortcuts: ShortcutRegistry;
+  modifierKind: "toggle" | "expand" | "solo";
   code: string;
   onToggleCategory: (category: MessageCategory) => void;
 }): boolean {
-  if (!args.command) {
+  if (args.event.repeat) {
     return false;
   }
-  const allowedInCurrentView = args.requireAlt
-    ? args.mainView === "history"
-    : args.mainView === "history" || args.mainView === "search";
+  const allowedInCurrentView =
+    args.modifierKind === "expand"
+      ? args.mainView === "history"
+      : args.mainView === "history" || args.mainView === "search";
   if (!allowedInCurrentView) {
     return false;
   }
-  if (args.requireAlt !== args.event.altKey || args.event.shiftKey) {
+  const matchesModifier =
+    args.modifierKind === "toggle"
+      ? args.shortcuts.matches.isPrimaryModifierPressed(args.event) &&
+        !args.event.altKey &&
+        !args.event.shiftKey
+      : args.modifierKind === "expand"
+        ? args.shortcuts.matches.isPrimaryModifierPressed(args.event) &&
+          args.event.altKey &&
+          !args.event.shiftKey
+        : args.shortcuts.matches.isHistoryCategorySoloShortcut(args.event);
+  if (!matchesModifier) {
     return false;
   }
 
@@ -640,6 +689,68 @@ function handleHistoryCategoryShortcut(args: {
   args.event.preventDefault();
   args.onToggleCategory(match.category);
   return true;
+}
+
+function handleHistoryCategoryPresetShortcut(args: {
+  event: KeyboardEvent;
+  mainView: MainView;
+  shortcuts: ShortcutRegistry;
+  code: string;
+  onTogglePrimaryCategories: () => void;
+  onToggleAllCategories: () => void;
+}): boolean {
+  if (args.event.repeat) {
+    return false;
+  }
+  if (
+    (args.mainView !== "history" && args.mainView !== "search") ||
+    !args.shortcuts.matches.isPrimaryModifierPressed(args.event) ||
+    args.event.altKey ||
+    args.event.shiftKey
+  ) {
+    return false;
+  }
+  if (args.code === "Digit8") {
+    args.event.preventDefault();
+    args.onTogglePrimaryCategories();
+    return true;
+  }
+  if (args.code === "Digit9") {
+    args.event.preventDefault();
+    args.onToggleAllCategories();
+    return true;
+  }
+  return false;
+}
+
+function handleHistoryCategoryFocusPresetShortcut(args: {
+  event: KeyboardEvent;
+  mainView: MainView;
+  shortcuts: ShortcutRegistry;
+  code: string;
+  onFocusPrimaryCategories: () => void;
+  onFocusAllCategories: () => void;
+}): boolean {
+  if (args.event.repeat) {
+    return false;
+  }
+  if (
+    (args.mainView !== "history" && args.mainView !== "search") ||
+    !args.shortcuts.matches.isHistoryCategorySoloShortcut(args.event)
+  ) {
+    return false;
+  }
+  if (args.code === "Digit8") {
+    args.event.preventDefault();
+    args.onFocusPrimaryCategories();
+    return true;
+  }
+  if (args.code === "Digit9") {
+    args.event.preventDefault();
+    args.onFocusAllCategories();
+    return true;
+  }
+  return false;
 }
 
 function isHistorySearchInputTarget(target: HTMLElement | null): boolean {
