@@ -3,11 +3,15 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { MessageCategory, Provider, SearchMode } from "@codetrail/core/browser";
 
-import { CATEGORIES, EMPTY_CATEGORY_COUNTS, SEARCH_PAGE_SIZE } from "../app/constants";
+import {
+  CATEGORIES,
+  EMPTY_CATEGORY_COUNTS,
+  EMPTY_PROVIDER_COUNTS,
+  SEARCH_PAGE_SIZE,
+} from "../app/constants";
 import type { SearchQueryResponse } from "../app/types";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useCodetrailClient } from "../lib/codetrailClient";
-import { countProviders } from "../lib/viewUtils";
 
 const SEARCH_RESULT_PAGE_SCROLL_OVERLAP_PX = 20;
 
@@ -46,6 +50,7 @@ export function useSearchController({
     highlightPatterns: [],
     totalCount: 0,
     categoryCounts: EMPTY_CATEGORY_COUNTS,
+    providerCounts: EMPTY_PROVIDER_COUNTS,
     results: [],
   });
 
@@ -65,6 +70,7 @@ export function useSearchController({
         query: searchQuery,
         totalCount: 0,
         categoryCounts: EMPTY_CATEGORY_COUNTS,
+        providerCounts: EMPTY_PROVIDER_COUNTS,
         highlightPatterns: [],
         queryError: null,
         results: [],
@@ -117,8 +123,8 @@ export function useSearchController({
   }, [searchResponse.totalCount]);
 
   const searchProviderCounts = useMemo(
-    () => countProviders(searchResponse.results.map((result) => result.provider)),
-    [searchResponse.results],
+    () => searchResponse.providerCounts ?? EMPTY_PROVIDER_COUNTS,
+    [searchResponse.providerCounts],
   );
 
   useEffect(() => {
@@ -147,13 +153,6 @@ export function useSearchController({
     }, 0);
   }, []);
 
-  const focusSearchResultsPane = useCallback(() => {
-    window.setTimeout(() => {
-      setFocusedSearchResultIndex(-1);
-      searchResultsScrollRef.current?.focus({ preventScroll: true });
-    }, 0);
-  }, []);
-
   const setSearchResultRef = useCallback((index: number, element: HTMLButtonElement | null) => {
     searchResultRefs.current[index] = element;
   }, []);
@@ -167,6 +166,19 @@ export function useSearchController({
     button.focus({ preventScroll: true });
     button.scrollIntoView({ block: "nearest" });
   }, []);
+
+  const focusSearchResultsPane = useCallback(() => {
+    window.setTimeout(() => {
+      const firstResult = searchResultRefs.current[0];
+      if (searchResponse.results.length > 0 && firstResult) {
+        setFocusedSearchResultIndex(0);
+        firstResult.focus({ preventScroll: true });
+        firstResult.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      setFocusedSearchResultIndex(-1);
+    }, 0);
+  }, [searchResponse.results.length]);
 
   const resolveFocusedSearchResultIndex = useCallback(() => {
     if (focusedSearchResultIndex >= 0 && focusedSearchResultIndex < searchResponse.results.length) {

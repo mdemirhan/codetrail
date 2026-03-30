@@ -120,11 +120,11 @@ describe("App shell", () => {
       screen.getByRole("button", { name: "Show or hide User messages (18,457)" }),
     ).toHaveAttribute(
       "title",
-      "Show or hide User messages (18,457)  ⌘1\nCtrl+Click Focus only User messages  ⌃1",
+      "Show or hide User messages (18,457)  ⌘1\nCmd+Click Focus only User messages  ⌃1",
     );
   });
 
-  it("ctrl-clicking a message filter pill focuses that category and restores on second ctrl-click", async () => {
+  it("cmd-clicking a message filter pill focuses that category and restores on second cmd-click", async () => {
     installScrollIntoViewMock();
 
     const client = createAppClient();
@@ -146,7 +146,7 @@ describe("App shell", () => {
       name: /Show or hide User messages \([\d,]+\)/,
     });
 
-    fireEvent.click(userFilterButton, { ctrlKey: true });
+    fireEvent.click(userFilterButton, { metaKey: true });
     await waitFor(() => {
       expect(container.querySelector(".msg-filter.user-filter")).toHaveClass("active");
       expect(container.querySelector(".msg-filter.assistant-filter")).not.toHaveClass("active");
@@ -154,7 +154,7 @@ describe("App shell", () => {
       expect(container.querySelector(".msg-filter.tool_edit-filter")).not.toHaveClass("active");
     });
 
-    fireEvent.click(userFilterButton, { ctrlKey: true });
+    fireEvent.click(userFilterButton, { metaKey: true });
     await waitFor(() => {
       expect(container.querySelector(".msg-filter.user-filter")).toHaveClass("active");
       expect(container.querySelector(".msg-filter.assistant-filter")).toHaveClass("active");
@@ -1233,7 +1233,9 @@ describe("App shell", () => {
     await user.type(pageInput, "1");
     await user.keyboard("{Tab}");
     expect(pageInput).toHaveValue("2");
-    expect(document.activeElement).toBe(messageList);
+    expect(document.activeElement).toBe(
+      screen.getByRole("combobox", { name: "Messages per page" }),
+    );
 
     await user.click(pageInput);
     await user.clear(pageInput);

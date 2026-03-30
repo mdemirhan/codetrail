@@ -14,6 +14,42 @@ function sha256(input: string): string {
   return createHash("sha256").update(input, "utf8").digest("hex");
 }
 
+const geminiProjectResolutionCache = new WeakMap<
+  ResolvedDiscoveryDependencies["fs"],
+  Map<string, GeminiProjectResolution>
+>();
+
+function trimTrailingSeparators(path: string): string {
+  if (/^[A-Za-z]:[\\/]?$/.test(path) || /^[\\/]+$/.test(path)) {
+    return path;
+  }
+  return path.replace(/[\\/]+$/, "");
+}
+
+function projectHashCandidates(path: string): string[] {
+  const trimmed = path.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const withoutTrailingSeparators = trimTrailingSeparators(trimmed);
+  const slashNormalized = withoutTrailingSeparators.replace(/\\/g, "/");
+  const candidates = new Set([trimmed, withoutTrailingSeparators, slashNormalized]);
+
+  if (/^[A-Za-z]:\//.test(slashNormalized)) {
+    candidates.add(`${slashNormalized[0]?.toLowerCase() ?? ""}${slashNormalized.slice(1)}`);
+    candidates.add(slashNormalized.toLowerCase());
+  }
+
+  return [...candidates].filter((candidate) => candidate.length > 0);
+}
+
+function rememberProjectHashMappings(hashToPath: Map<string, string>, projectPath: string): void {
+  for (const candidate of projectHashCandidates(projectPath)) {
+    hashToPath.set(sha256(candidate), projectPath);
+  }
+}
+
 export function buildGeminiProjectResolution(
   config: ResolvedDiscoveryConfig,
   dependencies: ResolvedDiscoveryDependencies,
@@ -43,18 +79,18 @@ export function buildGeminiProjectResolution(
         continue;
       }
 
-      hashToPath.set(sha256(rootPathValue), rootPathValue);
+      rememberProjectHashMappings(hashToPath, rootPathValue);
     }
   }
 
   const geminiProjectsPath = getDiscoveryPath(config, "gemini", "geminiProjectsPath");
   if (geminiProjectsPath && dependencies.fs.existsSync(geminiProjectsPath)) {
-    const projects = parseJsonFile<{ projects?: Record<string, string> }>(
+    const projects = parseJsonFile<{ projects?: Record<string, unknown> }>(
       geminiProjectsPath,
       dependencies,
     );
     for (const pathValue of Object.keys(projects?.projects ?? {})) {
-      hashToPath.set(sha256(pathValue), pathValue);
+      rememberProjectHashMappings(hashToPath, pathValue);
     }
   }
 
@@ -66,6 +102,64 @@ export function buildGeminiProjectResolution(
       }
     },
   };
+}
+
+export function getCachedGeminiProjectResolution(
+  config: ResolvedDiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): GeminiProjectResolution {
+  return getGeminiProjectResolution(config, dependencies, false);
+}
+
+export function hasCachedGeminiProjectResolution(
+  config: ResolvedDiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): boolean {
+  const byConfig = geminiProjectResolutionCache.get(dependencies.fs);
+  if (!byConfig) {
+    return false;
+  }
+
+  return byConfig.has(
+    JSON.stringify({
+      geminiRoot: getDiscoveryPath(config, "gemini", "geminiRoot") ?? "",
+      geminiHistoryRoot: getDiscoveryPath(config, "gemini", "geminiHistoryRoot") ?? "",
+      geminiProjectsPath: getDiscoveryPath(config, "gemini", "geminiProjectsPath") ?? "",
+    }),
+  );
+}
+
+export function refreshCachedGeminiProjectResolution(
+  config: ResolvedDiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+): GeminiProjectResolution {
+  return getGeminiProjectResolution(config, dependencies, true);
+}
+
+function getGeminiProjectResolution(
+  config: ResolvedDiscoveryConfig,
+  dependencies: ResolvedDiscoveryDependencies,
+  forceRefresh: boolean,
+): GeminiProjectResolution {
+  const cacheKey = JSON.stringify({
+    geminiRoot: getDiscoveryPath(config, "gemini", "geminiRoot") ?? "",
+    geminiHistoryRoot: getDiscoveryPath(config, "gemini", "geminiHistoryRoot") ?? "",
+    geminiProjectsPath: getDiscoveryPath(config, "gemini", "geminiProjectsPath") ?? "",
+  });
+  let byConfig = geminiProjectResolutionCache.get(dependencies.fs);
+  if (!byConfig) {
+    byConfig = new Map<string, GeminiProjectResolution>();
+    geminiProjectResolutionCache.set(dependencies.fs, byConfig);
+  }
+
+  const cached = byConfig.get(cacheKey);
+  if (cached && !forceRefresh) {
+    return cached;
+  }
+
+  const resolution = buildGeminiProjectResolution(config, dependencies);
+  byConfig.set(cacheKey, resolution);
+  return resolution;
 }
 
 export function geminiContainerDir(filePath: string): string {

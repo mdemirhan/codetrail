@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import {
   closeSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   openSync,
@@ -36,6 +38,10 @@ function expectDefined<T>(value: T | null | undefined, message: string): NonNull
     throw new Error(message);
   }
   return value as NonNullable<T>;
+}
+
+function sha256(input: string): string {
+  return createHash("sha256").update(input, "utf8").digest("hex");
 }
 
 describe("discoverSingleFile", () => {
@@ -456,6 +462,195 @@ describe("discoverSingleFile", () => {
     expect(discovered.sourceSessionId).toBe("gem-1");
     expect(discovered.projectPath).toBe("/workspace/dux");
     expect(discovered.metadata.unresolvedProject).toBe(false);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("resolves Gemini project hashes across trailing-slash path variants", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-single-gemini-hash-"));
+    const config = makeConfig(dir);
+    const geminiProjectsPath = expectDefined(
+      config.geminiProjectsPath,
+      "Expected Gemini projects path",
+    );
+    const geminiDir = join(config.geminiRoot, "hash-match", "chats");
+    mkdirSync(geminiDir, { recursive: true });
+    mkdirSync(join(dir, ".gemini"), { recursive: true });
+    writeFileSync(
+      geminiProjectsPath,
+      JSON.stringify({
+        projects: {
+          "/workspace/dux/": { displayName: "dux" },
+        },
+      }),
+    );
+
+    writeFileSync(
+      join(geminiDir, "session-1.json"),
+      JSON.stringify({
+        sessionId: "gem-hash-1",
+        projectHash: sha256("/workspace/dux"),
+        messages: [],
+      }),
+    );
+
+    const result = discoverSingleFile(join(geminiDir, "session-1.json"), config);
+
+    const discovered = expectDefined(result, "Expected Gemini project hash match");
+    expect(discovered.projectPath).toBe("/workspace/dux/");
+    expect(discovered.metadata.unresolvedProject).toBe(false);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("caches Gemini project resolution across repeated single-file discovery", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-single-gemini-cache-"));
+    const config = makeConfig(dir);
+    const geminiProjectsPath = expectDefined(
+      config.geminiProjectsPath,
+      "Expected Gemini projects path",
+    );
+    const geminiDir = join(config.geminiRoot, "cached", "chats");
+    mkdirSync(geminiDir, { recursive: true });
+    mkdirSync(join(dir, ".gemini"), { recursive: true });
+    writeFileSync(
+      geminiProjectsPath,
+      JSON.stringify({
+        projects: {
+          "/workspace/cached": { displayName: "cached" },
+        },
+      }),
+    );
+
+    const sessionPath = join(geminiDir, "session-1.json");
+    writeFileSync(
+      sessionPath,
+      JSON.stringify({
+        sessionId: "gem-cache-1",
+        projectHash: sha256("/workspace/cached"),
+        messages: [],
+      }),
+    );
+
+    const fs = {
+      existsSync: vi.fn((path: string) => existsSync(path)),
+      lstatSync: vi.fn((path: string) => {
+        const stat = statSync(path);
+        return {
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+          isDirectory: () => stat.isDirectory(),
+        };
+      }),
+      statSync: vi.fn((path: string) => {
+        const stat = statSync(path);
+        return {
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+          isDirectory: () => stat.isDirectory(),
+        };
+      }),
+      openSync: vi.fn((path: string, flags: "r") => openSync(path, flags)),
+      closeSync: vi.fn((fd: number) => closeSync(fd)),
+      readSync: vi.fn(
+        (fd: number, buffer: Buffer, offset: number, length: number, position: number | null) =>
+          readSync(fd, buffer, offset, length, position),
+      ),
+      readFileSync: vi.fn((path: string, encoding: "utf8") => readFileSync(path, encoding)),
+      readdirSync: vi.fn((path: string, options: { withFileTypes: true }) =>
+        readdirSync(path, options),
+      ),
+    };
+
+    discoverSingleFile(sessionPath, config, { fs });
+    discoverSingleFile(sessionPath, config, { fs });
+
+    const geminiProjectsReads = fs.readFileSync.mock.calls.filter(
+      ([path]) => path === geminiProjectsPath,
+    ).length;
+    expect(geminiProjectsReads).toBe(1);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("refreshes cached Gemini project resolution after a project-hash miss", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-single-gemini-refresh-"));
+    const config = makeConfig(dir);
+    const geminiProjectsPath = expectDefined(
+      config.geminiProjectsPath,
+      "Expected Gemini projects path",
+    );
+    const geminiDir = join(config.geminiRoot, "refresh", "chats");
+    mkdirSync(geminiDir, { recursive: true });
+    mkdirSync(join(dir, ".gemini"), { recursive: true });
+    writeFileSync(geminiProjectsPath, JSON.stringify({ projects: {} }));
+
+    const sessionPath = join(geminiDir, "session-1.json");
+    writeFileSync(
+      sessionPath,
+      JSON.stringify({
+        sessionId: "gem-refresh-1",
+        projectHash: sha256("/workspace/refreshed"),
+        messages: [],
+      }),
+    );
+
+    const fs = {
+      existsSync: vi.fn((path: string) => existsSync(path)),
+      lstatSync: vi.fn((path: string) => {
+        const stat = statSync(path);
+        return {
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+          isDirectory: () => stat.isDirectory(),
+        };
+      }),
+      statSync: vi.fn((path: string) => {
+        const stat = statSync(path);
+        return {
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+          isDirectory: () => stat.isDirectory(),
+        };
+      }),
+      openSync: vi.fn((path: string, flags: "r") => openSync(path, flags)),
+      closeSync: vi.fn((fd: number) => closeSync(fd)),
+      readSync: vi.fn(
+        (fd: number, buffer: Buffer, offset: number, length: number, position: number | null) =>
+          readSync(fd, buffer, offset, length, position),
+      ),
+      readFileSync: vi.fn((path: string, encoding: "utf8") => readFileSync(path, encoding)),
+      readdirSync: vi.fn((path: string, options: { withFileTypes: true }) =>
+        readdirSync(path, options),
+      ),
+    };
+
+    const first = expectDefined(
+      discoverSingleFile(sessionPath, config, { fs }),
+      "Expected initial Gemini session result",
+    );
+    expect(first.metadata.unresolvedProject).toBe(true);
+
+    writeFileSync(
+      geminiProjectsPath,
+      JSON.stringify({
+        projects: {
+          "/workspace/refreshed": { displayName: "refreshed" },
+        },
+      }),
+    );
+
+    const second = expectDefined(
+      discoverSingleFile(sessionPath, config, { fs }),
+      "Expected refreshed Gemini session result",
+    );
+    expect(second.projectPath).toBe("/workspace/refreshed");
+    expect(second.metadata.unresolvedProject).toBe(false);
+
+    const geminiProjectsReads = fs.readFileSync.mock.calls.filter(
+      ([path]) => path === geminiProjectsPath,
+    ).length;
+    expect(geminiProjectsReads).toBe(2);
 
     rmSync(dir, { recursive: true, force: true });
   });

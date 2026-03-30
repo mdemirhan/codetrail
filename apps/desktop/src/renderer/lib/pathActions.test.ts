@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { ExternalToolConfig } from "../../shared/uiPreferences";
 import { createMockCodetrailClient } from "../test/mockCodetrailClient";
 import {
   browseExternalToolCommand,
@@ -123,32 +122,16 @@ describe("pathActions", () => {
     });
   });
 
-  it("passes live external tool overrides when opening content", async () => {
+  it("does not pass renderer-side launch configuration overrides when opening content", async () => {
     const client = createMockCodetrailClient();
     client.invoke.mockResolvedValue({ ok: true, error: null });
-
-    const externalTools: ExternalToolConfig[] = [
-      {
-        id: "custom:textedit",
-        kind: "custom",
-        label: "Text Edit",
-        appId: null,
-        command: "/System/Applications/TextEdit.app",
-        editorArgs: ["{file}"],
-        diffArgs: ["{left}", "{right}"],
-        enabledForEditor: true,
-        enabledForDiff: false,
-      },
-    ];
 
     await openContentInEditor(
       {
         title: "Command",
         language: "shell",
         content: "bun run typecheck",
-        preferredExternalEditor: "custom:textedit",
-        terminalAppCommand: "/Applications/kitty.app",
-        externalTools,
+        editorId: "custom:textedit",
       },
       client,
     );
@@ -158,9 +141,7 @@ describe("pathActions", () => {
       title: "Command",
       content: "bun run typecheck",
       language: "shell",
-      preferredExternalEditor: "custom:textedit",
-      terminalAppCommand: "/Applications/kitty.app",
-      externalTools,
+      editorId: "custom:textedit",
     });
   });
 

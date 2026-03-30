@@ -119,6 +119,7 @@ const categoryCountsSchema = z.object({
   thinking: z.number().int().nonnegative(),
   system: z.number().int().nonnegative(),
 });
+const providerCountsSchema = z.object(createProviderRecord(() => z.number().int().nonnegative()));
 
 const monoFontSizeSchema = z.enum([
   "10px",
@@ -216,9 +217,7 @@ function createProviderZodShape<T extends z.ZodTypeAny>(
 }
 
 const systemMessageRegexRulesSchema = buildSystemMessageRegexRulesSchema();
-const liveProviderCountsSchema = z.object(
-  createProviderZodShape(() => z.number().int().nonnegative()),
-);
+const liveProviderCountsSchema = providerCountsSchema;
 const claudeHookStateSchema = z.object({
   settingsPath: z.string(),
   logPath: z.string(),
@@ -327,13 +326,6 @@ const indexerConfigSchema = z.object(makeAllNullable(indexerConfigBaseSchema.sha
 
 const uiZoomResponseSchema = z.object({
   percent: z.number().int().positive(),
-});
-
-const editorPaneStateOverrideSchema = z.object({
-  preferredExternalEditor: externalToolIdSchema.optional(),
-  preferredExternalDiffTool: externalToolIdSchema.optional(),
-  terminalAppCommand: z.string().optional(),
-  externalTools: z.array(externalToolConfigSchema).optional(),
 });
 
 const discoveryProviderPathSchema = z.object({
@@ -637,6 +629,7 @@ export const ipcContractSchemas = {
       highlightPatterns: z.array(z.string()).optional(),
       totalCount: z.number().int().nonnegative(),
       categoryCounts: categoryCountsSchema,
+      providerCounts: providerCountsSchema,
       results: z.array(searchResultSchema),
     }),
   },
@@ -700,42 +693,36 @@ export const ipcContractSchemas = {
   },
   "editor:open": {
     request: z.union([
-      z
-        .object({
-          kind: z.literal("file"),
-          toolRole: z.enum(["editor", "diff"]).optional(),
-          editorId: externalToolIdSchema.optional(),
-          filePath: z.string().min(1),
-          line: z.number().int().positive().optional(),
-          column: z.number().int().positive().optional(),
-        })
-        .merge(editorPaneStateOverrideSchema),
-      z
-        .object({
-          kind: z.literal("content"),
-          toolRole: z.enum(["editor", "diff"]).optional(),
-          editorId: externalToolIdSchema.optional(),
-          title: z.string().default("Untitled"),
-          content: z.string(),
-          filePath: z.string().optional(),
-          language: z.string().optional(),
-          line: z.number().int().positive().optional(),
-          column: z.number().int().positive().optional(),
-        })
-        .merge(editorPaneStateOverrideSchema),
-      z
-        .object({
-          kind: z.literal("diff"),
-          toolRole: z.literal("diff").optional(),
-          editorId: externalToolIdSchema.optional(),
-          title: z.string().default("Diff"),
-          leftContent: z.string(),
-          rightContent: z.string(),
-          filePath: z.string().optional(),
-          line: z.number().int().positive().optional(),
-          column: z.number().int().positive().optional(),
-        })
-        .merge(editorPaneStateOverrideSchema),
+      z.object({
+        kind: z.literal("file"),
+        toolRole: z.enum(["editor", "diff"]).optional(),
+        editorId: externalToolIdSchema.optional(),
+        filePath: z.string().min(1),
+        line: z.number().int().positive().optional(),
+        column: z.number().int().positive().optional(),
+      }),
+      z.object({
+        kind: z.literal("content"),
+        toolRole: z.enum(["editor", "diff"]).optional(),
+        editorId: externalToolIdSchema.optional(),
+        title: z.string().default("Untitled"),
+        content: z.string(),
+        filePath: z.string().optional(),
+        language: z.string().optional(),
+        line: z.number().int().positive().optional(),
+        column: z.number().int().positive().optional(),
+      }),
+      z.object({
+        kind: z.literal("diff"),
+        toolRole: z.literal("diff").optional(),
+        editorId: externalToolIdSchema.optional(),
+        title: z.string().default("Diff"),
+        leftContent: z.string(),
+        rightContent: z.string(),
+        filePath: z.string().optional(),
+        line: z.number().int().positive().optional(),
+        column: z.number().int().positive().optional(),
+      }),
     ]),
     response: z.object({
       ok: z.boolean(),

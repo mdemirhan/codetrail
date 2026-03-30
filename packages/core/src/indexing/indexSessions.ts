@@ -65,6 +65,7 @@ export type IndexingResult = {
 
 export type IndexingDependencies = {
   discoverSessionFiles?: typeof discoverSessionFiles;
+  discoverSingleFile?: typeof discoverSingleFile;
   openDatabase?: typeof openDatabase;
   ensureDatabaseSchema?: typeof ensureDatabaseSchema;
   clearIndexedData?: typeof clearIndexedData;
@@ -77,6 +78,7 @@ export type IndexingDependencies = {
 
 type ResolvedIndexingDependencies = {
   discoverSessionFiles: typeof discoverSessionFiles;
+  discoverSingleFile: typeof discoverSingleFile;
   openDatabase: typeof openDatabase;
   ensureDatabaseSchema: typeof ensureDatabaseSchema;
   clearIndexedData: typeof clearIndexedData;
@@ -551,7 +553,7 @@ export function indexChangedFiles(
   const discoveryConfig = resolveIndexingDiscoveryConfig(config);
 
   const initiallyDiscoveredFiles = changedFilePaths
-    .map((filePath) => discoverSingleFile(filePath, discoveryConfig))
+    .map((filePath) => resolvedDependencies.discoverSingleFile(filePath, discoveryConfig))
     .filter((file): file is NonNullable<typeof file> => file !== null);
 
   const db = resolvedDependencies.openDatabase(config.dbPath);
@@ -1140,6 +1142,7 @@ function resolveIndexingDependencies(
 ): ResolvedIndexingDependencies {
   return {
     discoverSessionFiles: dependencies.discoverSessionFiles ?? discoverSessionFiles,
+    discoverSingleFile: dependencies.discoverSingleFile ?? discoverSingleFile,
     openDatabase: dependencies.openDatabase ?? openDatabase,
     ensureDatabaseSchema: dependencies.ensureDatabaseSchema ?? ensureDatabaseSchema,
     clearIndexedData: dependencies.clearIndexedData ?? clearIndexedData,

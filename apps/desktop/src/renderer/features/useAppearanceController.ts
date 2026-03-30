@@ -138,6 +138,7 @@ export function useAppearanceController({
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const hasAutoSelectedPreferredEditorRef = useRef(false);
   const hasAutoSelectedPreferredDiffToolRef = useRef(false);
+  const externalToolsRequestRef = useRef(0);
 
   const shikiTheme = resolveShikiThemeForUiTheme(theme, darkShikiTheme, lightShikiTheme);
   const applyCommittedAppearance = useCallback(
@@ -164,20 +165,33 @@ export function useAppearanceController({
   );
 
   const loadAvailableExternalTools = useCallback(async () => {
+    const requestId = externalToolsRequestRef.current + 1;
+    externalToolsRequestRef.current = requestId;
     const response = await codetrail.invoke("editor:listAvailable", {
       externalTools: debouncedExternalTools,
     });
-    setAvailableEditors(Array.isArray(response.editors) ? response.editors : []);
-    setAvailableDiffTools(Array.isArray(response.diffTools) ? response.diffTools : []);
+    return {
+      requestId,
+      editors: Array.isArray(response.editors) ? response.editors : [],
+      diffTools: Array.isArray(response.diffTools) ? response.diffTools : [],
+    };
   }, [codetrail, debouncedExternalTools]);
 
   useEffect(() => {
     let cancelled = false;
-    void loadAvailableExternalTools().catch((error: unknown) => {
-      if (!cancelled) {
-        logError("Failed loading available editors", error);
-      }
-    });
+    void loadAvailableExternalTools()
+      .then((response) => {
+        if (cancelled || response.requestId !== externalToolsRequestRef.current) {
+          return;
+        }
+        setAvailableEditors(response.editors);
+        setAvailableDiffTools(response.diffTools);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          logError("Failed loading available editors", error);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -185,11 +199,7 @@ export function useAppearanceController({
   }, [loadAvailableExternalTools, logError]);
 
   useEffect(() => {
-    if (availableEditors.length === 0) {
-      return;
-    }
-
-    if (initialPaneState?.preferredExternalEditor == null) {
+    if (initialPaneState?.preferredExternalEditor == null && availableEditors.length > 0) {
       const preferred = pickPreferredExternalApp(availableEditors, "editor");
       if (
         preferred &&
@@ -201,7 +211,7 @@ export function useAppearanceController({
       }
     }
 
-    if (initialPaneState?.preferredExternalDiffTool == null) {
+    if (initialPaneState?.preferredExternalDiffTool == null && availableDiffTools.length > 0) {
       const preferred = pickPreferredExternalApp(availableDiffTools, "diff");
       if (
         preferred &&

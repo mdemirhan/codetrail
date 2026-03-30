@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { type IpcResponse, indexerConfigBaseSchema, paneStateBaseSchema } from "@codetrail/core";
+import {
+  type IpcResponse,
+  createProviderRecord,
+  indexerConfigBaseSchema,
+  paneStateBaseSchema,
+} from "@codetrail/core";
 import {
   createClaudeHookStateFixture,
   createLiveStatusFixture,
@@ -143,6 +148,7 @@ describe("registerIpcHandlers", () => {
             thinking: 0,
             system: 0,
           },
+          providerCounts: createProviderRecord(() => 0),
           results: [],
         }),
         "projects:delete": (payload) => ({
@@ -352,6 +358,7 @@ describe("registerIpcHandlers", () => {
             thinking: 0,
             system: 0,
           },
+          providerCounts: createProviderRecord(() => 0),
           results: [],
         }),
         "projects:delete": () => ({

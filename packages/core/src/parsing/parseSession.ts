@@ -82,7 +82,7 @@ function normalizeParsedMessages(
   diagnostics: ParserDiagnostic[],
   messages: ParsedProviderMessage[],
 ): ParseSessionResult["messages"] {
-  return messages.map((message) => {
+  return messages.flatMap((message) => {
     const candidate = {
       id: message.id,
       sessionId,
@@ -110,12 +110,9 @@ function normalizeParsedMessages(
         message: `Failed canonical validation: ${parsedMessage.error.message}`,
       });
 
-      return {
-        ...candidate,
-        content: String(candidate.content),
-      };
+      return [];
     }
 
-    return parsedMessage.data;
+    return [parsedMessage.data];
   });
 }

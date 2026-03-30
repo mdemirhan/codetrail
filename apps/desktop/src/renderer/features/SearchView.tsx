@@ -120,6 +120,7 @@ export function SearchView({
                       }}
                       placeholder={queryPlaceholder}
                       title={search.searchResponse.queryError ?? queryTitle}
+                      aria-label="Search all messages"
                     />
                   </div>
 
@@ -190,6 +191,7 @@ export function SearchView({
                           }}
                           placeholder={SEARCH_PLACEHOLDERS.globalProjects}
                           title="Filter results by project name"
+                          aria-label="Filter search results by project name"
                         />
                       </label>
 
@@ -290,7 +292,6 @@ export function SearchView({
                         <button
                           key={provider}
                           type="button"
-                          tabIndex={-1}
                           className={`msg-filter search-filter-chip search-filter-chip-provider search-filter-chip-provider-${provider}${
                             search.searchProviders.includes(provider) ? " is-active" : ""
                           }`}
@@ -315,7 +316,6 @@ export function SearchView({
                         <button
                           key={category}
                           type="button"
-                          tabIndex={-1}
                           className={`msg-filter search-filter-chip search-filter-chip-category search-filter-chip-category-${category}${
                             search.historyCategories.includes(category) ? " is-active" : ""
                           }`}
@@ -348,16 +348,7 @@ export function SearchView({
                 ) : null}
               </div>
 
-              <div
-                ref={search.searchResultsScrollRef}
-                className="search-results-scroll"
-                tabIndex={-1}
-                onFocus={(event) => {
-                  if (event.target === event.currentTarget) {
-                    search.setFocusedSearchResultIndex(-1);
-                  }
-                }}
-              >
+              <div ref={search.searchResultsScrollRef} className="search-results-scroll">
                 {search.searchResponse.results.length === 0 ? (
                   <div className="search-empty-state">
                     {search.hasActiveSearchQuery
@@ -370,7 +361,6 @@ export function SearchView({
                       type="button"
                       key={`${result.messageId}-${result.messageSourceId}`}
                       ref={(element) => search.setSearchResultRef(index, element)}
-                      tabIndex={-1}
                       className={`search-result-card search-result-card-${result.provider}${
                         search.focusedSearchResultIndex === index ? " is-focused" : ""
                       }`}
@@ -416,7 +406,6 @@ export function SearchView({
                     <button
                       type="button"
                       className="page-btn"
-                      tabIndex={-1}
                       onClick={search.goToPreviousSearchPage}
                       disabled={!search.canGoToPreviousSearchPage}
                       title={formatTooltipLabel("Previous page", shortcuts.actions.previousPage)}
@@ -427,7 +416,6 @@ export function SearchView({
                     <button
                       type="button"
                       className="page-btn"
-                      tabIndex={-1}
                       onClick={search.goToNextSearchPage}
                       disabled={!search.canGoToNextSearchPage}
                       title={formatTooltipLabel("Next page", shortcuts.actions.nextPage)}

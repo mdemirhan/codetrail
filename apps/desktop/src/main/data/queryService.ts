@@ -8,6 +8,7 @@ import {
   type SearchQueryPlan,
   buildSearchQueryPlan,
   buildWildcardFilterPatterns,
+  createProviderRecord,
   makeEmptyCategoryCounts,
   normalizeMessageCategories,
   normalizeMessageCategory,
@@ -1391,6 +1392,7 @@ function runSearchQueryWithDatabase(
       highlightPatterns: [],
       totalCount: 0,
       categoryCounts: makeEmptyCategoryCounts(),
+      providerCounts: createProviderRecord(() => 0),
       results: [],
     };
   }

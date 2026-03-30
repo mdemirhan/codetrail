@@ -2081,9 +2081,8 @@ describe("CodeBlock", () => {
     await waitFor(() => {
       expect(openContentInEditorMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          preferredExternalEditor: "editor:textedit",
-          terminalAppCommand: "/Applications/kitty.app",
-          externalTools: [{ id: "editor:textedit" }],
+          title: "payload.json",
+          content: '{"value": 1}',
         }),
       );
     });

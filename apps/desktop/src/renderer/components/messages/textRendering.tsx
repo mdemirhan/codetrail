@@ -915,21 +915,6 @@ function pickDefaultApp(
   return candidates.find((editor) => editor.id === preferredId) ?? candidates[0] ?? null;
 }
 
-function buildEditorOpenStateOverride(preferences: ViewerToolPreferences) {
-  return {
-    ...(preferences.preferredExternalEditor
-      ? { preferredExternalEditor: preferences.preferredExternalEditor }
-      : {}),
-    ...(preferences.preferredExternalDiffTool
-      ? { preferredExternalDiffTool: preferences.preferredExternalDiffTool }
-      : {}),
-    ...(preferences.terminalAppCommand !== undefined
-      ? { terminalAppCommand: preferences.terminalAppCommand }
-      : {}),
-    ...(preferences.externalTools.length > 0 ? { externalTools: preferences.externalTools } : {}),
-  };
-}
-
 function ContentViewer({
   kind,
   language,
@@ -1038,10 +1023,6 @@ function ContentViewer({
       : absoluteFilePath !== null || editorApps.some((editor) => editor.capabilities.openContent);
   const canOpenDiff = kind === "diff" && diffApps.length > 0;
   const canOpenViewerContent = kind !== "diff" && canOpenFile;
-  const editorOpenStateOverride = useMemo(
-    () => buildEditorOpenStateOverride(preferences),
-    [preferences],
-  );
   const metaPath = metaLabel?.trim() ? metaLabel.trim() : (diffModel?.displayFilePath ?? null);
   const normalizedKind = normalizeBadgeLabel(kind);
   const normalizedLanguage = normalizeBadgeLabel(language);
@@ -1118,7 +1099,6 @@ function ContentViewer({
         title: payload.title,
         leftContent: payload.leftContent,
         rightContent: payload.rightContent,
-        ...editorOpenStateOverride,
         ...(editorId ? { editorId } : {}),
         ...(payload.filePath ? { filePath: payload.filePath } : {}),
         ...(payload.line ? { line: payload.line } : {}),
@@ -1129,14 +1109,12 @@ function ContentViewer({
   const handleOpenFileOrContent = async (editorId?: EditorInfo["id"]) => {
     if (absoluteFilePath) {
       await openFileInEditor(absoluteFilePath, {
-        ...editorOpenStateOverride,
         ...(editorId ? { editorId } : {}),
         ...(startLine ? { line: startLine } : {}),
       });
       return;
     }
     await openContentInEditor({
-      ...editorOpenStateOverride,
       ...(editorId ? { editorId } : {}),
       title: metaPath ?? "Code",
       content: codeValue,
@@ -2672,15 +2650,7 @@ function stripLineColumnSuffix(pathValue: string): string {
 
 async function openLocalPath(path: string): Promise<void> {
   try {
-    const preferences = await getCachedViewerToolPreferences();
-    const result = await getCodetrailClient().invoke("editor:open", {
-      kind: "file",
-      filePath: path,
-      preferredExternalEditor: preferences.preferredExternalEditor ?? undefined,
-      preferredExternalDiffTool: preferences.preferredExternalDiffTool ?? undefined,
-      terminalAppCommand: preferences.terminalAppCommand,
-      externalTools: preferences.externalTools,
-    });
+    const result = await openFileInEditor(path, undefined, getCodetrailClient());
     if (!result.ok) {
       console.error("[codetrail] failed opening local markdown link", path, result.error);
     }

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { renderWithPaneFocus } from "../test/renderWithPaneFocus";
 import { DeleteIndexedHistoryDialog } from "./DeleteIndexedHistoryDialog";
 
 function installDialogMock(): void {
@@ -38,7 +39,7 @@ describe("DeleteIndexedHistoryDialog", () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
 
-    render(
+    renderWithPaneFocus(
       <DeleteIndexedHistoryDialog
         open
         target={{
@@ -68,7 +69,7 @@ describe("DeleteIndexedHistoryDialog", () => {
     installDialogMock();
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
-    render(
+    renderWithPaneFocus(
       <DeleteIndexedHistoryDialog
         open
         target={{
@@ -95,7 +96,7 @@ describe("DeleteIndexedHistoryDialog", () => {
   it("closes on Escape and backdrop click when idle", () => {
     installDialogMock();
     const onCancel = vi.fn();
-    render(
+    renderWithPaneFocus(
       <DeleteIndexedHistoryDialog
         open
         target={{
@@ -122,7 +123,7 @@ describe("DeleteIndexedHistoryDialog", () => {
   it("shows inline errors and blocks closing while busy", () => {
     installDialogMock();
     const onCancel = vi.fn();
-    render(
+    renderWithPaneFocus(
       <DeleteIndexedHistoryDialog
         open
         busy

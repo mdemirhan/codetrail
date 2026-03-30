@@ -155,6 +155,12 @@ export function App({
   const lastCompletedJobsRef = useRef(-1);
   const watchStatsLoadedRef = useRef(false);
   const skipNextStatusDrivenReloadRef = useRef(false);
+  const reloadIndexedDataRef = useRef<((source: "manual" | "auto") => Promise<void>) | null>(null);
+  const handleRefreshRef = useRef<
+    ((force: boolean, source?: "manual" | "auto") => Promise<void>) | null
+  >(null);
+  const refreshLiveStatusRef = useRef<(() => Promise<unknown>) | null>(null);
+  const watcherLifecycleRef = useRef(0);
   const helpViewRef = useRef<HTMLElement | null>(null);
   const settingsViewRef = useRef<HTMLElement | null>(null);
   const viewFocusRafRef = useRef<number | null>(null);
@@ -236,6 +242,9 @@ export function App({
     claudeHooksPrompted: history.claudeHooksPrompted,
     logError,
   });
+  useEffect(() => {
+    refreshLiveStatusRef.current = refreshLiveStatus;
+  }, [refreshLiveStatus]);
 
   useEffect(() => {
     if (mainView !== "settings" || appearance.settingsInfo || appearance.settingsLoading) {
@@ -341,6 +350,9 @@ export function App({
     },
     [history.handleRefreshAllData, mainView, search.hasActiveSearchQuery, search.reloadSearch],
   );
+  useEffect(() => {
+    reloadIndexedDataRef.current = reloadIndexedData;
+  }, [reloadIndexedData]);
 
   const pendingProviderDisableLabel =
     PROVIDER_LIST.find((provider) => provider.id === pendingProviderDisable)?.label ?? "Provider";
@@ -511,7 +523,7 @@ export function App({
           if (skipNextStatusDrivenReloadRef.current) {
             skipNextStatusDrivenReloadRef.current = false;
           } else {
-            await reloadIndexedData("auto");
+            await reloadIndexedDataRef.current?.("auto");
           }
         }
       } catch (error) {
@@ -585,7 +597,7 @@ export function App({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [codetrail, logError, mainView, refreshStrategy, reloadIndexedData]);
+  }, [codetrail, logError, mainView, refreshStrategy]);
 
   const focusSessionSearch = useCallback(() => {
     setMainView("history");
@@ -639,6 +651,9 @@ export function App({
     },
     [codetrail, logError, reloadIndexedData],
   );
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh;
+  }, [handleRefresh]);
 
   const handleIncrementalRefresh = useCallback(async () => {
     await handleRefresh(false);
@@ -860,37 +875,47 @@ export function App({
     const id = window.setInterval(() => {
       if (refreshingRef.current) return;
       setAutoRefreshScanInFlight(true);
-      void handleRefresh(false, "auto").finally(() => {
+      void handleRefreshRef.current?.(false, "auto")?.finally(() => {
         setAutoRefreshScanInFlight(false);
       });
     }, pollingIntervalMs);
     return () => window.clearInterval(id);
-  }, [handleRefresh, pollingIntervalMs]);
+  }, [pollingIntervalMs]);
 
   useEffect(() => {
     if (!isWatchRefreshStrategy(refreshStrategy)) return;
+    const lifecycleId = watcherLifecycleRef.current + 1;
+    watcherLifecycleRef.current = lifecycleId;
+    let cancelled = false;
 
     void codetrail
       .invoke("watcher:start", {
         debounceMs: WATCH_STRATEGY_TO_DEBOUNCE_MS[refreshStrategy],
       })
       .then((result) => {
+        if (cancelled || watcherLifecycleRef.current !== lifecycleId) {
+          return;
+        }
         if (!result.ok) {
           logError("File watcher started but no roots were watched", new Error("ok=false"));
           return;
         }
-        void refreshLiveStatus();
+        void refreshLiveStatusRef.current?.();
       })
       .catch((error: unknown) => {
-        logError("Failed to start file watcher", error);
+        if (!cancelled && watcherLifecycleRef.current === lifecycleId) {
+          logError("Failed to start file watcher", error);
+        }
       });
 
     return () => {
+      cancelled = true;
+      watcherLifecycleRef.current += 1;
       void codetrail.invoke("watcher:stop", {}).catch((error: unknown) => {
         logError("Failed to stop file watcher", error);
       });
     };
-  }, [codetrail, logError, refreshLiveStatus, refreshStrategy]);
+  }, [codetrail, logError, refreshStrategy]);
 
   useEffect(() => {
     if (mainView !== "history" || paneFocus.activeDomain.kind === "overlay") {
@@ -1219,7 +1244,9 @@ export function App({
                     onPreferredExternalDiffToolChange: appearance.setPreferredExternalDiffTool,
                     onTerminalAppCommandChange: appearance.setTerminalAppCommand,
                     onExternalToolsChange: appearance.setExternalTools,
-                    onRescanExternalTools: appearance.loadAvailableExternalTools,
+                    onRescanExternalTools: async () => {
+                      await appearance.loadAvailableExternalTools();
+                    },
                   }}
                   indexing={{
                     enabledProviders,

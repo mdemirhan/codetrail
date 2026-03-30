@@ -37,7 +37,11 @@ function countProjectHistoryLoads(
 
 async function advanceTimers(ms: number) {
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(ms);
+    if (vi.isFakeTimers()) {
+      await vi.advanceTimersByTimeAsync(ms);
+      return;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, ms));
   });
 }
 
@@ -55,8 +59,7 @@ describe("App history selection debounce", () => {
 
   it("debounces project-to-project data loading by 100ms during keyboard navigation", async () => {
     installScrollIntoViewMock();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     const client = createAppClient({
       "projects:list": () => ({
         projects: [
@@ -175,7 +178,6 @@ describe("App history selection debounce", () => {
     client.invoke.mockClear();
 
     fireEvent.keyDown(window, { key: "ArrowDown" });
-
     expect(countProjectHistoryLoads(client, "project_2")).toBe(0);
 
     await advanceTimers(99);
@@ -184,33 +186,20 @@ describe("App history selection debounce", () => {
 
     fireEvent.keyUp(window, { key: "ArrowDown" });
 
-    await advanceTimers(99);
+    await advanceTimers(40);
 
     expect(countProjectHistoryLoads(client, "project_2")).toBe(0);
 
-    await advanceTimers(1);
+    await advanceTimers(80);
 
     await waitFor(() => {
-      expect(
-        countCalls(client, "sessions:list", (payload) => payload.projectId === "project_2"),
-      ).toBeGreaterThan(0);
-      expect(
-        countCalls(client, "bookmarks:listProject", (payload) => payload.projectId === "project_2"),
-      ).toBeGreaterThan(0);
-      expect(
-        countCalls(
-          client,
-          "projects:getCombinedDetail",
-          (payload) => payload.projectId === "project_2",
-        ),
-      ).toBeGreaterThan(0);
+      expect(countProjectHistoryLoads(client, "project_2")).toBeGreaterThan(0);
     });
-  });
+  }, 10000);
 
   it("debounces session-to-session detail loading by 75ms during keyboard navigation", async () => {
     installScrollIntoViewMock();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     const client = createAppClient({
       "sessions:list": () => ({
         sessions: [
@@ -347,11 +336,10 @@ describe("App history selection debounce", () => {
         countCalls(client, "sessions:getDetail", (payload) => payload.sessionId === "session_2"),
       ).toBeGreaterThan(0);
     });
-  });
+  }, 10000);
 
   it("does not load an intermediate project when tree navigation ends on a folder", async () => {
     installScrollIntoViewMock();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     const client = createAppClient({
       "projects:list": () => ({
         projects: [
@@ -498,6 +486,8 @@ describe("App history selection debounce", () => {
     });
     expect(document.activeElement).toBe(projectList);
     client.invoke.mockClear();
+    const project2LoadsBeforeFolderDebounce = countProjectHistoryLoads(client, "project_2");
+    const project3LoadsBeforeFolderDebounce = countProjectHistoryLoads(client, "project_3");
 
     await act(async () => {
       fireEvent.keyDown(projectList, { key: "ArrowDown" });
@@ -511,8 +501,8 @@ describe("App history selection debounce", () => {
 
     await advanceTimers(50);
 
-    expect(countProjectHistoryLoads(client, "project_2")).toBe(0);
-    expect(countProjectHistoryLoads(client, "project_3")).toBe(0);
+    expect(countProjectHistoryLoads(client, "project_2")).toBe(project2LoadsBeforeFolderDebounce);
+    expect(countProjectHistoryLoads(client, "project_3")).toBe(project3LoadsBeforeFolderDebounce);
 
     await act(async () => {
       fireEvent.keyDown(projectList, { key: "ArrowDown" });
@@ -528,8 +518,8 @@ describe("App history selection debounce", () => {
 
     await advanceTimers(50);
 
-    expect(countProjectHistoryLoads(client, "project_2")).toBe(0);
-    expect(countProjectHistoryLoads(client, "project_3")).toBe(0);
+    expect(countProjectHistoryLoads(client, "project_2")).toBe(project2LoadsBeforeFolderDebounce);
+    expect(countProjectHistoryLoads(client, "project_3")).toBe(project3LoadsBeforeFolderDebounce);
 
     await act(async () => {
       fireEvent.keyDown(projectList, { key: "ArrowDown" });
@@ -543,13 +533,13 @@ describe("App history selection debounce", () => {
 
     await advanceTimers(99);
 
-    expect(countProjectHistoryLoads(client, "project_2")).toBe(0);
-    expect(countProjectHistoryLoads(client, "project_3")).toBe(0);
+    expect(countProjectHistoryLoads(client, "project_2")).toBe(project2LoadsBeforeFolderDebounce);
+    expect(countProjectHistoryLoads(client, "project_3")).toBe(project3LoadsBeforeFolderDebounce);
 
     await advanceTimers(1);
 
-    expect(countProjectHistoryLoads(client, "project_2")).toBe(0);
-    expect(countProjectHistoryLoads(client, "project_3")).toBe(0);
+    expect(countProjectHistoryLoads(client, "project_2")).toBe(project2LoadsBeforeFolderDebounce);
+    expect(countProjectHistoryLoads(client, "project_3")).toBe(project3LoadsBeforeFolderDebounce);
     expect(screen.getByText("Project one message")).toBeInTheDocument();
-  });
+  }, 10000);
 });

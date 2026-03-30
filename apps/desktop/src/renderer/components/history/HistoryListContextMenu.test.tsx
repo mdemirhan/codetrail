@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { renderWithPaneFocus } from "../../test/renderWithPaneFocus";
 import { HistoryListContextMenu } from "./HistoryListContextMenu";
 
 describe("HistoryListContextMenu", () => {
@@ -15,7 +16,7 @@ describe("HistoryListContextMenu", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 400 });
     Object.defineProperty(window, "innerHeight", { configurable: true, value: 300 });
 
-    const { rerender } = render(
+    const { rerender } = renderWithPaneFocus(
       <HistoryListContextMenu
         open
         x={390}
@@ -65,7 +66,7 @@ describe("HistoryListContextMenu", () => {
   it("closes on Escape and viewport scroll", () => {
     const onClose = vi.fn();
 
-    render(
+    renderWithPaneFocus(
       <HistoryListContextMenu
         open
         x={40}
@@ -96,7 +97,7 @@ describe("HistoryListContextMenu", () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
 
-    render(
+    renderWithPaneFocus(
       <HistoryListContextMenu
         open
         x={24}

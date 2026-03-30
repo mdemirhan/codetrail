@@ -551,7 +551,9 @@ export async function bootstrapMainProcess(
         exportHistoryMessages({
           browserWindow: BrowserWindow.fromWebContents(event.sender),
           onProgress: (progress) => {
-            event.sender.send(HISTORY_EXPORT_PROGRESS_CHANNEL, progress);
+            if (!event.sender.isDestroyed()) {
+              event.sender.send(HISTORY_EXPORT_PROGRESS_CHANNEL, progress);
+            }
           },
           queryService,
           request: payload,
@@ -641,27 +643,7 @@ export async function bootstrapMainProcess(
           }
         }
         const paneState = options.appStateStore?.getPaneState() ?? null;
-        const paneStateOverride =
-          paneState ||
-          payload.externalTools ||
-          payload.preferredExternalEditor ||
-          payload.preferredExternalDiffTool ||
-          payload.terminalAppCommand
-            ? {
-                ...(paneState ?? {}),
-                ...(payload.externalTools ? { externalTools: payload.externalTools } : {}),
-                ...(payload.preferredExternalEditor
-                  ? { preferredExternalEditor: payload.preferredExternalEditor }
-                  : {}),
-                ...(payload.preferredExternalDiffTool
-                  ? { preferredExternalDiffTool: payload.preferredExternalDiffTool }
-                  : {}),
-                ...(payload.terminalAppCommand !== undefined
-                  ? { terminalAppCommand: payload.terminalAppCommand }
-                  : {}),
-              }
-            : null;
-        return openInEditor(payload, paneStateOverride);
+        return openInEditor(payload, paneState);
       },
       "ui:getPaneState": () => {
         const paneState = options.appStateStore?.getPaneState();

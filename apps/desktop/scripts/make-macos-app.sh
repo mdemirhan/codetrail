@@ -151,9 +151,10 @@ ditto "${APP_BUNDLE}" "${PACKAGE_DIR}/${APP_NAME}.app"
 cp "${INSTALL_NOTES_PATH}" "${PACKAGE_DIR}/INSTALL.txt"
 ditto -c -k --sequesterRsrc --keepParent "${PACKAGE_DIR}" "${ZIP_PATH}"
 
-echo "Done. Open artifacts in:"
+echo "Done. Open local packaging artifacts in:"
 echo "  ${APP_DIR}/out"
 echo
-echo "This build is ad-hoc signed only. Users who download the zip from the internet may still"
+echo "This build is for local testing only. It is ad-hoc signed and not notarized."
+echo "Users who download the zip from the internet may still"
 echo "need to use Finder Open or remove quarantine with:"
 echo "  xattr -dr com.apple.quarantine \"${APP_NAME}.app\""

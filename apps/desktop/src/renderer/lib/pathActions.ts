@@ -6,12 +6,6 @@ import { type CodetrailClient, getCodetrailClient } from "./codetrailClient";
 
 type ExternalAppId = IpcResponse<"editor:listAvailable">["editors"][number]["id"];
 type ExternalToolRole = "editor" | "diff";
-type EditorOpenStateOverride = {
-  preferredExternalEditor?: ExternalAppId;
-  preferredExternalDiffTool?: ExternalAppId;
-  terminalAppCommand?: string;
-  externalTools?: ExternalToolConfig[];
-};
 
 type ProjectPathLike = {
   id: string;
@@ -68,7 +62,7 @@ export async function openFileInEditor(
     toolRole?: ExternalToolRole;
     line?: number;
     column?: number;
-  } & EditorOpenStateOverride = {},
+  } = {},
   client: CodetrailClient = getCodetrailClient(),
 ): Promise<{ ok: boolean; error: string | null }> {
   if (path.trim().length === 0) {
@@ -92,7 +86,7 @@ export async function openContentInEditor(
     line?: number;
     column?: number;
     content: string;
-  } & EditorOpenStateOverride,
+  },
   client: CodetrailClient = getCodetrailClient(),
 ): Promise<{ ok: boolean; error: string | null }> {
   const result = await client.invoke("editor:open", {
@@ -105,16 +99,6 @@ export async function openContentInEditor(
     ...(options.column ? { column: options.column } : {}),
     ...(options.editorId ? { editorId: options.editorId } : {}),
     ...(options.toolRole ? { toolRole: options.toolRole } : {}),
-    ...(options.preferredExternalEditor
-      ? { preferredExternalEditor: options.preferredExternalEditor }
-      : {}),
-    ...(options.preferredExternalDiffTool
-      ? { preferredExternalDiffTool: options.preferredExternalDiffTool }
-      : {}),
-    ...(options.terminalAppCommand !== undefined
-      ? { terminalAppCommand: options.terminalAppCommand }
-      : {}),
-    ...(options.externalTools ? { externalTools: options.externalTools } : {}),
   });
   return result.ok ? result : { ok: false, error: result.error ?? "Failed to open content" };
 }
@@ -128,7 +112,7 @@ export async function openDiffInEditor(
     column?: number;
     leftContent: string;
     rightContent: string;
-  } & EditorOpenStateOverride,
+  },
   client: CodetrailClient = getCodetrailClient(),
 ): Promise<{ ok: boolean; error: string | null }> {
   const result = await client.invoke("editor:open", {
@@ -141,16 +125,6 @@ export async function openDiffInEditor(
     leftContent: options.leftContent,
     rightContent: options.rightContent,
     ...(options.editorId ? { editorId: options.editorId } : {}),
-    ...(options.preferredExternalEditor
-      ? { preferredExternalEditor: options.preferredExternalEditor }
-      : {}),
-    ...(options.preferredExternalDiffTool
-      ? { preferredExternalDiffTool: options.preferredExternalDiffTool }
-      : {}),
-    ...(options.terminalAppCommand !== undefined
-      ? { terminalAppCommand: options.terminalAppCommand }
-      : {}),
-    ...(options.externalTools ? { externalTools: options.externalTools } : {}),
   });
   return result.ok ? result : { ok: false, error: result.error ?? "Failed to open diff" };
 }

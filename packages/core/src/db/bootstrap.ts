@@ -10,6 +10,8 @@ export type DatabaseBootstrapResult = {
   tables: string[];
 };
 
+export const MESSAGE_FTS_CONTENT_COLUMN_INDEX = 4;
+
 export type SqliteDatabase = InstanceType<typeof Database>;
 
 // The schema is intentionally small and append-friendly: raw transcript files stay on disk, while
@@ -263,6 +265,9 @@ export function clearProvidersData(db: SqliteDatabase, providers: Provider[]): v
     deleteByProvider(
       `DELETE FROM tool_calls WHERE message_id IN (SELECT id FROM messages WHERE provider IN (${placeholders}))`,
     );
+    deleteByProvider(
+      `DELETE FROM project_stats WHERE project_id IN (SELECT id FROM projects WHERE provider IN (${placeholders}))`,
+    );
     deleteByProvider(`DELETE FROM message_fts WHERE provider IN (${placeholders})`);
     deleteByProvider(`DELETE FROM messages WHERE provider IN (${placeholders})`);
     deleteByProvider(`DELETE FROM index_checkpoints WHERE provider IN (${placeholders})`);
@@ -341,7 +346,7 @@ function ensureMessageFtsTable(db: SqliteDatabase): void {
 }
 
 function ensureProjectStatsTriggers(db: SqliteDatabase): void {
-  const refreshProjectStatsSql = (projectIdSql: string) => `
+  const refreshProjectStatsSql = (projectIdSql: string, guardSql = "1 = 1") => `
     INSERT INTO project_stats (
       project_id,
       session_count,
@@ -358,6 +363,7 @@ function ensureProjectStatsTriggers(db: SqliteDatabase): void {
     FROM projects p
     LEFT JOIN sessions s ON s.project_id = p.id
     WHERE p.id = ${projectIdSql}
+      AND ${guardSql}
     GROUP BY p.id
     ON CONFLICT(project_id) DO UPDATE SET
       session_count = excluded.session_count,
@@ -422,7 +428,11 @@ function ensureProjectStatsTriggers(db: SqliteDatabase): void {
     AFTER UPDATE OF project_id, started_at, ended_at, message_count ON sessions
     BEGIN
       ${refreshProjectStatsSql("NEW.project_id")};
-      ${refreshProjectStatsSql("OLD.project_id")};
+      DELETE FROM project_stats
+      WHERE project_id = OLD.project_id
+        AND OLD.project_id != NEW.project_id
+        AND NOT EXISTS (SELECT 1 FROM projects WHERE id = OLD.project_id);
+      ${refreshProjectStatsSql("OLD.project_id", "OLD.project_id != NEW.project_id")};
     END
   `);
   db.exec(`

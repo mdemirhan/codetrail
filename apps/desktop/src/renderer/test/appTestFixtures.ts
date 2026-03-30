@@ -18,6 +18,13 @@ const EMPTY_INDEXER_CONFIG = Object.fromEntries(
 );
 
 const SETTINGS_INFO = createSettingsInfoFixture();
+const EMPTY_PROVIDER_COUNTS = {
+  claude: 0,
+  codex: 0,
+  gemini: 0,
+  cursor: 0,
+  copilot: 0,
+} as const;
 
 function cloneValue<T>(value: T): T {
   if (typeof structuredClone === "function") {
@@ -411,6 +418,7 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
             thinking: 0,
             system: 0,
           },
+          providerCounts: EMPTY_PROVIDER_COUNTS,
           results: [],
         };
       }
@@ -437,6 +445,10 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
           tool_result: 0,
           thinking: 0,
           system: 0,
+        },
+        providerCounts: {
+          ...EMPTY_PROVIDER_COUNTS,
+          claude: totalCount,
         },
         results:
           offset >= totalCount
@@ -652,6 +664,7 @@ export function createBookmarksSearchClient() {
         thinking: 0,
         system: 0,
       },
+      providerCounts: EMPTY_PROVIDER_COUNTS,
       results: [],
     }),
   });
@@ -989,6 +1002,7 @@ export function createHistoryNavigationClient() {
         thinking: 0,
         system: 0,
       },
+      providerCounts: EMPTY_PROVIDER_COUNTS,
       results: [],
     }),
   });
@@ -1242,6 +1256,7 @@ export function createProjectSwitchBookmarksDelayClient() {
         thinking: 0,
         system: 0,
       },
+      providerCounts: EMPTY_PROVIDER_COUNTS,
       results: [],
     }),
   });
@@ -1473,6 +1488,7 @@ export function createBookmarkSearchDelayClient() {
         thinking: 0,
         system: 0,
       },
+      providerCounts: EMPTY_PROVIDER_COUNTS,
       results: [],
     }),
   });

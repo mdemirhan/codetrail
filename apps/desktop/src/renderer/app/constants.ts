@@ -33,6 +33,8 @@ export const EMPTY_CATEGORY_COUNTS = {
   system: 0,
 };
 
+export const EMPTY_PROVIDER_COUNTS = createProviderRecord(() => 0);
+
 export const EMPTY_BOOKMARKS_RESPONSE: BookmarkListResponse = {
   projectId: "",
   totalCount: 0,

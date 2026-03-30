@@ -237,6 +237,13 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
         thinking: 0,
         system: 0,
       },
+      providerCounts: {
+        claude: 0,
+        codex: 0,
+        gemini: 0,
+        cursor: 0,
+        copilot: 0,
+      },
       results: [],
     },
   },
@@ -570,8 +577,16 @@ describe("ipc contracts", () => {
   it("accepts valid request and response payloads for every channel", () => {
     for (const channel of ipcChannels) {
       const example = channelExamples[channel];
-      expect(ipcContractSchemas[channel].request.safeParse(example.request).success).toBe(true);
-      expect(ipcContractSchemas[channel].response.safeParse(example.response).success).toBe(true);
+      const requestResult = ipcContractSchemas[channel].request.safeParse(example.request);
+      const responseResult = ipcContractSchemas[channel].response.safeParse(example.response);
+      expect(
+        requestResult.success,
+        `${channel} request: ${requestResult.success ? "ok" : requestResult.error.message}`,
+      ).toBe(true);
+      expect(
+        responseResult.success,
+        `${channel} response: ${responseResult.success ? "ok" : responseResult.error.message}`,
+      ).toBe(true);
     }
   });
 

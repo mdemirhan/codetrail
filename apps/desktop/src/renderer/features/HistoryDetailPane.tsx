@@ -42,6 +42,7 @@ function getHistoryCategoryShortcutDigit(
 function getHistoryCategoryTooltip(
   history: HistoryController,
   category: MessageCategory,
+  shortcuts: ReturnType<typeof useShortcutRegistry>,
   formatTooltipLabel: ReturnType<typeof useTooltipFormatter>,
 ): string {
   const label = history.prettyCategory(category);
@@ -52,7 +53,7 @@ function getHistoryCategoryTooltip(
       history.historyCategoriesShortcutMap[category],
     ),
     formatTooltipLabel(
-      `Ctrl+Click Focus only ${label} messages`,
+      `${shortcuts.labels.categoryClickModifier}+Click Focus only ${label} messages`,
       history.historyCategorySoloShortcutMap[category],
     ),
   ].join("\n");
@@ -452,9 +453,9 @@ export function HistoryDetailPane({
               className="msg-filter-main"
               {...preserveMessagePaneFocusProps}
               aria-label={getHistoryCategoryAriaLabel(history, category)}
-              title={getHistoryCategoryTooltip(history, category, formatTooltipLabel)}
+              title={getHistoryCategoryTooltip(history, category, shortcuts, formatTooltipLabel)}
               onMouseDown={(event) => {
-                if (!event.ctrlKey || event.button !== 0) {
+                if (!shortcuts.matches.isCategoryExpansionClick(event) || event.button !== 0) {
                   handledCtrlFilterMouseDownRef.current = null;
                   return;
                 }
@@ -464,12 +465,12 @@ export function HistoryDetailPane({
                 focusMessagePane();
               }}
               onContextMenu={(event) => {
-                if (event.ctrlKey) {
+                if (shortcuts.matches.isCategoryExpansionClick(event)) {
                   event.preventDefault();
                 }
               }}
               onClick={(event) => {
-                if (event.ctrlKey) {
+                if (shortcuts.matches.isCategoryExpansionClick(event)) {
                   if (handledCtrlFilterMouseDownRef.current === category) {
                     handledCtrlFilterMouseDownRef.current = null;
                     return;
@@ -549,6 +550,7 @@ export function HistoryDetailPane({
               }}
               placeholder={historySearchPlaceholder}
               title={history.historyQueryError ?? historySearchTooltip}
+              aria-label="Search current history view"
             />
           </div>
           <AdvancedSearchToggleButton
@@ -682,7 +684,7 @@ export function HistoryDetailPane({
                   commitPageInputValue();
                   return;
                 }
-                if (event.key === "Escape" || event.key === "Tab") {
+                if (event.key === "Escape") {
                   event.preventDefault();
                   resetPageInputValue();
                   focusMessagePane();

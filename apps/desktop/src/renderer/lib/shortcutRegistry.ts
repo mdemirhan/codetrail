@@ -221,6 +221,9 @@ function getShortcutItems(platform: DesktopPlatform) {
 }
 
 export type ShortcutRegistry = {
+  labels: {
+    categoryClickModifier: "Cmd" | "Ctrl";
+  };
   actions: {
     openGlobalSearch: string;
     openSettings: string;
@@ -261,6 +264,9 @@ export function createShortcutRegistry(platform: DesktopPlatform): ShortcutRegis
   const modifier = getPrimaryModifierLabel(platform);
   const isMac = isMacPlatform(platform);
   return {
+    labels: {
+      categoryClickModifier: isMac ? "Cmd" : "Ctrl",
+    },
     actions: {
       openGlobalSearch: `${modifier}+Shift+F`,
       openSettings: `${modifier}+,`,

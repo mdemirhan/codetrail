@@ -136,28 +136,43 @@ export function useHistoryDataEffects({
   projectCombinedDetailRefreshNonce: number;
   refreshContextRef: MutableRefObject<RefreshContext | null>;
 }) {
+  const projectsLoadedStateRef = useRef(projectsLoaded);
+  useEffect(() => {
+    projectsLoadedStateRef.current = projectsLoaded;
+  }, [projectsLoaded]);
+
   const loadProjects = useCallback(
     async (source: StableListUpdateSource = "resort") => {
       // Monotonic request tokens prevent stale async responses from overwriting newer selections.
       const requestToken = projectsLoadTokenRef.current + 1;
       projectsLoadTokenRef.current = requestToken;
-      setProjectsLoaded(false);
-      const response = await codetrail.invoke("projects:list", {
-        providers: projectProviders,
-        query: projectQuery,
-      });
-      if (requestToken !== projectsLoadTokenRef.current) {
-        return;
+      const wasLoaded = projectsLoadedStateRef.current;
+      if (!wasLoaded) {
+        setProjectsLoaded(false);
       }
-      setProjectListUpdateSource(source);
-      if (source === "auto") {
-        registerAutoProjectUpdates(
-          collectProjectMessageDeltas(projectsRef.current, response.projects),
-        );
+      try {
+        const response = await codetrail.invoke("projects:list", {
+          providers: projectProviders,
+          query: projectQuery,
+        });
+        if (requestToken !== projectsLoadTokenRef.current) {
+          return;
+        }
+        setProjectListUpdateSource(source);
+        if (source === "auto") {
+          registerAutoProjectUpdates(
+            collectProjectMessageDeltas(projectsRef.current, response.projects),
+          );
+        }
+        setProjects(response.projects);
+        setProjectsLoaded(true);
+        return response.projects;
+      } catch (error) {
+        if (requestToken === projectsLoadTokenRef.current && wasLoaded) {
+          setProjectsLoaded(true);
+        }
+        throw error;
       }
-      setProjects(response.projects);
-      setProjectsLoaded(true);
-      return response.projects;
     },
     [
       codetrail,

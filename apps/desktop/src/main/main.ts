@@ -128,17 +128,15 @@ function createWindow(appStateStore: AppStateStore): BrowserWindow {
     }
     return { action: "deny" };
   });
-  mainWindow.webContents.once("did-finish-load", () => {
-    mainWindow.webContents.on("will-navigate", (event, targetUrl) => {
-      const currentUrl = mainWindow.webContents.getURL();
-      if (normalizeNavigationUrl(targetUrl) === normalizeNavigationUrl(currentUrl)) {
-        return;
-      }
-      event.preventDefault();
-      if (isAllowedExternalUrl(targetUrl)) {
-        void shell.openExternal(targetUrl);
-      }
-    });
+  mainWindow.webContents.on("will-navigate", (event, targetUrl) => {
+    const currentUrl = mainWindow.webContents.getURL();
+    if (normalizeNavigationUrl(targetUrl) === normalizeNavigationUrl(currentUrl)) {
+      return;
+    }
+    event.preventDefault();
+    if (isAllowedExternalUrl(targetUrl)) {
+      void shell.openExternal(targetUrl);
+    }
   });
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();

@@ -35,8 +35,8 @@
     "desktop:make:mac": "bun run --cwd apps/desktop make:mac",
     "desktop:make:mac:x64": "bun run --cwd apps/desktop make:mac:x64",
     "desktop:make:mac:arm64": "bun run --cwd apps/desktop make:mac:arm64",
-    "e2e": "npx playwright test --config e2e/playwright.config.ts",
-    "e2e:headed": "HEADED=1 npx playwright test --config e2e/playwright.config.ts",
+    "e2e": "bun run desktop:build && npx playwright test --config e2e/playwright.config.ts",
+    "e2e:headed": "bun run desktop:build && HEADED=1 npx playwright test --config e2e/playwright.config.ts",
     "e2e:report": "npx playwright show-report e2e/playwright-report",
     "desktop:make:win": "bun run --cwd apps/desktop make:win",
     "ci": "bun run lint && bun run check:platform-boundaries && bun run typecheck && bun run test && bun run test:coverage"

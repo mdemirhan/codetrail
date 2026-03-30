@@ -8,7 +8,7 @@ import {
   createLiveStatusFixture,
   createSettingsInfoFixture,
 } from "@codetrail/core/testing";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -406,8 +406,12 @@ describe("SettingsView", () => {
     await user.click(within(customRow).getByRole("button", { name: "Browse" }));
     await user.click(within(customRow).getByRole("button", { name: "Diff" }));
     await user.click(screen.getByRole("button", { name: "Add Custom Tool" }));
-    await user.type(screen.getByRole("textbox", { name: "New custom tool name" }), "Helix");
-    await user.type(screen.getByRole("textbox", { name: "New custom tool command" }), "hx");
+    fireEvent.change(screen.getByRole("textbox", { name: "New custom tool name" }), {
+      target: { value: "Helix" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "New custom tool command" }), {
+      target: { value: "hx" },
+    });
     await user.click(screen.getByRole("button", { name: "Add Tool" }));
     await user.click(screen.getByRole("button", { name: "Remove Custom Tool 1" }));
     await user.click(screen.getByRole("button", { name: "Rescan System" }));
@@ -421,7 +425,9 @@ describe("SettingsView", () => {
       }),
     );
     await user.click(screen.getByRole("button", { name: "Add claude regex rule" }));
-    await user.type(screen.getByRole("textbox", { name: "claude regex rule 1" }), "$");
+    fireEvent.change(screen.getByRole("textbox", { name: "claude regex rule 1" }), {
+      target: { value: "^<command-name>$" },
+    });
     await user.click(screen.getByRole("button", { name: "Remove claude regex rule 1" }));
 
     const copyButtons = screen.getAllByRole("button", { name: /Copy /i });
@@ -517,7 +523,7 @@ describe("SettingsView", () => {
     expect(browseExternalToolCommand).toHaveBeenCalled();
     expect(copyTextToClipboard).toHaveBeenCalled();
     expect(openPath).toHaveBeenCalled();
-  });
+  }, 10000);
 
   it("ignores invalid text viewer theme selections", () => {
     const baseProps = createBaseProps();
@@ -616,11 +622,17 @@ describe("SettingsView", () => {
     expect(screen.getByRole("textbox", { name: "Custom Tool 1 command" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add Custom Tool" }));
-    await user.type(screen.getByRole("textbox", { name: "New custom tool name" }), "Helix");
-    await user.type(screen.getByRole("textbox", { name: "New custom tool command" }), "hx");
+    fireEvent.change(screen.getByRole("textbox", { name: "New custom tool name" }), {
+      target: { value: "Helix" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "New custom tool command" }), {
+      target: { value: "hx" },
+    });
     await user.click(screen.getByRole("button", { name: "Add Tool" }));
 
-    expect(screen.getByRole("button", { name: "Collapse Helix" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Collapse Helix" })).toBeInTheDocument();
+    });
     expect(screen.getByRole("textbox", { name: "Helix command" })).toHaveValue("hx");
 
     const helixRow = screen

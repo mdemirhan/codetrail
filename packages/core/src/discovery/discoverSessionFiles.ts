@@ -116,12 +116,14 @@ export function discoverSingleFile(
   config: DiscoveryConfig,
   dependencies: DiscoveryDependencies = {},
 ): DiscoveredSessionFile | null {
-  if (/[\\/]subagents[\\/]/.test(filePath)) {
-    return null;
-  }
-
   const resolvedDependencies = resolveDiscoveryDependencies(dependencies);
   const resolvedConfig = resolveDiscoveryConfig(config);
+  if (
+    /[\\/]subagents[\\/]/.test(filePath) &&
+    !resolvedConfig.providers.claude.options.includeSubagents
+  ) {
+    return null;
+  }
 
   for (const provider of PROVIDER_ADAPTER_LIST) {
     if (!resolvedConfig.enabledProviders.includes(provider.id)) {

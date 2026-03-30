@@ -25,5 +25,12 @@
       "@codetrail/core/*": ["packages/core/src/*"]
     }
   },
-  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx"]
+  "include": [
+    "*.ts",
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "e2e/**/*.ts"
+  ]
 }

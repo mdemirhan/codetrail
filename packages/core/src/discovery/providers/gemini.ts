@@ -18,12 +18,19 @@ import {
   walkFiles,
 } from "../shared";
 import type { DiscoveredSessionFile, ResolvedDiscoveryConfig } from "../types";
-import { buildGeminiProjectResolution, geminiContainerDir } from "./geminiHelpers";
+import {
+  buildGeminiProjectResolution,
+  geminiContainerDir,
+  getCachedGeminiProjectResolution,
+  hasCachedGeminiProjectResolution,
+  refreshCachedGeminiProjectResolution,
+} from "./geminiHelpers";
 
 function toDiscoveredGeminiFile(
   filePath: string,
   dependencies: ResolvedDiscoveryDependencies,
   resolution: ReturnType<typeof buildGeminiProjectResolution>,
+  refreshResolution?: () => ReturnType<typeof buildGeminiProjectResolution>,
 ): DiscoveredSessionFile | null {
   if (
     !hasFileExtension(filePath, ".json") ||
@@ -47,7 +54,12 @@ function toDiscoveredGeminiFile(
   const sessionIdentity = providerSessionIdentity("gemini", sourceSessionId, filePath);
   const projectHash = readString(content.projectHash) ?? "";
   const containerDir = geminiContainerDir(filePath);
-  let resolvedProjectPath = resolution.resolveProjectPath(projectHash);
+  let activeResolution = resolution;
+  let resolvedProjectPath = activeResolution.resolveProjectPath(projectHash);
+  if (!resolvedProjectPath && projectHash.length > 0 && refreshResolution) {
+    activeResolution = refreshResolution();
+    resolvedProjectPath = activeResolution.resolveProjectPath(projectHash);
+  }
   let resolutionSource = resolvedProjectPath ? "project_hash" : "unresolved";
 
   if (!resolvedProjectPath) {
@@ -56,7 +68,7 @@ function toDiscoveredGeminiFile(
       const fallbackPath = (safeReadUtf8File(projectRootPath, dependencies) ?? "").trim();
       if (fallbackPath.length > 0) {
         resolvedProjectPath = fallbackPath;
-        resolution.rememberProjectPath(projectHash, fallbackPath);
+        activeResolution.rememberProjectPath(projectHash, fallbackPath);
         resolutionSource = "project_root";
       }
     }
@@ -141,9 +153,12 @@ export function discoverSingleGeminiFile(
     return null;
   }
 
+  const shouldRefreshOnMiss = hasCachedGeminiProjectResolution(config, dependencies);
+
   return toDiscoveredGeminiFile(
     filePath,
     dependencies,
-    buildGeminiProjectResolution(config, dependencies),
+    getCachedGeminiProjectResolution(config, dependencies),
+    shouldRefreshOnMiss ? () => refreshCachedGeminiProjectResolution(config, dependencies) : undefined,
   );
 }

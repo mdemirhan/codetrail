@@ -247,7 +247,8 @@ export function readLeadingNonEmptyLines(
     }
 
     return lines.slice(0, maxLines);
-  } catch {
+  } catch (error) {
+    reportDiscoveryIssue(dependencies, { operation: "readFile", path: filePath, error });
     return [];
   } finally {
     if (fd !== null) {

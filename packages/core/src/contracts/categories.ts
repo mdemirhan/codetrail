@@ -29,7 +29,15 @@ export function normalizeMessageCategory(value: string): MessageCategory {
 export function normalizeMessageCategories(values: string[]): MessageCategory[] {
   const selected = new Set<MessageCategory>();
   for (const value of values) {
-    selected.add(normalizeMessageCategory(value));
+    const normalized = value.trim().toLowerCase();
+    const aliased = MESSAGE_CATEGORY_ALIASES[normalized];
+    if (aliased) {
+      selected.add(aliased);
+      continue;
+    }
+    if ((MESSAGE_CATEGORY_KEYS as readonly string[]).includes(normalized)) {
+      selected.add(normalized as MessageCategory);
+    }
   }
   return MESSAGE_CATEGORY_KEYS.filter((value) => selected.has(value));
 }

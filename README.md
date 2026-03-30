@@ -127,7 +127,7 @@ xattr -dr com.apple.quarantine "/Applications/Code Trail.app"
 
 ### Mac
 
-Build your own macOS release artifacts on macOS:
+Build your own local macOS app bundle on macOS:
 
 ```bash
 # Current architecture
@@ -140,7 +140,9 @@ bun run desktop:make:mac:x64
 
 Artifacts are written to `apps/desktop/out/`.
 
-The macOS release flow:
+These outputs are for local use and internal testing. They are ad-hoc signed, not notarized, and should not be treated as public distribution artifacts.
+
+The macOS packaging flow:
 
 1. Builds the TypeScript bundles
 2. Verifies and rebuilds native Electron modules when needed

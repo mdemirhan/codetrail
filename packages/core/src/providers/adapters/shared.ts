@@ -53,7 +53,7 @@ export function defaultTimestampNormalization<T extends { createdAt: string }>(
       ...message,
       createdAt: new Date(fallbackBaseMs).toISOString(),
     },
-    previousTimestampMs: context.previousTimestampMs,
+    previousTimestampMs: fallbackBaseMs,
   };
 }
 

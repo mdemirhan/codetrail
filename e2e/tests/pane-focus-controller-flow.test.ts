@@ -1,6 +1,8 @@
+import type { Page } from "@playwright/test";
+
 import { expect, test } from "../fixtures/app.fixture";
 
-function activePane(appPage: Parameters<typeof test>[0]["appPage"]) {
+function activePane(appPage: Page) {
   return appPage.locator('[data-pane-active="true"]').first();
 }
 

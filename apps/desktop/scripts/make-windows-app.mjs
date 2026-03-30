@@ -17,6 +17,7 @@ if (!existsSync(forgePath)) {
 }
 
 for (const command of [
+  ["bun", "run", "build"],
   ["node", "./scripts/build-app-icons.mjs"],
   ["node", "./scripts/materialize-forge-deps.mjs"],
   [forgePath, "make", "--platform", "win32"],

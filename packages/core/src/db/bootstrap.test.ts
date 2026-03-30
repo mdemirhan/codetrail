@@ -228,6 +228,18 @@ describe("initializeDatabase", () => {
           c: number;
         }
       ).c,
+      claudeProjectStats: (
+        db
+          .prepare(
+            "SELECT COUNT(*) as c FROM project_stats WHERE project_id IN (SELECT id FROM projects WHERE provider = 'claude')",
+          )
+          .get() as { c: number }
+      ).c,
+      codexProjectStats: (
+        db.prepare("SELECT COUNT(*) as c FROM project_stats WHERE project_id = 'p2'").get() as {
+          c: number;
+        }
+      ).c,
     };
     db.close();
 
@@ -240,6 +252,8 @@ describe("initializeDatabase", () => {
       codexIndexedFiles: 0,
       codexCheckpoints: 0,
       codexFts: 0,
+      claudeProjectStats: 1,
+      codexProjectStats: 0,
     });
 
     rmSync(dir, { recursive: true, force: true });

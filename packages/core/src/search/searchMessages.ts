@@ -4,7 +4,8 @@ import {
   normalizeMessageCategories,
   normalizeMessageCategory,
 } from "../contracts/categories";
-import type { SqliteDatabase } from "../db/bootstrap";
+import { createProviderRecord } from "../contracts/providerMetadata";
+import { MESSAGE_FTS_CONTENT_COLUMN_INDEX, type SqliteDatabase } from "../db/bootstrap";
 import {
   type SearchMode,
   type SearchQueryPlan,
@@ -44,6 +45,7 @@ export type SearchMessagesOutput = {
   totalCount: number;
   results: SearchMessageResult[];
   categoryCounts: Record<MessageCategory, number>;
+  providerCounts: Record<Provider, number>;
 };
 
 const SEARCH_FROM_SQL = `
@@ -61,6 +63,7 @@ export function searchMessages(
 ): SearchMessagesOutput {
   const query = input.query.trim();
   const categoryCounts = makeEmptyCategoryCounts();
+  const providerCounts = createProviderRecord(() => 0);
   if (!query) {
     return {
       query: input.query,
@@ -69,6 +72,7 @@ export function searchMessages(
       totalCount: 0,
       results: [],
       categoryCounts,
+      providerCounts,
     };
   }
 
@@ -81,6 +85,7 @@ export function searchMessages(
       totalCount: 0,
       results: [],
       categoryCounts,
+      providerCounts,
     };
   }
   if (!queryPlan.hasTerms) {
@@ -91,6 +96,7 @@ export function searchMessages(
       totalCount: 0,
       results: [],
       categoryCounts,
+      providerCounts,
     };
   }
 
@@ -109,12 +115,12 @@ export function searchMessages(
   const summaryRow = db
     .prepare(
       `WITH facet_matches AS (
-         SELECT m.category as category
+         SELECT m.category as category, s.provider as provider
          ${SEARCH_FROM_SQL}
          ${facetWhereClause}
        ),
        result_matches AS (
-         SELECT category
+         SELECT category, provider
          FROM facet_matches
          ${resultMatchWhereClause}
        )
@@ -126,7 +132,12 @@ export function searchMessages(
          COALESCE(SUM(CASE WHEN category = 'tool_edit' THEN 1 ELSE 0 END), 0) as tool_edit_count,
          COALESCE(SUM(CASE WHEN category = 'tool_result' THEN 1 ELSE 0 END), 0) as tool_result_count,
          COALESCE(SUM(CASE WHEN category = 'thinking' THEN 1 ELSE 0 END), 0) as thinking_count,
-         COALESCE(SUM(CASE WHEN category = 'system' THEN 1 ELSE 0 END), 0) as system_count
+         COALESCE(SUM(CASE WHEN category = 'system' THEN 1 ELSE 0 END), 0) as system_count,
+         COALESCE(SUM(CASE WHEN provider = 'claude' THEN 1 ELSE 0 END), 0) as claude_count,
+         COALESCE(SUM(CASE WHEN provider = 'codex' THEN 1 ELSE 0 END), 0) as codex_count,
+         COALESCE(SUM(CASE WHEN provider = 'gemini' THEN 1 ELSE 0 END), 0) as gemini_count,
+         COALESCE(SUM(CASE WHEN provider = 'cursor' THEN 1 ELSE 0 END), 0) as cursor_count,
+         COALESCE(SUM(CASE WHEN provider = 'copilot' THEN 1 ELSE 0 END), 0) as copilot_count
        FROM facet_matches`,
     )
     .get(...facetWhereParams, ...categoryFilter.params) as
@@ -139,6 +150,11 @@ export function searchMessages(
         tool_result_count: number;
         thinking_count: number;
         system_count: number;
+        claude_count: number;
+        codex_count: number;
+        gemini_count: number;
+        cursor_count: number;
+        copilot_count: number;
       }
     | undefined;
   const totalCount = Number(summaryRow?.total_count ?? 0);
@@ -149,12 +165,17 @@ export function searchMessages(
   categoryCounts.tool_result = Number(summaryRow?.tool_result_count ?? 0);
   categoryCounts.thinking = Number(summaryRow?.thinking_count ?? 0);
   categoryCounts.system = Number(summaryRow?.system_count ?? 0);
+  providerCounts.claude = Number(summaryRow?.claude_count ?? 0);
+  providerCounts.codex = Number(summaryRow?.codex_count ?? 0);
+  providerCounts.gemini = Number(summaryRow?.gemini_count ?? 0);
+  providerCounts.cursor = Number(summaryRow?.cursor_count ?? 0);
+  providerCounts.copilot = Number(summaryRow?.copilot_count ?? 0);
 
   const limit = Math.max(1, input.limit ?? 50);
   const offset = Math.max(0, input.offset ?? 0);
   // snippet() operates on the indexed FTS columns, so the snippet stays aligned with the exact hit
   // terms instead of reimplementing highlight logic in application code.
-  const snippetSelect = "snippet(message_fts, 4, '<mark>', '</mark>', '...', 64) as snippet";
+  const snippetSelect = `snippet(message_fts, ${String(MESSAGE_FTS_CONTENT_COLUMN_INDEX)}, '<mark>', '</mark>', '...', 64) as snippet`;
   const orderBy = "ORDER BY bm25(message_fts), m.created_at DESC, m.id DESC";
   const resultRows = db
     .prepare(
@@ -207,6 +228,7 @@ export function searchMessages(
     totalCount,
     results,
     categoryCounts,
+    providerCounts,
   };
 }
 

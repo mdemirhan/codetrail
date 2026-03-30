@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { openDatabase } from "../db/bootstrap";
 import { indexChangedFiles } from "./indexSessions";
@@ -100,6 +100,33 @@ describe("indexChangedFiles", () => {
     expect(sessionCount).toBe(1);
     expect(messageCount).toBeGreaterThan(0);
     expect(indexedCount).toBe(1);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("uses the injected single-file discovery dependency", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-changed-injected-"));
+    const dbPath = join(dir, "index.db");
+    const discoveryConfig = {
+      claudeRoot: join(dir, ".claude", "projects"),
+      codexRoot: join(dir, ".codex", "sessions"),
+      geminiRoot: join(dir, ".gemini", "tmp"),
+      geminiHistoryRoot: join(dir, ".gemini", "history"),
+      geminiProjectsPath: join(dir, ".gemini", "projects.json"),
+      cursorRoot: join(dir, ".cursor", "projects"),
+      copilotRoot: join(dir, ".copilot-workspace"),
+      includeClaudeSubagents: false,
+    };
+    const injectedDiscoverSingleFile = vi.fn(() => {
+      throw new Error("injected-discover-single-file");
+    });
+
+    expect(() =>
+      indexChangedFiles({ dbPath, discoveryConfig }, [join(dir, "missing.jsonl")], {
+        discoverSingleFile: injectedDiscoverSingleFile,
+      }),
+    ).toThrow("injected-discover-single-file");
+    expect(injectedDiscoverSingleFile).toHaveBeenCalledTimes(1);
 
     rmSync(dir, { recursive: true, force: true });
   });
