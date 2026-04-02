@@ -31,9 +31,7 @@ export function createMockCodetrailClient(): MockCodetrailClient {
   const onAppCommand = vi.fn<(listener: (command: AppCommand) => void) => () => void>(
     () => () => undefined,
   );
-  const onLiveStatusChanged = vi.fn<(listener: () => void) => () => void>(
-    () => () => undefined,
-  );
+  const onLiveStatusChanged = vi.fn<(listener: () => void) => () => void>(() => () => undefined);
 
   return {
     platform: "darwin" satisfies DesktopPlatform,
