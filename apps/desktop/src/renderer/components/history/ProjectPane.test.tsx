@@ -404,13 +404,18 @@ describe("ProjectPane", () => {
     expect(screen.getByRole("button", { name: "Collapse all folders" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Project Two/i })).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: "Collapse all folders" }));
+
+    expect(screen.getByRole("button", { name: "Expand all folders" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Project Two/i })).toBeNull();
+
     rerender(<ProjectPaneHarness overrides={{ data: { viewMode: "list" } }} />);
 
     expect(screen.queryByRole("button", { name: "Expand all folders" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Collapse all folders" })).toBeNull();
   });
 
-  it("keeps unselected folders collapsed on initial tree render", () => {
+  it("starts with only the selected project folder expanded", () => {
     renderProjectPane({
       data: {
         viewMode: "tree",
@@ -420,6 +425,78 @@ describe("ProjectPane", () => {
     expect(screen.getByRole("button", { name: /Project One/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Project Two/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Project Three/i })).toBeNull();
+  });
+
+  it("expands the selected project's folder on initial tree render", () => {
+    renderProjectPane({
+      data: {
+        viewMode: "tree",
+        selectedProjectId: "project_2",
+      },
+    });
+
+    expect(screen.getByRole("button", { name: /Project Two/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Project One/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Project Three/i })).toBeNull();
+  });
+
+  it("does not reopen a manually collapsed selected folder during tree refreshes", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderProjectPane({
+      data: {
+        viewMode: "tree",
+        updateSource: "auto",
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: /project-one, 1 projects/i }));
+    expect(screen.queryByRole("button", { name: /Project One/i })).toBeNull();
+
+    rerender(
+      <ProjectPaneHarness
+        overrides={{
+          data: {
+            viewMode: "tree",
+            updateSource: "auto",
+            projectUpdates: {
+              project_1: { messageDelta: 1, updatedAt: Date.now() },
+              project_2: { messageDelta: 4, updatedAt: Date.now() },
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /Project One/i })).toBeNull();
+  });
+
+  it("does not reopen a collapsed folder when the selected project changes after startup", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderProjectPane({
+      data: {
+        viewMode: "tree",
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: /project-one, 1 projects/i }));
+    expect(screen.queryByRole("button", { name: /Project One/i })).toBeNull();
+
+    rerender(
+      <ProjectPaneHarness
+        overrides={{
+          data: {
+            viewMode: "tree",
+            selectedProjectId: "project_2",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /Project Two/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /project-two, 1 projects/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
   });
 
   it("offers a tree-view toggle to hide the Sessions pane from the project overflow menu", async () => {
@@ -810,7 +887,15 @@ describe("ProjectPane", () => {
       />,
     );
 
+    expect(screen.queryByRole("button", { name: /Project Two/i })).toBeNull();
+
     await user.click(screen.getByRole("button", { name: "~/project-two, 1 projects" }));
+    expect(screen.queryByRole("button", { name: /Project Two/i })).toBeNull();
+
+    await user.dblClick(screen.getByRole("button", { name: "~/project-two, 1 projects" }));
+    expect(screen.getByRole("button", { name: /Project Two/i })).toBeInTheDocument();
+
+    await user.dblClick(screen.getByRole("button", { name: "~/project-two, 1 projects" }));
     expect(screen.queryByRole("button", { name: /Project Two/i })).toBeNull();
 
     rerender(
@@ -851,6 +936,17 @@ describe("ProjectPane", () => {
         }}
       />,
     );
+
+    expect(screen.queryByRole("button", { name: /Project Two/i })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "~/project-two, 1 projects" }));
+    expect(screen.getByRole("button", { name: /Project Two/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "~/project-two, 1 projects" }));
+    expect(screen.queryByRole("button", { name: /Project Two/i })).toBeNull();
+
+    await user.dblClick(screen.getByRole("button", { name: "~/project-two, 1 projects" }));
+    expect(screen.queryByRole("button", { name: /Project Two/i })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "~/project-two, 1 projects" }));
     await user.click(screen.getByRole("button", { name: /Project Two/i }));
@@ -1003,6 +1099,8 @@ describe("ProjectPane", () => {
       projectTwoFolder.compareDocumentPosition(projectThreeFolder) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    fireEvent.click(projectThreeFolder);
 
     rerender(
       <ProjectPaneHarness

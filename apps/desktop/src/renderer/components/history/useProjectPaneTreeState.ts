@@ -42,6 +42,7 @@ export function useProjectPaneTreeState({
   onConsumeAutoRevealSessionRequest,
 }: UseProjectPaneTreeStateArgs) {
   const folderOrderControlKeyRef = useRef("");
+  const expandedFoldersSeedKeyRef = useRef("");
   const [folderOrderIds, setFolderOrderIds] = useState<string[]>([]);
   const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>([]);
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>([]);
@@ -61,23 +62,28 @@ export function useProjectPaneTreeState({
       setTreeFocusedRow(null);
       return;
     }
-    if (
-      historyMode === "session" &&
-      selectedProjectId &&
-      selectedSessionId &&
-      expandedProjectIds.includes(selectedProjectId)
-    ) {
-      setTreeFocusedRow({ kind: "session", id: selectedSessionId, projectId: selectedProjectId });
-      return;
-    }
-    if (!selectedProjectId) {
-      return;
-    }
-    setTreeFocusedRow({ kind: "project", id: selectedProjectId });
+    setTreeFocusedRow((current) => {
+      if (current) {
+        return current;
+      }
+      if (
+        historyMode === "session" &&
+        selectedProjectId &&
+        selectedSessionId &&
+        expandedProjectIds.includes(selectedProjectId)
+      ) {
+        return { kind: "session", id: selectedSessionId, projectId: selectedProjectId };
+      }
+      if (!selectedProjectId) {
+        return current;
+      }
+      return { kind: "project", id: selectedProjectId };
+    });
   }, [expandedProjectIds, historyMode, selectedProjectId, selectedSessionId, viewMode]);
 
   useEffect(() => {
     if (viewMode !== "tree") {
+      expandedFoldersSeedKeyRef.current = "";
       setExpandedFolderIds([]);
       setExpandedProjectIds([]);
     }
@@ -185,25 +191,27 @@ export function useProjectPaneTreeState({
     }
 
     setExpandedFolderIds((current) => {
-      const visibleFolderIds = new Set(folderGroups.map((group) => group.id));
-      const next = current.filter((groupId) => visibleFolderIds.has(groupId));
-      const nextSet = new Set(next);
-      let changed = next.length !== current.length;
-
-      for (const group of folderGroups) {
-        const shouldForceOpen =
-          projectQueryInput.trim().length > 0 ||
-          group.projects.some((project) => project.id === selectedProjectId);
-        if (shouldForceOpen && !nextSet.has(group.id)) {
-          next.push(group.id);
-          nextSet.add(group.id);
-          changed = true;
-        }
+      const nextVisibleFolderIds = folderGroups.map((group) => group.id);
+      const visibleFolderIds = new Set(nextVisibleFolderIds);
+      const initialExpandedFolderIds = folderGroups
+        .filter(
+          (group) =>
+            projectQueryInput.trim().length > 0 ||
+            group.projects.some((project) => project.id === selectedProjectId),
+        )
+        .map((group) => group.id);
+      const expandedFoldersSeedKey = `${folderOrderControlKey}\u0000${nextVisibleFolderIds.join("\u0001")}`;
+      const shouldResetForVisibleFolders =
+        nextVisibleFolderIds.length > 0 &&
+        expandedFoldersSeedKeyRef.current !== expandedFoldersSeedKey;
+      if (shouldResetForVisibleFolders) {
+        expandedFoldersSeedKeyRef.current = expandedFoldersSeedKey;
+        return initialExpandedFolderIds;
       }
-
-      return changed ? next : current;
+      const next = current.filter((groupId) => visibleFolderIds.has(groupId));
+      return next.length === current.length ? current : next;
     });
-  }, [folderGroups, projectQueryInput, selectedProjectId, viewMode]);
+  }, [folderGroups, folderOrderControlKey, projectQueryInput, selectedProjectId, viewMode]);
 
   const expandedFolderIdSet = useMemo(() => new Set(expandedFolderIds), [expandedFolderIds]);
   const allVisibleFoldersExpanded =

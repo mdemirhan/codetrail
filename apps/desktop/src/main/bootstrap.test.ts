@@ -34,6 +34,7 @@ const {
   mockShowSaveDialog,
   mockShowOpenDialog,
   mockBrowserWindowFromWebContents,
+  mockBrowserWindowGetAllWindows,
   mockListProjects,
   mockGetProjectCombinedDetail,
   mockListSessions,
@@ -112,6 +113,7 @@ const {
     mockShowSaveDialog: vi.fn(async () => ({ canceled: true, filePath: undefined })),
     mockShowOpenDialog: vi.fn(async () => ({ canceled: true, filePaths: [] as string[] })),
     mockBrowserWindowFromWebContents: vi.fn(() => null),
+    mockBrowserWindowGetAllWindows: vi.fn(() => []),
     mockListProjects: vi.fn(() => ({
       projects: [
         {
@@ -240,6 +242,7 @@ vi.mock("electron", () => ({
   ipcMain: {},
   BrowserWindow: {
     fromWebContents: mockBrowserWindowFromWebContents,
+    getAllWindows: mockBrowserWindowGetAllWindows,
   },
   dialog: {
     showSaveDialog: mockShowSaveDialog,

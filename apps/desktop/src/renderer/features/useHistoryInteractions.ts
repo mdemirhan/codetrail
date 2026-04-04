@@ -7,6 +7,7 @@ import type {
   RefObject,
   SetStateAction,
 } from "react";
+import { flushSync } from "react-dom";
 
 import type { RefreshContext } from "./useHistoryController";
 
@@ -859,6 +860,50 @@ export function useHistoryInteractions({
     );
   }, [projectListRef, projectViewMode, selectedProjectId, treeFocusedRow]);
 
+  const getAdjacentTreeProjectTarget = useCallback(
+    (
+      currentTarget: ProjectNavigationTarget | null,
+      direction: Direction,
+    ): ReturnType<typeof getAdjacentVisibleProjectTarget> => {
+      const container = projectListRef.current;
+      if (!container) {
+        return null;
+      }
+
+      if (direction === "next" && currentTarget?.kind === "folder") {
+        const folderElement = container.querySelector<HTMLElement>(
+          `[data-project-nav-kind="folder"][data-folder-id="${CSS.escape(currentTarget.id)}"]`,
+        );
+        const isExpanded = folderElement?.getAttribute("aria-expanded") === "true";
+        if (folderElement && !isExpanded) {
+          const toggle = container.querySelector<HTMLElement>(
+            `[data-project-expand-toggle-for="${CSS.escape(currentTarget.id)}"]`,
+          );
+          flushSync(() => {
+            toggle?.click();
+          });
+
+          const firstProjectId = folderElement.dataset.folderFirstProjectId ?? "";
+          if (firstProjectId) {
+            const firstProjectElement = container.querySelector<HTMLElement>(
+              `[data-project-nav-kind="project"][data-project-nav-id="${CSS.escape(firstProjectId)}"]`,
+            );
+            if (firstProjectElement) {
+              return {
+                kind: "project",
+                id: firstProjectId,
+                element: firstProjectElement,
+              };
+            }
+          }
+        }
+      }
+
+      return getAdjacentVisibleProjectTarget(container, currentTarget, direction);
+    },
+    [projectListRef],
+  );
+
   const selectAdjacentSession = useCallback(
     (direction: Direction, { preserveFocus = false }: AdjacentSelectionOptions = {}) => {
       const currentNavigationId =
@@ -941,11 +986,9 @@ export function useHistoryInteractions({
       }
 
       const currentTarget = getCurrentProjectNavigationTarget();
-      const visibleTarget = getAdjacentVisibleProjectTarget(
-        projectListRef.current,
-        currentTarget,
-        direction,
-      );
+      const visibleTarget = preserveFocus
+        ? getAdjacentTreeProjectTarget(currentTarget, direction)
+        : getAdjacentVisibleProjectTarget(projectListRef.current, currentTarget, direction);
       if (!visibleTarget) {
         return;
       }
@@ -959,6 +1002,7 @@ export function useHistoryInteractions({
       projectListRef,
       projectViewMode,
       selectedProjectId,
+      getAdjacentTreeProjectTarget,
       selectProjectAllMessages,
       selectProjectTargetWithCommitMode,
       sortedProjects,

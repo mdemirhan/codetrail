@@ -510,23 +510,6 @@ describe("App history selection debounce", () => {
     });
     expect(projectList.contains(document.activeElement)).toBe(true);
     expect(
-      document.activeElement?.getAttribute("data-project-nav-id") ??
-        document.activeElement
-          ?.closest("[data-project-nav-id]")
-          ?.getAttribute("data-project-nav-id"),
-    ).toBe("project_2");
-
-    await advanceTimers(50);
-
-    expect(countProjectHistoryLoads(client, "project_2")).toBe(project2LoadsBeforeFolderDebounce);
-    expect(countProjectHistoryLoads(client, "project_3")).toBe(project3LoadsBeforeFolderDebounce);
-
-    await act(async () => {
-      fireEvent.keyDown(projectList, { key: "ArrowDown" });
-      fireEvent.keyUp(window, { key: "ArrowDown" });
-    });
-    expect(projectList.contains(document.activeElement)).toBe(true);
-    expect(
       document.activeElement?.getAttribute("data-folder-id") ??
         document.activeElement?.closest("[data-folder-id]")?.getAttribute("data-folder-id"),
     ).toBe("/workspace/folder-2/project-three");

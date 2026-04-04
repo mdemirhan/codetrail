@@ -530,7 +530,7 @@ describe("theme-aware Shiki rendering", () => {
     expect(document.querySelector(".content-viewer-body")).not.toBeNull();
   });
 
-  it("virtualizes large expanded diffs and swaps rendered rows on scroll", async () => {
+  it("renders large expanded diffs with exact layout after Show Rest", async () => {
     const lines = Array.from({ length: 2000 }, (_, index) => `+line ${index + 1}`);
     document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
     document.documentElement.dataset.defaultDiffViewMode = "split";
@@ -547,29 +547,14 @@ describe("theme-aware Shiki rendering", () => {
       />,
     );
 
-    const showMore = screen.getByRole("button", { name: "Show More" });
-    fireEvent.click(showMore);
-    fireEvent.click(showMore);
-    fireEvent.click(showMore);
-    fireEvent.click(showMore);
-
-    const body = document.querySelector(".content-viewer-body") as HTMLDivElement | null;
-    expect(body).not.toBeNull();
+    const showRest = screen.getByRole("button", { name: "Show Rest" });
+    fireEvent.click(showRest);
 
     await waitFor(() => {
       const renderedRows = document.querySelectorAll(".diff-split-row");
-      expect(renderedRows.length).toBeLessThan(200);
+      expect(renderedRows.length).toBeGreaterThan(1900);
       expect(screen.getByText("line 1")).toBeInTheDocument();
-      expect(screen.queryByText("line 1500")).toBeNull();
-    });
-
-    act(() => {
-      fireEvent.scroll(body!, { target: { scrollTop: 32_000 } });
-    });
-
-    await waitFor(() => {
       expect(screen.getByText("line 1500")).toBeInTheDocument();
-      expect(screen.queryByText("line 1")).toBeNull();
     });
   });
 
@@ -996,19 +981,16 @@ describe("CodeBlock", () => {
     expect(menuButton).toHaveFocus();
   });
 
-  it("progressively expands large non-diff viewers with Show More", () => {
+  it("shows the rest of large non-diff viewers with a single Show Rest action", () => {
     const codeValue = Array.from({ length: 850 }, (_, index) => `line ${index + 1}`).join("\n");
     render(<CodeBlock language="text" codeValue={codeValue} />);
 
     expect(screen.getByText("line 1")).toBeInTheDocument();
     expect(screen.queryByText("line 850")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show More" }));
-    expect(screen.queryByText("line 850")).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Show More" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show Rest" }));
     expect(screen.getByText("line 850")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show More" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show Rest" })).toBeNull();
   });
 
   it("opens viewer content with the default Open action", async () => {

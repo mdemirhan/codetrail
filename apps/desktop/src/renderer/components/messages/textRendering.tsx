@@ -44,14 +44,7 @@ import {
   type ViewerToolPreferences,
   useViewerExternalAppsContext,
 } from "../../lib/viewerExternalAppsContext";
-import {
-  APPROX_ROW_HEIGHT,
-  DIFF_VIRTUALIZE_ROW_COUNT,
-  EXPAND_LINES_STEP,
-  INITIAL_EXPANDED_LINES,
-  INLINE_FALLBACK_SYNTAX_LINE_LIMIT,
-  VIRTUALIZE_ROW_COUNT,
-} from "./viewerConfig";
+import { INITIAL_EXPANDED_LINES, INLINE_FALLBACK_SYNTAX_LINE_LIMIT } from "./viewerConfig";
 import {
   type ViewerKind,
   analyzeTextContent,
@@ -1023,8 +1016,6 @@ function ContentViewer({
     isLarge ? Math.min(totalLines, INITIAL_EXPANDED_LINES) : totalLines,
   );
   const [uncontrolledExpanded, setUncontrolledExpanded] = useState(defaultExpanded);
-  const bodyRef = useRef<HTMLDivElement | null>(null);
-  const [scrollTop, setScrollTop] = useState(0);
   const isExpanded = expanded ?? uncontrolledExpanded;
 
   const setExpandedState = (nextExpanded: boolean | ((current: boolean) => boolean)) => {
@@ -1206,52 +1197,7 @@ function ContentViewer({
     });
   };
 
-  const virtualize = !wrap && kind !== "diff" && totalLines > VIRTUALIZE_ROW_COUNT;
   const visibleLineValues = textAnalysis.lineValues.slice(0, visibleCount);
-  const visibleDiffRows = useMemo(
-    () => (kind === "diff" && diffModel ? diffModel.rows.slice(0, visibleCount) : []),
-    [diffModel, kind, visibleCount],
-  );
-  const diffVisualOffsets = useMemo(
-    () => (kind === "diff" ? buildDiffVisualOffsets(visibleDiffRows, diffMode) : [0]),
-    [diffMode, kind, visibleDiffRows],
-  );
-  const diffVisualRowCount =
-    kind === "diff" ? (diffVisualOffsets[diffVisualOffsets.length - 1] ?? 0) : 0;
-  const virtualizeDiff = !wrap && kind === "diff" && diffVisualRowCount > DIFF_VIRTUALIZE_ROW_COUNT;
-  const viewportRowCount = 40;
-  const startIndex = virtualize ? Math.max(0, Math.floor(scrollTop / APPROX_ROW_HEIGHT) - 10) : 0;
-  const endIndex = virtualize
-    ? Math.min(visibleLineValues.length, startIndex + viewportRowCount + 20)
-    : visibleLineValues.length;
-  const renderedLineValues = visibleLineValues.slice(startIndex, endIndex);
-  const diffStartVisualIndex = virtualizeDiff
-    ? Math.max(0, Math.floor(scrollTop / APPROX_ROW_HEIGHT) - 10)
-    : 0;
-  const diffEndVisualIndex = virtualizeDiff
-    ? Math.min(diffVisualRowCount, diffStartVisualIndex + viewportRowCount + 20)
-    : diffVisualRowCount;
-  const diffRenderStartIndex = virtualizeDiff
-    ? findDiffRowIndexByVisualOffset(diffVisualOffsets, diffStartVisualIndex)
-    : 0;
-  const diffRenderEndIndex = virtualizeDiff
-    ? Math.min(
-        visibleDiffRows.length,
-        findDiffRowIndexByVisualOffset(
-          diffVisualOffsets,
-          Math.max(diffStartVisualIndex, diffEndVisualIndex - 1),
-        ) + 1,
-      )
-    : visibleDiffRows.length;
-  const diffTopSpacerHeight = virtualizeDiff
-    ? (diffVisualOffsets[diffRenderStartIndex] ?? 0) * APPROX_ROW_HEIGHT
-    : 0;
-  const diffBottomSpacerHeight = virtualizeDiff
-    ? Math.max(
-        0,
-        diffVisualRowCount - (diffVisualOffsets[diffRenderEndIndex] ?? diffVisualRowCount),
-      ) * APPROX_ROW_HEIGHT
-    : 0;
 
   return (
     <div
@@ -1414,15 +1360,7 @@ function ContentViewer({
       </div>
       {kind === "diff" && diffModel ? (
         isExpanded ? (
-          <div
-            ref={bodyRef}
-            className={`content-viewer-body${virtualizeDiff ? " virtualized" : ""}`}
-            onScroll={(event) => {
-              if (virtualizeDiff) {
-                setScrollTop(event.currentTarget.scrollTop);
-              }
-            }}
-          >
+          <div className="content-viewer-body">
             <DiffViewerBody
               diffModel={diffModel}
               diffMode={diffMode}
@@ -1432,11 +1370,6 @@ function ContentViewer({
               highlightActive={highlightActive}
               highlightPatterns={highlightPatterns}
               visibleCount={visibleCount}
-              startIndex={diffRenderStartIndex}
-              endIndex={diffRenderEndIndex}
-              virtualize={virtualizeDiff}
-              topSpacerHeight={diffTopSpacerHeight}
-              bottomSpacerHeight={diffBottomSpacerHeight}
               unifiedTokenLines={diffUnifiedTokenLines}
               splitLeftTokenLines={diffSplitLeftTokenLines}
               splitRightTokenLines={diffSplitRightTokenLines}
@@ -1446,21 +1379,10 @@ function ContentViewer({
           </div>
         ) : null
       ) : (
-        <div
-          ref={bodyRef}
-          className={`content-viewer-body${virtualize ? " virtualized" : ""}`}
-          onScroll={(event) => {
-            if (virtualize) {
-              setScrollTop(event.currentTarget.scrollTop);
-            }
-          }}
-        >
-          {virtualize ? (
-            <div style={{ height: startIndex * APPROX_ROW_HEIGHT }} aria-hidden />
-          ) : null}
+        <div className="content-viewer-body">
           <pre className="code-pre">
-            {renderedLineValues.map((line, index) => {
-              const lineNumber = startIndex + index + 1;
+            {visibleLineValues.map((line, index) => {
+              const lineNumber = index + 1;
               const tokenLine = tokenLines?.[lineNumber - 1];
               return (
                 <div
@@ -1485,14 +1407,6 @@ function ContentViewer({
               );
             })}
           </pre>
-          {virtualize ? (
-            <div
-              style={{
-                height: Math.max(0, visibleLineValues.length - endIndex) * APPROX_ROW_HEIGHT,
-              }}
-              aria-hidden
-            />
-          ) : null}
         </div>
       )}
       {visibleCount < totalLines && (!isCollapsibleDiff || isExpanded) ? (
@@ -1500,11 +1414,9 @@ function ContentViewer({
           <button
             type="button"
             className="content-viewer-action message-action-button"
-            onClick={() =>
-              setVisibleCount((value) => Math.min(totalLines, value + EXPAND_LINES_STEP))
-            }
+            onClick={() => setVisibleCount(totalLines)}
           >
-            Show More
+            Show Rest
           </button>
         </div>
       ) : null}
@@ -1552,49 +1464,6 @@ function renderCodeLineContent(
     return renderSyntaxHighlightedLine(line, language);
   }
   return [<span key={`${key}:plain`}>{line}</span>];
-}
-
-function countDiffVisualRows(
-  rows: ReturnType<typeof buildDiffViewModel>["rows"],
-  diffMode: "unified" | "split",
-): number {
-  if (diffMode === "split") {
-    return rows.length;
-  }
-  let count = 0;
-  for (const row of rows) {
-    count += row.kind === "paired" ? 2 : 1;
-  }
-  return count;
-}
-
-function buildDiffVisualOffsets(
-  rows: ReturnType<typeof buildDiffViewModel>["rows"],
-  diffMode: "unified" | "split",
-): number[] {
-  const offsets = new Array<number>(rows.length + 1);
-  offsets[0] = 0;
-  for (let index = 0; index < rows.length; index += 1) {
-    const previousOffset = offsets[index] ?? 0;
-    offsets[index + 1] =
-      previousOffset + (diffMode === "unified" && rows[index]?.kind === "paired" ? 2 : 1);
-  }
-  return offsets;
-}
-
-function findDiffRowIndexByVisualOffset(offsets: number[], visualIndex: number): number {
-  let low = 0;
-  let high = offsets.length - 1;
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    const nextOffset = offsets[middle + 1] ?? Number.POSITIVE_INFINITY;
-    if (nextOffset <= visualIndex) {
-      low = middle + 1;
-    } else {
-      high = middle;
-    }
-  }
-  return low;
 }
 
 function ViewerAppMenu({
@@ -1802,11 +1671,6 @@ function DiffViewerBody({
   highlightActive,
   highlightPatterns,
   visibleCount,
-  startIndex,
-  endIndex,
-  virtualize,
-  topSpacerHeight,
-  bottomSpacerHeight,
   unifiedTokenLines,
   splitLeftTokenLines,
   splitRightTokenLines,
@@ -1821,11 +1685,6 @@ function DiffViewerBody({
   highlightActive: boolean;
   highlightPatterns: string[];
   visibleCount: number;
-  startIndex: number;
-  endIndex: number;
-  virtualize: boolean;
-  topSpacerHeight: number;
-  bottomSpacerHeight: number;
   unifiedTokenLines: ShikiTokenLine[] | null;
   splitLeftTokenLines: ShikiTokenLine[] | null;
   splitRightTokenLines: ShikiTokenLine[] | null;
@@ -1833,7 +1692,6 @@ function DiffViewerBody({
   tokenColorResolver: (color: string | undefined) => string | undefined;
 }) {
   const rows = useMemo(() => diffModel.rows.slice(0, visibleCount), [diffModel.rows, visibleCount]);
-  const renderedRows = rows.slice(startIndex, endIndex);
   const unifiedTokenRows = useMemo(() => {
     if (!unifiedTokenLines) {
       return null;
@@ -1867,11 +1725,7 @@ function DiffViewerBody({
   }, [rows, unifiedTokenLines]);
   return diffMode === "split" ? (
     <div className={`diff-table diff-table-split${wrap ? " wrap" : ""}`}>
-      {virtualize && topSpacerHeight > 0 ? (
-        <div style={{ height: topSpacerHeight }} aria-hidden />
-      ) : null}
-      {renderedRows.map((row, index) => {
-        const rowIndex = startIndex + index;
+      {rows.map((row, rowIndex) => {
         const key = `${row.kind}:${rowIndex}`;
         const leftTokenLine = splitLeftTokenLines?.[rowIndex];
         const rightTokenLine = splitRightTokenLines?.[rowIndex];
@@ -1978,17 +1832,10 @@ function DiffViewerBody({
           </div>
         );
       })}
-      {virtualize && bottomSpacerHeight > 0 ? (
-        <div style={{ height: bottomSpacerHeight }} aria-hidden />
-      ) : null}
     </div>
   ) : (
     <div className={`diff-table${wrap ? " wrap" : ""}`}>
-      {virtualize && topSpacerHeight > 0 ? (
-        <div style={{ height: topSpacerHeight }} aria-hidden />
-      ) : null}
-      {renderedRows.map((row, index) => {
-        const rowIndex = startIndex + index;
+      {rows.map((row, rowIndex) => {
         const key = `${row.kind}:${rowIndex}`;
         if (row.kind === "context") {
           const tokenRow = unifiedTokenRows?.[rowIndex];
@@ -2098,9 +1945,6 @@ function DiffViewerBody({
           </div>
         );
       })}
-      {virtualize && bottomSpacerHeight > 0 ? (
-        <div style={{ height: bottomSpacerHeight }} aria-hidden />
-      ) : null}
     </div>
   );
 }

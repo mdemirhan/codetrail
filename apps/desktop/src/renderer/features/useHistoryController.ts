@@ -475,6 +475,8 @@ export function useHistoryController({
   const bookmarksLoadTokenRef = useRef(0);
   const sessionScrollTopRef = useRef(initialSessionScrollTop);
   const sessionScrollSyncTimerRef = useRef<number | null>(null);
+  const activeHistoryMessageIdsRef = useRef<string[]>([]);
+  const bookmarkStateRequestKeyRef = useRef("");
   const {
     selection,
     committedSelection,
@@ -1199,6 +1201,30 @@ export function useHistoryController({
     () => activeHistoryMessages.map((message) => message.id),
     [activeHistoryMessages],
   );
+  const stableActiveHistoryMessageIds = useMemo(() => {
+    const previousIds = activeHistoryMessageIdsRef.current;
+    if (
+      previousIds.length === activeHistoryMessageIds.length &&
+      previousIds.every((messageId, index) => messageId === activeHistoryMessageIds[index])
+    ) {
+      return previousIds;
+    }
+    return activeHistoryMessageIds;
+  }, [activeHistoryMessageIds]);
+  const stableActiveHistoryMessageIdsSignature = useMemo(
+    () => stableActiveHistoryMessageIds.join("\u0000"),
+    [stableActiveHistoryMessageIds],
+  );
+  const bookmarkStateRequestKey = useMemo(
+    () =>
+      `${selectedProjectId ?? ""}\u0001${historyMode}\u0001${bookmarkStatesRefreshNonce}\u0001${stableActiveHistoryMessageIdsSignature}`,
+    [
+      bookmarkStatesRefreshNonce,
+      historyMode,
+      selectedProjectId,
+      stableActiveHistoryMessageIdsSignature,
+    ],
+  );
 
   useEffect(() => {
     historyCategoriesRef.current = historyCategories;
@@ -1211,6 +1237,14 @@ export function useHistoryController({
   useEffect(() => {
     selectedSessionRefreshFingerprintRef.current = getSessionRefreshFingerprint(selectedSession);
   }, [selectedSession]);
+
+  useEffect(() => {
+    activeHistoryMessageIdsRef.current = stableActiveHistoryMessageIds;
+  }, [stableActiveHistoryMessageIds]);
+
+  useEffect(() => {
+    bookmarkStateRequestKeyRef.current = bookmarkStateRequestKey;
+  }, [bookmarkStateRequestKey]);
 
   useEffect(() => {
     const visibleMessageIds = new Set(activeHistoryMessages.map((message) => message.id));
@@ -1229,9 +1263,6 @@ export function useHistoryController({
   }, [activeHistoryMessages]);
 
   useEffect(() => {
-    const bookmarkStateRefreshKey = `${bookmarkStatesRefreshNonce}`;
-    void bookmarkStateRefreshKey;
-
     if (!selectedProjectId) {
       setVisibleBookmarkedMessageIds([]);
       return;
@@ -1245,24 +1276,25 @@ export function useHistoryController({
       return;
     }
 
-    if (activeHistoryMessageIds.length === 0) {
+    if (stableActiveHistoryMessageIds.length === 0) {
       setVisibleBookmarkedMessageIds([]);
       return;
     }
 
     let cancelled = false;
+    const requestKey = bookmarkStateRequestKey;
     void codetrail
       .invoke("bookmarks:getStates", {
         projectId: selectedProjectId,
-        messageIds: activeHistoryMessageIds,
+        messageIds: stableActiveHistoryMessageIds,
       })
       .then((response) => {
-        if (!cancelled) {
+        if (!cancelled && bookmarkStateRequestKeyRef.current === requestKey) {
           setVisibleBookmarkedMessageIds(response.bookmarkedMessageIds);
         }
       })
       .catch(() => {
-        if (!cancelled) {
+        if (!cancelled && bookmarkStateRequestKeyRef.current === requestKey) {
           setVisibleBookmarkedMessageIds([]);
         }
       });
@@ -1271,13 +1303,13 @@ export function useHistoryController({
       cancelled = true;
     };
   }, [
-    activeHistoryMessageIds,
+    bookmarkStateRequestKey,
     bookmarksResponse.projectId,
     bookmarksResponse.results,
-    bookmarkStatesRefreshNonce,
     codetrail,
     historyMode,
     selectedProjectId,
+    stableActiveHistoryMessageIds,
   ]);
 
   const refreshVisibleBookmarkStates = useCallback(() => {

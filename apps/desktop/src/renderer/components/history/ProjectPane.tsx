@@ -331,7 +331,7 @@ export function ProjectPane({
             }
           }}
           onDoubleClick={(event) => {
-            if (isTreeRowActionTarget(event.target) || !hasSessions) {
+            if (isTreeRowActionTarget(event.target) || !hasSessions || singleClickProjectsExpand) {
               return;
             }
             handleToggleProjectExpansion(project.id);
@@ -585,7 +585,9 @@ export function ProjectPane({
                       }
                     }}
                     onDoubleClick={() => {
-                      handleToggleFolder(group.id);
+                      if (!singleClickFoldersExpand) {
+                        handleToggleFolder(group.id);
+                      }
                     }}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {

@@ -207,6 +207,38 @@ describe("App history navigation", () => {
     });
   });
 
+  it("falls back to visible tree navigation when a folder is missing its first-project hint", async () => {
+    installScrollIntoViewMock();
+
+    const client = createHistoryNavigationClient();
+    const { container } = renderWithClient(
+      <App testHistorySelectionDebounceOverrides={{ project: 0, session: 0 }} />,
+      client,
+    );
+    const messageList = () => container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+
+    await waitFor(() => {
+      expect(screen.getByText("Project one first message")).toBeInTheDocument();
+    });
+
+    const folderRow = expectDefined(
+      container.querySelector<HTMLElement>(
+        '[data-project-nav-kind="folder"][data-folder-id="/workspace/project-two"]',
+      ),
+      "Expected project-two folder row",
+    );
+    folderRow.removeAttribute("data-folder-first-project-id");
+
+    expectDefined(messageList(), "Expected message list").focus();
+    pressWindowArrow("ArrowDown", { ctrlKey: true });
+    pressWindowArrow("ArrowDown", { ctrlKey: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("Project two combined message")).toBeInTheDocument();
+      expect(document.activeElement).toBe(messageList());
+    });
+  });
+
   it("moves between projects and sessions with plain Up/Down when their panes are focused", async () => {
     installScrollIntoViewMock();
 
@@ -245,8 +277,19 @@ describe("App history navigation", () => {
     fireEvent.mouseDown(expectDefined(projectHeader(), "Expected project pane header"));
     fireEvent.click(expectDefined(projectHeader(), "Expected project pane header"));
     fireEvent.keyDown(expectDefined(projectList(), "Expected project list"), { key: "ArrowDown" });
+    fireEvent.keyUp(window, { key: "ArrowDown" });
+    await waitFor(() => {
+      expect(activePane()).toHaveAttribute("data-history-pane", "project");
+      expect(
+        container.querySelector('[data-folder-id="/workspace/project-two"].active'),
+      ).toBeTruthy();
+    });
+
+    fireEvent.keyDown(expectDefined(projectList(), "Expected project list"), { key: "ArrowRight" });
+    fireEvent.keyUp(window, { key: "ArrowRight" });
     fireEvent.keyDown(expectDefined(projectList(), "Expected project list"), { key: "ArrowDown" });
     fireEvent.keyUp(window, { key: "ArrowDown" });
+
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
       expect(activePane()).toHaveAttribute("data-history-pane", "project");
@@ -398,6 +441,7 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one session")).toBeInTheDocument();
     });
 
+    await user.click(screen.getByRole("button", { name: /project-two, 1 projects/i }));
     await user.click(screen.getByText("Project Two"));
 
     await waitFor(() => {
