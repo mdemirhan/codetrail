@@ -158,6 +158,7 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
       countOnly: true,
       query: "parser",
       categories: ["assistant"],
+      focusMessageId: "message_1",
     },
     response: {
       projectId: "project_1",

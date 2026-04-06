@@ -70,6 +70,11 @@ type BookmarkListOptionsInput = BookmarkListOptions | string | undefined;
 
 export type BookmarkStore = {
   listProjectBookmarks: (projectId: string, options?: BookmarkListOptionsInput) => StoredBookmark[];
+  getProjectBookmarkFocusIndex: (
+    projectId: string,
+    target: { messageId?: string; messageSourceId?: string },
+    options?: BookmarkListOptionsInput,
+  ) => number | null;
   countProjectBookmarks: (projectId: string, options?: BookmarkListOptionsInput) => number;
   listProjectBookmarkMessageIds: (projectId: string, messageIds: string[]) => string[];
   countProjectBookmarkCategories: (
@@ -224,6 +229,63 @@ export function createBookmarkStore(bookmarksDbPath: string): BookmarkStore {
            ORDER BY b.message_created_at ${orderDirection}, b.message_id ${orderDirection}${limitOffsetSql}`,
         )
         .all(...params) as StoredBookmark[];
+    },
+    getProjectBookmarkFocusIndex: (projectId, target, optionsInput = {}) => {
+      if (!target.messageId && !target.messageSourceId) {
+        return null;
+      }
+      const options = normalizeBookmarkListOptions(optionsInput);
+      const built = buildProjectBookmarkQuery(projectId, options);
+      if (built.impossible) {
+        return null;
+      }
+
+      const orderDirection = options.sortDirection === "desc" ? "DESC" : "ASC";
+      const targetClause = target.messageId
+        ? "b.message_id = ?"
+        : "b.message_source_id = ?";
+      const targetValue = target.messageId ?? target.messageSourceId;
+      const targetRow = db
+        .prepare(
+          `SELECT b.message_created_at, b.message_id
+           ${built.fromSql}
+           WHERE ${built.whereClause}
+             AND ${targetClause}
+           ORDER BY b.message_created_at ${orderDirection}, b.message_id ${orderDirection}
+           LIMIT 1`,
+        )
+        .get(...built.params, targetValue) as
+        | { message_created_at: string; message_id: string }
+        | undefined;
+      if (!targetRow) {
+        return null;
+      }
+
+      const sortComparison =
+        orderDirection === "ASC"
+          ? `(
+               b.message_created_at < ?
+               OR (b.message_created_at = ? AND b.message_id < ?)
+             )`
+          : `(
+               b.message_created_at > ?
+               OR (b.message_created_at = ? AND b.message_id > ?)
+             )`;
+      const indexRow = db
+        .prepare(
+          `SELECT COUNT(*) as cnt
+           ${built.fromSql}
+           WHERE ${built.whereClause}
+             AND ${sortComparison}`,
+        )
+        .get(
+          ...built.params,
+          targetRow.message_created_at,
+          targetRow.message_created_at,
+          targetRow.message_id,
+        ) as { cnt: number } | undefined;
+
+      return Number(indexRow?.cnt ?? 0);
     },
     countProjectBookmarks: (projectId, optionsInput = {}) => {
       const options = normalizeBookmarkListOptions(optionsInput);

@@ -42,6 +42,7 @@ describe("MessageCard", () => {
     const onToggleBookmark = vi.fn();
     const onRevealInSession = vi.fn();
     const onRevealInProject = vi.fn();
+    const onRevealInBookmarks = vi.fn();
 
     renderWithPaneFocus(
       <MessageCard
@@ -56,6 +57,7 @@ describe("MessageCard", () => {
         onToggleBookmark={onToggleBookmark}
         onRevealInSession={onRevealInSession}
         onRevealInProject={onRevealInProject}
+        onRevealInBookmarks={onRevealInBookmarks}
       />,
     );
 
@@ -68,12 +70,14 @@ describe("MessageCard", () => {
     await user.click(screen.getByRole("button", { name: "Copy raw message data" }));
     await user.click(screen.getByRole("button", { name: "Reveal this message in session" }));
     await user.click(screen.getByRole("button", { name: "Reveal this message in project" }));
+    await user.click(screen.getByRole("button", { name: "Reveal this message in bookmarks" }));
     await user.click(screen.getByRole("button", { name: "Bookmark this message" }));
 
     expect(onToggleExpanded).toHaveBeenCalledWith("message_1", "assistant");
     expect(copyTextToClipboard).toHaveBeenCalledTimes(2);
     expect(onRevealInSession).toHaveBeenCalledWith("message_1", "source_1");
     expect(onRevealInProject).toHaveBeenCalledWith("message_1", "source_1", "session_1");
+    expect(onRevealInBookmarks).toHaveBeenCalledWith("message_1", "source_1");
     expect(onToggleBookmark).toHaveBeenCalledWith(message);
   });
 
@@ -103,6 +107,7 @@ describe("MessageCard", () => {
     expect(screen.getByText(/Tool Use:/)).toBeInTheDocument();
     expect(screen.getByText("Read ~/project/src/app.ts")).toBeInTheDocument();
     expect(screen.queryByText("Assistant response body")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reveal this message in bookmarks" })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Expand message" }));
     expect(onToggleExpanded).toHaveBeenCalled();

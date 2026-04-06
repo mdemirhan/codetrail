@@ -247,20 +247,26 @@ export function useHistoryDataEffects({
       setBookmarksLoadedProjectId(selectedProjectId);
       return response;
     }
+    const isRevealing = pendingRevealTarget !== null;
     const isAllHistoryCategoriesSelected = historyCategories.length === CATEGORIES.length;
     const response = await codetrail.invoke("bookmarks:listProject", {
       projectId: selectedProjectId,
       page: sessionPage,
       pageSize: messagePageSize,
       sortDirection: bookmarkSortDirection,
-      query: effectiveBookmarkQuery,
+      query: isRevealing ? "" : effectiveBookmarkQuery,
       searchMode,
       categories: isAllHistoryCategoriesSelected ? undefined : historyCategories,
+      focusMessageId: pendingRevealTarget?.messageId || undefined,
+      focusSourceId: pendingRevealTarget?.sourceId || undefined,
     });
     if (requestToken !== bookmarksLoadTokenRef.current) {
       return;
     }
     setBookmarksResponse(response);
+    if (isRevealing) {
+      setPendingRevealTarget(null);
+    }
     if (typeof response.page === "number" && response.page !== sessionPage) {
       setSessionPage(response.page);
     }
@@ -274,10 +280,12 @@ export function useHistoryDataEffects({
     historyCategories,
     historyMode,
     messagePageSize,
+    pendingRevealTarget,
     searchMode,
     sessionPage,
     selectedProjectId,
     setBookmarksLoadedProjectId,
+    setPendingRevealTarget,
     setBookmarksResponse,
     setSessionPage,
   ]);

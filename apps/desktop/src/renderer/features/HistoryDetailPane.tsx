@@ -615,6 +615,11 @@ export function HistoryDetailPane({
               {...(history.historyMode === "project_all"
                 ? {}
                 : { onRevealInProject: history.handleRevealInProject })}
+              {...(history.historyMode === "bookmarks"
+                ? {}
+                : history.bookmarkedMessageIds.has(message.id)
+                  ? { onRevealInBookmarks: history.handleRevealInBookmarks }
+                  : {})}
             />
           ))
         ) : (

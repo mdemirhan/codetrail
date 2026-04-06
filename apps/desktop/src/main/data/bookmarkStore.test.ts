@@ -230,6 +230,89 @@ describe("bookmarkStore", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("computes bookmark focus index in the database for message and source ids", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-bookmark-focus-index-"));
+    const indexedDbPath = join(dir, "indexed.sqlite");
+    seedIndexedDb(indexedDbPath);
+
+    const store = createBookmarkStore(resolveBookmarksDbPath(indexedDbPath));
+    store.upsertBookmark({
+      projectId: "p1",
+      sessionId: "s1",
+      messageId: "m1",
+      messageSourceId: "dup",
+      provider: "claude",
+      sessionTitle: "Project intro",
+      messageCategory: "assistant",
+      messageContent: "Oldest parser note",
+      messageCreatedAt: "2026-03-01T10:00:01.000Z",
+      bookmarkedAt: "2026-03-01T10:01:01.000Z",
+    });
+    store.upsertBookmark({
+      projectId: "p1",
+      sessionId: "s1",
+      messageId: "m2",
+      messageSourceId: "dup",
+      provider: "claude",
+      sessionTitle: "Project intro",
+      messageCategory: "assistant",
+      messageContent: "Middle parser note",
+      messageCreatedAt: "2026-03-01T10:00:02.000Z",
+      bookmarkedAt: "2026-03-01T10:01:02.000Z",
+    });
+    store.upsertBookmark({
+      projectId: "p1",
+      sessionId: "s1",
+      messageId: "m3",
+      messageSourceId: "src3",
+      provider: "claude",
+      sessionTitle: "Project intro",
+      messageCategory: "assistant",
+      messageContent: "Newest formatting note",
+      messageCreatedAt: "2026-03-01T10:00:03.000Z",
+      bookmarkedAt: "2026-03-01T10:01:03.000Z",
+    });
+
+    expect(
+      store.getProjectBookmarkFocusIndex(
+        "p1",
+        { messageId: "m2" },
+        { sortDirection: "asc" },
+      ),
+    ).toBe(1);
+    expect(
+      store.getProjectBookmarkFocusIndex(
+        "p1",
+        { messageSourceId: "dup" },
+        { sortDirection: "asc" },
+      ),
+    ).toBe(0);
+    expect(
+      store.getProjectBookmarkFocusIndex(
+        "p1",
+        { messageId: "m2" },
+        { sortDirection: "desc" },
+      ),
+    ).toBe(1);
+    expect(
+      store.getProjectBookmarkFocusIndex(
+        "p1",
+        { messageId: "m3" },
+        { query: "formatting", sortDirection: "asc" },
+      ),
+    ).toBe(0);
+    expect(
+      store.getProjectBookmarkFocusIndex(
+        "p1",
+        { messageId: "m2" },
+        { query: "formatting", sortDirection: "asc" },
+      ),
+    ).toBeNull();
+
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("applies additive schema changes for existing bookmark databases on open", () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-bookmark-migrate-"));
     const indexedDbPath = join(dir, "indexed.sqlite");

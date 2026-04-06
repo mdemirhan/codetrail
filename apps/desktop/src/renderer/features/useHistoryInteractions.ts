@@ -107,6 +107,7 @@ export function useHistoryInteractions({
   historyCategories,
   setPendingSearchNavigation,
   setSessionQueryInput,
+  setBookmarkQueryInput,
   setFocusMessageId,
   setPendingRevealTarget,
   loadBookmarks,
@@ -180,6 +181,7 @@ export function useHistoryInteractions({
   historyCategories: MessageCategory[];
   setPendingSearchNavigation: Dispatch<SetStateAction<HistorySearchNavigation | null>>;
   setSessionQueryInput: Dispatch<SetStateAction<string>>;
+  setBookmarkQueryInput: Dispatch<SetStateAction<string>>;
   setFocusMessageId: Dispatch<SetStateAction<string>>;
   setPendingRevealTarget: Dispatch<SetStateAction<PendingRevealTarget | null>>;
   loadBookmarks: () => Promise<unknown>;
@@ -763,6 +765,26 @@ export function useHistoryInteractions({
     ],
   );
 
+  const handleRevealInBookmarks = useCallback(
+    (messageId: string, sourceId: string) => {
+      if (!selectedProjectId || historyMode === "bookmarks") {
+        return;
+      }
+      setBookmarkQueryInput("");
+      openProjectBookmarksView(selectedProjectId);
+      setFocusMessageId(messageId);
+      setPendingRevealTarget({ messageId, sourceId });
+    },
+    [
+      historyMode,
+      openProjectBookmarksView,
+      selectedProjectId,
+      setBookmarkQueryInput,
+      setFocusMessageId,
+      setPendingRevealTarget,
+    ],
+  );
+
   const closeBookmarksView = useCallback(() => {
     resetHistorySelectionState();
     const nextSelection =
@@ -1336,6 +1358,7 @@ export function useHistoryInteractions({
     handleToggleMessageExpanded,
     handleRevealInSession,
     handleRevealInProject,
+    handleRevealInBookmarks,
     handleToggleBookmark,
     handleMessageListScroll,
     handleHistorySearchKeyDown,

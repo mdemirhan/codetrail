@@ -547,6 +547,8 @@ export const ipcContractSchemas = {
       query: z.string().optional(),
       searchMode: searchModeSchema.optional(),
       categories: z.array(messageCategorySchema).optional(),
+      focusMessageId: z.string().min(1).optional(),
+      focusSourceId: z.string().min(1).optional(),
     }),
     response: z.object({
       projectId: z.string().min(1),

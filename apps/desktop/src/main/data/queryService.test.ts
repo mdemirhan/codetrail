@@ -190,6 +190,13 @@ function seedQueryDb() {
 function createBookmarkStoreMock(overrides: Partial<BookmarkStore> = {}): BookmarkStore {
   return {
     listProjectBookmarks: vi.fn((_projectId: string, _options?: unknown) => []),
+    getProjectBookmarkFocusIndex: vi.fn(
+      (
+        _projectId: string,
+        _target: { messageId?: string; messageSourceId?: string },
+        _options?: unknown,
+      ) => null,
+    ),
     countProjectBookmarks: vi.fn((_projectId: string, _options?: unknown) => 0),
     listProjectBookmarkMessageIds: vi.fn((_projectId: string, _messageIds: string[]) => []),
     countProjectBookmarkCategories: vi.fn(() => ({
@@ -875,6 +882,126 @@ describe("queryService in-memory", () => {
         sortDirection: "asc",
         limit: 1,
         offset: 0,
+      }),
+    );
+  });
+
+  it("repositions bookmark pagination to reveal the focused bookmark", () => {
+    const db = seedQueryDb();
+    const bookmarkStore = createBookmarkStoreMock({
+      countProjectBookmarks: vi.fn((projectId: string) => (projectId === "project_1" ? 3 : 0)),
+      getProjectBookmarkFocusIndex: vi.fn(() => 1),
+      countProjectBookmarkCategories: vi.fn(() => ({
+        user: 1,
+        assistant: 2,
+        tool_use: 0,
+        tool_edit: 0,
+        tool_result: 0,
+        thinking: 0,
+        system: 0,
+      })),
+      listProjectBookmarks: vi.fn((projectId: string, options?: unknown) => {
+        const typedOptions =
+          typeof options === "object" && options !== null
+            ? (options as {
+                sortDirection?: "asc" | "desc";
+                limit?: number;
+                offset?: number;
+              })
+            : {};
+        if (projectId !== "project_1") {
+          return [];
+        }
+        const rows = [
+          {
+            project_id: "project_1",
+            session_id: "session_1",
+            message_id: "message_1",
+            message_source_id: "source_1",
+            provider: "claude" as const,
+            session_title: "Session one",
+            message_category: "user" as const,
+            message_content: "Oldest bookmark",
+            message_created_at: "2026-03-01T10:00:00.000Z",
+            bookmarked_at: "2026-03-01T10:01:00.000Z",
+            is_orphaned: 0,
+            orphaned_at: null,
+            snapshot_version: 1,
+            snapshot_json: "{}",
+          },
+          {
+            project_id: "project_1",
+            session_id: "session_1",
+            message_id: "message_2",
+            message_source_id: "source_2",
+            provider: "claude" as const,
+            session_title: "Session one",
+            message_category: "assistant" as const,
+            message_content: "Middle bookmark",
+            message_created_at: "2026-03-01T10:00:05.000Z",
+            bookmarked_at: "2026-03-01T10:01:05.000Z",
+            is_orphaned: 0,
+            orphaned_at: null,
+            snapshot_version: 1,
+            snapshot_json: "{}",
+          },
+          {
+            project_id: "project_1",
+            session_id: "session_1",
+            message_id: "message_3",
+            message_source_id: "source_3",
+            provider: "claude" as const,
+            session_title: "Session one",
+            message_category: "assistant" as const,
+            message_content: "Newest bookmark",
+            message_created_at: "2026-03-01T10:00:10.000Z",
+            bookmarked_at: "2026-03-01T10:01:10.000Z",
+            is_orphaned: 0,
+            orphaned_at: null,
+            snapshot_version: 1,
+            snapshot_json: "{}",
+          },
+        ];
+        const orderedRows = typedOptions.sortDirection === "desc" ? [...rows].reverse() : rows;
+        const offset = typedOptions.offset ?? 0;
+        const limit = typedOptions.limit ?? orderedRows.length;
+        return orderedRows.slice(offset, offset + limit);
+      }),
+    });
+    const service = createQueryServiceFromDb(db, {
+      bookmarkStore,
+      ownsBookmarkStore: false,
+    });
+
+    const response = service.listProjectBookmarks({
+      projectId: "project_1",
+      page: 0,
+      pageSize: 1,
+      sortDirection: "asc",
+      query: "",
+      categories: undefined,
+      focusMessageId: "message_2",
+    });
+
+    expect(response.page).toBe(1);
+    expect(response.results[0]?.message.id).toBe("message_2");
+    expect(bookmarkStore.getProjectBookmarkFocusIndex).toHaveBeenCalledWith(
+      "project_1",
+      {
+        messageId: "message_2",
+        messageSourceId: undefined,
+      },
+      expect.objectContaining({
+        sortDirection: "asc",
+      }),
+    );
+    expect(bookmarkStore.listProjectBookmarks).toHaveBeenNthCalledWith(
+      1,
+      "project_1",
+      expect.objectContaining({
+        sortDirection: "asc",
+        limit: 1,
+        offset: 1,
       }),
     );
   });

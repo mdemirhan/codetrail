@@ -1082,10 +1082,27 @@ function listProjectBookmarksWithStore(
     searchMode: request.searchMode ?? "simple",
     ...(request.categories ? { categories: request.categories } : {}),
   });
+  const bookmarkListOptions = {
+    ...(bookmarkQuery !== null ? { query: bookmarkQuery } : {}),
+    searchMode: request.searchMode ?? "simple",
+    ...(request.categories ? { categories: request.categories } : {}),
+    sortDirection: request.sortDirection ?? "asc",
+  } as const;
   if (filteredCount === 0) {
     page = 0;
   } else if (page * pageSize >= filteredCount) {
     page = Math.floor((filteredCount - 1) / pageSize);
+  }
+  const focusIndex = bookmarkStore.getProjectBookmarkFocusIndex(
+    request.projectId,
+    {
+      messageId: request.focusMessageId,
+      messageSourceId: request.focusSourceId,
+    },
+    bookmarkListOptions,
+  );
+  if (focusIndex !== null) {
+    page = Math.floor(focusIndex / pageSize);
   }
   if (countOnly) {
     return {
@@ -1101,10 +1118,7 @@ function listProjectBookmarksWithStore(
     };
   }
   const storedRows = bookmarkStore.listProjectBookmarks(request.projectId, {
-    ...(bookmarkQuery !== null ? { query: bookmarkQuery } : {}),
-    searchMode: request.searchMode ?? "simple",
-    ...(request.categories ? { categories: request.categories } : {}),
-    sortDirection: request.sortDirection ?? "asc",
+    ...bookmarkListOptions,
     limit: pageSize,
     offset: page * pageSize,
   });

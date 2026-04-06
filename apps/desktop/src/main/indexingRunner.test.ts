@@ -146,6 +146,7 @@ function createBookmarkStoreHarness() {
   const close = vi.fn();
   const createBookmarkStore = vi.fn(() => ({
     listProjectBookmarks: vi.fn(),
+    getProjectBookmarkFocusIndex: vi.fn(() => null),
     countProjectBookmarks: vi.fn(() => 0),
     listProjectBookmarkMessageIds: vi.fn(() => []),
     countProjectBookmarkCategories: vi.fn(() => ({

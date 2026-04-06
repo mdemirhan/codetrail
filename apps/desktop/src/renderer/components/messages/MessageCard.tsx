@@ -42,6 +42,7 @@ type MessageCardProps = {
   onToggleBookmark?: (message: SessionMessage) => void;
   onRevealInSession?: (messageId: string, sourceId: string) => void;
   onRevealInProject?: (messageId: string, sourceId: string, sessionId: string) => void;
+  onRevealInBookmarks?: (messageId: string, sourceId: string) => void;
   cardRef?: Ref<HTMLDivElement> | null;
 };
 
@@ -59,6 +60,7 @@ function MessageCardComponent({
   onToggleBookmark,
   onRevealInSession,
   onRevealInProject,
+  onRevealInBookmarks,
   cardRef,
 }: MessageCardProps) {
   const paneFocus = usePaneFocus();
@@ -163,6 +165,12 @@ function MessageCardComponent({
   const handleRevealInProjectButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onRevealInProject?.(message.id, message.sourceId, message.sessionId);
+    paneFocus.focusHistoryPane("message");
+  };
+
+  const handleRevealInBookmarksButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onRevealInBookmarks?.(message.id, message.sourceId);
     paneFocus.focusHistoryPane("message");
   };
 
@@ -290,6 +298,18 @@ function MessageCardComponent({
               title="Reveal in Project"
             >
               Reveal in Project
+            </button>
+          ) : null}
+          {onRevealInBookmarks ? (
+            <button
+              type="button"
+              className="message-action-button message-reveal-button"
+              {...preserveMessagePaneFocusProps}
+              onClick={handleRevealInBookmarksButtonClick}
+              aria-label="Reveal this message in bookmarks"
+              title="Reveal in Bookmarks"
+            >
+              Reveal in Bookmarks
             </button>
           ) : null}
           {onToggleBookmark ? (
