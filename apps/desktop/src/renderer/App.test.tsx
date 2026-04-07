@@ -87,6 +87,36 @@ describe("App shell", () => {
     expect(countChannelCalls(client, "dashboard:getStats")).toBeGreaterThanOrEqual(1);
   });
 
+  it("refreshes dashboard stats when the dashboard is reopened", async () => {
+    installScrollIntoViewMock();
+
+    const client = createAppClient();
+    const user = userEvent.setup();
+
+    renderWithClient(<App />, client);
+
+    await user.click(screen.getByRole("button", { name: "Open dashboard" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Activity Dashboard" })).toBeInTheDocument();
+    });
+
+    const firstOpenCalls = countChannelCalls(client, "dashboard:getStats");
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Activity Dashboard" })).toBeNull();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open dashboard" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Activity Dashboard" })).toBeInTheDocument();
+      expect(countChannelCalls(client, "dashboard:getStats")).toBeGreaterThan(firstOpenCalls);
+    });
+  });
+
   it("compacts large message-type pill counts while keeping the exact count in the tooltip", async () => {
     installDialogMock();
     installScrollIntoViewMock();

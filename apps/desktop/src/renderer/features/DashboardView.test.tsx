@@ -142,6 +142,113 @@ const statsFixture: DashboardStatsResponse = {
       messageCount: 44,
     },
   ],
+  aiCodeStats: {
+    summary: {
+      writeEventCount: 5,
+      measurableWriteEventCount: 4,
+      writeSessionCount: 3,
+      fileChangeCount: 6,
+      distinctFilesTouchedCount: 5,
+      linesAdded: 32,
+      linesDeleted: 11,
+      netLines: 21,
+      multiFileWriteCount: 1,
+      averageFilesPerWrite: 1.5,
+    },
+    changeTypeCounts: {
+      add: 2,
+      update: 3,
+      delete: 1,
+    },
+    providerStats: [
+      {
+        provider: "codex",
+        writeEventCount: 3,
+        fileChangeCount: 4,
+        linesAdded: 20,
+        linesDeleted: 8,
+        writeSessionCount: 2,
+      },
+      {
+        provider: "claude",
+        writeEventCount: 2,
+        fileChangeCount: 2,
+        linesAdded: 12,
+        linesDeleted: 3,
+        writeSessionCount: 1,
+      },
+      {
+        provider: "gemini",
+        writeEventCount: 0,
+        fileChangeCount: 0,
+        linesAdded: 0,
+        linesDeleted: 0,
+        writeSessionCount: 0,
+      },
+      {
+        provider: "cursor",
+        writeEventCount: 0,
+        fileChangeCount: 0,
+        linesAdded: 0,
+        linesDeleted: 0,
+        writeSessionCount: 0,
+      },
+      {
+        provider: "copilot",
+        writeEventCount: 0,
+        fileChangeCount: 0,
+        linesAdded: 0,
+        linesDeleted: 0,
+        writeSessionCount: 0,
+      },
+    ],
+    recentActivity: [
+      { date: "2026-03-03", writeEventCount: 0, fileChangeCount: 0, linesAdded: 0, linesDeleted: 0 },
+      { date: "2026-03-04", writeEventCount: 1, fileChangeCount: 1, linesAdded: 4, linesDeleted: 0 },
+      { date: "2026-03-05", writeEventCount: 0, fileChangeCount: 0, linesAdded: 0, linesDeleted: 0 },
+      { date: "2026-03-06", writeEventCount: 0, fileChangeCount: 0, linesAdded: 0, linesDeleted: 0 },
+      { date: "2026-03-07", writeEventCount: 1, fileChangeCount: 2, linesAdded: 7, linesDeleted: 2 },
+      { date: "2026-03-08", writeEventCount: 0, fileChangeCount: 0, linesAdded: 0, linesDeleted: 0 },
+      { date: "2026-03-09", writeEventCount: 0, fileChangeCount: 0, linesAdded: 0, linesDeleted: 0 },
+      { date: "2026-03-10", writeEventCount: 0, fileChangeCount: 0, linesAdded: 0, linesDeleted: 0 },
+      { date: "2026-03-11", writeEventCount: 1, fileChangeCount: 1, linesAdded: 8, linesDeleted: 3 },
+      { date: "2026-03-12", writeEventCount: 0, fileChangeCount: 0, linesAdded: 0, linesDeleted: 0 },
+      { date: "2026-03-13", writeEventCount: 1, fileChangeCount: 1, linesAdded: 5, linesDeleted: 1 },
+      { date: "2026-03-14", writeEventCount: 0, fileChangeCount: 0, linesAdded: 0, linesDeleted: 0 },
+      { date: "2026-03-15", writeEventCount: 0, fileChangeCount: 0, linesAdded: 0, linesDeleted: 0 },
+      { date: "2026-03-16", writeEventCount: 1, fileChangeCount: 1, linesAdded: 8, linesDeleted: 5 },
+    ],
+    topFiles: [
+      {
+        filePath: "src/dashboard.tsx",
+        writeEventCount: 2,
+        linesAdded: 16,
+        linesDeleted: 6,
+        lastTouchedAt: "2026-03-16T10:05:03.000Z",
+      },
+      {
+        filePath: "src/queryService.ts",
+        writeEventCount: 1,
+        linesAdded: 9,
+        linesDeleted: 3,
+        lastTouchedAt: "2026-03-11T10:05:03.000Z",
+      },
+    ],
+    topFileTypes: [
+      {
+        label: ".ts",
+        fileChangeCount: 4,
+        linesAdded: 18,
+        linesDeleted: 6,
+      },
+      {
+        label: ".tsx",
+        fileChangeCount: 2,
+        linesAdded: 14,
+        linesDeleted: 5,
+      },
+    ],
+  },
   activityWindowDays: 14,
 };
 
@@ -153,12 +260,24 @@ describe("DashboardView", () => {
 
     expect(screen.getByRole("heading", { name: "Activity Dashboard" })).toBeInTheDocument();
     expect(screen.getByText("Workspace telemetry")).toBeInTheDocument();
+    expect(screen.getByText("AI Code Activity")).toBeInTheDocument();
+    expect(screen.getByText("Write Velocity")).toBeInTheDocument();
+    expect(screen.getByText("Change Profile")).toBeInTheDocument();
+    expect(screen.getByText("Provider Write Throughput")).toBeInTheDocument();
+    expect(screen.getByText("Top Written Files")).toBeInTheDocument();
+    expect(screen.getByText("Top File Types")).toBeInTheDocument();
+    expect(screen.getByText("Measured from 4 of 5 write events.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Some write payloads could not be fully parsed, so line totals are conservative."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Category Composition")).toBeInTheDocument();
     expect(screen.getByText("Provider Throughput")).toBeInTheDocument();
     expect(screen.getByText("Message Skyline")).toBeInTheDocument();
     expect(screen.getByText("Where the action is")).toBeInTheDocument();
     expect(screen.getByText("Most-used model signatures")).toBeInTheDocument();
     expect(screen.getByText("Code Trail")).toBeInTheDocument();
+    expect(screen.getByText("src/dashboard.tsx")).toBeInTheDocument();
+    expect(screen.getByText(".ts")).toBeInTheDocument();
     expect(screen.getAllByText("codex-gpt-5")).toHaveLength(2);
     expect(screen.getByText("Assistant")).toBeInTheDocument();
     expect(screen.getByText("Tool Result")).toBeInTheDocument();
@@ -182,5 +301,58 @@ describe("DashboardView", () => {
     await user.click(screen.getByRole("button", { name: "Refresh dashboard" }));
 
     expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an empty state when no ai write activity has been indexed", () => {
+    renderWithPaneFocus(
+      <DashboardView
+        stats={{
+          ...statsFixture,
+          aiCodeStats: {
+            ...statsFixture.aiCodeStats,
+            summary: {
+              ...statsFixture.aiCodeStats.summary,
+              writeEventCount: 0,
+              measurableWriteEventCount: 0,
+              writeSessionCount: 0,
+              fileChangeCount: 0,
+              distinctFilesTouchedCount: 0,
+              linesAdded: 0,
+              linesDeleted: 0,
+              netLines: 0,
+              multiFileWriteCount: 0,
+              averageFilesPerWrite: 0,
+            },
+            providerStats: statsFixture.aiCodeStats.providerStats.map((provider) => ({
+              ...provider,
+              writeEventCount: 0,
+              fileChangeCount: 0,
+              linesAdded: 0,
+              linesDeleted: 0,
+              writeSessionCount: 0,
+            })),
+            recentActivity: statsFixture.aiCodeStats.recentActivity.map((point) => ({
+              ...point,
+              writeEventCount: 0,
+              fileChangeCount: 0,
+              linesAdded: 0,
+              linesDeleted: 0,
+            })),
+            topFiles: [],
+            topFileTypes: [],
+            changeTypeCounts: {
+              add: 0,
+              update: 0,
+              delete: 0,
+            },
+          },
+        }}
+        loading={false}
+        error={null}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("No AI write activity indexed yet")).toBeInTheDocument();
   });
 });

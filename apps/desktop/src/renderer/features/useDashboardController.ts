@@ -27,6 +27,29 @@ const EMPTY_DASHBOARD_STATS: DashboardStatsResponse = {
   recentActivity: [],
   topProjects: [],
   topModels: [],
+  aiCodeStats: {
+    summary: {
+      writeEventCount: 0,
+      measurableWriteEventCount: 0,
+      writeSessionCount: 0,
+      fileChangeCount: 0,
+      distinctFilesTouchedCount: 0,
+      linesAdded: 0,
+      linesDeleted: 0,
+      netLines: 0,
+      multiFileWriteCount: 0,
+      averageFilesPerWrite: 0,
+    },
+    changeTypeCounts: {
+      add: 0,
+      update: 0,
+      delete: 0,
+    },
+    providerStats: [],
+    recentActivity: [],
+    topFiles: [],
+    topFileTypes: [],
+  },
   activityWindowDays: 14,
 };
 
@@ -71,11 +94,11 @@ export function useDashboardController({
   }, [codetrail, logError]);
 
   useEffect(() => {
-    if (mainView !== "dashboard" || loaded) {
+    if (mainView !== "dashboard") {
       return;
     }
     void reloadStats();
-  }, [loaded, mainView, reloadStats]);
+  }, [mainView, reloadStats]);
 
   return {
     stats,

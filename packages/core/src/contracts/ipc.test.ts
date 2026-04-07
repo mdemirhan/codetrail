@@ -25,6 +25,30 @@ type ChannelExample = {
   response: unknown;
 };
 
+const emptyAiCodeStats = {
+  summary: {
+    writeEventCount: 0,
+    measurableWriteEventCount: 0,
+    writeSessionCount: 0,
+    fileChangeCount: 0,
+    distinctFilesTouchedCount: 0,
+    linesAdded: 0,
+    linesDeleted: 0,
+    netLines: 0,
+    multiFileWriteCount: 0,
+    averageFilesPerWrite: 0,
+  },
+  changeTypeCounts: {
+    add: 0,
+    update: 0,
+    delete: 0,
+  },
+  providerStats: [],
+  recentActivity: [],
+  topFiles: [],
+  topFileTypes: [],
+};
+
 function createClaudeHookStateExample(input: { installed: boolean }) {
   return createClaudeHookStateFixture({
     settingsPath: "/home/user/.claude/settings.json",
@@ -97,6 +121,7 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
       recentActivity: [],
       topProjects: [],
       topModels: [],
+      aiCodeStats: emptyAiCodeStats,
       activityWindowDays: 14,
     },
   },
