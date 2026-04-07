@@ -85,6 +85,7 @@ export type BookmarkStore = {
     searchMode?: SearchMode,
   ) => Record<MessageCategory, number>;
   countProjectBookmarksByProjectIds?: (projectIds: string[]) => Record<string, number>;
+  countAllBookmarks?: () => number;
   countSessionBookmarks: (projectId: string, sessionId: string) => number;
   countSessionBookmarksBySessionIds?: (
     projectId: string,
@@ -132,6 +133,7 @@ export function createBookmarkStore(bookmarksDbPath: string): BookmarkStore {
      WHERE project_id = ? AND message_id = ?`,
   );
   const countStmt = db.prepare("SELECT COUNT(*) as cnt FROM bookmarks WHERE project_id = ?");
+  const countAllStmt = db.prepare("SELECT COUNT(*) as cnt FROM bookmarks");
   const countSessionStmt = db.prepare(
     "SELECT COUNT(*) as cnt FROM bookmarks WHERE project_id = ? AND session_id = ?",
   );
@@ -350,6 +352,10 @@ export function createBookmarkStore(bookmarksDbPath: string): BookmarkStore {
     },
     countProjectBookmarksByProjectIds: (projectIds) => {
       return countBookmarksByProjectIds(db, projectIds);
+    },
+    countAllBookmarks: () => {
+      const row = countAllStmt.get() as { cnt: number } | undefined;
+      return Number(row?.cnt ?? 0);
     },
     countSessionBookmarks: (projectId, sessionId) => {
       const row = countSessionStmt.get(projectId, sessionId) as { cnt: number } | undefined;

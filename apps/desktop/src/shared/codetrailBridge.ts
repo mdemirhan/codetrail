@@ -13,6 +13,9 @@ export type CodetrailBridge = {
   appGetSettingsInfo(
     payload: IpcRequestInput<"app:getSettingsInfo">,
   ): Promise<IpcResponse<"app:getSettingsInfo">>;
+  dashboardGetStats(
+    payload: IpcRequestInput<"dashboard:getStats">,
+  ): Promise<IpcResponse<"dashboard:getStats">>;
   bookmarksGetStates(
     payload: IpcRequestInput<"bookmarks:getStates">,
   ): Promise<IpcResponse<"bookmarks:getStates">>;
@@ -105,6 +108,7 @@ export const CHANNEL_TO_BRIDGE_METHOD = {
   "app:flushState": "appFlushState",
   "app:setCommandState": "appSetCommandState",
   "app:getSettingsInfo": "appGetSettingsInfo",
+  "dashboard:getStats": "dashboardGetStats",
   "bookmarks:getStates": "bookmarksGetStates",
   "bookmarks:listProject": "bookmarksListProject",
   "bookmarks:toggle": "bookmarksToggle",

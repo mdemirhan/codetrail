@@ -16,6 +16,7 @@ export type BookmarkStateResponse = IpcResponse<"bookmarks:getStates">;
 export type SearchQueryResponse = IpcResponse<"search:query">;
 export type SearchResult = SearchQueryResponse["results"][number];
 export type SettingsInfoResponse = IpcResponse<"app:getSettingsInfo">;
+export type DashboardStatsResponse = IpcResponse<"dashboard:getStats">;
 export type WatchStatsResponse = IpcResponse<"watcher:getStats">;
 export type WatchLiveStatusResponse = IpcResponse<"watcher:getLiveStatus">;
 export type ClaudeHookStateResponse = WatchLiveStatusResponse["claudeHookState"];
@@ -25,7 +26,7 @@ export type HistoryMessage =
   | SessionDetail["messages"][number]
   | ProjectCombinedDetail["messages"][number];
 
-export type MainView = "history" | "search" | "settings" | "help";
+export type MainView = "history" | "dashboard" | "search" | "settings" | "help";
 export type SortDirection = "asc" | "desc";
 export type ProjectViewMode = "list" | "tree";
 export type ProjectSortField = "last_active" | "name";

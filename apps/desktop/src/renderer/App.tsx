@@ -29,10 +29,12 @@ import { HistoryExportProgressDialog } from "./components/HistoryExportProgressD
 import { SettingsView } from "./components/SettingsView";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { TopBar } from "./components/TopBar";
+import { DashboardView } from "./features/DashboardView";
 import { HistoryDetailPane } from "./features/HistoryDetailPane";
 import { HistoryLayout } from "./features/HistoryLayout";
 import { SearchView } from "./features/SearchView";
 import { useAppearanceController } from "./features/useAppearanceController";
+import { useDashboardController } from "./features/useDashboardController";
 import {
   type HistorySelectionDebounceOverrides,
   useHistoryController,
@@ -202,6 +204,7 @@ export function App({
   const watcherLifecycleRef = useRef(0);
   const watcherPendingPathCountRef = useRef(0);
   const watcherStatusBurstUntilRef = useRef(0);
+  const dashboardViewRef = useRef<HTMLElement | null>(null);
   const helpViewRef = useRef<HTMLElement | null>(null);
   const settingsViewRef = useRef<HTMLElement | null>(null);
   const viewFocusRafRef = useRef<number | null>(null);
@@ -261,6 +264,10 @@ export function App({
     setSearchProviders,
     historyCategories: history.historyCategories,
     setHistoryCategories: history.setHistoryCategories,
+    logError,
+  });
+  const dashboard = useDashboardController({
+    mainView,
     logError,
   });
   const preferredRefreshStrategy =
@@ -342,6 +349,10 @@ export function App({
 
   const searchViewTarget = mainView === "search" ? search.globalSearchInputRef.current : null;
   useEffect(() => {
+    paneFocus.registerViewTarget(
+      "dashboard",
+      mainView === "dashboard" ? dashboardViewRef.current : null,
+    );
     paneFocus.registerViewTarget("search", searchViewTarget);
     paneFocus.registerViewTarget("help", mainView === "help" ? helpViewRef.current : null);
     paneFocus.registerViewTarget(
@@ -361,6 +372,13 @@ export function App({
   }, [mainView, paneFocus.activeDomain, paneFocus.lastHistoryPane]);
 
   useEffect(() => {
+    if (mainView === "dashboard") {
+      paneFocus.enterView("dashboard");
+      scheduleFocusFrame(viewFocusRafRef, () => {
+        dashboardViewRef.current?.focus({ preventScroll: true });
+      });
+      return;
+    }
     if (mainView === "search") {
       paneFocus.enterView("search");
       return;
@@ -392,12 +410,20 @@ export function App({
       });
       const shouldReloadSearch =
         source === "manual" || (mainView === "search" && search.hasActiveSearchQuery);
+      const shouldReloadDashboard = mainView === "dashboard";
       await Promise.all([
         historyRefreshPromise,
         shouldReloadSearch ? search.reloadSearch() : Promise.resolve(),
+        shouldReloadDashboard ? dashboard.reloadStats() : Promise.resolve(),
       ]);
     },
-    [history.handleRefreshAllData, mainView, search.hasActiveSearchQuery, search.reloadSearch],
+    [
+      dashboard.reloadStats,
+      history.handleRefreshAllData,
+      mainView,
+      search.hasActiveSearchQuery,
+      search.reloadSearch,
+    ],
   );
   useEffect(() => {
     reloadIndexedDataRef.current = reloadIndexedData;
@@ -746,6 +772,10 @@ export function App({
     setMainView("search");
     search.focusGlobalSearch();
   }, [search.focusGlobalSearch]);
+
+  const openDashboardView = useCallback(() => {
+    setMainView("dashboard");
+  }, []);
 
   const openHelpView = useCallback(() => {
     setMainView("help");
@@ -1271,6 +1301,9 @@ export function App({
             indexing={indexing}
             focusMode={focusMode}
             focusDisabled={mainView !== "history"}
+            onToggleDashboard={() =>
+              mainView === "dashboard" ? returnToHistoryWithPaneFocus() : openDashboardView()
+            }
             onToggleSearchView={() =>
               mainView === "search" ? returnToHistoryWithPaneFocus() : focusGlobalSearch()
             }
@@ -1349,6 +1382,15 @@ export function App({
                   />
                 </section>
               )
+            ) : mainView === "dashboard" ? (
+              <section className="pane content-pane" ref={dashboardViewRef} tabIndex={-1}>
+                <DashboardView
+                  stats={dashboard.stats}
+                  loading={dashboard.loading}
+                  error={dashboard.error}
+                  onRefresh={() => void dashboard.reloadStats()}
+                />
+              </section>
             ) : mainView === "search" ? (
               <SearchView
                 search={search}

@@ -1,6 +1,7 @@
 export type ToolbarIconName =
   | "history"
   | "turns"
+  | "dashboard"
   | "search"
   | "refresh"
   | "reindex"
@@ -42,6 +43,7 @@ export type ToolbarIconName =
 const TOOLBAR_ICON_PATHS = {
   history: "M4 3h16v4H4zM4 10h16v4H4zM4 17h16v4H4z",
   turns: "M6 4h12a2 2 0 0 1 2 2v12H8a2 2 0 0 1-2-2zm0 0v10a2 2 0 0 0 2 2h10",
+  dashboard: "M4 19V9M10 19V5M16 19v-8M22 19V3",
   search:
     "M9 3a6 6 0 1 0 0 12a6 6 0 0 0 0-12m0 2a4 4 0 1 1 0 8a4 4 0 0 1 0-8m6.5 9.1l1.4-1.4L22 18l-1.4 1.4z",
   refresh: "M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4",
@@ -86,6 +88,7 @@ const TOOLBAR_ICON_PATHS = {
 const TOOLBAR_ICON_TITLES: Record<ToolbarIconName, string> = {
   history: "History",
   turns: "Turns",
+  dashboard: "Dashboard",
   search: "Search",
   refresh: "Refresh",
   reindex: "Reindex",

@@ -17,6 +17,7 @@ describe("TopBar", () => {
     const onShikiThemeChange = vi.fn();
     const onShikiThemePreview = vi.fn();
     const onShikiThemePreviewReset = vi.fn();
+    const onToggleDashboard = vi.fn();
     const onIncrementalRefresh = vi.fn();
     const onToggleFocus = vi.fn();
     const onToggleHelp = vi.fn();
@@ -30,6 +31,7 @@ describe("TopBar", () => {
         indexing={false}
         focusMode={false}
         focusDisabled={false}
+        onToggleDashboard={onToggleDashboard}
         onToggleSearchView={onToggleSearchView}
         onThemeChange={onThemeChange}
         onThemePreview={onThemePreview}
@@ -64,6 +66,7 @@ describe("TopBar", () => {
       "Toggle Settings  ⌘,",
     );
 
+    await user.click(screen.getByRole("button", { name: "Open dashboard" }));
     await user.click(screen.getByRole("button", { name: "Search" }));
     await user.click(screen.getByRole("button", { name: "Incremental refresh" }));
     await user.click(screen.getByRole("button", { name: "Enter focus mode" }));
@@ -76,6 +79,7 @@ describe("TopBar", () => {
     await user.click(screen.getByRole("button", { name: "Light Plus" }));
     await user.click(screen.getByRole("button", { name: "Open settings" }));
 
+    expect(onToggleDashboard).toHaveBeenCalledTimes(1);
     expect(onToggleSearchView).toHaveBeenCalledTimes(1);
     expect(onIncrementalRefresh).toHaveBeenCalledTimes(1);
     expect(onToggleFocus).toHaveBeenCalledTimes(1);
@@ -99,6 +103,7 @@ describe("TopBar", () => {
         indexing={false}
         focusMode={false}
         focusDisabled={false}
+        onToggleDashboard={vi.fn()}
         onToggleSearchView={vi.fn()}
         onThemeChange={onThemeChange}
         onThemePreview={onThemePreview}
@@ -144,6 +149,7 @@ describe("TopBar", () => {
         indexing={false}
         focusMode={false}
         focusDisabled={false}
+        onToggleDashboard={vi.fn()}
         onToggleSearchView={vi.fn()}
         onThemeChange={vi.fn()}
         onThemePreview={vi.fn()}
@@ -188,6 +194,7 @@ describe("TopBar", () => {
         indexing={false}
         focusMode={false}
         focusDisabled={false}
+        onToggleDashboard={vi.fn()}
         onToggleSearchView={vi.fn()}
         onThemeChange={vi.fn()}
         onThemePreview={onThemePreview}
@@ -234,6 +241,7 @@ describe("TopBar", () => {
         indexing={false}
         focusMode={false}
         focusDisabled={false}
+        onToggleDashboard={vi.fn()}
         onToggleSearchView={vi.fn()}
         onThemeChange={vi.fn()}
         onThemePreview={vi.fn()}

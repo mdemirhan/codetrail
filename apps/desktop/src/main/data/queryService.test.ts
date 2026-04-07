@@ -208,6 +208,8 @@ function createBookmarkStoreMock(overrides: Partial<BookmarkStore> = {}): Bookma
       thinking: 0,
       system: 0,
     })),
+    countProjectBookmarksByProjectIds: vi.fn((_projectIds: string[]) => ({})),
+    countAllBookmarks: vi.fn(() => 0),
     countSessionBookmarks: vi.fn(() => 0),
     getBookmark: vi.fn(() => null),
     upsertBookmark: vi.fn(),
@@ -225,6 +227,222 @@ function createBookmarkStoreMock(overrides: Partial<BookmarkStore> = {}): Bookma
 }
 
 describe("queryService in-memory", () => {
+  it("aggregates dashboard statistics across providers, categories, and projects", () => {
+    const db = seedQueryDb();
+    const now = "2026-03-02T11:00:00.000Z";
+
+    db.prepare(
+      `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run("project_2", "codex", "Project Two", "/workspace/project-two", now, now);
+
+    db.prepare(
+      `INSERT INTO sessions (
+        id,
+        project_id,
+        provider,
+        file_path,
+        model_names,
+        started_at,
+        ended_at,
+        duration_ms,
+        git_branch,
+        cwd,
+        message_count,
+        token_input_total,
+        token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "session_2",
+      "project_2",
+      "codex",
+      "/workspace/project-two/session-2.jsonl",
+      "codex-gpt-5",
+      "2026-03-02T11:00:00.000Z",
+      "2026-03-02T11:00:10.000Z",
+      10000,
+      "feature/dashboard",
+      "/workspace/project-two",
+      3,
+      31,
+      17,
+    );
+
+    db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "message_3",
+      "source_3",
+      "session_2",
+      "codex",
+      "tool_edit",
+      "Updated dashboard layout styles",
+      "2026-03-02T11:00:02.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "message_4",
+      "source_4",
+      "session_2",
+      "codex",
+      "tool_use",
+      "Read dashboard query implementation",
+      "2026-03-02T11:00:04.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "message_5",
+      "source_5",
+      "session_2",
+      "codex",
+      "tool_result",
+      "Dashboard query returned aggregated rows",
+      "2026-03-02T11:00:10.000Z",
+      31,
+      17,
+      10000,
+      "native",
+      "high",
+    );
+
+    db.prepare(
+      `INSERT INTO indexed_files (
+        file_path,
+        provider,
+        project_path,
+        session_identity,
+        file_size,
+        file_mtime_ms,
+        indexed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "/workspace/project-two/session-2.jsonl",
+      "codex",
+      "/workspace/project-two",
+      "codex:session_2",
+      1024,
+      Date.parse("2026-03-02T11:00:10.000Z"),
+      now,
+    );
+
+    db.prepare(
+      `INSERT INTO tool_calls (
+        id,
+        message_id,
+        tool_name,
+        args_json,
+        result_json,
+        started_at,
+        completed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "tool_call_1",
+      "message_4",
+      "Read",
+      JSON.stringify({ filePath: "src/dashboard.tsx" }),
+      JSON.stringify({ ok: true }),
+      "2026-03-02T11:00:03.000Z",
+      "2026-03-02T11:00:04.000Z",
+    );
+
+    const bookmarkStore = createBookmarkStoreMock({
+      countAllBookmarks: vi.fn(() => 3),
+      countProjectBookmarksByProjectIds: vi.fn((projectIds: string[]) =>
+        Object.fromEntries(
+          projectIds.map((projectId) => [projectId, projectId === "project_2" ? 2 : 1]),
+        ),
+      ),
+    });
+    const service = createQueryServiceFromDb(db, {
+      bookmarkStore,
+      ownsBookmarkStore: false,
+    });
+
+    const stats = service.getDashboardStats();
+
+    expect(stats.summary.projectCount).toBe(2);
+    expect(stats.summary.sessionCount).toBe(2);
+    expect(stats.summary.messageCount).toBe(5);
+    expect(stats.summary.bookmarkCount).toBe(3);
+    expect(stats.summary.toolCallCount).toBe(1);
+    expect(stats.summary.indexedFileCount).toBe(2);
+    expect(stats.summary.activeProviderCount).toBe(2);
+    expect(stats.summary.averageMessagesPerSession).toBe(2.5);
+    expect(stats.categoryCounts.user).toBe(1);
+    expect(stats.categoryCounts.assistant).toBe(1);
+    expect(stats.categoryCounts.tool_edit).toBe(1);
+    expect(stats.categoryCounts.tool_use).toBe(1);
+    expect(stats.categoryCounts.tool_result).toBe(1);
+    expect(stats.providerStats.find((provider) => provider.provider === "codex")).toMatchObject({
+      projectCount: 1,
+      sessionCount: 1,
+      messageCount: 3,
+      toolCallCount: 1,
+    });
+    expect(stats.topProjects[0]).toMatchObject({
+      projectId: "project_2",
+      bookmarkCount: 2,
+    });
+    expect(stats.topModels[0]).toMatchObject({
+      modelName: "codex-gpt-5",
+      messageCount: 3,
+    });
+    expect(stats.recentActivity).toHaveLength(stats.activityWindowDays);
+    expect(bookmarkStore.countAllBookmarks).toHaveBeenCalled();
+    expect(bookmarkStore.countProjectBookmarksByProjectIds).toHaveBeenCalled();
+  });
+
   it("serves list/detail/bookmark flows using createQueryServiceFromDb", () => {
     const db = seedQueryDb();
     const service = createQueryServiceFromDb(db);

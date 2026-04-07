@@ -69,6 +69,24 @@ function installDialogMock(): void {
 }
 
 describe("App shell", () => {
+  it("opens the dashboard view from the top bar and loads dashboard stats", async () => {
+    installScrollIntoViewMock();
+
+    const client = createAppClient();
+    const user = userEvent.setup();
+
+    renderWithClient(<App />, client);
+
+    await user.click(screen.getByRole("button", { name: "Open dashboard" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Activity Dashboard" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Workspace telemetry")).toBeInTheDocument();
+    expect(countChannelCalls(client, "dashboard:getStats")).toBeGreaterThanOrEqual(1);
+  });
+
   it("compacts large message-type pill counts while keeping the exact count in the tooltip", async () => {
     installDialogMock();
     installScrollIntoViewMock();

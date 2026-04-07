@@ -157,6 +157,54 @@ type FocusTargetRow = {
   created_at: string;
   created_at_ms: number;
 };
+type DashboardSummaryRow = {
+  project_count: number;
+  session_count: number;
+  message_count: number;
+  tool_call_count: number;
+  indexed_file_count: number;
+  indexed_bytes_total: number;
+  token_input_total: number;
+  token_output_total: number;
+  total_duration_ms: number;
+  average_session_duration_ms: number;
+};
+type DashboardCategoryRow = {
+  category: string;
+  count: number;
+};
+type DashboardProviderRow = {
+  provider: Provider;
+  project_count: number;
+  session_count: number;
+  message_count: number;
+  token_input_total: number;
+  token_output_total: number;
+  last_activity: string | null;
+};
+type DashboardToolCallProviderRow = {
+  provider: Provider;
+  tool_call_count: number;
+};
+type DashboardActivityRow = {
+  date: string;
+  session_count: number;
+  message_count: number;
+};
+type DashboardProjectRow = {
+  project_id: string;
+  provider: Provider;
+  name: string;
+  path: string;
+  session_count: number;
+  message_count: number;
+  last_activity: string | null;
+};
+type DashboardModelRow = {
+  model_name: string;
+  session_count: number;
+  message_count: number;
+};
 
 type TurnAnchorRow = {
   id: string;
@@ -193,6 +241,7 @@ type TurnNavigationMetadata = {
 };
 
 export type QueryService = {
+  getDashboardStats: () => IpcResponse<"dashboard:getStats">;
   listProjects: (request: IpcRequest<"projects:list">) => IpcResponse<"projects:list">;
   getProjectById: (projectId: string) => IpcResponse<"projects:list">["projects"][number] | null;
   getProjectCombinedDetail: (
@@ -263,6 +312,7 @@ export function createQueryServiceFromDb(
 
   let closed = false;
   return {
+    getDashboardStats: () => getDashboardStatsWithDatabase(db, bookmarkStore),
     listProjects: (request) => listProjectsWithDatabase(db, bookmarkStore, request),
     getProjectById: (projectId) => getProjectByIdWithDatabase(db, bookmarkStore, projectId),
     getProjectCombinedDetail: (request) => getProjectCombinedDetailWithDatabase(db, request),
@@ -287,6 +337,209 @@ export function createQueryServiceFromDb(
         bookmarkStore.close();
       }
     },
+  };
+}
+
+function getDashboardStatsWithDatabase(
+  db: DatabaseHandle,
+  bookmarkStore: BookmarkStore,
+): IpcResponse<"dashboard:getStats"> {
+  const summaryRow = db
+    .prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM projects) AS project_count,
+         (SELECT COUNT(*) FROM sessions) AS session_count,
+         (SELECT COUNT(*) FROM messages) AS message_count,
+         (SELECT COUNT(*) FROM tool_calls) AS tool_call_count,
+         (SELECT COUNT(*) FROM indexed_files) AS indexed_file_count,
+         (SELECT COALESCE(SUM(file_size), 0) FROM indexed_files) AS indexed_bytes_total,
+         (SELECT COALESCE(SUM(token_input_total), 0) FROM sessions) AS token_input_total,
+         (SELECT COALESCE(SUM(token_output_total), 0) FROM sessions) AS token_output_total,
+         (SELECT COALESCE(SUM(duration_ms), 0) FROM sessions WHERE duration_ms IS NOT NULL) AS total_duration_ms,
+         (SELECT COALESCE(AVG(duration_ms), 0) FROM sessions WHERE duration_ms IS NOT NULL) AS average_session_duration_ms`,
+    )
+    .get() as DashboardSummaryRow | undefined;
+
+  const categoryCounts = makeEmptyCategoryCounts();
+  const categoryRows = db
+    .prepare("SELECT category, COUNT(*) AS count FROM messages GROUP BY category")
+    .all() as DashboardCategoryRow[];
+  for (const row of categoryRows) {
+    categoryCounts[normalizeMessageCategory(row.category)] = Number(row.count ?? 0);
+  }
+
+  const providerCounts = createProviderRecord(() => 0);
+  const providerStatsByProvider = createProviderRecord((provider) => ({
+    provider,
+    projectCount: 0,
+    sessionCount: 0,
+    messageCount: 0,
+    toolCallCount: 0,
+    tokenInputTotal: 0,
+    tokenOutputTotal: 0,
+    lastActivity: null as string | null,
+  }));
+
+  const providerRows = db
+    .prepare(
+      `SELECT
+         provider,
+         COUNT(DISTINCT project_id) AS project_count,
+         COUNT(*) AS session_count,
+         COALESCE(SUM(message_count), 0) AS message_count,
+         COALESCE(SUM(token_input_total), 0) AS token_input_total,
+         COALESCE(SUM(token_output_total), 0) AS token_output_total,
+         MAX(activity_at) AS last_activity
+       FROM sessions
+       GROUP BY provider`,
+    )
+    .all() as DashboardProviderRow[];
+  for (const row of providerRows) {
+    providerCounts[row.provider] = Number(row.message_count ?? 0);
+    providerStatsByProvider[row.provider] = {
+      provider: row.provider,
+      projectCount: Number(row.project_count ?? 0),
+      sessionCount: Number(row.session_count ?? 0),
+      messageCount: Number(row.message_count ?? 0),
+      toolCallCount: 0,
+      tokenInputTotal: Number(row.token_input_total ?? 0),
+      tokenOutputTotal: Number(row.token_output_total ?? 0),
+      lastActivity: row.last_activity ?? null,
+    };
+  }
+
+  const toolCallRows = db
+    .prepare(
+      `SELECT m.provider AS provider, COUNT(*) AS tool_call_count
+       FROM tool_calls tc
+       JOIN messages m ON m.id = tc.message_id
+       GROUP BY m.provider`,
+    )
+    .all() as DashboardToolCallProviderRow[];
+  for (const row of toolCallRows) {
+    providerStatsByProvider[row.provider] = {
+      ...providerStatsByProvider[row.provider],
+      toolCallCount: Number(row.tool_call_count ?? 0),
+    };
+  }
+
+  const activityWindowDays = 14;
+  const activityStart = new Date();
+  activityStart.setUTCHours(0, 0, 0, 0);
+  activityStart.setUTCDate(activityStart.getUTCDate() - (activityWindowDays - 1));
+  const recentActivityRows = db
+    .prepare(
+      `SELECT
+         substr(created_at, 1, 10) AS date,
+         COUNT(DISTINCT session_id) AS session_count,
+         COUNT(*) AS message_count
+       FROM messages
+       WHERE created_at >= ?
+       GROUP BY substr(created_at, 1, 10)
+       ORDER BY date ASC`,
+    )
+    .all(activityStart.toISOString()) as DashboardActivityRow[];
+  const recentActivityByDate = new Map(
+    recentActivityRows.map((row) => [
+      row.date,
+      {
+        date: row.date,
+        sessionCount: Number(row.session_count ?? 0),
+        messageCount: Number(row.message_count ?? 0),
+      },
+    ]),
+  );
+  const recentActivity = Array.from({ length: activityWindowDays }, (_, index) => {
+    const date = new Date(activityStart);
+    date.setUTCDate(activityStart.getUTCDate() + index);
+    const key = date.toISOString().slice(0, 10);
+    return (
+      recentActivityByDate.get(key) ?? {
+        date: key,
+        sessionCount: 0,
+        messageCount: 0,
+      }
+    );
+  });
+
+  const topProjectRows = db
+    .prepare(
+      `SELECT
+         p.id AS project_id,
+         p.provider AS provider,
+         p.name AS name,
+         p.path AS path,
+         COALESCE(ps.session_count, 0) AS session_count,
+         COALESCE(ps.message_count, 0) AS message_count,
+         ps.last_activity AS last_activity
+       FROM projects p
+       LEFT JOIN project_stats ps ON ps.project_id = p.id
+       ORDER BY COALESCE(ps.message_count, 0) DESC, COALESCE(ps.session_count, 0) DESC, p.name ASC
+       LIMIT 6`,
+    )
+    .all() as DashboardProjectRow[];
+  const topProjectBookmarkCounts = bookmarkStore.countProjectBookmarksByProjectIds?.(
+    topProjectRows.map((row) => row.project_id),
+  );
+  const topProjects = topProjectRows.map((row) => ({
+    projectId: row.project_id,
+    provider: row.provider,
+    name: row.name,
+    path: row.path,
+    sessionCount: Number(row.session_count ?? 0),
+    messageCount: Number(row.message_count ?? 0),
+    bookmarkCount: Number(topProjectBookmarkCounts?.[row.project_id] ?? 0),
+    lastActivity: row.last_activity ?? null,
+  }));
+
+  const topModels = db
+    .prepare(
+      `SELECT
+         model_names AS model_name,
+         COUNT(*) AS session_count,
+         COALESCE(SUM(message_count), 0) AS message_count
+       FROM sessions
+       WHERE TRIM(model_names) <> ''
+       GROUP BY model_names
+       ORDER BY COALESCE(SUM(message_count), 0) DESC, COUNT(*) DESC, model_names ASC
+       LIMIT 6`,
+    )
+    .all() as DashboardModelRow[];
+
+  const summary = {
+    projectCount: Number(summaryRow?.project_count ?? 0),
+    sessionCount: Number(summaryRow?.session_count ?? 0),
+    messageCount: Number(summaryRow?.message_count ?? 0),
+    bookmarkCount: Number(bookmarkStore.countAllBookmarks?.() ?? 0),
+    toolCallCount: Number(summaryRow?.tool_call_count ?? 0),
+    indexedFileCount: Number(summaryRow?.indexed_file_count ?? 0),
+    indexedBytesTotal: Number(summaryRow?.indexed_bytes_total ?? 0),
+    tokenInputTotal: Number(summaryRow?.token_input_total ?? 0),
+    tokenOutputTotal: Number(summaryRow?.token_output_total ?? 0),
+    totalDurationMs: Number(summaryRow?.total_duration_ms ?? 0),
+    averageMessagesPerSession:
+      Number(summaryRow?.session_count ?? 0) > 0
+        ? Number(summaryRow?.message_count ?? 0) / Number(summaryRow?.session_count ?? 1)
+        : 0,
+    averageSessionDurationMs: Number(summaryRow?.average_session_duration_ms ?? 0),
+    activeProviderCount: Object.values(providerStatsByProvider).filter(
+      (stats) => stats.projectCount > 0 || stats.sessionCount > 0 || stats.messageCount > 0,
+    ).length,
+  };
+
+  return {
+    summary,
+    categoryCounts,
+    providerCounts,
+    providerStats: Object.values(providerStatsByProvider),
+    recentActivity,
+    topProjects,
+    topModels: topModels.map((row) => ({
+      modelName: row.model_name,
+      sessionCount: Number(row.session_count ?? 0),
+      messageCount: Number(row.message_count ?? 0),
+    })),
+    activityWindowDays,
   };
 }
 

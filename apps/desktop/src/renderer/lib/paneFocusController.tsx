@@ -12,7 +12,7 @@ import {
 import { isEditableTarget } from "./focusTargets";
 
 export type HistoryPaneId = "project" | "session" | "message";
-export type ViewFocusDomainId = "search" | "settings" | "help";
+export type ViewFocusDomainId = "dashboard" | "search" | "settings" | "help";
 export type FocusDomain =
   | { kind: "history"; pane: HistoryPaneId }
   | { kind: ViewFocusDomainId }
@@ -124,6 +124,7 @@ export function useCreatePaneFocusController(): PaneFocusController {
     message: { root: null, focusTarget: null },
   });
   const viewTargetsRef = useRef<ViewTargetRegistration>({
+    dashboard: null,
     search: null,
     settings: null,
     help: null,

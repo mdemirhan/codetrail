@@ -591,6 +591,7 @@ export function TopBar({
   indexing,
   focusMode,
   focusDisabled,
+  onToggleDashboard = () => undefined,
   onToggleSearchView,
   onThemeChange,
   onThemePreview,
@@ -608,12 +609,13 @@ export function TopBar({
   onToggleHelp,
   onToggleSettings,
 }: {
-  mainView: "history" | "search" | "settings" | "help";
+  mainView: "history" | "dashboard" | "search" | "settings" | "help";
   theme: ThemeMode;
   shikiTheme: ShikiThemeId;
   indexing: boolean;
   focusMode: boolean;
   focusDisabled: boolean;
+  onToggleDashboard?: () => void;
   onToggleSearchView: () => void;
   onThemeChange: (theme: ThemeMode) => void;
   onThemePreview: (theme: ThemeMode) => void;
@@ -636,13 +638,15 @@ export function TopBar({
   const formatTooltipLabel = useTooltipFormatter();
   const preserveHistoryFocusProps = paneFocus.getPreserveHistoryFocusProps();
   const activeTitleSuffix =
-    mainView === "search"
-      ? "Search"
-      : mainView === "settings"
-        ? "Settings"
-        : mainView === "help"
-          ? "Help"
-          : null;
+    mainView === "dashboard"
+      ? "Dashboard"
+      : mainView === "search"
+        ? "Search"
+        : mainView === "settings"
+          ? "Settings"
+          : mainView === "help"
+            ? "Help"
+            : null;
 
   return (
     <header className="titlebar">
@@ -657,6 +661,17 @@ export function TopBar({
         </div>
       </div>
       <div className="titlebar-actions">
+        <button
+          type="button"
+          className={mainView === "dashboard" ? "tb-btn active" : "tb-btn"}
+          {...preserveHistoryFocusProps}
+          onClick={onToggleDashboard}
+          aria-label={mainView === "dashboard" ? "Return to history view" : "Open dashboard"}
+          title={mainView === "dashboard" ? "Return to History" : "Open Dashboard"}
+        >
+          <ToolbarIcon name="dashboard" />
+          Dashboard
+        </button>
         <button
           type="button"
           className={mainView === "search" ? "tb-btn active" : "tb-btn"}

@@ -592,6 +592,7 @@ export async function bootstrapMainProcess(
         options.onCommandStateChanged?.(payload);
         return { ok: true };
       },
+      "dashboard:getStats": () => queryService.getDashboardStats(),
       "indexer:refresh": async (payload) => {
         invalidateAllowedRootsCache();
         if (payload.projectId && !payload.force) {

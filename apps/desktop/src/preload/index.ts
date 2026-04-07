@@ -23,6 +23,7 @@ const api: CodetrailBridge = {
   appFlushState: (payload) => invoke("app:flushState", payload),
   appSetCommandState: (payload) => invoke("app:setCommandState", payload),
   appGetSettingsInfo: (payload) => invoke("app:getSettingsInfo", payload),
+  dashboardGetStats: (payload) => invoke("dashboard:getStats", payload),
   bookmarksGetStates: (payload) => invoke("bookmarks:getStates", payload),
   bookmarksListProject: (payload) => invoke("bookmarks:listProject", payload),
   bookmarksToggle: (payload) => invoke("bookmarks:toggle", payload),

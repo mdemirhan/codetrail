@@ -189,4 +189,41 @@ describe("App focus restoration", () => {
       expect(document.activeElement).toBe(container.querySelector(".list-scroll.session-list"));
     });
   });
+
+  it("restores the last active history pane when exiting the dashboard with Escape", async () => {
+    installScrollIntoViewMock();
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(screen.getByText("Project One")).toBeInTheDocument();
+    });
+
+    expandHistoryPanes();
+
+    focusPaneFromHeader(container, "project");
+    await waitFor(() => {
+      expect(container.querySelector('[data-pane-active="true"]')).toHaveAttribute(
+        "data-history-pane",
+        "project",
+      );
+      expect(document.activeElement).toBe(container.querySelector(".list-scroll.project-list"));
+    });
+
+    clickToolbarButton(screen.getByRole("button", { name: "Open dashboard" }));
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Activity Dashboard" })).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Activity Dashboard" })).toBeNull();
+      expect(container.querySelector('[data-pane-active="true"]')).toHaveAttribute(
+        "data-history-pane",
+        "project",
+      );
+      expect(document.activeElement).toBe(container.querySelector(".list-scroll.project-list"));
+    });
+  });
 });

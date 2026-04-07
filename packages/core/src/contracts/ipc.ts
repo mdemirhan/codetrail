@@ -141,6 +141,51 @@ const categoryCountsSchema = z.object({
   system: z.number().int().nonnegative(),
 });
 const providerCountsSchema = z.object(createProviderRecord(() => z.number().int().nonnegative()));
+const dashboardSummarySchema = z.object({
+  projectCount: z.number().int().nonnegative(),
+  sessionCount: z.number().int().nonnegative(),
+  messageCount: z.number().int().nonnegative(),
+  bookmarkCount: z.number().int().nonnegative(),
+  toolCallCount: z.number().int().nonnegative(),
+  indexedFileCount: z.number().int().nonnegative(),
+  indexedBytesTotal: z.number().int().nonnegative(),
+  tokenInputTotal: z.number().int().nonnegative(),
+  tokenOutputTotal: z.number().int().nonnegative(),
+  totalDurationMs: z.number().int().nonnegative(),
+  averageMessagesPerSession: z.number().nonnegative(),
+  averageSessionDurationMs: z.number().nonnegative(),
+  activeProviderCount: z.number().int().nonnegative(),
+});
+const dashboardProviderStatSchema = z.object({
+  provider: providerSchema,
+  projectCount: z.number().int().nonnegative(),
+  sessionCount: z.number().int().nonnegative(),
+  messageCount: z.number().int().nonnegative(),
+  toolCallCount: z.number().int().nonnegative(),
+  tokenInputTotal: z.number().int().nonnegative(),
+  tokenOutputTotal: z.number().int().nonnegative(),
+  lastActivity: z.string().nullable(),
+});
+const dashboardActivityPointSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  sessionCount: z.number().int().nonnegative(),
+  messageCount: z.number().int().nonnegative(),
+});
+const dashboardProjectStatSchema = z.object({
+  projectId: z.string().min(1),
+  provider: providerSchema,
+  name: z.string(),
+  path: z.string(),
+  sessionCount: z.number().int().nonnegative(),
+  messageCount: z.number().int().nonnegative(),
+  bookmarkCount: z.number().int().nonnegative(),
+  lastActivity: z.string().nullable(),
+});
+const dashboardModelStatSchema = z.object({
+  modelName: z.string().min(1),
+  sessionCount: z.number().int().nonnegative(),
+  messageCount: z.number().int().nonnegative(),
+});
 
 const monoFontSizeSchema = z.enum([
   "10px",
@@ -476,6 +521,19 @@ export const ipcContractSchemas = {
     request: z.object({}),
     response: z.object({
       schemaVersion: z.number().int().positive(),
+    }),
+  },
+  "dashboard:getStats": {
+    request: z.object({}),
+    response: z.object({
+      summary: dashboardSummarySchema,
+      categoryCounts: categoryCountsSchema,
+      providerCounts: providerCountsSchema,
+      providerStats: z.array(dashboardProviderStatSchema),
+      recentActivity: z.array(dashboardActivityPointSchema),
+      topProjects: z.array(dashboardProjectStatSchema),
+      topModels: z.array(dashboardModelStatSchema),
+      activityWindowDays: z.number().int().positive(),
     }),
   },
   "indexer:refresh": {
