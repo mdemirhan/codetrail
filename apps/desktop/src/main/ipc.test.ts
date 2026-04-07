@@ -40,6 +40,30 @@ function createClaudeHookState(input: { installed: boolean }) {
   });
 }
 
+const emptyAiCodeStats = {
+  summary: {
+    writeEventCount: 0,
+    measurableWriteEventCount: 0,
+    writeSessionCount: 0,
+    fileChangeCount: 0,
+    distinctFilesTouchedCount: 0,
+    linesAdded: 0,
+    linesDeleted: 0,
+    netLines: 0,
+    multiFileWriteCount: 0,
+    averageFilesPerWrite: 0,
+  },
+  changeTypeCounts: {
+    add: 0,
+    update: 0,
+    delete: 0,
+  },
+  providerStats: [],
+  recentActivity: [],
+  topFiles: [],
+  topFileTypes: [],
+} satisfies IpcResponse<"dashboard:getStats">["aiCodeStats"];
+
 describe("registerIpcHandlers", () => {
   it("validates request payloads before invoking handlers", async () => {
     const registry = new Map<string, (event: unknown, payload: unknown) => Promise<unknown>>();
@@ -87,6 +111,7 @@ describe("registerIpcHandlers", () => {
           recentActivity: [],
           topProjects: [],
           topModels: [],
+          aiCodeStats: emptyAiCodeStats,
           activityWindowDays: 14,
         }),
         "indexer:refresh": (payload) => ({ jobId: payload.force ? "force-1" : "normal-1" }),
@@ -355,6 +380,7 @@ describe("registerIpcHandlers", () => {
           recentActivity: [],
           topProjects: [],
           topModels: [],
+          aiCodeStats: emptyAiCodeStats,
           activityWindowDays: 14,
         }),
         "indexer:refresh": () => ({ jobId: "refresh-1" }),

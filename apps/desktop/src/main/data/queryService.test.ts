@@ -395,6 +395,32 @@ describe("queryService in-memory", () => {
       "2026-03-02T11:00:03.000Z",
       "2026-03-02T11:00:04.000Z",
     );
+    db.prepare(
+      `INSERT INTO tool_calls (
+        id,
+        message_id,
+        tool_name,
+        args_json,
+        result_json,
+        started_at,
+        completed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "tool_call_2",
+      "message_3",
+      "apply_patch",
+      JSON.stringify(
+        [
+          "*** Begin Patch",
+          "*** Add File: src/dashboard.tsx",
+          "+export const Dashboard = () => null;",
+          "*** End Patch",
+        ].join("\n"),
+      ),
+      null,
+      "2026-03-02T11:00:01.000Z",
+      "2026-03-02T11:00:02.000Z",
+    );
 
     const bookmarkStore = createBookmarkStoreMock({
       countAllBookmarks: vi.fn(() => 3),
@@ -415,7 +441,7 @@ describe("queryService in-memory", () => {
     expect(stats.summary.sessionCount).toBe(2);
     expect(stats.summary.messageCount).toBe(5);
     expect(stats.summary.bookmarkCount).toBe(3);
-    expect(stats.summary.toolCallCount).toBe(1);
+    expect(stats.summary.toolCallCount).toBe(2);
     expect(stats.summary.indexedFileCount).toBe(2);
     expect(stats.summary.activeProviderCount).toBe(2);
     expect(stats.summary.averageMessagesPerSession).toBe(2.5);
@@ -428,7 +454,7 @@ describe("queryService in-memory", () => {
       projectCount: 1,
       sessionCount: 1,
       messageCount: 3,
-      toolCallCount: 1,
+      toolCallCount: 2,
     });
     expect(stats.topProjects[0]).toMatchObject({
       projectId: "project_2",
@@ -438,9 +464,366 @@ describe("queryService in-memory", () => {
       modelName: "codex-gpt-5",
       messageCount: 3,
     });
+    expect(stats.aiCodeStats.summary).toMatchObject({
+      writeEventCount: 1,
+      measurableWriteEventCount: 1,
+      writeSessionCount: 1,
+      fileChangeCount: 1,
+      distinctFilesTouchedCount: 1,
+      linesAdded: 1,
+      linesDeleted: 0,
+      netLines: 1,
+      multiFileWriteCount: 0,
+    });
+    expect(stats.aiCodeStats.changeTypeCounts).toEqual({
+      add: 1,
+      update: 0,
+      delete: 0,
+    });
+    expect(stats.aiCodeStats.providerStats.find((provider) => provider.provider === "codex"))
+      .toMatchObject({
+        writeEventCount: 1,
+        fileChangeCount: 1,
+        linesAdded: 1,
+        linesDeleted: 0,
+        writeSessionCount: 1,
+      });
+    expect(stats.aiCodeStats.topFiles[0]).toMatchObject({
+      filePath: "src/dashboard.tsx",
+      writeEventCount: 1,
+      linesAdded: 1,
+      linesDeleted: 0,
+    });
     expect(stats.recentActivity).toHaveLength(stats.activityWindowDays);
     expect(bookmarkStore.countAllBookmarks).toHaveBeenCalled();
     expect(bookmarkStore.countProjectBookmarksByProjectIds).toHaveBeenCalled();
+  });
+
+  it("aggregates ai code activity metrics across structured writes, multi-file patches, and unparseable events", () => {
+    const db = createInMemoryDatabase();
+    const now = "2026-04-01T09:00:00.000Z";
+
+    db.prepare(
+      `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run("project_1", "claude", "Project One", "/workspace/project-one", now, now);
+    db.prepare(
+      `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run("project_2", "codex", "Project Two", "/workspace/project-two", now, now);
+
+    const insertSession = db.prepare(
+      `INSERT INTO sessions (
+        id,
+        project_id,
+        provider,
+        file_path,
+        model_names,
+        started_at,
+        ended_at,
+        duration_ms,
+        git_branch,
+        cwd,
+        message_count,
+        token_input_total,
+        token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    insertSession.run(
+      "session_1",
+      "project_1",
+      "claude",
+      "/workspace/project-one/session-1.jsonl",
+      "claude-opus-4-1",
+      "2026-04-01T09:00:00.000Z",
+      "2026-04-01T09:05:00.000Z",
+      300000,
+      "main",
+      "/workspace/project-one",
+      1,
+      0,
+      0,
+    );
+    insertSession.run(
+      "session_2",
+      "project_2",
+      "codex",
+      "/workspace/project-two/session-2.jsonl",
+      "codex-gpt-5",
+      "2026-04-02T09:00:00.000Z",
+      "2026-04-02T09:12:00.000Z",
+      720000,
+      "feat/ai-stats",
+      "/workspace/project-two",
+      4,
+      0,
+      0,
+    );
+
+    const insertMessage = db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    insertMessage.run(
+      "message_1",
+      "source_1",
+      "session_1",
+      "claude",
+      "tool_edit",
+      "Updated src/app.ts",
+      "2026-04-01T09:03:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "message_2",
+      "source_2",
+      "session_2",
+      "codex",
+      "tool_edit",
+      "Applied multi-file patch",
+      "2026-04-02T09:04:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "message_3",
+      "source_3",
+      "session_2",
+      "codex",
+      "tool_edit",
+      "Created src/feature.tsx",
+      "2026-04-03T09:08:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "message_4",
+      "source_4",
+      "session_2",
+      "codex",
+      "tool_edit",
+      "Moved and deleted files",
+      "2026-04-04T09:09:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "message_5",
+      "source_5",
+      "session_2",
+      "codex",
+      "tool_edit",
+      "Payload truncated",
+      "2026-04-05T09:10:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+
+    const insertToolCall = db.prepare(
+      `INSERT INTO tool_calls (
+        id,
+        message_id,
+        tool_name,
+        args_json,
+        result_json,
+        started_at,
+        completed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    insertToolCall.run(
+      "tool_call_1",
+      "message_1",
+      "str_replace",
+      JSON.stringify({
+        path: "src/app.ts",
+        old_string: "const value = 1;\n",
+        new_string: "const value = 1;\nconst next = 2;\n",
+      }),
+      null,
+      "2026-04-01T09:03:00.000Z",
+      "2026-04-01T09:03:01.000Z",
+    );
+    insertToolCall.run(
+      "tool_call_2",
+      "message_2",
+      "apply_patch",
+      JSON.stringify(
+        [
+          "*** Begin Patch",
+          "*** Add File: src/new.ts",
+          "+export const created = true;",
+          "+export const version = 1;",
+          "*** Update File: src/parser.ts",
+          "@@",
+          "-const value = old();",
+          "+const value = next();",
+          "+const after = true;",
+          "*** End Patch",
+        ].join("\n"),
+      ),
+      null,
+      "2026-04-02T09:04:00.000Z",
+      "2026-04-02T09:04:05.000Z",
+    );
+    insertToolCall.run(
+      "tool_call_3",
+      "message_3",
+      "write_file",
+      JSON.stringify({
+        path: "src/feature.tsx",
+        content: "export function Feature() {\n  return <div />;\n}\n",
+      }),
+      null,
+      "2026-04-03T09:08:00.000Z",
+      "2026-04-03T09:08:01.000Z",
+    );
+    insertToolCall.run(
+      "tool_call_4",
+      "message_4",
+      "apply_patch",
+      JSON.stringify(
+        [
+          "*** Begin Patch",
+          "*** Delete File: src/obsolete.ts",
+          "@@",
+          "-export const obsolete = true;",
+          "*** Update File: src/old-name.ts",
+          "*** Move to: src/new-name.ts",
+          "@@",
+          "-export const before = oldName();",
+          "+export const after = newName();",
+          "*** End Patch",
+        ].join("\n"),
+      ),
+      null,
+      "2026-04-04T09:09:00.000Z",
+      "2026-04-04T09:09:03.000Z",
+    );
+    insertToolCall.run(
+      "tool_call_5",
+      "message_5",
+      "apply_patch",
+      "{",
+      null,
+      "2026-04-05T09:10:00.000Z",
+      "2026-04-05T09:10:01.000Z",
+    );
+
+    const service = createQueryServiceFromDb(db, {
+      bookmarkStore: createBookmarkStoreMock(),
+      ownsBookmarkStore: false,
+    });
+
+    const stats = service.getDashboardStats();
+
+    expect(stats.aiCodeStats.summary).toMatchObject({
+      writeEventCount: 5,
+      measurableWriteEventCount: 4,
+      writeSessionCount: 2,
+      fileChangeCount: 6,
+      distinctFilesTouchedCount: 6,
+      linesAdded: 9,
+      linesDeleted: 3,
+      netLines: 6,
+      multiFileWriteCount: 2,
+      averageFilesPerWrite: 1.5,
+    });
+    expect(stats.aiCodeStats.changeTypeCounts).toEqual({
+      add: 2,
+      update: 3,
+      delete: 1,
+    });
+    expect(stats.aiCodeStats.providerStats.find((provider) => provider.provider === "codex"))
+      .toMatchObject({
+        writeEventCount: 4,
+        fileChangeCount: 5,
+        linesAdded: 8,
+        linesDeleted: 3,
+        writeSessionCount: 1,
+      });
+    expect(stats.aiCodeStats.providerStats.find((provider) => provider.provider === "claude"))
+      .toMatchObject({
+        writeEventCount: 1,
+        fileChangeCount: 1,
+        linesAdded: 1,
+        linesDeleted: 0,
+        writeSessionCount: 1,
+      });
+    expect(stats.aiCodeStats.topFiles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          filePath: "src/new.ts",
+          writeEventCount: 1,
+          linesAdded: 2,
+          linesDeleted: 0,
+        }),
+        expect.objectContaining({
+          filePath: "src/new-name.ts",
+          linesAdded: 1,
+          linesDeleted: 1,
+        }),
+      ]),
+    );
+    expect(stats.aiCodeStats.topFileTypes).toEqual([
+      {
+        label: ".ts",
+        fileChangeCount: 5,
+        linesAdded: 6,
+        linesDeleted: 3,
+      },
+      {
+        label: ".tsx",
+        fileChangeCount: 1,
+        linesAdded: 3,
+        linesDeleted: 0,
+      },
+    ]);
+    expect(stats.aiCodeStats.recentActivity).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          date: "2026-04-02",
+          writeEventCount: 1,
+          fileChangeCount: 2,
+          linesAdded: 4,
+          linesDeleted: 1,
+        }),
+        expect.objectContaining({
+          date: "2026-04-05",
+          writeEventCount: 1,
+          fileChangeCount: 0,
+          linesAdded: 0,
+          linesDeleted: 0,
+        }),
+      ]),
+    );
   });
 
   it("serves list/detail/bookmark flows using createQueryServiceFromDb", () => {

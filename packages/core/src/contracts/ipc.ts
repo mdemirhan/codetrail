@@ -186,6 +186,59 @@ const dashboardModelStatSchema = z.object({
   sessionCount: z.number().int().nonnegative(),
   messageCount: z.number().int().nonnegative(),
 });
+const dashboardAiCodeSummarySchema = z.object({
+  writeEventCount: z.number().int().nonnegative(),
+  measurableWriteEventCount: z.number().int().nonnegative(),
+  writeSessionCount: z.number().int().nonnegative(),
+  fileChangeCount: z.number().int().nonnegative(),
+  distinctFilesTouchedCount: z.number().int().nonnegative(),
+  linesAdded: z.number().int().nonnegative(),
+  linesDeleted: z.number().int().nonnegative(),
+  netLines: z.number().int(),
+  multiFileWriteCount: z.number().int().nonnegative(),
+  averageFilesPerWrite: z.number().nonnegative(),
+});
+const dashboardAiCodeChangeTypeCountsSchema = z.object({
+  add: z.number().int().nonnegative(),
+  update: z.number().int().nonnegative(),
+  delete: z.number().int().nonnegative(),
+});
+const dashboardAiCodeProviderStatSchema = z.object({
+  provider: providerSchema,
+  writeEventCount: z.number().int().nonnegative(),
+  fileChangeCount: z.number().int().nonnegative(),
+  linesAdded: z.number().int().nonnegative(),
+  linesDeleted: z.number().int().nonnegative(),
+  writeSessionCount: z.number().int().nonnegative(),
+});
+const dashboardAiCodeActivityPointSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  writeEventCount: z.number().int().nonnegative(),
+  fileChangeCount: z.number().int().nonnegative(),
+  linesAdded: z.number().int().nonnegative(),
+  linesDeleted: z.number().int().nonnegative(),
+});
+const dashboardAiCodeTopFileSchema = z.object({
+  filePath: z.string().min(1),
+  writeEventCount: z.number().int().nonnegative(),
+  linesAdded: z.number().int().nonnegative(),
+  linesDeleted: z.number().int().nonnegative(),
+  lastTouchedAt: z.string().nullable(),
+});
+const dashboardAiCodeTopFileTypeSchema = z.object({
+  label: z.string().min(1),
+  fileChangeCount: z.number().int().nonnegative(),
+  linesAdded: z.number().int().nonnegative(),
+  linesDeleted: z.number().int().nonnegative(),
+});
+const dashboardAiCodeStatsSchema = z.object({
+  summary: dashboardAiCodeSummarySchema,
+  changeTypeCounts: dashboardAiCodeChangeTypeCountsSchema,
+  providerStats: z.array(dashboardAiCodeProviderStatSchema),
+  recentActivity: z.array(dashboardAiCodeActivityPointSchema),
+  topFiles: z.array(dashboardAiCodeTopFileSchema),
+  topFileTypes: z.array(dashboardAiCodeTopFileTypeSchema),
+});
 
 const monoFontSizeSchema = z.enum([
   "10px",
@@ -533,6 +586,7 @@ export const ipcContractSchemas = {
       recentActivity: z.array(dashboardActivityPointSchema),
       topProjects: z.array(dashboardProjectStatSchema),
       topModels: z.array(dashboardModelStatSchema),
+      aiCodeStats: dashboardAiCodeStatsSchema,
       activityWindowDays: z.number().int().positive(),
     }),
   },

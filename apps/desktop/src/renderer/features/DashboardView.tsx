@@ -62,6 +62,14 @@ function formatAverage(value: number): string {
   return value >= 100 ? value.toFixed(0) : value.toFixed(1);
 }
 
+function formatSignedInteger(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded > 0) {
+    return `+${formatInteger(rounded)}`;
+  }
+  return formatInteger(rounded);
+}
+
 function MetricCard({
   label,
   value,
@@ -133,9 +141,63 @@ export function DashboardView({
   const providerMax = useMemo(() => {
     return Math.max(1, ...stats.providerStats.map((provider) => provider.messageCount));
   }, [stats.providerStats]);
+  const aiVelocityMax = useMemo(() => {
+    return Math.max(
+      1,
+      ...stats.aiCodeStats.recentActivity.map((point) => point.linesAdded + point.linesDeleted),
+    );
+  }, [stats.aiCodeStats.recentActivity]);
+  const aiProviderStats = useMemo(() => {
+    return [...stats.aiCodeStats.providerStats]
+      .filter((provider) => provider.writeEventCount > 0 || provider.fileChangeCount > 0)
+      .sort((left, right) => {
+        if (right.fileChangeCount !== left.fileChangeCount) {
+          return right.fileChangeCount - left.fileChangeCount;
+        }
+        const leftLines = left.linesAdded + left.linesDeleted;
+        const rightLines = right.linesAdded + right.linesDeleted;
+        if (rightLines !== leftLines) {
+          return rightLines - leftLines;
+        }
+        return left.provider.localeCompare(right.provider);
+      });
+  }, [stats.aiCodeStats.providerStats]);
+  const aiProviderMax = useMemo(() => {
+    return Math.max(1, ...aiProviderStats.map((provider) => provider.fileChangeCount));
+  }, [aiProviderStats]);
+  const aiChangeProfile = useMemo(() => {
+    const total = Math.max(1, stats.aiCodeStats.summary.fileChangeCount);
+    return [
+      {
+        label: "Add",
+        count: stats.aiCodeStats.changeTypeCounts.add,
+        accent: "var(--accent-green)",
+        percentage: (stats.aiCodeStats.changeTypeCounts.add / total) * 100,
+      },
+      {
+        label: "Update",
+        count: stats.aiCodeStats.changeTypeCounts.update,
+        accent: "var(--accent-blue)",
+        percentage: (stats.aiCodeStats.changeTypeCounts.update / total) * 100,
+      },
+      {
+        label: "Delete",
+        count: stats.aiCodeStats.changeTypeCounts.delete,
+        accent: "var(--accent-red)",
+        percentage: (stats.aiCodeStats.changeTypeCounts.delete / total) * 100,
+      },
+    ];
+  }, [stats.aiCodeStats.changeTypeCounts, stats.aiCodeStats.summary.fileChangeCount]);
 
   const leadingProject = stats.topProjects[0] ?? null;
   const leadingModel = stats.topModels[0] ?? null;
+  const hasAiWriteActivity = stats.aiCodeStats.summary.writeEventCount > 0;
+  const hasPartialAiCoverage =
+    stats.aiCodeStats.summary.measurableWriteEventCount < stats.aiCodeStats.summary.writeEventCount;
+  const aiWriteSessionRatio =
+    stats.summary.sessionCount > 0
+      ? (stats.aiCodeStats.summary.writeSessionCount / stats.summary.sessionCount) * 100
+      : 0;
 
   return (
     <div className="dashboard-view">
@@ -214,6 +276,236 @@ export function DashboardView({
           }
           tone="muted"
         />
+      </section>
+
+      <section className="dashboard-ai-section">
+        <div className="dashboard-section-heading">
+          <div>
+            <p className="dashboard-card-eyebrow">AI code activity</p>
+            <h2 className="dashboard-section-title">AI Code Activity</h2>
+          </div>
+          <span className="dashboard-card-meta">Write-only telemetry from explicit tool edits</span>
+        </div>
+
+        {!hasAiWriteActivity ? (
+          <article className="dashboard-card dashboard-ai-empty-state">
+            <div className="dashboard-card-header">
+              <div>
+                <p className="dashboard-card-eyebrow">No write activity yet</p>
+                <h2 className="dashboard-card-title">No AI write activity indexed yet</h2>
+              </div>
+            </div>
+            <p className="dashboard-ai-empty-copy">
+              Code Trail will surface write volume, file change mix, and top touched files here as
+              soon as indexed sessions include explicit edit tools such as patches or structured
+              writes.
+            </p>
+          </article>
+        ) : (
+          <>
+            <section className="dashboard-ai-metric-grid">
+              <MetricCard
+                label="AI Write Events"
+                value={formatCompactInteger(stats.aiCodeStats.summary.writeEventCount)}
+                meta={`${formatCompactInteger(stats.aiCodeStats.summary.writeSessionCount)} sessions with writes`}
+                tone="blue"
+              />
+              <MetricCard
+                label="Files Touched"
+                value={formatCompactInteger(stats.aiCodeStats.summary.distinctFilesTouchedCount)}
+                meta={`${formatCompactInteger(stats.aiCodeStats.summary.fileChangeCount)} file changes recorded`}
+                tone="teal"
+              />
+              <MetricCard
+                label="Lines Added"
+                value={formatCompactInteger(stats.aiCodeStats.summary.linesAdded)}
+                meta={`${formatCompactInteger(stats.aiCodeStats.summary.linesDeleted)} deleted alongside additions`}
+                tone="green"
+              />
+              <MetricCard
+                label="Net Lines"
+                value={formatSignedInteger(stats.aiCodeStats.summary.netLines)}
+                meta={`${formatAverage(stats.aiCodeStats.summary.averageFilesPerWrite)} files per measurable write`}
+                tone="orange"
+              />
+            </section>
+
+            <div className="dashboard-ai-note">
+              <span>
+                Measured from{" "}
+                {formatCompactInteger(stats.aiCodeStats.summary.measurableWriteEventCount)} of{" "}
+                {formatCompactInteger(stats.aiCodeStats.summary.writeEventCount)} write events.
+              </span>
+              <span>
+                {aiWriteSessionRatio.toFixed(1)}% of indexed sessions include AI writes.
+              </span>
+              {hasPartialAiCoverage ? (
+                <span>Some write payloads could not be fully parsed, so line totals are conservative.</span>
+              ) : null}
+            </div>
+
+            <section className="dashboard-ai-main-grid">
+              <article className="dashboard-card dashboard-card-feature">
+                <div className="dashboard-card-header">
+                  <div>
+                    <p className="dashboard-card-eyebrow">Recent AI edits</p>
+                    <h2 className="dashboard-card-title">Write Velocity</h2>
+                  </div>
+                  <span className="dashboard-card-meta">Last {stats.activityWindowDays} days</span>
+                </div>
+                <div className="dashboard-ai-velocity">
+                  {stats.aiCodeStats.recentActivity.map((point) => {
+                    const totalLines = point.linesAdded + point.linesDeleted;
+                    const stackHeight = `${Math.max(10, (totalLines / aiVelocityMax) * 100)}%`;
+                    const additionShare = totalLines > 0 ? (point.linesAdded / totalLines) * 100 : 0;
+                    const deletionShare = totalLines > 0 ? (point.linesDeleted / totalLines) * 100 : 0;
+                    return (
+                      <div key={point.date} className="dashboard-ai-velocity-column">
+                        <div
+                          className="dashboard-ai-velocity-stack"
+                          style={{ height: stackHeight }}
+                          title={`${point.date}: ${formatInteger(point.writeEventCount)} write events, ${formatInteger(point.fileChangeCount)} file changes, +${formatInteger(point.linesAdded)} / -${formatInteger(point.linesDeleted)}`}
+                        >
+                          <span
+                            className="dashboard-ai-velocity-bar dashboard-ai-velocity-bar-add"
+                            style={{ height: `${additionShare}%` }}
+                          />
+                          <span
+                            className="dashboard-ai-velocity-bar dashboard-ai-velocity-bar-delete"
+                            style={{ height: `${deletionShare}%` }}
+                          />
+                        </div>
+                        <span>{point.date.slice(5)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <div className="dashboard-ai-side-grid">
+                <article className="dashboard-card">
+                  <div className="dashboard-card-header">
+                    <div>
+                      <p className="dashboard-card-eyebrow">Change mix</p>
+                      <h2 className="dashboard-card-title">Change Profile</h2>
+                    </div>
+                  </div>
+                  <div className="dashboard-legend">
+                    {aiChangeProfile.map((item) => (
+                      <div key={item.label} className="dashboard-legend-row">
+                        <div className="dashboard-legend-main">
+                          <span
+                            className="dashboard-legend-swatch"
+                            style={{ background: item.accent }}
+                            aria-hidden
+                          />
+                          <span className="dashboard-legend-label">{item.label}</span>
+                        </div>
+                        <div className="dashboard-legend-stats">
+                          <strong>{formatCompactInteger(item.count)}</strong>
+                          <span>{item.percentage.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="dashboard-card">
+                  <div className="dashboard-card-header">
+                    <div>
+                      <p className="dashboard-card-eyebrow">Providers</p>
+                      <h2 className="dashboard-card-title">Provider Write Throughput</h2>
+                    </div>
+                  </div>
+                  <div className="dashboard-provider-list">
+                    {aiProviderStats.map((provider) => {
+                      const width = `${Math.max(8, (provider.fileChangeCount / aiProviderMax) * 100)}%`;
+                      return (
+                        <div key={provider.provider} className="dashboard-provider-row">
+                          <div className="dashboard-provider-head">
+                            <div>
+                              <strong>{prettyProvider(provider.provider)}</strong>
+                              <p>
+                                {formatCompactInteger(provider.writeSessionCount)} sessions,{" "}
+                                {formatCompactInteger(provider.writeEventCount)} write events
+                              </p>
+                            </div>
+                            <div className="dashboard-provider-counts">
+                              <strong>{formatCompactInteger(provider.fileChangeCount)}</strong>
+                              <span>file changes</span>
+                            </div>
+                          </div>
+                          <div className="dashboard-provider-bar">
+                            <span className="dashboard-provider-bar-fill" style={{ width }} />
+                          </div>
+                          <div className="dashboard-provider-foot">
+                            <span>+{formatCompactInteger(provider.linesAdded)} lines</span>
+                            <span>-{formatCompactInteger(provider.linesDeleted)} lines</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section className="dashboard-ai-secondary-grid">
+              <article className="dashboard-card">
+                <div className="dashboard-card-header">
+                  <div>
+                    <p className="dashboard-card-eyebrow">Top files</p>
+                    <h2 className="dashboard-card-title">Top Written Files</h2>
+                  </div>
+                </div>
+                <div className="dashboard-ranked-list">
+                  {stats.aiCodeStats.topFiles.map((file, index) => (
+                    <div key={file.filePath} className="dashboard-ranked-row">
+                      <div className="dashboard-ranked-rank">{index + 1}</div>
+                      <div className="dashboard-ranked-main">
+                        <div className="dashboard-ranked-title-row">
+                          <strong title={file.filePath}>{compactPath(file.filePath)}</strong>
+                        </div>
+                        <div className="dashboard-ranked-meta">
+                          <span>{formatCompactInteger(file.writeEventCount)} write events</span>
+                          <span>+{formatCompactInteger(file.linesAdded)}</span>
+                          <span>-{formatCompactInteger(file.linesDeleted)}</span>
+                          <span>
+                            {file.lastTouchedAt ? formatDate(file.lastTouchedAt) : "No activity"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="dashboard-card">
+                <div className="dashboard-card-header">
+                  <div>
+                    <p className="dashboard-card-eyebrow">File types</p>
+                    <h2 className="dashboard-card-title">Top File Types</h2>
+                  </div>
+                </div>
+                <div className="dashboard-model-list">
+                  {stats.aiCodeStats.topFileTypes.map((fileType, index) => (
+                    <div key={`${fileType.label}-${index}`} className="dashboard-model-row">
+                      <div>
+                        <strong>{fileType.label}</strong>
+                        <p>
+                          {formatCompactInteger(fileType.fileChangeCount)} file changes, +
+                          {formatCompactInteger(fileType.linesAdded)} / -
+                          {formatCompactInteger(fileType.linesDeleted)}
+                        </p>
+                      </div>
+                      <span className="dashboard-model-chip">{index + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+          </>
+        )}
       </section>
 
       <section className="dashboard-main-grid">

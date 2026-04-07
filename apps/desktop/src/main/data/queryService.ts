@@ -25,6 +25,7 @@ import {
   createBookmarkStore,
   resolveBookmarksDbPath,
 } from "./bookmarkStore";
+import { summarizeStoredToolEditActivity } from "../../shared/aiCodeActivity";
 
 type DatabaseHandle = ReturnType<typeof openDatabase>;
 type OpenDatabase = typeof openDatabase;
@@ -205,6 +206,16 @@ type DashboardModelRow = {
   session_count: number;
   message_count: number;
 };
+type DashboardAiWriteRow = {
+  message_id: string;
+  session_id: string;
+  provider: Provider;
+  created_at: string;
+  tool_name: string | null;
+  args_json: string | null;
+};
+
+type DashboardAiCodeStats = IpcResponse<"dashboard:getStats">["aiCodeStats"];
 
 type TurnAnchorRow = {
   id: string;
@@ -461,6 +472,7 @@ function getDashboardStatsWithDatabase(
       }
     );
   });
+  const aiCodeStats = collectDashboardAiCodeStats(db, recentActivity.map((point) => point.date));
 
   const topProjectRows = db
     .prepare(
@@ -539,8 +551,250 @@ function getDashboardStatsWithDatabase(
       sessionCount: Number(row.session_count ?? 0),
       messageCount: Number(row.message_count ?? 0),
     })),
+    aiCodeStats,
     activityWindowDays,
   };
+}
+
+function collectDashboardAiCodeStats(
+  db: DatabaseHandle,
+  recentDateKeys: string[],
+): DashboardAiCodeStats {
+  const providerStatsByProvider = createProviderRecord((provider) => ({
+    provider,
+    writeEventCount: 0,
+    fileChangeCount: 0,
+    linesAdded: 0,
+    linesDeleted: 0,
+    writeSessionCount: 0,
+  }));
+  const providerSessionIds = createProviderRecord(() => new Set<string>());
+  const changeTypeCounts: DashboardAiCodeStats["changeTypeCounts"] = {
+    add: 0,
+    update: 0,
+    delete: 0,
+  };
+  const recentActivityByDate = new Map(
+    recentDateKeys.map((date) => [
+      date,
+      {
+        date,
+        writeEventCount: 0,
+        fileChangeCount: 0,
+        linesAdded: 0,
+        linesDeleted: 0,
+      },
+    ]),
+  );
+  const fileStatsByPath = new Map<
+    string,
+    {
+      filePath: string;
+      writeEventCount: number;
+      linesAdded: number;
+      linesDeleted: number;
+      lastTouchedAt: string | null;
+    }
+  >();
+  const fileTypeStatsByLabel = new Map<
+    string,
+    {
+      label: string;
+      fileChangeCount: number;
+      linesAdded: number;
+      linesDeleted: number;
+    }
+  >();
+  const distinctSessionIds = new Set<string>();
+  const distinctFilesTouched = new Set<string>();
+  const writeRows = db
+    .prepare(
+      `SELECT
+         m.id AS message_id,
+         m.session_id AS session_id,
+         m.provider AS provider,
+         m.created_at AS created_at,
+         tc.tool_name AS tool_name,
+         tc.args_json AS args_json
+       FROM messages m
+       LEFT JOIN tool_calls tc ON tc.message_id = m.id
+       WHERE m.category = 'tool_edit'
+       ORDER BY m.created_at ASC, m.id ASC`,
+    )
+    .all() as DashboardAiWriteRow[];
+
+  let measurableWriteEventCount = 0;
+  let fileChangeCount = 0;
+  let linesAdded = 0;
+  let linesDeleted = 0;
+  let multiFileWriteCount = 0;
+
+  for (const row of writeRows) {
+    distinctSessionIds.add(row.session_id);
+    providerStatsByProvider[row.provider] = {
+      ...providerStatsByProvider[row.provider],
+      writeEventCount: providerStatsByProvider[row.provider].writeEventCount + 1,
+    };
+    providerSessionIds[row.provider].add(row.session_id);
+
+    const activityPoint = recentActivityByDate.get(row.created_at.slice(0, 10));
+    if (activityPoint) {
+      activityPoint.writeEventCount += 1;
+    }
+
+    const editSummary = summarizeStoredToolEditActivity({
+      toolName: row.tool_name,
+      argsJson: row.args_json,
+    });
+    if (!editSummary || editSummary.files.length === 0) {
+      continue;
+    }
+
+    measurableWriteEventCount += 1;
+    if (editSummary.files.length > 1) {
+      multiFileWriteCount += 1;
+    }
+
+    const eventTouchedPaths = new Set<string>();
+    for (const file of editSummary.files) {
+      fileChangeCount += 1;
+      linesAdded += file.linesAdded;
+      linesDeleted += file.linesDeleted;
+      distinctFilesTouched.add(file.filePath);
+      changeTypeCounts[file.changeType] += 1;
+      eventTouchedPaths.add(file.filePath);
+
+      providerStatsByProvider[row.provider] = {
+        ...providerStatsByProvider[row.provider],
+        fileChangeCount: providerStatsByProvider[row.provider].fileChangeCount + 1,
+        linesAdded: providerStatsByProvider[row.provider].linesAdded + file.linesAdded,
+        linesDeleted: providerStatsByProvider[row.provider].linesDeleted + file.linesDeleted,
+      };
+
+      if (activityPoint) {
+        activityPoint.fileChangeCount += 1;
+        activityPoint.linesAdded += file.linesAdded;
+        activityPoint.linesDeleted += file.linesDeleted;
+      }
+
+      const existingFileStat = fileStatsByPath.get(file.filePath);
+      if (existingFileStat) {
+        existingFileStat.linesAdded += file.linesAdded;
+        existingFileStat.linesDeleted += file.linesDeleted;
+        if (!existingFileStat.lastTouchedAt || row.created_at > existingFileStat.lastTouchedAt) {
+          existingFileStat.lastTouchedAt = row.created_at;
+        }
+      } else {
+        fileStatsByPath.set(file.filePath, {
+          filePath: file.filePath,
+          writeEventCount: 0,
+          linesAdded: file.linesAdded,
+          linesDeleted: file.linesDeleted,
+          lastTouchedAt: row.created_at,
+        });
+      }
+
+      const fileTypeLabel = inferDashboardFileTypeLabel(file.filePath);
+      const existingFileTypeStat = fileTypeStatsByLabel.get(fileTypeLabel);
+      if (existingFileTypeStat) {
+        existingFileTypeStat.fileChangeCount += 1;
+        existingFileTypeStat.linesAdded += file.linesAdded;
+        existingFileTypeStat.linesDeleted += file.linesDeleted;
+      } else {
+        fileTypeStatsByLabel.set(fileTypeLabel, {
+          label: fileTypeLabel,
+          fileChangeCount: 1,
+          linesAdded: file.linesAdded,
+          linesDeleted: file.linesDeleted,
+        });
+      }
+    }
+
+    for (const filePath of eventTouchedPaths) {
+      const fileStat = fileStatsByPath.get(filePath);
+      if (fileStat) {
+        fileStat.writeEventCount += 1;
+      }
+    }
+  }
+
+  for (const provider of Object.keys(providerStatsByProvider) as Provider[]) {
+    providerStatsByProvider[provider] = {
+      ...providerStatsByProvider[provider],
+      writeSessionCount: providerSessionIds[provider].size,
+    };
+  }
+
+  return {
+    summary: {
+      writeEventCount: writeRows.length,
+      measurableWriteEventCount,
+      writeSessionCount: distinctSessionIds.size,
+      fileChangeCount,
+      distinctFilesTouchedCount: distinctFilesTouched.size,
+      linesAdded,
+      linesDeleted,
+      netLines: linesAdded - linesDeleted,
+      multiFileWriteCount,
+      averageFilesPerWrite:
+        measurableWriteEventCount > 0 ? fileChangeCount / measurableWriteEventCount : 0,
+    },
+    changeTypeCounts,
+    providerStats: Object.values(providerStatsByProvider),
+    recentActivity: recentDateKeys.map((date) => {
+      return (
+        recentActivityByDate.get(date) ?? {
+          date,
+          writeEventCount: 0,
+          fileChangeCount: 0,
+          linesAdded: 0,
+          linesDeleted: 0,
+        }
+      );
+    }),
+    topFiles: Array.from(fileStatsByPath.values())
+      .sort((left, right) => {
+        const leftTotal = left.linesAdded + left.linesDeleted;
+        const rightTotal = right.linesAdded + right.linesDeleted;
+        if (rightTotal !== leftTotal) {
+          return rightTotal - leftTotal;
+        }
+        if (right.writeEventCount !== left.writeEventCount) {
+          return right.writeEventCount - left.writeEventCount;
+        }
+        if ((right.lastTouchedAt ?? "") !== (left.lastTouchedAt ?? "")) {
+          return (right.lastTouchedAt ?? "").localeCompare(left.lastTouchedAt ?? "");
+        }
+        return left.filePath.localeCompare(right.filePath);
+      })
+      .slice(0, 6),
+    topFileTypes: Array.from(fileTypeStatsByLabel.values())
+      .sort((left, right) => {
+        if (right.fileChangeCount !== left.fileChangeCount) {
+          return right.fileChangeCount - left.fileChangeCount;
+        }
+        const leftTotal = left.linesAdded + left.linesDeleted;
+        const rightTotal = right.linesAdded + right.linesDeleted;
+        if (rightTotal !== leftTotal) {
+          return rightTotal - leftTotal;
+        }
+        return left.label.localeCompare(right.label);
+      })
+      .slice(0, 6),
+  };
+}
+
+function inferDashboardFileTypeLabel(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, "/");
+  const baseName = normalized.slice(normalized.lastIndexOf("/") + 1);
+  const extensionIndex = baseName.lastIndexOf(".");
+  if (extensionIndex <= 0 || extensionIndex === baseName.length - 1) {
+    if (baseName.startsWith(".") && !baseName.slice(1).includes(".")) {
+      return baseName.toLowerCase();
+    }
+    return "No extension";
+  }
+  return baseName.slice(extensionIndex).toLowerCase();
 }
 
 function listRecentLiveSessionFilesWithDatabase(
