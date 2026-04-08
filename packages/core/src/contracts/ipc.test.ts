@@ -42,6 +42,7 @@ const emptyAiCodeStats = {
     add: 0,
     update: 0,
     delete: 0,
+    move: 0,
   },
   providerStats: [],
   recentActivity: [],

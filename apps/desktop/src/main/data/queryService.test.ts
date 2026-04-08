@@ -479,6 +479,7 @@ describe("queryService in-memory", () => {
       add: 1,
       update: 0,
       delete: 0,
+      move: 0,
     });
     expect(stats.aiCodeStats.providerStats.find((provider) => provider.provider === "codex"))
       .toMatchObject({
@@ -758,8 +759,9 @@ describe("queryService in-memory", () => {
     });
     expect(stats.aiCodeStats.changeTypeCounts).toEqual({
       add: 2,
-      update: 3,
+      update: 2,
       delete: 1,
+      move: 1,
     });
     expect(stats.aiCodeStats.providerStats.find((provider) => provider.provider === "codex"))
       .toMatchObject({

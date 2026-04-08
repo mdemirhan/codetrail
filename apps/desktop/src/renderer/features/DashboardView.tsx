@@ -186,6 +186,12 @@ export function DashboardView({
         accent: "var(--accent-red)",
         percentage: (stats.aiCodeStats.changeTypeCounts.delete / total) * 100,
       },
+      {
+        label: "Move",
+        count: stats.aiCodeStats.changeTypeCounts.move,
+        accent: "var(--accent-purple)",
+        percentage: (stats.aiCodeStats.changeTypeCounts.move / total) * 100,
+      },
     ];
   }, [stats.aiCodeStats.changeTypeCounts, stats.aiCodeStats.summary.fileChangeCount]);
 

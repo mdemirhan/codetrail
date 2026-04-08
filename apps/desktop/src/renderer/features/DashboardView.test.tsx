@@ -159,6 +159,7 @@ const statsFixture: DashboardStatsResponse = {
       add: 2,
       update: 3,
       delete: 1,
+      move: 0,
     },
     providerStats: [
       {
@@ -344,6 +345,7 @@ describe("DashboardView", () => {
               add: 0,
               update: 0,
               delete: 0,
+              move: 0,
             },
           },
         }}

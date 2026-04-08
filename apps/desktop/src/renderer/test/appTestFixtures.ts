@@ -251,6 +251,7 @@ function createRendererClient(handlers: Record<string, ChannelHandler>) {
             add: 2,
             update: 2,
             delete: 1,
+            move: 0,
           },
           providerStats: [
             {

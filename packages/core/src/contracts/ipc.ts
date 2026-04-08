@@ -202,6 +202,7 @@ const dashboardAiCodeChangeTypeCountsSchema = z.object({
   add: z.number().int().nonnegative(),
   update: z.number().int().nonnegative(),
   delete: z.number().int().nonnegative(),
+  move: z.number().int().nonnegative(),
 });
 const dashboardAiCodeProviderStatSchema = z.object({
   provider: providerSchema,
