@@ -1756,54 +1756,141 @@ export function useHistoryController({
     [goToHistoryPage, goToTurnNumber],
   );
 
+  const refreshSelection = useMemo(
+    () => ({
+      historyMode,
+      historyDetailMode,
+      effectiveHistoryPage,
+      selectedProjectId,
+      selectedSessionId,
+      turnSourceSessionId,
+      turnAnchorMessageId,
+      turnVisualizationSelection,
+      canToggleTurnView,
+      projectViewMode,
+    }),
+    [
+      canToggleTurnView,
+      effectiveHistoryPage,
+      historyDetailMode,
+      historyMode,
+      projectViewMode,
+      selectedProjectId,
+      selectedSessionId,
+      turnAnchorMessageId,
+      turnSourceSessionId,
+      turnVisualizationSelection,
+    ],
+  );
+
+  const refreshDetailState = useMemo(
+    () => ({
+      detailMessages,
+      selectedProject,
+      selectedSession,
+      sessionDetail,
+      projectCombinedDetail,
+      bookmarksResponse,
+      sessionTurnDetail,
+    }),
+    [
+      bookmarksResponse,
+      detailMessages,
+      projectCombinedDetail,
+      selectedProject,
+      selectedSession,
+      sessionDetail,
+      sessionTurnDetail,
+    ],
+  );
+
+  const refreshSortState = useMemo(
+    () => ({
+      messagePageSize: appearance.messagePageSize,
+      messageSortDirection,
+      bookmarkSortDirection,
+      projectAllSortDirection,
+      turnViewSortDirection,
+      activeMessageSortDirection,
+    }),
+    [
+      activeMessageSortDirection,
+      appearance.messagePageSize,
+      bookmarkSortDirection,
+      messageSortDirection,
+      projectAllSortDirection,
+      turnViewSortDirection,
+    ],
+  );
+
+  const refreshCatalog = useMemo(
+    () => ({
+      initialAutoRefreshStrategy: initialPaneState?.currentAutoRefreshStrategy ?? "off",
+      loadProjects,
+      loadSessions,
+      refreshTreeProjectSessions,
+      treeProjectSessionsByProjectIdRef,
+    }),
+    [
+      initialPaneState?.currentAutoRefreshStrategy,
+      loadProjects,
+      loadSessions,
+      refreshTreeProjectSessions,
+      treeProjectSessionsByProjectIdRef,
+    ],
+  );
+
+  const refreshDetailApi = useMemo(
+    () => ({
+      loadBookmarks,
+      requestSessionDetailRefresh,
+      requestProjectCombinedDetailRefresh,
+      requestTurnDetailRefresh,
+    }),
+    [
+      loadBookmarks,
+      requestProjectCombinedDetailRefresh,
+      requestSessionDetailRefresh,
+      requestTurnDetailRefresh,
+    ],
+  );
+
+  const refreshViewport = useMemo(
+    () => ({
+      messageListRef,
+      setSessionScrollTop,
+      sessionScrollTopRef,
+      pendingRestoredSessionScrollRef,
+      focusMessageId,
+      visibleFocusedMessageId,
+      focusedMessagePosition,
+      focusedMessageRef,
+      pendingMessageAreaFocus,
+      setPendingMessageAreaFocus,
+      pendingMessagePageNavigation,
+      loadedHistoryPage,
+      setPendingMessagePageNavigation,
+      setFocusMessageId,
+    }),
+    [
+      focusMessageId,
+      focusedMessagePosition,
+      loadedHistoryPage,
+      pendingMessageAreaFocus,
+      pendingMessagePageNavigation,
+      setSessionScrollTop,
+      visibleFocusedMessageId,
+    ],
+  );
+
   const { handleRefreshAllData } = useHistoryRefreshController({
     refreshContextRef,
-    initialAutoRefreshStrategy: initialPaneState?.currentAutoRefreshStrategy ?? "off",
-    messageListRef,
-    detailMessages,
-    effectiveHistoryPage,
-    messagePageSize: appearance.messagePageSize,
-    historyMode,
-    historyDetailMode,
-    selectedProjectId,
-    selectedSessionId,
-    selectedProject,
-    selectedSession,
-    sessionDetail,
-    projectCombinedDetail,
-    bookmarksResponse,
-    messageSortDirection,
-    bookmarkSortDirection,
-    projectAllSortDirection,
-    turnViewSortDirection,
-    turnSourceSessionId,
-    turnAnchorMessageId,
-    sessionTurnDetail,
-    turnVisualizationSelection,
-    canToggleTurnView,
-    loadProjects,
-    loadSessions,
-    loadBookmarks,
-    refreshTreeProjectSessions,
-    requestSessionDetailRefresh,
-    requestProjectCombinedDetailRefresh,
-    requestTurnDetailRefresh,
-    projectViewMode,
-    treeProjectSessionsByProjectIdRef,
-    setSessionScrollTop,
-    sessionScrollTopRef,
-    pendingRestoredSessionScrollRef,
-    activeMessageSortDirection,
-    focusMessageId,
-    visibleFocusedMessageId,
-    focusedMessagePosition,
-    focusedMessageRef,
-    pendingMessageAreaFocus,
-    setPendingMessageAreaFocus,
-    pendingMessagePageNavigation,
-    loadedHistoryPage,
-    setPendingMessagePageNavigation,
-    setFocusMessageId,
+    selection: refreshSelection,
+    detailState: refreshDetailState,
+    sortState: refreshSortState,
+    catalog: refreshCatalog,
+    detailApi: refreshDetailApi,
+    viewport: refreshViewport,
   });
 
   const pageHistoryMessages = useCallback(
