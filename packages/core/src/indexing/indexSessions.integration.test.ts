@@ -2720,7 +2720,9 @@ describe("runIncrementalIndexing", () => {
     runIncrementalIndexing({ dbPath, discoveryConfig: createDiscoveryConfig(dir) });
 
     const db = openDatabase(dbPath);
-    db.prepare("UPDATE sessions SET canonical_project_path = NULL WHERE file_path = ?").run(projectFile);
+    db.prepare("UPDATE sessions SET canonical_project_path = NULL WHERE file_path = ?").run(
+      projectFile,
+    );
     db.close();
 
     const result = runIncrementalIndexing({

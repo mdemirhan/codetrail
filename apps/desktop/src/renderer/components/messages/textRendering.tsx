@@ -23,7 +23,6 @@ import {
   normalizeAbsolutePath,
   normalizePathForComparison,
 } from "@codetrail/core/browser";
-import { ToolbarIcon } from "../ToolbarIcon";
 import {
   type ExternalToolConfig,
   getDefaultShikiThemeForUiTheme,
@@ -45,6 +44,7 @@ import {
   type ViewerToolPreferences,
   useViewerExternalAppsContext,
 } from "../../lib/viewerExternalAppsContext";
+import { ToolbarIcon } from "../ToolbarIcon";
 import { INITIAL_EXPANDED_LINES, INLINE_FALLBACK_SYNTAX_LINE_LIMIT } from "./viewerConfig";
 import {
   type ViewerKind,
@@ -1528,7 +1528,11 @@ function ContentViewer({
       </div>
       {kind === "diff" && diffModel ? (
         isExpanded ? (
-          <div className="content-viewer-body">
+          <div
+            className={`content-viewer-body${
+              diffMode === "split" && !wrap ? " content-viewer-body-split-nowrap" : ""
+            }`}
+          >
             <DiffViewerBody
               rows={renderedDiffRows}
               diffMode={diffMode}
@@ -1900,8 +1904,85 @@ function DiffViewerBody({
     }
     return mapped;
   }, [rows, unifiedTokenLines]);
+  const leftPaneRef = useRef<HTMLDivElement | null>(null);
+  const rightPaneRef = useRef<HTMLDivElement | null>(null);
+  const syncingPaneRef = useRef<"left" | "right" | null>(null);
+
+  const syncSplitPaneScroll = useCallback((source: "left" | "right") => {
+    const sourcePane = source === "left" ? leftPaneRef.current : rightPaneRef.current;
+    const targetPane = source === "left" ? rightPaneRef.current : leftPaneRef.current;
+    if (!sourcePane || !targetPane) {
+      return;
+    }
+    if (syncingPaneRef.current && syncingPaneRef.current !== source) {
+      syncingPaneRef.current = null;
+      return;
+    }
+    syncingPaneRef.current = source;
+    targetPane.scrollTop = sourcePane.scrollTop;
+    requestAnimationFrame(() => {
+      if (syncingPaneRef.current === source) {
+        syncingPaneRef.current = null;
+      }
+    });
+  }, []);
+
+  if (diffMode === "split" && !wrap) {
+    return (
+      <div className="diff-table diff-table-split diff-table-split-nowrap">
+        <div
+          ref={leftPaneRef}
+          className="diff-split-pane diff-split-pane-left"
+          onScroll={() => syncSplitPaneScroll("left")}
+        >
+          <div className="diff-split-pane-inner">
+            {rows.map((row, rowIndex) =>
+              renderSplitPaneRow({
+                side: "left",
+                row,
+                rowIndex,
+                query,
+                highlightActive,
+                highlightPatterns,
+                syntaxLanguage,
+                allowFallbackSyntax,
+                tokenColorResolver,
+                tokenLine: splitLeftTokenLines?.[rowIndex],
+                collapsedSequenceMarkers,
+                onToggleSequenceMarker,
+              }),
+            )}
+          </div>
+        </div>
+        <div
+          ref={rightPaneRef}
+          className="diff-split-pane diff-split-pane-right"
+          onScroll={() => syncSplitPaneScroll("right")}
+        >
+          <div className="diff-split-pane-inner">
+            {rows.map((row, rowIndex) =>
+              renderSplitPaneRow({
+                side: "right",
+                row,
+                rowIndex,
+                query,
+                highlightActive,
+                highlightPatterns,
+                syntaxLanguage,
+                allowFallbackSyntax,
+                tokenColorResolver,
+                tokenLine: splitRightTokenLines?.[rowIndex],
+                collapsedSequenceMarkers,
+                onToggleSequenceMarker,
+              }),
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
   return diffMode === "split" ? (
-    <div className={`diff-table diff-table-split${wrap ? " wrap" : ""}`}>
+    <div className="diff-table diff-table-split wrap">
       {rows.map((row, rowIndex) => {
         const key = `${row.kind}:${rowIndex}`;
         const leftTokenLine = splitLeftTokenLines?.[rowIndex];
@@ -2182,6 +2263,164 @@ function DiffViewerBody({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function renderSplitPaneRow({
+  side,
+  row,
+  rowIndex,
+  query,
+  highlightActive,
+  highlightPatterns,
+  syntaxLanguage,
+  allowFallbackSyntax,
+  tokenColorResolver,
+  tokenLine,
+  collapsedSequenceMarkers,
+  onToggleSequenceMarker,
+}: {
+  side: "left" | "right";
+  row: DiffDisplayRow;
+  rowIndex: number;
+  query: string;
+  highlightActive: boolean;
+  highlightPatterns: string[];
+  syntaxLanguage: string;
+  allowFallbackSyntax: boolean;
+  tokenColorResolver: (color: string | undefined) => string | undefined;
+  tokenLine: ShikiTokenLine | undefined;
+  collapsedSequenceMarkers: Record<string, boolean>;
+  onToggleSequenceMarker: (markerText: string) => void;
+}) {
+  const key = `${side}:${row.kind}:${rowIndex}`;
+  if (row.kind === "marker") {
+    return side === "left" ? (
+      <div key={key} className="diff-split-pane-row diff-sequence-marker">
+        <button
+          type="button"
+          className={`diff-sequence-marker-button${
+            collapsedSequenceMarkers[row.text] ? " is-collapsed" : ""
+          }`}
+          onMouseDown={(event) => {
+            event.preventDefault();
+          }}
+          onClick={() => onToggleSequenceMarker(row.text)}
+          aria-expanded={!collapsedSequenceMarkers[row.text]}
+          aria-label={`${collapsedSequenceMarkers[row.text] ? "Expand" : "Collapse"} ${row.text}`}
+          title={`Toggle unchanged lines for ${row.text}`}
+        >
+          <span className="diff-sequence-marker-icon" aria-hidden="true">
+            <svg aria-hidden="true" focusable="false" fill="none" viewBox="0 0 24 24">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
+            </svg>
+          </span>
+          <span className="diff-code diff-sequence-marker-code">
+            {renderDiffSequenceMarkerContent(row.text)}
+          </span>
+        </button>
+      </div>
+    ) : (
+      <div key={key} className="diff-split-pane-row diff-sequence-marker">
+        <div className="diff-sequence-marker-spacer" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  if (row.kind === "context") {
+    return (
+      <div key={key} className="diff-split-pane-row diff-context">
+        <span className="diff-ln">{side === "left" ? row.oldLine : row.newLine}</span>
+        <span className="diff-code">
+          {renderCodeLineContent(
+            row.text,
+            highlightActive,
+            query,
+            key,
+            highlightPatterns,
+            tokenLine,
+            syntaxLanguage,
+            allowFallbackSyntax,
+            tokenColorResolver,
+          )}
+        </span>
+      </div>
+    );
+  }
+
+  if (row.kind === "paired") {
+    const lineNumber = side === "left" ? row.oldLine : row.newLine;
+    const text = side === "left" ? row.leftText : row.rightText;
+    const parts = side === "left" ? row.leftParts : row.rightParts;
+    const diffClass = side === "left" ? "diff-remove" : "diff-add";
+    return (
+      <div key={key} className="diff-split-pane-row">
+        <span className="diff-ln">{lineNumber}</span>
+        <span className={`diff-code ${diffClass}`}>
+          {highlightActive
+            ? buildHighlightedTextNodes(text, query, `${key}:highlight`, highlightPatterns)
+            : tokenLine
+              ? renderTokenLine(`${key}:token`, tokenLine, tokenColorResolver)
+              : allowFallbackSyntax
+                ? renderInlineDiffParts(
+                    parts,
+                    side === "left" ? "diff-word-remove" : "diff-word-add",
+                    `${key}:inline`,
+                  )
+                : [<span key={`${key}:plain`}>{text}</span>]}
+        </span>
+      </div>
+    );
+  }
+
+  if (row.kind === "remove") {
+    return side === "left" ? (
+      <div key={key} className="diff-split-pane-row">
+        <span className="diff-ln">{row.oldLine}</span>
+        <span className="diff-code diff-remove">
+          {renderCodeLineContent(
+            row.text,
+            highlightActive,
+            query,
+            `${key}:remove`,
+            highlightPatterns,
+            tokenLine,
+            syntaxLanguage,
+            allowFallbackSyntax,
+            tokenColorResolver,
+          )}
+        </span>
+      </div>
+    ) : (
+      <div key={key} className="diff-split-pane-row diff-split-pane-row-empty">
+        <span className="diff-ln"> </span>
+        <span className="diff-code" />
+      </div>
+    );
+  }
+
+  return side === "left" ? (
+    <div key={key} className="diff-split-pane-row diff-split-pane-row-empty">
+      <span className="diff-ln"> </span>
+      <span className="diff-code" />
+    </div>
+  ) : (
+    <div key={key} className="diff-split-pane-row">
+      <span className="diff-ln">{row.newLine}</span>
+      <span className="diff-code diff-add">
+        {renderCodeLineContent(
+          row.text,
+          highlightActive,
+          query,
+          `${key}:add`,
+          highlightPatterns,
+          tokenLine,
+          syntaxLanguage,
+          allowFallbackSyntax,
+          tokenColorResolver,
+        )}
+      </span>
     </div>
   );
 }

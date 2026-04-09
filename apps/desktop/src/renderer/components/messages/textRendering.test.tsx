@@ -351,6 +351,8 @@ describe("renderPlainText", () => {
 
 describe("theme-aware Shiki rendering", () => {
   beforeEach(() => {
+    delete document.documentElement.dataset.defaultViewerWrapMode;
+    delete document.documentElement.dataset.defaultDiffViewMode;
     resetContentViewerCachesForTests();
   });
 
@@ -523,7 +525,7 @@ describe("theme-aware Shiki rendering", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Unified" })).toBeInTheDocument();
-      expect(document.querySelectorAll(".diff-split-row").length).toBeGreaterThan(0);
+      expect(document.querySelectorAll(".diff-split-pane-row").length).toBeGreaterThan(0);
     });
     expect(document.querySelectorAll(".diff-row")).toHaveLength(0);
   });
@@ -554,7 +556,7 @@ describe("theme-aware Shiki rendering", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Unified" })).toBeInTheDocument();
-      expect(document.querySelectorAll(".diff-split-row").length).toBeGreaterThan(0);
+      expect(document.querySelectorAll(".diff-split-pane-row").length).toBeGreaterThan(0);
     });
 
     rerender(
@@ -575,7 +577,7 @@ describe("theme-aware Shiki rendering", () => {
       expect(screen.getByRole("button", { name: "Split" })).toBeInTheDocument();
       expect(document.querySelectorAll(".diff-row").length).toBeGreaterThan(0);
     });
-    expect(document.querySelectorAll(".diff-split-row")).toHaveLength(0);
+    expect(document.querySelectorAll(".diff-split-pane-row")).toHaveLength(0);
   });
 
   it("renders split diffs with inserted JSX lines as standalone add rows", async () => {
@@ -606,14 +608,356 @@ describe("theme-aware Shiki rendering", () => {
       expect(screen.getByRole("button", { name: "Unified" })).toBeInTheDocument();
     });
 
-    const rows = Array.from(document.querySelectorAll(".diff-split-row"));
-    expect(rows).toHaveLength(5);
+    const leftRows = Array.from(
+      document.querySelectorAll(".diff-split-pane-left .diff-split-pane-row"),
+    );
+    const rightRows = Array.from(
+      document.querySelectorAll(".diff-split-pane-right .diff-split-pane-row"),
+    );
+    expect(leftRows).toHaveLength(5);
+    expect(rightRows).toHaveLength(5);
 
-    expect(rows[0]?.querySelector(".diff-remove")).not.toBeNull();
-    expect(rows[0]?.querySelector(".diff-add")).not.toBeNull();
-    expect(rows[1]?.querySelector(".diff-remove")).toBeNull();
-    expect(rows[1]?.querySelector(".diff-add")).not.toBeNull();
-    expect(rows[1]?.textContent).toContain("content-viewer-path-text");
+    expect(leftRows[0]?.querySelector(".diff-remove")).not.toBeNull();
+    expect(rightRows[0]?.querySelector(".diff-add")).not.toBeNull();
+    expect(leftRows[1]?.classList.contains("diff-split-pane-row-empty")).toBe(true);
+    expect(rightRows[1]?.querySelector(".diff-add")).not.toBeNull();
+    expect(rightRows[1]?.textContent).toContain("content-viewer-path-text");
+  });
+
+  it("renders independent scroll panes in split nowrap mode", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
+    document.documentElement.dataset.defaultDiffViewMode = "split";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,1 +1,1 @@",
+          "-const beforeValue = 1;",
+          "+const afterValue = 2;",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Unified" })).toBeInTheDocument();
+    });
+
+    const body = document.querySelector(".content-viewer-body-split-nowrap");
+    expect(body).not.toBeNull();
+
+    const panes = Array.from(document.querySelectorAll(".diff-split-pane"));
+    expect(panes).toHaveLength(2);
+    expect(panes[0]).toHaveClass("diff-split-pane-left");
+    expect(panes[1]).toHaveClass("diff-split-pane-right");
+  });
+
+  it("syncs vertical scroll between split panes in nowrap mode", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
+    document.documentElement.dataset.defaultDiffViewMode = "split";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,2 +1,2 @@",
+          "-const a = 1;",
+          "-const b = 2;",
+          "+const a = 10;",
+          "+const b = 20;",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".diff-split-pane")).toHaveLength(2);
+    });
+
+    const panes = document.querySelectorAll(".diff-split-pane");
+    const leftPane = panes[0] as HTMLDivElement;
+    const rightPane = panes[1] as HTMLDivElement;
+    leftPane.scrollTop = 80;
+    fireEvent.scroll(leftPane);
+
+    expect(rightPane.scrollTop).toBe(80);
+    expect(rightPane.scrollLeft).toBe(0);
+  });
+
+  it("renders paired rows with remove on left and add on right in split nowrap mode", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
+    document.documentElement.dataset.defaultDiffViewMode = "split";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,1 +1,1 @@",
+          "-const old = 1;",
+          "+const updated = 2;",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".diff-split-pane")).toHaveLength(2);
+    });
+
+    const leftRows = document.querySelectorAll(".diff-split-pane-left .diff-split-pane-row");
+    const rightRows = document.querySelectorAll(".diff-split-pane-right .diff-split-pane-row");
+    expect(leftRows).toHaveLength(1);
+    expect(rightRows).toHaveLength(1);
+
+    expect(leftRows[0]?.querySelector(".diff-remove")).not.toBeNull();
+    expect(leftRows[0]?.querySelector(".diff-add")).toBeNull();
+    expect(leftRows[0]?.textContent).toContain("old");
+
+    expect(rightRows[0]?.querySelector(".diff-add")).not.toBeNull();
+    expect(rightRows[0]?.querySelector(".diff-remove")).toBeNull();
+    expect(rightRows[0]?.textContent).toContain("updated");
+  });
+
+  it("renders remove-only rows with content on left and empty placeholder on right", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
+    document.documentElement.dataset.defaultDiffViewMode = "split";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,2 +1,0 @@",
+          "-removed line one",
+          "-removed line two",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".diff-split-pane")).toHaveLength(2);
+    });
+
+    const leftRows = document.querySelectorAll(".diff-split-pane-left .diff-split-pane-row");
+    const rightRows = document.querySelectorAll(".diff-split-pane-right .diff-split-pane-row");
+
+    expect(leftRows).toHaveLength(2);
+    expect(rightRows).toHaveLength(2);
+
+    for (const row of Array.from(leftRows)) {
+      expect(row.querySelector(".diff-remove")).not.toBeNull();
+    }
+
+    for (const row of Array.from(rightRows)) {
+      expect(row).toHaveClass("diff-split-pane-row-empty");
+      const code = row.querySelector(".diff-code");
+      expect(code?.textContent).toBe("");
+    }
+  });
+
+  it("renders add-only rows with empty placeholder on left and content on right", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
+    document.documentElement.dataset.defaultDiffViewMode = "split";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,0 +1,2 @@",
+          "+added line one",
+          "+added line two",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".diff-split-pane")).toHaveLength(2);
+    });
+
+    const leftRows = document.querySelectorAll(".diff-split-pane-left .diff-split-pane-row");
+    const rightRows = document.querySelectorAll(".diff-split-pane-right .diff-split-pane-row");
+
+    expect(leftRows).toHaveLength(2);
+    expect(rightRows).toHaveLength(2);
+
+    for (const row of Array.from(leftRows)) {
+      expect(row).toHaveClass("diff-split-pane-row-empty");
+      const code = row.querySelector(".diff-code");
+      expect(code?.textContent).toBe("");
+    }
+
+    for (const row of Array.from(rightRows)) {
+      expect(row.querySelector(".diff-add")).not.toBeNull();
+    }
+  });
+
+  it("renders context rows on both sides with correct line numbers in split nowrap mode", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
+    document.documentElement.dataset.defaultDiffViewMode = "split";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -5,3 +5,3 @@",
+          " const context = true;",
+          "-const old = 1;",
+          "+const updated = 2;",
+          " const moreContext = false;",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".diff-split-pane")).toHaveLength(2);
+    });
+
+    const leftRows = document.querySelectorAll(".diff-split-pane-left .diff-split-pane-row");
+    const rightRows = document.querySelectorAll(".diff-split-pane-right .diff-split-pane-row");
+
+    expect(leftRows).toHaveLength(3);
+    expect(rightRows).toHaveLength(3);
+
+    const leftContext = leftRows[0]!;
+    const rightContext = rightRows[0]!;
+    expect(leftContext).toHaveClass("diff-context");
+    expect(rightContext).toHaveClass("diff-context");
+    expect(leftContext.querySelector(".diff-ln")?.textContent).toBe("5");
+    expect(rightContext.querySelector(".diff-ln")?.textContent).toBe("5");
+    expect(leftContext.textContent).toContain("context");
+    expect(rightContext.textContent).toContain("context");
+  });
+
+  it("renders sequence markers on left pane with spacer on right pane", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
+    document.documentElement.dataset.defaultDiffViewMode = "split";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "Edit 1 of 2 | +1 -1 | 12:34:01 PM",
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,1 +1,1 @@",
+          "-before",
+          "+after",
+          "Edit 2 of 2 | +1 -1 | 12:35:02 PM",
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -5,1 +5,1 @@",
+          "-again",
+          "+done",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".diff-split-pane")).toHaveLength(2);
+    });
+
+    const leftMarkers = document.querySelectorAll(".diff-split-pane-left .diff-sequence-marker");
+    const rightMarkers = document.querySelectorAll(".diff-split-pane-right .diff-sequence-marker");
+    expect(leftMarkers).toHaveLength(2);
+    expect(rightMarkers).toHaveLength(2);
+
+    expect(leftMarkers[0]?.querySelector(".diff-sequence-marker-button")).not.toBeNull();
+    expect(rightMarkers[0]?.querySelector(".diff-sequence-marker-spacer")).not.toBeNull();
+  });
+
+  it("uses shared grid with display:contents rows in split wrap mode", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "wrap";
+    document.documentElement.dataset.defaultDiffViewMode = "split";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,1 +1,1 @@",
+          "-const beforeValue = 1;",
+          "+const afterValue = 2;",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Unified" })).toBeInTheDocument();
+    });
+
+    const table = document.querySelector(".diff-table-split.wrap");
+    expect(table).not.toBeNull();
+    expect(document.querySelector(".diff-table-split-nowrap")).toBeNull();
+    expect(document.querySelectorAll(".diff-split-pane")).toHaveLength(0);
+
+    const rows = document.querySelectorAll(".diff-split-row");
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("keeps left and right pane row counts equal across all row kinds", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
+    document.documentElement.dataset.defaultDiffViewMode = "split";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,5 +1,4 @@",
+          " const context = true;",
+          "-const removed = 1;",
+          "-const alsoRemoved = 2;",
+          "+const added = 3;",
+          " const paired = 0;",
+          "-const oldPaired = 4;",
+          "+const newPaired = 5;",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".diff-split-pane")).toHaveLength(2);
+    });
+
+    const leftCount = document.querySelectorAll(
+      ".diff-split-pane-left .diff-split-pane-row",
+    ).length;
+    const rightCount = document.querySelectorAll(
+      ".diff-split-pane-right .diff-split-pane-row",
+    ).length;
+
+    expect(leftCount).toBe(rightCount);
+    expect(leftCount).toBeGreaterThan(0);
   });
 
   it("collapses diff blocks without falling back to raw diff content", async () => {
@@ -686,7 +1030,7 @@ describe("theme-aware Shiki rendering", () => {
     fireEvent.click(showRest);
 
     await waitFor(() => {
-      const renderedRows = document.querySelectorAll(".diff-split-row");
+      const renderedRows = document.querySelectorAll(".diff-split-pane-row");
       expect(renderedRows.length).toBeGreaterThan(1900);
       expect(screen.getByText("line 1")).toBeInTheDocument();
       expect(screen.getByText("line 1500")).toBeInTheDocument();

@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { useHistoryController } from "../../features/useHistoryController";
 import { copyTextToClipboard } from "../../lib/clipboard";
 import { usePaneFocus } from "../../lib/paneFocusController";
-import { MessageCard } from "../messages/MessageCard";
 import { ToolbarIcon } from "../ToolbarIcon";
+import { MessageCard } from "../messages/MessageCard";
 import {
   CodeBlock,
   DiffBlock,

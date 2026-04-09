@@ -791,9 +791,8 @@ function normalizeDiscoveredProjectPaths(
     return discoveredFiles;
   }
 
-  const existingProjects = (
-    db
-      .prepare(
+  const existingProjects = db
+    .prepare(
       projectScope
         ? `SELECT provider, path, name
       , repository_url
@@ -802,11 +801,10 @@ function normalizeDiscoveredProjectPaths(
         : `SELECT provider, path, name
       , repository_url
        FROM projects`,
-      )
-      .all(
-        ...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []),
-      )
-  ) as ExistingProjectCandidateRow[];
+    )
+    .all(
+      ...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []),
+    ) as ExistingProjectCandidateRow[];
   const codexCandidateProjects = buildCodexCandidateProjects(discoveredFiles, existingProjects);
 
   return discoveredFiles.map((discovered) => {
@@ -1410,10 +1408,10 @@ function resolveIndexingDiscoveryConfig(config: IndexingConfig): DiscoveryConfig
     ...DEFAULT_DISCOVERY_CONFIG,
     ...config.discoveryConfig,
     ...(config.projectScope
-        ? { enabledProviders: [config.projectScope.provider] }
-        : config.enabledProviders
-          ? { enabledProviders: config.enabledProviders }
-          : {}),
+      ? { enabledProviders: [config.projectScope.provider] }
+      : config.enabledProviders
+        ? { enabledProviders: config.enabledProviders }
+        : {}),
   };
 }
 
@@ -4121,9 +4119,8 @@ function listIndexCheckpoints(
   db: SqliteDatabase,
   projectScope?: ProjectIndexingScope,
 ): IndexCheckpointRow[] {
-  return (
-    db
-      .prepare(
+  return db
+    .prepare(
       projectScope
         ? `SELECT
          c.file_path,
@@ -4159,18 +4156,18 @@ function listIndexCheckpoints(
          head_hash,
          tail_hash
        FROM index_checkpoints`,
-      )
-      .all(...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []))
-  ) as IndexCheckpointRow[];
+    )
+    .all(
+      ...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []),
+    ) as IndexCheckpointRow[];
 }
 
 function listDeletedSessions(
   db: SqliteDatabase,
   projectScope?: ProjectIndexingScope,
 ): DeletedSessionRow[] {
-  return (
-    db
-      .prepare(
+  return db
+    .prepare(
       projectScope
         ? `SELECT
          file_path,
@@ -4209,18 +4206,18 @@ function listDeletedSessions(
          head_hash,
          tail_hash
        FROM deleted_sessions`,
-      )
-      .all(...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []))
-  ) as DeletedSessionRow[];
+    )
+    .all(
+      ...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []),
+    ) as DeletedSessionRow[];
 }
 
 function listDeletedProjects(
   db: SqliteDatabase,
   projectScope?: ProjectIndexingScope,
 ): DeletedProjectRow[] {
-  return (
-    db
-      .prepare(
+  return db
+    .prepare(
       projectScope
         ? `SELECT
          provider,
@@ -4233,9 +4230,10 @@ function listDeletedProjects(
          project_path,
          deleted_at_ms
        FROM deleted_projects`,
-      )
-      .all(...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []))
-  ) as DeletedProjectRow[];
+    )
+    .all(
+      ...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []),
+    ) as DeletedProjectRow[];
 }
 
 function computeFileHashes(
@@ -4307,34 +4305,40 @@ function hashFileSlice(filePath: string, start: number, length: number): string 
   return hash.digest("hex");
 }
 
-function listIndexedFiles(db: SqliteDatabase, projectScope?: ProjectIndexingScope): IndexedFileRow[] {
-  return (
-    db
-      .prepare(
+function listIndexedFiles(
+  db: SqliteDatabase,
+  projectScope?: ProjectIndexingScope,
+): IndexedFileRow[] {
+  return db
+    .prepare(
       projectScope
         ? `SELECT file_path, provider, project_path, session_identity, file_size, file_mtime_ms
        FROM indexed_files
        WHERE provider = ? AND project_path = ?`
         : `SELECT file_path, provider, project_path, session_identity, file_size, file_mtime_ms
        FROM indexed_files`,
-      )
-      .all(...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []))
-  ) as IndexedFileRow[];
+    )
+    .all(
+      ...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []),
+    ) as IndexedFileRow[];
 }
 
-function listSessionFiles(db: SqliteDatabase, projectScope?: ProjectIndexingScope): SessionFileRow[] {
-  return (
-    db
-      .prepare(
+function listSessionFiles(
+  db: SqliteDatabase,
+  projectScope?: ProjectIndexingScope,
+): SessionFileRow[] {
+  return db
+    .prepare(
       projectScope
         ? `SELECT sessions.id, sessions.file_path
            FROM sessions
            JOIN projects ON projects.id = sessions.project_id
            WHERE projects.provider = ? AND projects.path = ?`
         : "SELECT id, file_path FROM sessions",
-      )
-      .all(...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []))
-  ) as SessionFileRow[];
+    )
+    .all(
+      ...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []),
+    ) as SessionFileRow[];
 }
 
 function deleteSessionData(statements: IndexingStatements, sessionId: string): void {
@@ -4423,7 +4427,9 @@ function clearProjectIndexedData(db: SqliteDatabase, projectScope: ProjectIndexi
   const deleteDeletedProjectsForProject = db.prepare(
     "DELETE FROM deleted_projects WHERE provider = ? AND project_path = ?",
   );
-  const deleteProjectsForProject = db.prepare("DELETE FROM projects WHERE provider = ? AND path = ?");
+  const deleteProjectsForProject = db.prepare(
+    "DELETE FROM projects WHERE provider = ? AND path = ?",
+  );
   const deleteIndexedFile = db.prepare("DELETE FROM indexed_files WHERE file_path = ?");
   const deleteIndexCheckpoint = db.prepare("DELETE FROM index_checkpoints WHERE file_path = ?");
   const clear = db.transaction(() => {
@@ -4445,14 +4451,8 @@ function clearProjectIndexedData(db: SqliteDatabase, projectScope: ProjectIndexi
       deleteIndexCheckpoint.run(filePath);
     }
 
-    deleteDeletedSessionsForProject.run(
-      projectScope.provider,
-      projectScope.projectPath,
-    );
-    deleteDeletedProjectsForProject.run(
-      projectScope.provider,
-      projectScope.projectPath,
-    );
+    deleteDeletedSessionsForProject.run(projectScope.provider, projectScope.projectPath);
+    deleteDeletedProjectsForProject.run(projectScope.provider, projectScope.projectPath);
     deleteProjectStatsForProject.run(projectScope.provider, projectScope.projectPath);
     deleteProjectsForProject.run(projectScope.provider, projectScope.projectPath);
   });

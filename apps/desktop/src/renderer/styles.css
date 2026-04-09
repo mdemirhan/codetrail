@@ -3399,11 +3399,11 @@ button svg *,
   display: inline-flex;
   max-width: 100%;
   border: 1px solid var(--path-pill-border);
-  border-radius: 999px;
+  border-radius: 4px;
   background: var(--path-pill-bg);
   color: var(--path-pill-text);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.3;
   padding: 2px 10px;
   overflow-wrap: anywhere;
@@ -3699,7 +3699,7 @@ button svg *,
 .content-viewer-summary {
   color: var(--code-meta-text);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.2;
   letter-spacing: 0;
   text-transform: none;
@@ -3827,9 +3827,14 @@ button svg *,
   overflow: auto;
 }
 
+.content-viewer-body-split-nowrap {
+  overflow: hidden;
+}
+
 .content-viewer-line,
 .diff-row,
-.diff-split-row {
+.diff-split-row,
+.diff-split-pane-row {
   display: grid;
   align-items: stretch;
 }
@@ -3841,6 +3846,15 @@ button svg *,
 
 .diff-split-row {
   grid-template-columns: 56px minmax(0, 1fr) 56px minmax(0, 1fr);
+}
+
+.diff-split-pane-row {
+  grid-template-columns: 56px max-content;
+  min-height: 22px;
+}
+
+.diff-split-pane-row.diff-sequence-marker {
+  grid-template-columns: 1fr;
 }
 
 .content-viewer-line.kind-log {
@@ -3860,7 +3874,8 @@ button svg *,
   margin-top: 8px;
 }
 
-.diff-sequence-marker:hover {
+.diff-sequence-marker:hover,
+.diff-sequence-marker-button:hover {
   background: var(--sequence-header-hover-bg);
 }
 
@@ -3880,11 +3895,12 @@ button svg *,
   min-height: 32px;
   padding: 3px 10px;
   border: 0;
-  background: transparent;
+  background: var(--sequence-header-bg);
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 120ms ease;
 }
 
 .diff-sequence-marker-button:hover,
@@ -4016,10 +4032,57 @@ button svg *,
   color: var(--diff-context-text);
 }
 
-.diff-table-split:not(.wrap) .diff-split-row {
-  grid-template-columns: 56px max-content 56px max-content;
-  width: max-content;
+.diff-table-split.wrap {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 56px minmax(0, 1fr);
+  grid-auto-rows: minmax(22px, auto);
+  align-items: stretch;
+  width: 100%;
+}
+
+.diff-table-split.wrap .diff-split-row {
+  display: contents;
+}
+
+.diff-table-split.wrap .diff-code {
+  min-width: 0;
+}
+
+.diff-table-split-nowrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+}
+
+.diff-split-pane {
+  min-width: 0;
+  max-height: 560px;
+  overflow: auto;
+}
+
+.diff-split-pane + .diff-split-pane {
+  border-left: 1px solid var(--diff-ln-border);
+}
+
+.diff-split-pane-inner {
   min-width: 100%;
+}
+
+.diff-split-pane .diff-code {
+  min-width: 0;
+}
+
+.diff-sequence-marker-spacer {
+  grid-column: 1 / -1;
+  box-sizing: border-box;
+  min-height: 32px;
+  background: var(--sequence-header-bg);
+}
+
+.diff-split-pane .diff-sequence-marker:not(:first-child) .diff-sequence-marker-button,
+.diff-split-pane .diff-sequence-marker:not(:first-child) .diff-sequence-marker-spacer {
+  margin-top: 8px;
 }
 
 .diff-table-split .diff-code {

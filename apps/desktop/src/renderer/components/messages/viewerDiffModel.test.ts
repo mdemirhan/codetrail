@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDiffViewModel, parseDiffSequenceMarker } from "./viewerDiffModel";
+import {
+  buildDiffRenderSourceFromRows,
+  buildDiffViewModel,
+  parseDiffSequenceMarker,
+} from "./viewerDiffModel";
 
 describe("viewerDiffModel", () => {
   it("pairs multi-line removed and added blocks in order", () => {
@@ -351,5 +355,105 @@ describe("viewerDiffModel", () => {
         newLine: 1,
       }),
     );
+  });
+});
+
+describe("buildDiffRenderSourceFromRows", () => {
+  it("produces split sources with the same line count as the row count", () => {
+    const diff = [
+      "diff --git a/a.ts b/a.ts",
+      "--- a/a.ts",
+      "+++ b/a.ts",
+      "@@ -1,4 +1,3 @@",
+      " const context = true;",
+      "-const removed = 1;",
+      "+const added = 2;",
+      "+const alsoAdded = 3;",
+      " const end = false;",
+    ].join("\n");
+
+    const model = buildDiffViewModel(diff, "/Users/acme/repo/a.ts", ["/Users/acme/repo"]);
+    const source = buildDiffRenderSourceFromRows(model.rows, "split");
+    const leftLines = source.splitLeft.split("\n");
+    const rightLines = source.splitRight.split("\n");
+
+    expect(leftLines).toHaveLength(model.rows.length);
+    expect(rightLines).toHaveLength(model.rows.length);
+  });
+
+  it("places remove text only on the left and add text only on the right", () => {
+    const diff = [
+      "diff --git a/a.ts b/a.ts",
+      "--- a/a.ts",
+      "+++ b/a.ts",
+      "@@ -1,2 +1,2 @@",
+      "-removed line",
+      "+added line",
+      " context",
+    ].join("\n");
+
+    const model = buildDiffViewModel(diff, "/Users/acme/repo/a.ts", ["/Users/acme/repo"]);
+    const source = buildDiffRenderSourceFromRows(model.rows, "split");
+    const leftLines = source.splitLeft.split("\n");
+    const rightLines = source.splitRight.split("\n");
+
+    const pairedRow = model.rows[0];
+    expect(pairedRow?.kind).toBe("paired");
+    if (pairedRow?.kind === "paired") {
+      expect(leftLines[0]).toBe(pairedRow.leftText);
+      expect(rightLines[0]).toBe(pairedRow.rightText);
+    }
+  });
+
+  it("fills empty strings for the opposite side of standalone adds and removes", () => {
+    const diff = [
+      "diff --git a/a.ts b/a.ts",
+      "--- a/a.ts",
+      "+++ b/a.ts",
+      "@@ -1,1 +1,1 @@",
+      "-only removed",
+      "+only added",
+    ].join("\n");
+
+    const model = buildDiffViewModel(diff, "/Users/acme/repo/a.ts", ["/Users/acme/repo"]);
+    const source = buildDiffRenderSourceFromRows(model.rows, "split");
+    const leftLines = source.splitLeft.split("\n");
+    const rightLines = source.splitRight.split("\n");
+
+    for (let index = 0; index < model.rows.length; index++) {
+      const row = model.rows[index]!;
+      if (row.kind === "add") {
+        expect(leftLines[index]).toBe("");
+      }
+      if (row.kind === "remove") {
+        expect(rightLines[index]).toBe("");
+      }
+    }
+  });
+
+  it("produces matching line counts for diffs with sequence markers", () => {
+    const diff = [
+      "Edit 1 of 2 | +1 -1 | 12:34:01 PM",
+      "diff --git a/a.ts b/a.ts",
+      "--- a/a.ts",
+      "+++ b/a.ts",
+      "@@ -1,1 +1,1 @@",
+      "-before",
+      "+after",
+      "Edit 2 of 2 | +1 -0 | 12:35:02 PM",
+      "diff --git a/a.ts b/a.ts",
+      "--- a/a.ts",
+      "+++ b/a.ts",
+      "@@ -5,0 +5,1 @@",
+      "+new line",
+    ].join("\n");
+
+    const model = buildDiffViewModel(diff, "/Users/acme/repo/a.ts", ["/Users/acme/repo"]);
+    const source = buildDiffRenderSourceFromRows(model.rows, "split");
+    const leftLines = source.splitLeft.split("\n");
+    const rightLines = source.splitRight.split("\n");
+
+    expect(leftLines).toHaveLength(model.rows.length);
+    expect(rightLines).toHaveLength(model.rows.length);
   });
 });
