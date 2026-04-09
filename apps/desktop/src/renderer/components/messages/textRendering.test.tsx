@@ -434,7 +434,7 @@ describe("theme-aware Shiki rendering", () => {
     document.documentElement.dataset.themeVariant = "dark";
     document.documentElement.dataset.defaultDiffViewMode = "unified";
 
-    render(
+    const { container } = render(
       <DiffBlock
         codeValue={[
           "diff --git a/a.ts b/a.ts",
@@ -467,7 +467,7 @@ describe("theme-aware Shiki rendering", () => {
     document.documentElement.dataset.defaultDiffViewMode = "split";
     resetContentViewerCachesForTests();
 
-    render(
+    const { container } = render(
       <DiffBlock
         codeValue={[
           "diff --git a/a.ts b/a.ts",
@@ -491,7 +491,7 @@ describe("theme-aware Shiki rendering", () => {
     document.documentElement.dataset.defaultDiffViewMode = "unified";
     resetContentViewerCachesForTests();
 
-    render(
+    const { container } = render(
       <DiffBlock
         codeValue={[
           "diff --git a/a.ts b/a.ts",
@@ -574,7 +574,7 @@ describe("theme-aware Shiki rendering", () => {
     document.documentElement.dataset.defaultDiffViewMode = "split";
     resetContentViewerCachesForTests();
 
-    render(
+    const { container } = render(
       <DiffBlock
         codeValue={[
           "diff --git a/a.tsx b/a.tsx",
@@ -1413,6 +1413,50 @@ describe("CodeBlock", () => {
           "+const afterValue = 2;",
         ].join("\n"),
       );
+    });
+  });
+
+  it("allows collapsing and expanding individual sequence edit sections", async () => {
+    resetContentViewerCachesForTests();
+
+    const { container } = render(
+      <DiffBlock
+        codeValue={[
+          "Edit 1 of 2 | +1 -1 | 12:50:11 PM",
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,1 +1,1 @@",
+          "-const beforeValue = 1;",
+          "+const afterValue = 2;",
+          "Edit 2 of 2 | +1 -1 | 12:51:12 PM",
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -2,1 +2,1 @@",
+          "-const secondBefore = 1;",
+          "+const secondAfter = 2;",
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    expect(container.textContent).toContain("const beforeValue = 1;");
+    expect(container.textContent).toContain("const secondBefore = 1;");
+
+    fireEvent.click(screen.getByRole("button", { name: /collapse edit 1 of 2/i }));
+
+    await waitFor(() => {
+      expect(container.textContent).not.toContain("const beforeValue = 1;");
+      expect(container.textContent).not.toContain("const afterValue = 2;");
+      expect(container.textContent).toContain("const secondBefore = 1;");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /expand edit 1 of 2/i }));
+
+    await waitFor(() => {
+      expect(container.textContent).toContain("const beforeValue = 1;");
+      expect(container.textContent).toContain("const afterValue = 2;");
     });
   });
 

@@ -3535,6 +3535,18 @@ button svg *,
 }
 
 .content-viewer-header {
+  --sequence-header-bg: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-blue-dim) 88%, transparent) 0,
+    color-mix(in srgb, var(--accent-blue-dim) 32%, transparent) 32px,
+    color-mix(in srgb, var(--code-bg) 82%, var(--accent-blue-dim)) 100%
+  );
+  --sequence-header-hover-bg: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-blue-dim) 92%, transparent) 0,
+    color-mix(in srgb, var(--accent-blue-dim) 42%, transparent) 32px,
+    color-mix(in srgb, var(--code-bg) 76%, var(--accent-blue-dim)) 100%
+  );
   position: sticky;
   top: 0;
   z-index: 1;
@@ -3542,10 +3554,19 @@ button svg *,
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
+  padding: 3px 10px;
+  border-bottom: none;
+  background: var(--sequence-header-bg);
+  min-height: 32px;
+  transition: background 120ms ease;
 }
 
 .content-viewer-header.is-collapsible {
   position: sticky;
+}
+
+.content-viewer-header:hover {
+  background: var(--sequence-header-hover-bg);
 }
 
 .content-viewer-header-hit-area {
@@ -3601,7 +3622,8 @@ button svg *,
 
 .content-viewer-meta-toggle:focus-visible {
   outline: none;
-  box-shadow: none;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-blue) 52%, transparent);
 }
 
 .content-viewer-meta-click-target {
@@ -3653,7 +3675,7 @@ button svg *,
   color: var(--code-meta-text);
   font-family: var(--font-mono);
   font-size: 11px;
-  line-height: 1;
+  line-height: 1.2;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -3680,7 +3702,8 @@ button svg *,
   white-space: nowrap;
   text-overflow: ellipsis;
   pointer-events: auto;
-  line-height: 1;
+  line-height: 1.2;
+  padding-bottom: 1px;
 }
 
 .content-viewer-diff-counts {
@@ -3783,15 +3806,16 @@ button svg *,
 }
 
 .diff-sequence-marker {
-  border-top: 1px solid color-mix(in srgb, var(--border) 78%, var(--accent-blue-dim));
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, var(--accent-blue-dim));
-  background: color-mix(in srgb, var(--code-bg) 90%, var(--accent-blue-dim));
-  padding-top: 4px;
-  padding-bottom: 4px;
+  background: var(--sequence-header-bg);
+  transition: background 120ms ease;
 }
 
 .diff-sequence-marker:not(:first-child) {
   margin-top: 8px;
+}
+
+.diff-sequence-marker:hover {
+  background: var(--sequence-header-hover-bg);
 }
 
 .diff-sequence-marker-code {
@@ -3799,7 +3823,51 @@ button svg *,
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
+}
+
+.diff-sequence-marker-button {
   grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 3px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.diff-sequence-marker-button:hover,
+.diff-sequence-marker-button:focus-visible {
+  outline: none;
+}
+
+.diff-sequence-marker-button:focus-visible {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-blue) 52%, transparent);
+}
+
+.diff-sequence-marker-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.diff-sequence-marker-icon svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 120ms ease;
+}
+
+.diff-sequence-marker-button.is-collapsed .diff-sequence-marker-icon svg {
+  transform: rotate(-90deg);
 }
 
 .diff-sequence-marker-title {
@@ -3807,7 +3875,7 @@ button svg *,
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-strong);
+  color: color-mix(in srgb, var(--text-strong) 88%, var(--accent-blue));
 }
 
 .diff-sequence-marker-meta {
@@ -3815,15 +3883,15 @@ button svg *,
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 78%, var(--accent-blue));
 }
 
 .diff-sequence-marker-separator {
-  color: var(--text-dim);
+  color: color-mix(in srgb, var(--text-dim) 72%, var(--accent-blue));
 }
 
 .diff-sequence-marker-time {
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 78%, var(--accent-blue));
 }
 
 .content-viewer-ln,

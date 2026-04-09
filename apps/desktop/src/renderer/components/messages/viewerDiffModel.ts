@@ -58,16 +58,10 @@ export type DiffSequenceMarker = {
   timeLabel: string;
 };
 
-export function buildDiffRenderSource(
-  diffModel: DiffViewModel | null,
+export function buildDiffRenderSourceFromRows(
+  rows: DiffDisplayRow[],
   mode: "unified" | "split",
-  maxRows?: number,
 ): { unified: string; splitLeft: string; splitRight: string } {
-  if (!diffModel) {
-    return { unified: "", splitLeft: "", splitRight: "" };
-  }
-  const rows =
-    typeof maxRows === "number" ? diffModel.rows.slice(0, Math.max(0, maxRows)) : diffModel.rows;
   if (mode === "unified") {
     return {
       unified: rows
@@ -106,6 +100,19 @@ export function buildDiffRenderSource(
       )
       .join("\n"),
   };
+}
+
+export function buildDiffRenderSource(
+  diffModel: DiffViewModel | null,
+  mode: "unified" | "split",
+  maxRows?: number,
+): { unified: string; splitLeft: string; splitRight: string } {
+  if (!diffModel) {
+    return { unified: "", splitLeft: "", splitRight: "" };
+  }
+  const rows =
+    typeof maxRows === "number" ? diffModel.rows.slice(0, Math.max(0, maxRows)) : diffModel.rows;
+  return buildDiffRenderSourceFromRows(rows, mode);
 }
 
 export function buildDiffViewModel(

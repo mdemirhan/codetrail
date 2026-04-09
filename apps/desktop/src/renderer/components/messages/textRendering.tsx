@@ -54,7 +54,9 @@ import {
   shouldProgressivelyRender,
 } from "./viewerDetection";
 import {
+  type DiffDisplayRow,
   buildDiffRenderSource,
+  buildDiffRenderSourceFromRows,
   buildDiffViewModel,
   getPathBaseName,
   parseDiffSequenceMarker,
@@ -1022,6 +1024,9 @@ function ContentViewer({
     isLarge ? Math.min(totalLines, INITIAL_EXPANDED_LINES) : totalLines,
   );
   const [uncontrolledExpanded, setUncontrolledExpanded] = useState(defaultExpanded);
+  const [collapsedSequenceMarkers, setCollapsedSequenceMarkers] = useState<Record<string, boolean>>(
+    {},
+  );
   const isExpanded = expanded ?? uncontrolledExpanded;
   const diffViewIdentity = kind === "diff" ? `${filePath ?? ""}\u0000${codeValue}` : null;
   const hasSequenceMarkers = diffModel?.rows.some((row) => row.kind === "marker") ?? false;
@@ -1050,13 +1055,55 @@ function ContentViewer({
     setVisibleCount(isLarge ? Math.min(totalLines, INITIAL_EXPANDED_LINES) : totalLines);
   }, [isLarge, totalLines]);
 
+  useEffect(() => {
+    if (!hasSequenceMarkers) {
+      setCollapsedSequenceMarkers({});
+      return;
+    }
+    setCollapsedSequenceMarkers((current) => {
+      const next: Record<string, boolean> = {};
+      for (const row of diffModel?.rows ?? []) {
+        if (row.kind !== "marker") {
+          continue;
+        }
+        next[row.text] = current[row.text] ?? false;
+      }
+      return next;
+    });
+  }, [diffModel?.rows, hasSequenceMarkers]);
+
   const visibleCodeValue = useMemo(
     () => textAnalysis.lineValues.slice(0, visibleCount).join("\n"),
     [textAnalysis.lineValues, visibleCount],
   );
+  const renderedDiffRows = useMemo(() => {
+    if (!diffModel) {
+      return [] as DiffDisplayRow[];
+    }
+    const visibleRows = diffModel.rows.slice(0, visibleCount);
+    if (!hasSequenceMarkers) {
+      return visibleRows;
+    }
+    const rows: DiffDisplayRow[] = [];
+    let hideSectionRows = false;
+    for (const row of visibleRows) {
+      if (row.kind === "marker") {
+        rows.push(row);
+        hideSectionRows = collapsedSequenceMarkers[row.text] ?? false;
+        continue;
+      }
+      if (!hideSectionRows) {
+        rows.push(row);
+      }
+    }
+    return rows;
+  }, [collapsedSequenceMarkers, diffModel, hasSequenceMarkers, visibleCount]);
   const diffRenderSource = useMemo(
-    () => buildDiffRenderSource(diffModel, diffMode, visibleCount),
-    [diffModel, diffMode, visibleCount],
+    () =>
+      kind === "diff"
+        ? buildDiffRenderSourceFromRows(renderedDiffRows, diffMode)
+        : buildDiffRenderSource(diffModel, diffMode, visibleCount),
+    [diffMode, diffModel, kind, renderedDiffRows, visibleCount],
   );
   const tokenLines = useShikiTokenLines(
     syntaxLanguage,
@@ -1238,6 +1285,9 @@ function ContentViewer({
             className="content-viewer-header-hit-area"
             aria-hidden="true"
             tabIndex={-1}
+            onMouseDown={(event) => {
+              event.preventDefault();
+            }}
             onClick={handleDiffToggle}
           />
         ) : null}
@@ -1249,6 +1299,9 @@ function ContentViewer({
               aria-expanded={isExpanded}
               aria-label={diffToggleLabel}
               title={diffToggleLabel}
+              onMouseDown={(event) => {
+                event.preventDefault();
+              }}
               onClick={handleDiffToggle}
             >
               <svg
@@ -1267,6 +1320,9 @@ function ContentViewer({
                 aria-hidden="true"
                 tabIndex={-1}
                 title={diffToggleLabel}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                }}
                 onClick={handleDiffToggle}
               >
                 <span className="diff-meta-added">+{diffModel.addedLineCount}</span>
@@ -1464,19 +1520,25 @@ function ContentViewer({
         isExpanded ? (
           <div className="content-viewer-body">
             <DiffViewerBody
-              diffModel={diffModel}
+              rows={renderedDiffRows}
               diffMode={diffMode}
               wrap={wrap}
               syntaxLanguage={syntaxLanguage}
               query={query}
               highlightActive={highlightActive}
               highlightPatterns={highlightPatterns}
-              visibleCount={visibleCount}
               unifiedTokenLines={diffUnifiedTokenLines}
               splitLeftTokenLines={diffSplitLeftTokenLines}
               splitRightTokenLines={diffSplitRightTokenLines}
               allowFallbackSyntax={allowFallbackSyntax}
               tokenColorResolver={tokenColorResolver}
+              collapsedSequenceMarkers={collapsedSequenceMarkers}
+              onToggleSequenceMarker={(markerText) => {
+                setCollapsedSequenceMarkers((current) => ({
+                  ...current,
+                  [markerText]: !current[markerText],
+                }));
+              }}
             />
           </div>
         ) : null
@@ -1765,35 +1827,36 @@ function ViewerAppMenu({
 }
 
 function DiffViewerBody({
-  diffModel,
+  rows,
   diffMode,
   wrap,
   syntaxLanguage,
   query,
   highlightActive,
   highlightPatterns,
-  visibleCount,
   unifiedTokenLines,
   splitLeftTokenLines,
   splitRightTokenLines,
   allowFallbackSyntax,
   tokenColorResolver,
+  collapsedSequenceMarkers,
+  onToggleSequenceMarker,
 }: {
-  diffModel: ReturnType<typeof buildDiffViewModel>;
+  rows: DiffDisplayRow[];
   diffMode: "unified" | "split";
   wrap: boolean;
   syntaxLanguage: string;
   query: string;
   highlightActive: boolean;
   highlightPatterns: string[];
-  visibleCount: number;
   unifiedTokenLines: ShikiTokenLine[] | null;
   splitLeftTokenLines: ShikiTokenLine[] | null;
   splitRightTokenLines: ShikiTokenLine[] | null;
   allowFallbackSyntax: boolean;
   tokenColorResolver: (color: string | undefined) => string | undefined;
+  collapsedSequenceMarkers: Record<string, boolean>;
+  onToggleSequenceMarker: (markerText: string) => void;
 }) {
-  const rows = useMemo(() => diffModel.rows.slice(0, visibleCount), [diffModel.rows, visibleCount]);
   const unifiedTokenRows = useMemo(() => {
     if (!unifiedTokenLines) {
       return null;
@@ -1834,9 +1897,30 @@ function DiffViewerBody({
         if (row.kind === "marker") {
           return (
             <div key={key} className="diff-split-row diff-sequence-marker">
-              <span className="diff-code diff-sequence-marker-code">
-                {renderDiffSequenceMarkerContent(row.text)}
-              </span>
+              <button
+                type="button"
+                className={`diff-sequence-marker-button${
+                  collapsedSequenceMarkers[row.text] ? " is-collapsed" : ""
+                }`}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                }}
+                onClick={() => onToggleSequenceMarker(row.text)}
+                aria-expanded={!collapsedSequenceMarkers[row.text]}
+                aria-label={`${
+                  collapsedSequenceMarkers[row.text] ? "Expand" : "Collapse"
+                } ${row.text}`}
+                title={`${collapsedSequenceMarkers[row.text] ? "Expand" : "Collapse"} ${row.text}`}
+              >
+                <span className="diff-sequence-marker-icon" aria-hidden="true">
+                  <svg aria-hidden="true" focusable="false" fill="none" viewBox="0 0 24 24">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </span>
+                <span className="diff-code diff-sequence-marker-code">
+                  {renderDiffSequenceMarkerContent(row.text)}
+                </span>
+              </button>
             </div>
           );
         }
@@ -1951,9 +2035,30 @@ function DiffViewerBody({
         if (row.kind === "marker") {
           return (
             <div key={key} className="diff-row diff-sequence-marker">
-              <span className="diff-code diff-sequence-marker-code">
-                {renderDiffSequenceMarkerContent(row.text)}
-              </span>
+              <button
+                type="button"
+                className={`diff-sequence-marker-button${
+                  collapsedSequenceMarkers[row.text] ? " is-collapsed" : ""
+                }`}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                }}
+                onClick={() => onToggleSequenceMarker(row.text)}
+                aria-expanded={!collapsedSequenceMarkers[row.text]}
+                aria-label={`${
+                  collapsedSequenceMarkers[row.text] ? "Expand" : "Collapse"
+                } ${row.text}`}
+                title={`${collapsedSequenceMarkers[row.text] ? "Expand" : "Collapse"} ${row.text}`}
+              >
+                <span className="diff-sequence-marker-icon" aria-hidden="true">
+                  <svg aria-hidden="true" focusable="false" fill="none" viewBox="0 0 24 24">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </span>
+                <span className="diff-code diff-sequence-marker-code">
+                  {renderDiffSequenceMarkerContent(row.text)}
+                </span>
+              </button>
             </div>
           );
         }
