@@ -4,11 +4,7 @@ import type { ProjectSummary, SessionSummary } from "../../app/types";
 import { formatCompactInteger, formatInteger } from "../../lib/numberFormatting";
 import { usePaneFocus } from "../../lib/paneFocusController";
 import { getProjectGroupId } from "../../lib/projectTree";
-import {
-  getChipProviders,
-  getProviderWithChildren,
-  toggleGroupProviders,
-} from "../../lib/providerGroups";
+import { getChipProviders, getProviderWithChildren } from "../../lib/providerGroups";
 import { SEARCH_PLACEHOLDERS } from "../../lib/searchLabels";
 import { compactPath, deriveSessionTitle, formatDate, prettyProvider } from "../../lib/viewUtils";
 import { ToolbarIcon } from "../ToolbarIcon";

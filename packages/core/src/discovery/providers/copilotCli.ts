@@ -1,5 +1,7 @@
 import { basename, dirname, join } from "node:path";
 
+import { compactMetadata } from "../../metadata";
+
 import { readString } from "../../parsing/helpers";
 import {
   type ResolvedDiscoveryDependencies,
@@ -37,7 +39,17 @@ export function parseWorkspaceYaml(content: string): CopilotCliWorkspaceMeta {
       continue;
     }
     const key = line.slice(0, colonIndex).trim();
-    const value = line.slice(colonIndex + 1).trim();
+    const rawValue = line.slice(colonIndex + 1).trim();
+    if (!rawValue) {
+      continue;
+    }
+    // Strip matching surrounding quotes (YAML serializers may quote values
+    // containing colons, backslashes, or other special characters).
+    const value =
+      (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+      (rawValue.startsWith("'") && rawValue.endsWith("'"))
+        ? rawValue.slice(1, -1)
+        : rawValue;
     if (!value) {
       continue;
     }
@@ -106,7 +118,7 @@ function toDiscoveredCopilotCliFile(
     return null;
   }
 
-  if (!filePath.endsWith("events.jsonl")) {
+  if (basename(filePath) !== "events.jsonl") {
     return null;
   }
 
@@ -121,6 +133,8 @@ function toDiscoveredCopilotCliFile(
   const sourceSessionId = meta.id ?? dirName;
   const sessionIdentity = providerSessionIdentity("copilot_cli", sourceSessionId, filePath);
   const projectPath = meta.cwd ?? "";
+  const unresolvedProject = !projectPath;
+  const resolutionSource = projectPath ? "cwd" : "unresolved";
 
   return {
     provider: "copilot_cli",
@@ -135,12 +149,12 @@ function toDiscoveredCopilotCliFile(
     metadata: {
       includeInHistory: true,
       isSubagent: false,
-      unresolvedProject: false,
+      unresolvedProject,
       gitBranch: meta.branch,
       cwd: meta.cwd,
       worktreeLabel: null,
       worktreeSource: null,
-      repositoryUrl: meta.repository,
+      repositoryUrl: null,
       forkedFromSessionId: null,
       parentSessionCwd: null,
       providerProjectKey: null,
@@ -151,9 +165,9 @@ function toDiscoveredCopilotCliFile(
       providerSource: null,
       providerClientVersion: null,
       lineageParentId: null,
-      resolutionSource: "cwd",
+      resolutionSource,
       projectMetadata: null,
-      sessionMetadata: meta.summary ? { summary: meta.summary } : null,
+      sessionMetadata: compactMetadata({ summary: meta.summary, repository: meta.repository }),
     },
   };
 }
