@@ -149,7 +149,7 @@ function isPathWithinOptionalRoot(
     : false;
 }
 
-function shouldBackfillAfterIndexingJob(event: IndexingJobSettledEvent): boolean {
+function shouldRepairAfterIndexingJob(event: IndexingJobSettledEvent): boolean {
   if (!event.success || event.request.kind !== "incremental") {
     return false;
   }
@@ -239,24 +239,41 @@ export async function bootstrapMainProcess(
       options.appStateStore?.getPaneState()?.systemMessageRegexRules,
     onJobSettled: (event) => {
       watchStatsStore.recordJobSettled(event);
-      if (!shouldBackfillAfterIndexingJob(event)) {
+      if (!shouldRepairAfterIndexingJob(event)) {
         return;
       }
       void queueWatcherTransition(async () => {
         await liveSessionStoreSync.catch(() => undefined);
-        if (!runtime.liveSessionStore || !runtime.fileWatcher || !isLiveWatchEnabled()) {
+        if (!runtime.liveSessionStore || !isLiveWatchEnabled()) {
           return;
         }
-        await runtime.liveSessionStore.backfillRecentSessionsAfterIndexing();
+        const watcherActive = runtime.fileWatcher !== null && runtime.watcherDebounceMs !== null;
+        const watcherInactive = runtime.fileWatcher === null && runtime.watcherDebounceMs === null;
+        if (!watcherActive && !watcherInactive) {
+          throw new Error("Inconsistent watcher state during post-index live repair.");
+        }
+        const temporarilyStartedForRepair = watcherInactive;
+        try {
+          if (temporarilyStartedForRepair) {
+            await runtime.liveSessionStore.start({
+              discoveryConfig: getEffectiveDiscoveryConfig(),
+            });
+          }
+          await runtime.liveSessionStore.repairRecentSessionsAfterIndexing();
+        } finally {
+          if (temporarilyStartedForRepair) {
+            await runtime.liveSessionStore.stop();
+          }
+        }
       }).catch((error: unknown) => {
         if (options.onBackgroundError) {
-          options.onBackgroundError("post-index live backfill failed", error, {
+          options.onBackgroundError("post-index live repair failed", error, {
             source: event.source,
             requestKind: event.request.kind,
           });
           return;
         }
-        console.error("[codetrail] post-index live backfill failed", error);
+        console.error("[codetrail] post-index live repair failed", error);
       });
     },
     ...(options.onIndexingFileIssue ? { onFileIssue: options.onIndexingFileIssue } : {}),

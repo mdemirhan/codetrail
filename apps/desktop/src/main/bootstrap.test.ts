@@ -68,7 +68,7 @@ const {
     handleWatcherBatch: ReturnType<typeof vi.fn>;
     takeIndexingPrefetchedJsonlChunks: ReturnType<typeof vi.fn>;
     noteStructuralInvalidation: ReturnType<typeof vi.fn>;
-    backfillRecentSessionsAfterIndexing: ReturnType<typeof vi.fn>;
+    repairRecentSessionsAfterIndexing: ReturnType<typeof vi.fn>;
     snapshot: ReturnType<typeof vi.fn>;
     installClaudeHooks: ReturnType<typeof vi.fn>;
     removeClaudeHooks: ReturnType<typeof vi.fn>;
@@ -225,10 +225,14 @@ const {
         handleWatcherBatch: vi.fn(async () => undefined),
         takeIndexingPrefetchedJsonlChunks: vi.fn(() => []),
         noteStructuralInvalidation: vi.fn(),
-        backfillRecentSessionsAfterIndexing: vi.fn(async () => ({
+        repairRecentSessionsAfterIndexing: vi.fn(async () => ({
           ran: true,
+          candidateCount: 0,
           recoveredSessionCount: 0,
+          repairedTrackedSessionCount: 0,
+          restartedStore: false,
           consumedStructuralInvalidation: false,
+          staleCandidateCountAfterRepair: 0,
         })),
         snapshot: vi.fn(() => ({
           enabled: true,
@@ -1548,13 +1552,13 @@ describe("bootstrapMainProcess", () => {
     expect(mockEnqueueChangedFiles).not.toHaveBeenCalled();
   });
 
-  it("marks structural invalidation for structure-only watcher batches and backfills after fallback indexing settles", async () => {
+  it("marks structural invalidation for structure-only watcher batches and repairs after fallback indexing settles", async () => {
     await bootstrapMainProcess({ runStartupIndexing: false });
     await getRequiredHandler(handlers, "watcher:start")({ debounceMs: 5000 });
     const liveSessionStore = getLastLiveSessionStore();
     mockEnqueue.mockClear();
     liveSessionStore.noteStructuralInvalidation.mockClear();
-    liveSessionStore.backfillRecentSessionsAfterIndexing.mockClear();
+    liveSessionStore.repairRecentSessionsAfterIndexing.mockClear();
 
     const firstWatcher = mockFileWatcherInstances[0];
     if (!firstWatcher) {
@@ -1579,15 +1583,15 @@ describe("bootstrapMainProcess", () => {
     });
 
     await vi.waitFor(() => {
-      expect(liveSessionStore.backfillRecentSessionsAfterIndexing).toHaveBeenCalledTimes(1);
+      expect(liveSessionStore.repairRecentSessionsAfterIndexing).toHaveBeenCalledTimes(1);
     });
   });
 
-  it("backfills live sessions after successful manual incremental refresh completion", async () => {
+  it("repairs live sessions after successful manual incremental refresh completion", async () => {
     await bootstrapMainProcess({ runStartupIndexing: false });
     await getRequiredHandler(handlers, "watcher:start")({ debounceMs: 5000 });
     const liveSessionStore = getLastLiveSessionStore();
-    liveSessionStore.backfillRecentSessionsAfterIndexing.mockClear();
+    liveSessionStore.repairRecentSessionsAfterIndexing.mockClear();
 
     await settleIndexingJob({
       source: "manual_incremental",
@@ -1596,15 +1600,65 @@ describe("bootstrapMainProcess", () => {
     });
 
     await vi.waitFor(() => {
-      expect(liveSessionStore.backfillRecentSessionsAfterIndexing).toHaveBeenCalledTimes(1);
+      expect(liveSessionStore.repairRecentSessionsAfterIndexing).toHaveBeenCalledTimes(1);
     });
   });
 
-  it("does not backfill live sessions after targeted watcher indexing completes", async () => {
+  it("temporarily starts the live store to repair manual refreshes when no watcher is active", async () => {
+    await bootstrapMainProcess({ runStartupIndexing: false });
+    const liveSessionStore = getLastLiveSessionStore();
+    liveSessionStore.start.mockClear();
+    liveSessionStore.stop.mockClear();
+    liveSessionStore.repairRecentSessionsAfterIndexing.mockClear();
+
+    await settleIndexingJob({
+      source: "manual_incremental",
+      request: { kind: "incremental" },
+      success: true,
+    });
+
+    await vi.waitFor(() => {
+      expect(liveSessionStore.start).toHaveBeenCalledTimes(1);
+      expect(liveSessionStore.repairRecentSessionsAfterIndexing).toHaveBeenCalledTimes(1);
+      expect(liveSessionStore.stop).toHaveBeenCalledTimes(1);
+    });
+    expect(liveSessionStore.start.mock.invocationCallOrder[0]).toBeLessThan(
+      liveSessionStore.repairRecentSessionsAfterIndexing.mock.invocationCallOrder[0] ??
+        Number.POSITIVE_INFINITY,
+    );
+    expect(
+      liveSessionStore.repairRecentSessionsAfterIndexing.mock.invocationCallOrder[0],
+    ).toBeLessThan(liveSessionStore.stop.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY);
+  });
+
+  it("stops the temporarily started live store when repair throws", async () => {
+    await bootstrapMainProcess({ runStartupIndexing: false });
+    const liveSessionStore = getLastLiveSessionStore();
+    liveSessionStore.start.mockClear();
+    liveSessionStore.stop.mockClear();
+    liveSessionStore.repairRecentSessionsAfterIndexing.mockClear();
+    liveSessionStore.repairRecentSessionsAfterIndexing.mockRejectedValueOnce(
+      new Error("repair failed"),
+    );
+
+    await settleIndexingJob({
+      source: "manual_incremental",
+      request: { kind: "incremental" },
+      success: true,
+    });
+
+    await vi.waitFor(() => {
+      expect(liveSessionStore.start).toHaveBeenCalledTimes(1);
+      expect(liveSessionStore.repairRecentSessionsAfterIndexing).toHaveBeenCalledTimes(1);
+      expect(liveSessionStore.stop).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not repair live sessions after targeted watcher indexing completes", async () => {
     await bootstrapMainProcess({ runStartupIndexing: false });
     await getRequiredHandler(handlers, "watcher:start")({ debounceMs: 5000 });
     const liveSessionStore = getLastLiveSessionStore();
-    liveSessionStore.backfillRecentSessionsAfterIndexing.mockClear();
+    liveSessionStore.repairRecentSessionsAfterIndexing.mockClear();
 
     await settleIndexingJob({
       source: "watch_targeted",
@@ -1612,7 +1666,7 @@ describe("bootstrapMainProcess", () => {
       success: true,
     });
 
-    expect(liveSessionStore.backfillRecentSessionsAfterIndexing).not.toHaveBeenCalled();
+    expect(liveSessionStore.repairRecentSessionsAfterIndexing).not.toHaveBeenCalled();
   });
 
   it("retains pending structural invalidation until the next successful qualifying indexing completion", async () => {
@@ -1625,7 +1679,7 @@ describe("bootstrapMainProcess", () => {
     }
 
     liveSessionStore.noteStructuralInvalidation.mockClear();
-    liveSessionStore.backfillRecentSessionsAfterIndexing.mockClear();
+    liveSessionStore.repairRecentSessionsAfterIndexing.mockClear();
 
     await firstWatcher.onFilesChanged({
       changedPaths: [],
@@ -1638,7 +1692,7 @@ describe("bootstrapMainProcess", () => {
       request: { kind: "incremental" },
       success: false,
     });
-    expect(liveSessionStore.backfillRecentSessionsAfterIndexing).not.toHaveBeenCalled();
+    expect(liveSessionStore.repairRecentSessionsAfterIndexing).not.toHaveBeenCalled();
 
     await settleIndexingJob({
       source: "manual_incremental",
@@ -1646,7 +1700,7 @@ describe("bootstrapMainProcess", () => {
       success: true,
     });
     await vi.waitFor(() => {
-      expect(liveSessionStore.backfillRecentSessionsAfterIndexing).toHaveBeenCalledTimes(1);
+      expect(liveSessionStore.repairRecentSessionsAfterIndexing).toHaveBeenCalledTimes(1);
     });
   });
 

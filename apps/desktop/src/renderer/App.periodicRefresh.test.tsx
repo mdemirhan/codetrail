@@ -1105,6 +1105,9 @@ describe("App periodic refresh", () => {
             selectedProjectId: "project_1",
             selectedSessionId: "session_1",
             historyMode: "session",
+            liveWatchEnabled: true,
+            currentAutoRefreshStrategy: "watch-1s",
+            preferredAutoRefreshStrategy: "watch-1s",
           } as PaneStateSnapshot
         }
       />,
@@ -1131,6 +1134,7 @@ describe("App periodic refresh", () => {
     const sessionsBefore = countChannelCalls(client, "sessions:list");
     const sessionDetailBefore = countChannelCalls(client, "sessions:getDetail");
     const searchBefore = countChannelCalls(client, "search:query");
+    const liveStatusBefore = countChannelCalls(client, "watcher:getLiveStatus");
 
     await user.click(screen.getByRole("button", { name: "Incremental refresh" }));
 
@@ -1140,6 +1144,7 @@ describe("App periodic refresh", () => {
       expect(countChannelCalls(client, "sessions:list")).toBeGreaterThan(sessionsBefore);
       expect(countChannelCalls(client, "sessions:getDetail")).toBeGreaterThan(sessionDetailBefore);
       expect(countChannelCalls(client, "search:query")).toBeGreaterThan(searchBefore);
+      expect(countChannelCalls(client, "watcher:getLiveStatus")).toBeGreaterThan(liveStatusBefore);
     });
   });
 

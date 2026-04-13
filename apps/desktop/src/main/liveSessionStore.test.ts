@@ -1,9 +1,11 @@
 import {
   appendFileSync,
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   truncateSync,
   utimesSync,
   writeFileSync,
@@ -101,6 +103,25 @@ function makeBatch(path: string): FileWatcherBatch {
   return {
     changedPaths: [path],
     requiresFullScan: false,
+  };
+}
+
+function makeRecentLiveCandidate(
+  filePath: string,
+  provider: "claude" | "codex",
+  fileMtimeMs: number,
+  fileSize = statSync(filePath).size,
+): {
+  filePath: string;
+  provider: "claude" | "codex";
+  fileMtimeMs: number;
+  fileSize: number;
+} {
+  return {
+    filePath,
+    provider,
+    fileMtimeMs,
+    fileSize,
   };
 }
 
@@ -398,11 +419,7 @@ describe("LiveSessionStore", () => {
     const store = new LiveSessionStore({
       queryService: {
         listRecentLiveSessionFiles: vi.fn(() => [
-          {
-            filePath,
-            provider: "codex" as const,
-            fileMtimeMs: Date.parse("2026-03-24T09:00:00.000Z"),
-          },
+          makeRecentLiveCandidate(filePath, "codex", Date.parse("2026-03-24T09:00:00.000Z")),
         ]),
       } satisfies Pick<QueryService, "listRecentLiveSessionFiles">,
       userDataDir: join(dir, "user-data"),
@@ -451,16 +468,8 @@ describe("LiveSessionStore", () => {
     const store = new LiveSessionStore({
       queryService: {
         listRecentLiveSessionFiles: vi.fn(() => [
-          {
-            filePath: codexPath,
-            provider: "codex" as const,
-            fileMtimeMs: Date.parse("2026-03-24T09:00:00.000Z"),
-          },
-          {
-            filePath: claudePath,
-            provider: "claude" as const,
-            fileMtimeMs: Date.parse("2026-03-24T09:00:00.000Z"),
-          },
+          makeRecentLiveCandidate(codexPath, "codex", Date.parse("2026-03-24T09:00:00.000Z")),
+          makeRecentLiveCandidate(claudePath, "claude", Date.parse("2026-03-24T09:00:00.000Z")),
         ]),
       } satisfies Pick<QueryService, "listRecentLiveSessionFiles">,
       userDataDir: join(dir, "user-data"),
@@ -495,11 +504,7 @@ describe("LiveSessionStore", () => {
     const store = new LiveSessionStore({
       queryService: {
         listRecentLiveSessionFiles: vi.fn(() => [
-          {
-            filePath,
-            provider: "codex" as const,
-            fileMtimeMs: Date.parse("2026-03-24T09:00:00.000Z"),
-          },
+          makeRecentLiveCandidate(filePath, "codex", Date.parse("2026-03-24T09:00:00.000Z")),
         ]),
       } satisfies Pick<QueryService, "listRecentLiveSessionFiles">,
       userDataDir: join(dir, "user-data"),
@@ -513,7 +518,7 @@ describe("LiveSessionStore", () => {
     expect(getSingleSession(store).detailText).toBe("Recent large tail");
   });
 
-  it("backfills indexed-but-untracked Codex sessions after indexing completes", async () => {
+  it("repairs indexed-but-untracked Codex sessions after indexing completes", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-backfill-"));
     tempDirs.push(dir);
     const config = makeConfig(dir);
@@ -532,12 +537,8 @@ describe("LiveSessionStore", () => {
     const listRecentLiveSessionFiles = vi
       .fn()
       .mockReturnValueOnce([])
-      .mockReturnValueOnce([
-        {
-          filePath,
-          provider: "codex" as const,
-          fileMtimeMs: Date.parse("2026-04-11T09:00:02.000Z"),
-        },
+      .mockImplementation(() => [
+        makeRecentLiveCandidate(filePath, "codex", Date.parse("2026-04-11T09:00:02.000Z")),
       ]);
     const store = new LiveSessionStore({
       queryService: {
@@ -551,19 +552,178 @@ describe("LiveSessionStore", () => {
     await store.start({ discoveryConfig: config });
     expect(store.snapshot().sessions).toHaveLength(0);
 
-    const result = await store.backfillRecentSessionsAfterIndexing();
+    const result = await store.repairRecentSessionsAfterIndexing();
 
     expect(result).toEqual({
       ran: true,
+      candidateCount: 1,
       recoveredSessionCount: 1,
+      repairedTrackedSessionCount: 0,
+      restartedStore: false,
       consumedStructuralInvalidation: false,
+      staleCandidateCountAfterRepair: 0,
     });
     expect(getSingleSession(store).provider).toBe("codex");
     expect(getSingleSession(store).detailText).toBe("Recovered after indexing");
   });
 
-  it("skips already tracked files during post-index backfill", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-backfill-skip-"));
+  it("replays already tracked Codex sessions when the file is rewritten without growing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-repair-mtime-"));
+    tempDirs.push(dir);
+    const config = makeConfig(dir);
+    const filePath = join(config.codexRoot, "2026", "04", "11", "codex-session.jsonl");
+    const initialTranscript =
+      `${JSON.stringify({
+        type: "session_meta",
+        payload: { id: "codex-session", cwd: "/workspace/codetrail" },
+      })}\n` +
+      `${JSON.stringify({
+        timestamp: "2026-04-11T09:00:00.000Z",
+        type: "response_item",
+        payload: {
+          type: "function_call",
+          name: "exec_command",
+          arguments: { cmd: "bun run lint" },
+        },
+      })}\n`;
+    const rewrittenTranscript =
+      `${JSON.stringify({
+        type: "session_meta",
+        payload: { id: "codex-session", cwd: "/workspace/codetrail" },
+      })}\n` +
+      `${JSON.stringify({
+        timestamp: "2026-04-11T09:00:01.000Z",
+        type: "response_item",
+        payload: {
+          type: "function_call",
+          name: "exec_command",
+          arguments: { cmd: "bun run test" },
+        },
+      })}\n`;
+    expect(Buffer.byteLength(rewrittenTranscript, "utf8")).toBe(
+      Buffer.byteLength(initialTranscript, "utf8"),
+    );
+    mkdirSync(dirname(filePath), { recursive: true });
+    writeFileSync(filePath, initialTranscript, "utf8");
+    const initialMtimeMs = Date.parse("2026-04-11T09:00:00.000Z");
+    utimesSync(filePath, initialMtimeMs / 1000, initialMtimeMs / 1000);
+
+    const listRecentLiveSessionFiles = vi
+      .fn()
+      .mockReturnValueOnce([])
+      .mockImplementation(() => [
+        makeRecentLiveCandidate(filePath, "codex", Date.parse("2026-04-11T09:00:01.000Z")),
+      ]);
+    const store = new LiveSessionStore({
+      queryService: {
+        listRecentLiveSessionFiles,
+      } satisfies Pick<QueryService, "listRecentLiveSessionFiles">,
+      userDataDir: join(dir, "user-data"),
+      homeDir: join(dir, "home"),
+      now: () => Date.parse("2026-04-11T09:00:00.000Z"),
+    });
+
+    await store.start({ discoveryConfig: config });
+    await store.handleWatcherBatch(makeBatch(filePath));
+    const newerMtimeMs = Date.parse("2026-04-11T09:00:01.000Z");
+    writeFileSync(filePath, rewrittenTranscript, "utf8");
+    utimesSync(filePath, newerMtimeMs / 1000, newerMtimeMs / 1000);
+
+    const result = await store.repairRecentSessionsAfterIndexing();
+
+    expect(result).toEqual({
+      ran: true,
+      candidateCount: 1,
+      recoveredSessionCount: 0,
+      repairedTrackedSessionCount: 1,
+      restartedStore: false,
+      consumedStructuralInvalidation: false,
+      staleCandidateCountAfterRepair: 0,
+    });
+    expect(store.snapshot().sessions).toHaveLength(1);
+    expect(getSingleSession(store).statusKind).toBe("running_tool");
+    expect(getSingleSession(store).detailText).toBe("bun run test");
+  });
+
+  it("restores the previous cursor when replay-from-start fails", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-replay-error-"));
+    tempDirs.push(dir);
+    const config = makeConfig(dir);
+    const filePath = join(config.codexRoot, "2026", "04", "11", "codex-session.jsonl");
+    const initialTranscript =
+      `${JSON.stringify({
+        type: "session_meta",
+        payload: { id: "codex-session", cwd: "/workspace/codetrail" },
+      })}\n` +
+      `${JSON.stringify({
+        timestamp: "2026-04-11T09:00:00.000Z",
+        type: "response_item",
+        payload: {
+          type: "function_call",
+          name: "exec_command",
+          arguments: { cmd: "bun run lint" },
+        },
+      })}\n`;
+    const rewrittenTranscript =
+      `${JSON.stringify({
+        type: "session_meta",
+        payload: { id: "codex-session", cwd: "/workspace/codetrail" },
+      })}\n` +
+      `${JSON.stringify({
+        timestamp: "2026-04-11T09:00:01.000Z",
+        type: "response_item",
+        payload: {
+          type: "function_call",
+          name: "exec_command",
+          arguments: { cmd: "bun run test" },
+        },
+      })}\n`;
+    mkdirSync(dirname(filePath), { recursive: true });
+    writeFileSync(filePath, initialTranscript, "utf8");
+    const initialMtimeMs = Date.parse("2026-04-11T09:00:00.000Z");
+    utimesSync(filePath, initialMtimeMs / 1000, initialMtimeMs / 1000);
+
+    const store = new LiveSessionStore({
+      queryService: {
+        listRecentLiveSessionFiles: vi.fn(() => []),
+      } satisfies Pick<QueryService, "listRecentLiveSessionFiles">,
+      userDataDir: join(dir, "user-data"),
+      homeDir: join(dir, "home"),
+      now: () => Date.parse("2026-04-11T09:00:00.000Z"),
+    });
+
+    await store.start({ discoveryConfig: config });
+    await store.handleWatcherBatch(makeBatch(filePath));
+    writeFileSync(filePath, rewrittenTranscript, "utf8");
+    const newerMtimeMs = Date.parse("2026-04-11T09:00:01.000Z");
+    utimesSync(filePath, newerMtimeMs / 1000, newerMtimeMs / 1000);
+
+    chmodSync(filePath, 0o000);
+    try {
+      await (
+        store as unknown as {
+          replayRecentSessionCandidatesFromStart: (
+            candidates: Array<{
+              filePath: string;
+              provider: "claude" | "codex";
+              fileMtimeMs: number;
+              fileSize: number;
+            }>,
+          ) => Promise<void>;
+        }
+      ).replayRecentSessionCandidatesFromStart([
+        makeRecentLiveCandidate(filePath, "codex", newerMtimeMs),
+      ]);
+    } finally {
+      chmodSync(filePath, 0o644);
+    }
+
+    expect(getSingleSession(store).statusKind).toBe("running_tool");
+    expect(getSingleSession(store).detailText).toBe("bun run lint");
+  });
+
+  it("repairs already tracked Codex sessions when the file size grows without a watcher batch", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-repair-size-"));
     tempDirs.push(dir);
     const config = makeConfig(dir);
     const filePath = join(config.codexRoot, "2026", "04", "11", "codex-session.jsonl");
@@ -571,9 +731,9 @@ describe("LiveSessionStore", () => {
     appendFileSync(
       filePath,
       `${JSON.stringify({
-        timestamp: "2026-04-11T09:00:00.000Z",
+        timestamp: "2026-04-11T09:00:01.000Z",
         type: "event_msg",
-        payload: { type: "agent_message", text: "Already tracked" },
+        payload: { type: "agent_message", text: "Recovered before append" },
       })}\n`,
       "utf8",
     );
@@ -581,12 +741,8 @@ describe("LiveSessionStore", () => {
     const listRecentLiveSessionFiles = vi
       .fn()
       .mockReturnValueOnce([])
-      .mockReturnValueOnce([
-        {
-          filePath,
-          provider: "codex" as const,
-          fileMtimeMs: Date.parse("2026-04-11T09:00:01.000Z"),
-        },
+      .mockImplementation(() => [
+        makeRecentLiveCandidate(filePath, "codex", Date.parse("2026-04-11T09:00:02.000Z")),
       ]);
     const store = new LiveSessionStore({
       queryService: {
@@ -600,18 +756,36 @@ describe("LiveSessionStore", () => {
     await store.start({ discoveryConfig: config });
     await store.handleWatcherBatch(makeBatch(filePath));
 
-    const result = await store.backfillRecentSessionsAfterIndexing();
+    appendFileSync(
+      filePath,
+      `${JSON.stringify({
+        timestamp: "2026-04-11T09:00:02.000Z",
+        type: "response_item",
+        payload: {
+          type: "function_call",
+          name: "exec_command",
+          arguments: { cmd: "bun run typecheck" },
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await store.repairRecentSessionsAfterIndexing();
 
     expect(result).toEqual({
       ran: true,
+      candidateCount: 1,
       recoveredSessionCount: 0,
+      repairedTrackedSessionCount: 1,
+      restartedStore: false,
       consumedStructuralInvalidation: false,
+      staleCandidateCountAfterRepair: 0,
     });
-    expect(store.snapshot().sessions).toHaveLength(1);
-    expect(getSingleSession(store).detailText).toBe("Already tracked");
+    expect(getSingleSession(store).statusKind).toBe("running_tool");
+    expect(getSingleSession(store).detailText).toBe("bun run typecheck");
   });
 
-  it("does not count missing indexed files as recovered during backfill", async () => {
+  it("reports stale missing indexed files after repair and attempts a soft restart", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-backfill-missing-"));
     tempDirs.push(dir);
     const config = makeConfig(dir);
@@ -620,11 +794,12 @@ describe("LiveSessionStore", () => {
     const listRecentLiveSessionFiles = vi
       .fn()
       .mockReturnValueOnce([])
-      .mockReturnValueOnce([
+      .mockImplementation(() => [
         {
           filePath: missingPath,
           provider: "codex" as const,
           fileMtimeMs: Date.parse("2026-04-11T09:00:01.000Z"),
+          fileSize: 1,
         },
       ]);
     const store = new LiveSessionStore({
@@ -638,17 +813,21 @@ describe("LiveSessionStore", () => {
 
     await store.start({ discoveryConfig: config });
 
-    const result = await store.backfillRecentSessionsAfterIndexing();
+    const result = await store.repairRecentSessionsAfterIndexing();
 
     expect(result).toEqual({
       ran: true,
+      candidateCount: 1,
       recoveredSessionCount: 0,
+      repairedTrackedSessionCount: 0,
+      restartedStore: true,
       consumedStructuralInvalidation: false,
+      staleCandidateCountAfterRepair: 1,
     });
     expect(store.snapshot().sessions).toHaveLength(0);
   });
 
-  it("backfill preserves existing live sessions and Claude hook precision", async () => {
+  it("repair preserves existing live sessions and Claude hook precision", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-backfill-preserve-"));
     tempDirs.push(dir);
     const config = makeConfig(dir);
@@ -673,12 +852,8 @@ describe("LiveSessionStore", () => {
     const listRecentLiveSessionFiles = vi
       .fn()
       .mockReturnValueOnce([])
-      .mockReturnValueOnce([
-        {
-          filePath: codexPath,
-          provider: "codex" as const,
-          fileMtimeMs: Date.parse("2026-04-11T09:00:03.000Z"),
-        },
+      .mockImplementation(() => [
+        makeRecentLiveCandidate(codexPath, "codex", Date.parse("2026-04-11T09:00:03.000Z")),
       ]);
     const { createFileWatcher, records } = createWatcherFactory();
     const store = new LiveSessionStore({
@@ -710,13 +885,17 @@ describe("LiveSessionStore", () => {
     await records[0]!.callback(makeBatch(hookLogPath));
 
     store.noteStructuralInvalidation();
-    const result = await store.backfillRecentSessionsAfterIndexing();
+    const result = await store.repairRecentSessionsAfterIndexing();
 
     const sessions = store.snapshot().sessions;
     expect(result).toEqual({
       ran: true,
+      candidateCount: 1,
       recoveredSessionCount: 1,
+      repairedTrackedSessionCount: 0,
+      restartedStore: false,
       consumedStructuralInvalidation: true,
+      staleCandidateCountAfterRepair: 0,
     });
     expect(records).toHaveLength(1);
     expect(sessions).toHaveLength(2);
@@ -727,7 +906,7 @@ describe("LiveSessionStore", () => {
     expect(codexSession?.detailText).toBe("Recovered Codex session");
   });
 
-  it("retains structural invalidation after a failed backfill and consumes it on the next success", async () => {
+  it("retains structural invalidation after a failed repair and consumes it on the next success", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-backfill-retry-"));
     tempDirs.push(dir);
     const config = makeConfig(dir);
@@ -749,12 +928,8 @@ describe("LiveSessionStore", () => {
       .mockImplementationOnce(() => {
         throw new Error("transient db failure");
       })
-      .mockReturnValueOnce([
-        {
-          filePath,
-          provider: "codex" as const,
-          fileMtimeMs: Date.parse("2026-04-11T09:00:02.000Z"),
-        },
+      .mockImplementation(() => [
+        makeRecentLiveCandidate(filePath, "codex", Date.parse("2026-04-11T09:00:02.000Z")),
       ]);
     const store = new LiveSessionStore({
       queryService: {
@@ -768,56 +943,49 @@ describe("LiveSessionStore", () => {
     await store.start({ discoveryConfig: config });
     store.noteStructuralInvalidation();
 
-    const firstAttempt = await store.backfillRecentSessionsAfterIndexing();
+    const firstAttempt = await store.repairRecentSessionsAfterIndexing();
     expect(firstAttempt).toEqual({
       ran: false,
+      candidateCount: 0,
       recoveredSessionCount: 0,
+      repairedTrackedSessionCount: 0,
+      restartedStore: false,
       consumedStructuralInvalidation: false,
+      staleCandidateCountAfterRepair: 0,
     });
-    expect(
-      (store as unknown as { structuralInvalidationPending: boolean })
-        .structuralInvalidationPending,
-    ).toBe(true);
 
-    const secondAttempt = await store.backfillRecentSessionsAfterIndexing();
+    const secondAttempt = await store.repairRecentSessionsAfterIndexing();
     expect(secondAttempt).toEqual({
       ran: true,
+      candidateCount: 1,
       recoveredSessionCount: 1,
+      repairedTrackedSessionCount: 0,
+      restartedStore: false,
       consumedStructuralInvalidation: true,
+      staleCandidateCountAfterRepair: 0,
     });
-    expect(
-      (store as unknown as { structuralInvalidationPending: boolean })
-        .structuralInvalidationPending,
-    ).toBe(false);
     expect(getSingleSession(store).detailText).toBe("Recovered on retry");
   });
 
-  it("continues updating a recovered session without restarting the store", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-backfill-no-restart-"));
+  it("soft-restarts the live store and recovers candidates that only become readable during restart", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-repair-restart-"));
     tempDirs.push(dir);
     const config = makeConfig(dir);
-    const filePath = join(config.codexRoot, "2026", "04", "11", "codex-session.jsonl");
-    createCodexTranscript(filePath);
-    appendFileSync(
+    const filePath = join(config.codexRoot, "2026", "04", "11", "recovered-on-restart.jsonl");
+    const candidate = {
       filePath,
-      `${JSON.stringify({
-        timestamp: "2026-04-11T09:00:01.000Z",
-        type: "event_msg",
-        payload: { type: "agent_message", text: "Recovered before append" },
-      })}\n`,
-      "utf8",
-    );
-
-    const listRecentLiveSessionFiles = vi
-      .fn()
-      .mockReturnValueOnce([])
-      .mockReturnValueOnce([
-        {
-          filePath,
-          provider: "codex" as const,
-          fileMtimeMs: Date.parse("2026-04-11T09:00:01.000Z"),
-        },
-      ]);
+      provider: "codex" as const,
+      fileMtimeMs: Date.parse("2026-04-11T09:00:02.000Z"),
+      fileSize: 1,
+    };
+    let seededStartupCandidates = false;
+    const listRecentLiveSessionFiles = vi.fn(() => {
+      if (!seededStartupCandidates) {
+        seededStartupCandidates = true;
+        return [];
+      }
+      return [candidate];
+    });
     const store = new LiveSessionStore({
       queryService: {
         listRecentLiveSessionFiles,
@@ -828,30 +996,120 @@ describe("LiveSessionStore", () => {
     });
 
     await store.start({ discoveryConfig: config });
-    await store.backfillRecentSessionsAfterIndexing();
+    const originalStart = store.start.bind(store);
+    const startSpy = vi.spyOn(store, "start").mockImplementationOnce(async (input) => {
+      createCodexTranscript(filePath);
+      appendFileSync(
+        filePath,
+        `${JSON.stringify({
+          timestamp: "2026-04-11T09:00:02.000Z",
+          type: "response_item",
+          payload: {
+            type: "function_call",
+            name: "exec_command",
+            arguments: { cmd: "bun run typecheck" },
+          },
+        })}\n`,
+        "utf8",
+      );
+      await originalStart(input);
+    });
 
-    const recoveredSession = getSingleSession(store);
-    expect(recoveredSession.detailText).toBe("Recovered before append");
+    const result = await store.repairRecentSessionsAfterIndexing();
+    startSpy.mockRestore();
 
+    expect(result).toEqual({
+      ran: true,
+      candidateCount: 1,
+      recoveredSessionCount: 1,
+      repairedTrackedSessionCount: 0,
+      restartedStore: true,
+      consumedStructuralInvalidation: false,
+      staleCandidateCountAfterRepair: 0,
+    });
+    expect(getSingleSession(store).statusKind).toBe("running_tool");
+    expect(getSingleSession(store).detailText).toBe("bun run typecheck");
+  });
+
+  it("retains structural invalidation when soft restart fails and consumes it after a later success", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-live-store-repair-restart-error-"));
+    tempDirs.push(dir);
+    const config = makeConfig(dir);
+    const missingPath = join(config.codexRoot, "2026", "04", "11", "missing-session.jsonl");
+    const recoveredPath = join(config.codexRoot, "2026", "04", "11", "recovered-session.jsonl");
+    createCodexTranscript(recoveredPath);
     appendFileSync(
-      filePath,
+      recoveredPath,
       `${JSON.stringify({
         timestamp: "2026-04-11T09:00:02.000Z",
-        type: "response_item",
-        payload: {
-          type: "function_call",
-          name: "exec_command",
-          arguments: { cmd: "bun run typecheck" },
-        },
+        type: "event_msg",
+        payload: { type: "agent_message", text: "Recovered after restart failure" },
       })}\n`,
       "utf8",
     );
-    await store.handleWatcherBatch(makeBatch(filePath));
 
-    const updatedSession = getSingleSession(store);
-    expect(updatedSession.sessionIdentity).toBe(recoveredSession.sessionIdentity);
-    expect(updatedSession.statusKind).toBe("running_tool");
-    expect(updatedSession.detailText).toBe("bun run typecheck");
+    let repairMode: "missing" | "recovered" = "missing";
+    let callCount = 0;
+    const listRecentLiveSessionFiles = vi.fn(() => {
+      callCount += 1;
+      if (callCount === 1) {
+        return [];
+      }
+      if (repairMode === "missing") {
+        return [
+          {
+            filePath: missingPath,
+            provider: "codex" as const,
+            fileMtimeMs: Date.parse("2026-04-11T09:00:01.000Z"),
+            fileSize: 1,
+          },
+        ];
+      }
+      return [
+        makeRecentLiveCandidate(recoveredPath, "codex", Date.parse("2026-04-11T09:00:02.000Z")),
+      ];
+    });
+
+    const store = new LiveSessionStore({
+      queryService: {
+        listRecentLiveSessionFiles,
+      } satisfies Pick<QueryService, "listRecentLiveSessionFiles">,
+      userDataDir: join(dir, "user-data"),
+      homeDir: join(dir, "home"),
+      now: () => Date.parse("2026-04-11T09:00:00.000Z"),
+    });
+
+    await store.start({ discoveryConfig: config });
+    store.noteStructuralInvalidation();
+    const startSpy = vi.spyOn(store, "start").mockImplementationOnce(async () => {
+      throw new Error("restart start failed");
+    });
+
+    const firstAttempt = await store.repairRecentSessionsAfterIndexing();
+    expect(firstAttempt).toEqual({
+      ran: false,
+      candidateCount: 1,
+      recoveredSessionCount: 0,
+      repairedTrackedSessionCount: 0,
+      restartedStore: true,
+      consumedStructuralInvalidation: false,
+      staleCandidateCountAfterRepair: 0,
+    });
+
+    startSpy.mockRestore();
+    repairMode = "recovered";
+
+    const secondAttempt = await store.repairRecentSessionsAfterIndexing();
+    expect(secondAttempt).toEqual({
+      ran: true,
+      candidateCount: 1,
+      recoveredSessionCount: 1,
+      repairedTrackedSessionCount: 0,
+      restartedStore: false,
+      consumedStructuralInvalidation: true,
+      staleCandidateCountAfterRepair: 0,
+    });
+    expect(getSingleSession(store).detailText).toBe("Recovered after restart failure");
   });
 
   it("updates Claude sessions from the dedicated hook watcher", async () => {
@@ -925,11 +1183,7 @@ describe("LiveSessionStore", () => {
     const oldActivityMs = Date.parse("2026-03-24T08:00:00.000Z");
     utimesSync(transcriptPath, oldActivityMs / 1000, oldActivityMs / 1000);
     const listRecentLiveSessionFiles = vi.fn(() => [
-      {
-        filePath: transcriptPath,
-        provider: "claude" as const,
-        fileMtimeMs: oldActivityMs,
-      },
+      makeRecentLiveCandidate(transcriptPath, "claude", oldActivityMs),
     ]);
 
     const store = new LiveSessionStore({

@@ -40,6 +40,13 @@ export type QueryServiceDependencies = {
   bookmarkStore?: BookmarkStore;
 };
 
+export type RecentLiveSessionFile = {
+  filePath: string;
+  provider: Provider;
+  fileMtimeMs: number;
+  fileSize: number;
+};
+
 type SessionSummaryRow = {
   id: string;
   project_id: string;
@@ -219,11 +226,7 @@ export type QueryService = {
     minFileMtimeMs: number;
     limit: number;
     offset?: number;
-  }) => Array<{
-    filePath: string;
-    provider: Provider;
-    fileMtimeMs: number;
-  }>;
+  }) => RecentLiveSessionFile[];
   close: () => void;
 };
 
@@ -298,11 +301,7 @@ function listRecentLiveSessionFilesWithDatabase(
     limit: number;
     offset?: number;
   },
-): Array<{
-  filePath: string;
-  provider: Provider;
-  fileMtimeMs: number;
-}> {
+): RecentLiveSessionFile[] {
   if (input.providers.length === 0 || input.limit <= 0) {
     return [];
   }
@@ -311,7 +310,7 @@ function listRecentLiveSessionFilesWithDatabase(
   const placeholders = input.providers.map(() => "?").join(", ");
   const rows = db
     .prepare(
-      `SELECT file_path, provider, file_mtime_ms
+      `SELECT file_path, provider, file_mtime_ms, file_size
        FROM indexed_files
        WHERE provider IN (${placeholders})
          AND file_mtime_ms >= ?
@@ -323,12 +322,14 @@ function listRecentLiveSessionFilesWithDatabase(
     file_path: string;
     provider: Provider;
     file_mtime_ms: number;
+    file_size: number;
   }>;
 
   return rows.map((row) => ({
     filePath: row.file_path,
     provider: row.provider,
     fileMtimeMs: row.file_mtime_ms,
+    fileSize: row.file_size,
   }));
 }
 

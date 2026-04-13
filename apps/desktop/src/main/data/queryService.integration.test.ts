@@ -293,6 +293,8 @@ describe("queryService", () => {
     expect(recentFiles).toHaveLength(2);
     expect(recentFiles.map((entry) => entry.provider).sort()).toEqual(["claude", "codex"]);
     expect(recentFiles[0]?.fileMtimeMs).toBeGreaterThanOrEqual(recentFiles[1]?.fileMtimeMs ?? 0);
+    expect(recentFiles[0]?.fileSize).toBeGreaterThan(0);
+    expect(recentFiles[1]?.fileSize).toBeGreaterThan(0);
 
     const claudeOnly = queryService.listRecentLiveSessionFiles({
       providers: ["claude"],
@@ -318,6 +320,8 @@ describe("queryService", () => {
     expect(secondPage).toHaveLength(1);
     expect(firstPage[0]?.filePath).not.toBe(secondPage[0]?.filePath);
     expect(firstPage[0]?.fileMtimeMs).toBeGreaterThanOrEqual(secondPage[0]?.fileMtimeMs ?? 0);
+    expect(firstPage[0]?.fileSize).toBeGreaterThan(0);
+    expect(secondPage[0]?.fileSize).toBeGreaterThan(0);
 
     queryService.close();
     cleanup();

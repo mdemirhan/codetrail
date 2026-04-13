@@ -783,6 +783,13 @@ export function App({
           ...(projectId ? { projectId } : {}),
         });
         await reloadIndexedData(source);
+        if (
+          source === "manual" &&
+          isWatchRefreshStrategy(refreshStrategy) &&
+          history.liveWatchEnabled
+        ) {
+          await refreshLiveStatusRef.current?.();
+        }
       } catch (error) {
         skipNextStatusDrivenReloadRef.current = false;
         logError(projectId ? "Project reindex failed" : "Refresh failed", error);
@@ -790,7 +797,7 @@ export function App({
         setRefreshing(false);
       }
     },
-    [codetrail, logError, reloadIndexedData],
+    [codetrail, history.liveWatchEnabled, logError, refreshStrategy, reloadIndexedData],
   );
   useEffect(() => {
     handleRefreshRef.current = handleRefresh;

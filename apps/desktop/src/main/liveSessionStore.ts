@@ -15,7 +15,7 @@ import {
   readClaudeHookTranscriptPath,
 } from "@codetrail/core";
 
-import type { QueryService } from "./data/queryService";
+import type { QueryService, RecentLiveSessionFile } from "./data/queryService";
 import {
   type FileWatcherBatch,
   type FileWatcherOptions,
@@ -44,7 +44,7 @@ import { buildLiveStatusSnapshot, pruneStaleSessionCursors } from "./live/liveSn
 
 const STARTUP_SEED_WINDOW_MS = 90_000;
 const STARTUP_SEED_LIMIT = 24;
-const BACKFILL_PAGE_SIZE = 100;
+const REPAIR_PAGE_SIZE = 100;
 const INITIAL_TAIL_BYTES = 32 * 1024;
 const MAX_READ_BYTES = 64 * 1024;
 const IDLE_TIMEOUT_MS = 120_000;
@@ -60,11 +60,27 @@ type FileCursorState = {
   session: LiveSessionState;
 };
 
-type StartupSeedCandidate = {
-  filePath: string;
+type RecentLiveSessionCandidate = RecentLiveSessionFile & {
   provider: "claude" | "codex";
-  fileMtimeMs: number;
 };
+
+type LiveSessionRepairResult = {
+  ran: boolean;
+  candidateCount: number;
+  recoveredSessionCount: number;
+  repairedTrackedSessionCount: number;
+  restartedStore: boolean;
+  consumedStructuralInvalidation: boolean;
+  staleCandidateCountAfterRepair: number;
+};
+
+type RepairPassSummary = {
+  candidateCount: number;
+  recoveredSessionCount: number;
+  repairedTrackedSessionCount: number;
+};
+
+type CandidateRepairKind = "untracked" | "tracked";
 
 export type LiveSessionStoreOptions = {
   queryService: Pick<QueryService, "listRecentLiveSessionFiles">;
@@ -182,54 +198,92 @@ export class LiveSessionStore {
     this.structuralInvalidationPending = true;
   }
 
-  async backfillRecentSessionsAfterIndexing(): Promise<{
-    ran: boolean;
-    recoveredSessionCount: number;
-    consumedStructuralInvalidation: boolean;
-  }> {
+  async repairRecentSessionsAfterIndexing(): Promise<LiveSessionRepairResult> {
     if (!this.enabled || !this.discoveryConfig || this.liveWatchStartedAtMs === null) {
       return {
         ran: false,
+        candidateCount: 0,
         recoveredSessionCount: 0,
+        repairedTrackedSessionCount: 0,
+        restartedStore: false,
         consumedStructuralInvalidation: false,
+        staleCandidateCountAfterRepair: 0,
       };
     }
 
     const consumedStructuralInvalidation = this.structuralInvalidationPending;
+    const repairMinFileMtimeMs = this.liveWatchStartedAtMs;
     const providers = this.getRecentLiveProviders();
+    let candidateCount = 0;
     let recoveredSessionCount = 0;
+    let repairedTrackedSessionCount = 0;
+    let restartedStore = false;
     try {
-      for (let offset = 0; ; offset += BACKFILL_PAGE_SIZE) {
-        const candidates = this.queryService.listRecentLiveSessionFiles({
+      const candidateKindsByFilePath = new Map<string, CandidateRepairKind>();
+      const initialRepair = await this.repairCandidatesSince(
+        {
           providers,
-          minFileMtimeMs: this.liveWatchStartedAtMs,
-          limit: BACKFILL_PAGE_SIZE,
-          offset,
-        }) as StartupSeedCandidate[];
-        recoveredSessionCount += await this.ingestRecentSessionCandidates(candidates, {
-          initialTailBytes: INITIAL_TAIL_BYTES,
-          skipTrackedFiles: true,
+          minFileMtimeMs: repairMinFileMtimeMs,
+        },
+        {
+          recordCandidateKindByFilePath: candidateKindsByFilePath,
+        },
+      );
+      candidateCount = initialRepair.candidateCount;
+      recoveredSessionCount = initialRepair.recoveredSessionCount;
+      repairedTrackedSessionCount = initialRepair.repairedTrackedSessionCount;
+      let staleCandidatesAfterRepair = await this.collectStaleRecentSessionCandidatesSince({
+        providers,
+        minFileMtimeMs: repairMinFileMtimeMs,
+      });
+      if (staleCandidatesAfterRepair.length > 0) {
+        restartedStore = true;
+        const restartRepair = await this.softRestartForRepair({
+          discoveryConfig: this.discoveryConfig,
+          providers,
+          minFileMtimeMs: repairMinFileMtimeMs,
+          staleUntrackedCandidates: staleCandidatesAfterRepair.filter(
+            (candidate) => candidateKindsByFilePath.get(candidate.filePath) === "untracked",
+          ),
+          staleTrackedCandidates: staleCandidatesAfterRepair.filter(
+            (candidate) => candidateKindsByFilePath.get(candidate.filePath) === "tracked",
+          ),
         });
-        if (candidates.length < BACKFILL_PAGE_SIZE) {
-          break;
-        }
+        recoveredSessionCount += restartRepair.recoveredSessionCount;
+        repairedTrackedSessionCount += restartRepair.repairedTrackedSessionCount;
+        staleCandidatesAfterRepair = await this.collectStaleRecentSessionCandidatesSince({
+          providers,
+          minFileMtimeMs: repairMinFileMtimeMs,
+        });
       }
-      if (consumedStructuralInvalidation) {
+      const staleCandidateCountAfterRepair = staleCandidatesAfterRepair.length;
+      const repairedCleanly = staleCandidateCountAfterRepair === 0;
+      if (consumedStructuralInvalidation && repairedCleanly) {
         this.structuralInvalidationPending = false;
       }
       return {
         ran: true,
         recoveredSessionCount,
-        consumedStructuralInvalidation,
+        candidateCount,
+        repairedTrackedSessionCount,
+        restartedStore,
+        consumedStructuralInvalidation: consumedStructuralInvalidation && repairedCleanly,
+        staleCandidateCountAfterRepair,
       };
     } catch (error) {
-      this.reportBackgroundError("Failed backfilling recent live sessions after indexing", error, {
+      this.reportBackgroundError("Failed repairing recent live sessions after indexing", error, {
         consumedStructuralInvalidation,
+        candidateCount,
+        restartedStore,
       });
       return {
         ran: false,
+        candidateCount,
         recoveredSessionCount,
+        repairedTrackedSessionCount,
+        restartedStore,
         consumedStructuralInvalidation: false,
+        staleCandidateCountAfterRepair: 0,
       };
     }
   }
@@ -411,14 +465,13 @@ export class LiveSessionStore {
 
     const providers = this.getRecentLiveProviders();
     const cutoffMs = this.now() - STARTUP_SEED_WINDOW_MS;
-    const candidates = this.queryService.listRecentLiveSessionFiles({
+    const candidates = this.listRecentSessionCandidatePage({
       providers,
       minFileMtimeMs: cutoffMs,
       limit: STARTUP_SEED_LIMIT,
-    }) as StartupSeedCandidate[];
+    });
     await this.ingestRecentSessionCandidates(candidates, {
       initialTailBytes: INITIAL_TAIL_BYTES,
-      skipTrackedFiles: false,
     });
   }
 
@@ -431,22 +484,18 @@ export class LiveSessionStore {
   }
 
   private async ingestRecentSessionCandidates(
-    candidates: StartupSeedCandidate[],
+    candidates: RecentLiveSessionCandidate[],
     options: {
       initialTailBytes: number;
-      skipTrackedFiles: boolean;
     },
   ): Promise<number> {
-    const pendingCandidates = candidates.filter(
-      (candidate) => !options.skipTrackedFiles || !this.sessionCursors.has(candidate.filePath),
-    );
-    if (pendingCandidates.length === 0) {
+    if (candidates.length === 0) {
       return 0;
     }
 
     const trackedFilePathsBeforeIngestion = new Set(this.sessionCursors.keys());
     const results = await Promise.allSettled(
-      pendingCandidates.map((candidate) =>
+      candidates.map((candidate) =>
         this.processTranscriptPath(candidate.filePath, {
           initialTailBytes: options.initialTailBytes,
         }),
@@ -454,7 +503,7 @@ export class LiveSessionStore {
     );
     let recoveredSessionCount = 0;
     results.forEach((result, index) => {
-      const candidate = pendingCandidates[index];
+      const candidate = candidates[index];
       if (result.status === "rejected") {
         this.reportBackgroundError("Failed ingesting recent live transcript", result.reason, {
           filePath: candidate?.filePath,
@@ -470,6 +519,271 @@ export class LiveSessionStore {
       }
     });
     return recoveredSessionCount;
+  }
+
+  private partitionRecentSessionCandidates(candidates: RecentLiveSessionCandidate[]): {
+    untrackedCandidates: RecentLiveSessionCandidate[];
+    trackedIncrementalCandidates: RecentLiveSessionCandidate[];
+    trackedReplayCandidates: RecentLiveSessionCandidate[];
+  } {
+    const untrackedCandidates: RecentLiveSessionCandidate[] = [];
+    const trackedIncrementalCandidates: RecentLiveSessionCandidate[] = [];
+    const trackedReplayCandidates: RecentLiveSessionCandidate[] = [];
+    for (const candidate of candidates) {
+      const cursor = this.sessionCursors.get(candidate.filePath);
+      if (!cursor) {
+        untrackedCandidates.push(candidate);
+        continue;
+      }
+      if (!this.isRecentSessionCandidateHealthy(candidate, cursor)) {
+        if (candidate.fileSize === cursor.lastSize) {
+          trackedReplayCandidates.push(candidate);
+        } else {
+          trackedIncrementalCandidates.push(candidate);
+        }
+      }
+    }
+    return { untrackedCandidates, trackedIncrementalCandidates, trackedReplayCandidates };
+  }
+
+  private async repairCandidatesSince(
+    input: {
+      providers: Array<"claude" | "codex">;
+      minFileMtimeMs: number;
+    },
+    options: {
+      countedFilePaths?: ReadonlySet<string>;
+      recordCandidateKindByFilePath?: Map<string, CandidateRepairKind>;
+    } = {},
+  ): Promise<RepairPassSummary> {
+    let candidateCount = 0;
+    let recoveredSessionCount = 0;
+    let repairedTrackedSessionCount = 0;
+    await this.forEachRecentSessionCandidatePage(input, async (page) => {
+      candidateCount += page.length;
+      const pageBuckets = this.partitionRecentSessionCandidates(page);
+      if (options.recordCandidateKindByFilePath) {
+        for (const candidate of pageBuckets.untrackedCandidates) {
+          options.recordCandidateKindByFilePath?.set(candidate.filePath, "untracked");
+        }
+        for (const candidate of [
+          ...pageBuckets.trackedIncrementalCandidates,
+          ...pageBuckets.trackedReplayCandidates,
+        ]) {
+          options.recordCandidateKindByFilePath?.set(candidate.filePath, "tracked");
+        }
+      }
+      await this.ingestRecentSessionCandidates(pageBuckets.untrackedCandidates, {
+        initialTailBytes: INITIAL_TAIL_BYTES,
+      });
+      await this.ingestRecentSessionCandidates(pageBuckets.trackedIncrementalCandidates, {
+        initialTailBytes: INITIAL_TAIL_BYTES,
+      });
+      await this.replayRecentSessionCandidatesFromStart(pageBuckets.trackedReplayCandidates);
+      recoveredSessionCount += this.countHealthyRecentSessionCandidates(
+        this.filterCandidatesByFilePath(pageBuckets.untrackedCandidates, options.countedFilePaths),
+      );
+      repairedTrackedSessionCount += this.countHealthyRecentSessionCandidates(
+        this.filterCandidatesByFilePath(
+          [...pageBuckets.trackedIncrementalCandidates, ...pageBuckets.trackedReplayCandidates],
+          options.countedFilePaths,
+        ),
+      );
+    });
+    return {
+      candidateCount,
+      recoveredSessionCount,
+      repairedTrackedSessionCount,
+    };
+  }
+
+  private async collectStaleRecentSessionCandidatesSince(input: {
+    providers: Array<"claude" | "codex">;
+    minFileMtimeMs: number;
+  }): Promise<RecentLiveSessionCandidate[]> {
+    const staleCandidates: RecentLiveSessionCandidate[] = [];
+    await this.forEachRecentSessionCandidatePage(input, async (page) => {
+      for (const candidate of page) {
+        const cursor = this.sessionCursors.get(candidate.filePath);
+        if (!cursor || !this.isRecentSessionCandidateHealthy(candidate, cursor)) {
+          staleCandidates.push(candidate);
+        }
+      }
+    });
+    return staleCandidates;
+  }
+
+  private countHealthyRecentSessionCandidates(candidates: RecentLiveSessionCandidate[]): number {
+    let healthyCount = 0;
+    for (const candidate of candidates) {
+      const cursor = this.sessionCursors.get(candidate.filePath);
+      if (cursor && this.isRecentSessionCandidateHealthy(candidate, cursor)) {
+        healthyCount += 1;
+      }
+    }
+    return healthyCount;
+  }
+
+  private isRecentSessionCandidateHealthy(
+    candidate: RecentLiveSessionCandidate,
+    cursor: FileCursorState,
+  ): boolean {
+    return cursor.lastMtimeMs >= candidate.fileMtimeMs && cursor.lastSize >= candidate.fileSize;
+  }
+
+  private async softRestartForRepair(input: {
+    discoveryConfig: DiscoveryConfig;
+    providers: Array<"claude" | "codex">;
+    minFileMtimeMs: number;
+    staleUntrackedCandidates: RecentLiveSessionCandidate[];
+    staleTrackedCandidates: RecentLiveSessionCandidate[];
+  }): Promise<Omit<RepairPassSummary, "candidateCount">> {
+    const previousLiveWatchStartedAtMs = this.liveWatchStartedAtMs;
+    const structuralInvalidationPending = this.structuralInvalidationPending;
+    await this.stop();
+    try {
+      await this.start({ discoveryConfig: input.discoveryConfig });
+      this.liveWatchStartedAtMs = previousLiveWatchStartedAtMs;
+      this.structuralInvalidationPending = structuralInvalidationPending;
+      const recoveredSessionCount = this.countHealthyRecentSessionCandidates(
+        input.staleUntrackedCandidates,
+      );
+      const repairedTrackedSessionCount = this.countHealthyRecentSessionCandidates(
+        input.staleTrackedCandidates,
+      );
+      const remainingStaleCandidateFilePaths = new Set(
+        [...input.staleUntrackedCandidates, ...input.staleTrackedCandidates]
+          .filter((candidate) => {
+            const cursor = this.sessionCursors.get(candidate.filePath);
+            return !cursor || !this.isRecentSessionCandidateHealthy(candidate, cursor);
+          })
+          .map((candidate) => candidate.filePath),
+      );
+      const repairSummary = await this.repairCandidatesSince(
+        {
+          providers: input.providers,
+          minFileMtimeMs: input.minFileMtimeMs,
+        },
+        {
+          countedFilePaths: remainingStaleCandidateFilePaths,
+        },
+      );
+      return {
+        recoveredSessionCount: recoveredSessionCount + repairSummary.recoveredSessionCount,
+        repairedTrackedSessionCount:
+          repairedTrackedSessionCount + repairSummary.repairedTrackedSessionCount,
+      };
+    } catch (error) {
+      this.enabled = true;
+      this.discoveryConfig = input.discoveryConfig;
+      this.liveWatchStartedAtMs = previousLiveWatchStartedAtMs;
+      this.structuralInvalidationPending = structuralInvalidationPending;
+      this.invalidateSnapshotCache();
+      throw error;
+    }
+  }
+
+  private async replayRecentSessionCandidatesFromStart(
+    candidates: RecentLiveSessionCandidate[],
+  ): Promise<void> {
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      candidates.map(async (candidate) => {
+        const previousCursor = this.cloneCursor(
+          this.sessionCursors.get(candidate.filePath) ?? null,
+        );
+        this.sessionCursors.delete(candidate.filePath);
+        this.indexingPrefetchByFilePath.delete(candidate.filePath);
+        try {
+          await this.processTranscriptPath(candidate.filePath);
+        } catch (error) {
+          if (previousCursor) {
+            this.sessionCursors.set(candidate.filePath, previousCursor);
+          }
+          throw error;
+        }
+        if (!this.sessionCursors.has(candidate.filePath) && previousCursor) {
+          this.sessionCursors.set(candidate.filePath, previousCursor);
+        }
+      }),
+    );
+    results.forEach((result, index) => {
+      const candidate = candidates[index];
+      if (result.status === "rejected") {
+        this.reportBackgroundError(
+          "Failed replaying recent live transcript from start",
+          result.reason,
+          {
+            filePath: candidate?.filePath,
+          },
+        );
+      }
+    });
+  }
+
+  private async forEachRecentSessionCandidatePage(
+    input: {
+      providers: Array<"claude" | "codex">;
+      minFileMtimeMs: number;
+    },
+    visitor: (page: RecentLiveSessionCandidate[]) => Promise<void>,
+  ): Promise<void> {
+    for (let offset = 0; ; offset += REPAIR_PAGE_SIZE) {
+      const page = this.listRecentSessionCandidatePage({
+        providers: input.providers,
+        minFileMtimeMs: input.minFileMtimeMs,
+        limit: REPAIR_PAGE_SIZE,
+        offset,
+      });
+      if (page.length === 0) {
+        break;
+      }
+      await visitor(page);
+      if (page.length < REPAIR_PAGE_SIZE) {
+        break;
+      }
+    }
+  }
+
+  private listRecentSessionCandidatePage(input: {
+    providers: Array<"claude" | "codex">;
+    minFileMtimeMs: number;
+    limit: number;
+    offset?: number;
+  }): RecentLiveSessionCandidate[] {
+    return this.queryService
+      .listRecentLiveSessionFiles(input)
+      .filter(
+        (candidate): candidate is RecentLiveSessionCandidate =>
+          candidate.provider === "claude" || candidate.provider === "codex",
+      );
+  }
+
+  private filterCandidatesByFilePath(
+    candidates: RecentLiveSessionCandidate[],
+    filePaths: ReadonlySet<string> | undefined,
+  ): RecentLiveSessionCandidate[] {
+    if (!filePaths) {
+      return candidates;
+    }
+    return candidates.filter((candidate) => filePaths.has(candidate.filePath));
+  }
+
+  private cloneCursor(cursor: FileCursorState | null): FileCursorState | null {
+    if (!cursor) {
+      return null;
+    }
+    return {
+      filePath: cursor.filePath,
+      offset: cursor.offset,
+      lastSize: cursor.lastSize,
+      lastMtimeMs: cursor.lastMtimeMs,
+      partialLineBuffer: cursor.partialLineBuffer,
+      session: structuredClone(cursor.session),
+    };
   }
 
   private async processTranscriptPath(
