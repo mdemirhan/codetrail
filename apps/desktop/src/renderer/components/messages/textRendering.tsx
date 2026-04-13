@@ -2122,7 +2122,7 @@ function DiffViewerBody({
       })}
     </div>
   ) : (
-    <div className={`diff-table${wrap ? " wrap" : ""}`}>
+    <div className={`diff-table${wrap ? " wrap" : " diff-table-nowrap"}`}>
       {rows.map((row, rowIndex) => {
         const key = `${row.kind}:${rowIndex}`;
         if (row.kind === "marker") {

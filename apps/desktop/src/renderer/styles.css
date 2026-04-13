@@ -3813,6 +3813,11 @@ button svg *,
   line-height: 1.45;
 }
 
+.diff-table-nowrap {
+  width: max-content;
+  min-width: 100%;
+}
+
 .code-pre {
   margin: 0;
   padding: 0;
@@ -3842,6 +3847,10 @@ button svg *,
 .content-viewer-line,
 .diff-row {
   grid-template-columns: 56px minmax(0, 1fr);
+}
+
+.diff-table-nowrap .diff-row {
+  grid-template-columns: 56px max-content;
 }
 
 .diff-split-row {

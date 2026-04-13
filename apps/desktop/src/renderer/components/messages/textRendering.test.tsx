@@ -292,7 +292,7 @@ describe("renderRichText", () => {
     const html = renderNodes(renderRichText(markdown, "", "diff-block"));
 
     expect(html).toContain('class="code-block diff-block content-viewer');
-    expect(html).toContain('class="diff-table"');
+    expect(html).toMatch(/class="diff-table(?: [^"]*)?"/);
     expect(html).toContain('class="diff-row diff-remove"');
     expect(html).toContain('class="diff-row diff-add"');
     expect(html).toContain('class="diff-word-remove"');
@@ -654,6 +654,36 @@ describe("theme-aware Shiki rendering", () => {
     expect(panes).toHaveLength(2);
     expect(panes[0]).toHaveClass("diff-split-pane-left");
     expect(panes[1]).toHaveClass("diff-split-pane-right");
+  });
+
+  it("renders unified nowrap diffs with a dedicated scroll-width table", async () => {
+    document.documentElement.dataset.defaultViewerWrapMode = "nowrap";
+    document.documentElement.dataset.defaultDiffViewMode = "unified";
+    resetContentViewerCachesForTests();
+
+    render(
+      <DiffBlock
+        codeValue={[
+          "diff --git a/a.ts b/a.ts",
+          "--- a/a.ts",
+          "+++ b/a.ts",
+          "@@ -1,1 +1,1 @@",
+          '-const beforeValue = someVeryLongIdentifier.withAnotherLongSegment("left");',
+          '+const afterValue = someVeryLongIdentifier.withAnotherLongSegment("right");',
+        ].join("\n")}
+        filePath="/Users/acme/repo/a.ts"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Split" })).toBeInTheDocument();
+    });
+
+    const table = document.querySelector(".diff-table-nowrap");
+    expect(table).not.toBeNull();
+    expect(table).toHaveClass("diff-table");
+    expect(table).not.toHaveClass("wrap");
+    expect(document.querySelector(".diff-table-split-nowrap")).toBeNull();
   });
 
   it("syncs vertical scroll between split panes in nowrap mode", async () => {
