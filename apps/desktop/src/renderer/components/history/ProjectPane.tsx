@@ -4,6 +4,7 @@ import type { ProjectSummary, SessionSummary } from "../../app/types";
 import { formatCompactInteger, formatInteger } from "../../lib/numberFormatting";
 import { usePaneFocus } from "../../lib/paneFocusController";
 import { getProjectGroupId } from "../../lib/projectTree";
+import { getChipProviders, getProviderWithChildren } from "../../lib/providerGroups";
 import { SEARCH_PLACEHOLDERS } from "../../lib/searchLabels";
 import { compactPath, deriveSessionTitle, formatDate, prettyProvider } from "../../lib/viewUtils";
 import { ToolbarIcon } from "../ToolbarIcon";
@@ -537,18 +538,26 @@ export function ProjectPane({
         </div>
       </div>
       <div className="tag-row" {...paneFocus.getPaneChromeProps("project")}>
-        {providers.map((provider) => (
-          <button
-            key={provider}
-            type="button"
-            className={`tag tag-${provider}${projectProviders.includes(provider) ? " active" : ""}`}
-            onClick={() => onToggleProvider(provider)}
-            {...paneFocus.getPreservePaneFocusProps("project")}
-          >
-            {prettyProvider(provider)}
-            <span className="count">{projectProviderCounts[provider]}</span>
-          </button>
-        ))}
+        {getChipProviders(providers).map((provider) => {
+          const associated = getProviderWithChildren(provider, providers);
+          const combinedCount = associated.reduce(
+            (sum, p) => sum + (projectProviderCounts[p] ?? 0),
+            0,
+          );
+          const isActive = associated.some((p) => projectProviders.includes(p));
+          return (
+            <button
+              key={provider}
+              type="button"
+              className={`tag tag-${provider}${isActive ? " active" : ""}`}
+              onClick={() => onToggleProvider(provider)}
+              {...paneFocus.getPreservePaneFocusProps("project")}
+            >
+              {prettyProvider(provider)}
+              <span className="count">{combinedCount}</span>
+            </button>
+          );
+        })}
       </div>
       <div
         className={`list-scroll project-list${viewMode === "tree" ? " project-list-tree" : ""}`}

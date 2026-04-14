@@ -287,3 +287,254 @@ describe("parseProviderPayload (Codex tool classification)", () => {
     expect(messages[0]?.content).toContain("apply_patch");
   });
 });
+
+describe("parseCopilotCliEvent", () => {
+  const sessionId = "test-session-id";
+
+  function parse(events: unknown[]) {
+    const diagnostics: ParserDiagnostic[] = [];
+    return parseProviderPayload({
+      provider: "copilot_cli",
+      sessionId,
+      payload: events,
+      diagnostics,
+    });
+  }
+
+  it("parses a user.message event", () => {
+    const messages = parse([
+      {
+        type: "user.message",
+        data: { interactionId: "ia-001", content: "Hello, world!" },
+        timestamp: "2024-01-15T10:00:05.000Z",
+      },
+    ]);
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.category).toBe("user");
+    expect(messages[0]?.content).toBe("Hello, world!");
+    expect(messages[0]?.id).toBe("ia-001");
+    expect(messages[0]?.createdAt).toBe("2024-01-15T10:00:05.000Z");
+  });
+
+  it("skips user.message events with empty content", () => {
+    const messages = parse([
+      {
+        type: "user.message",
+        data: { interactionId: "ia-001", content: "" },
+        timestamp: "2024-01-15T10:00:05.000Z",
+      },
+    ]);
+    expect(messages).toHaveLength(0);
+  });
+
+  it("uses fallback id for user.message when interactionId is absent", () => {
+    const messages = parse([
+      { type: "user.message", data: { content: "Hi" }, timestamp: "2024-01-15T10:00:05.000Z" },
+    ]);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.id).toBe(`${sessionId}:msg:0`);
+  });
+
+  it("parses an assistant.message event with token count", () => {
+    const messages = parse([
+      {
+        type: "assistant.message",
+        data: {
+          messageId: "msg-001",
+          content: "Sure, I can help.",
+          outputTokens: 42,
+          toolRequests: [],
+        },
+        timestamp: "2024-01-15T10:00:10.000Z",
+      },
+    ]);
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.category).toBe("assistant");
+    expect(messages[0]?.content).toBe("Sure, I can help.");
+    expect(messages[0]?.id).toBe("msg-001");
+    expect(messages[0]?.tokenOutput).toBe(42);
+  });
+
+  it("sets tokenOutput to null when outputTokens is absent", () => {
+    const messages = parse([
+      {
+        type: "assistant.message",
+        data: { messageId: "msg-001", content: "No tokens here.", toolRequests: [] },
+        timestamp: "2024-01-15T10:00:10.000Z",
+      },
+    ]);
+    expect(messages[0]?.tokenOutput).toBeNull();
+  });
+
+  it("parses assistant.message tool requests as separate tool_use messages", () => {
+    const messages = parse([
+      {
+        type: "assistant.message",
+        data: {
+          messageId: "msg-001",
+          content: "Let me check that file.",
+          outputTokens: 10,
+          toolRequests: [
+            { toolCallId: "tool-001", name: "read_file", arguments: { path: "src/index.ts" } },
+          ],
+        },
+        timestamp: "2024-01-15T10:00:10.000Z",
+      },
+    ]);
+
+    expect(messages).toHaveLength(2);
+    expect(messages[0]?.category).toBe("assistant");
+    expect(messages[1]?.id).toBe("tool-001");
+    expect(messages[1]?.content).toContain('"id":"tool-001"');
+    expect(messages[1]?.content).toContain("read_file");
+  });
+
+  it("uses a distinct tool_result id when a tool call completes", () => {
+    const messages = parse([
+      {
+        type: "assistant.message",
+        data: {
+          messageId: "msg-001",
+          content: "Let me check that file.",
+          toolRequests: [
+            { toolCallId: "tool-001", name: "read_file", arguments: { path: "src/index.ts" } },
+          ],
+        },
+        timestamp: "2024-01-15T10:00:10.000Z",
+      },
+      {
+        type: "tool.execution_complete",
+        data: { toolCallId: "tool-001", result: { content: "File contents here." } },
+        timestamp: "2024-01-15T10:00:11.000Z",
+      },
+    ]);
+
+    expect(messages).toHaveLength(3);
+    expect(messages[1]?.id).toBe("tool-001");
+    expect(messages[2]?.id).toBe("tool-001:result");
+    expect(messages[1]?.id).not.toBe(messages[2]?.id);
+  });
+
+  it("uses fallback id for assistant.message when messageId is absent", () => {
+    const messages = parse([
+      {
+        type: "assistant.message",
+        data: { content: "Hello", toolRequests: [] },
+        timestamp: "2024-01-15T10:00:10.000Z",
+      },
+    ]);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.id).toBe(`${sessionId}:msg:0`);
+  });
+
+  it("parses tool.execution_complete with a result", () => {
+    const messages = parse([
+      {
+        type: "tool.execution_complete",
+        data: { toolCallId: "tool-001", result: { content: "File contents here." } },
+        timestamp: "2024-01-15T10:00:11.000Z",
+      },
+    ]);
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.category).toBe("tool_result");
+    expect(messages[0]?.id).toBe("tool-001:result");
+    expect(messages[0]?.content).toBe("File contents here.");
+  });
+
+  it("skips tool.execution_complete when result is absent (no spurious '{}' row)", () => {
+    const messages = parse([
+      {
+        type: "tool.execution_complete",
+        data: { toolCallId: "tool-001" },
+        timestamp: "2024-01-15T10:00:11.000Z",
+      },
+    ]);
+    expect(messages).toHaveLength(0);
+  });
+
+  it("skips tool.execution_complete when result is an empty object (no spurious '{}' row)", () => {
+    const messages = parse([
+      {
+        type: "tool.execution_complete",
+        data: { toolCallId: "tool-001", result: {} },
+        timestamp: "2024-01-15T10:00:11.000Z",
+      },
+    ]);
+    expect(messages).toHaveLength(0);
+  });
+
+  it("skips tool.execution_complete when result has only an empty content field", () => {
+    const messages = parse([
+      {
+        type: "tool.execution_complete",
+        data: { toolCallId: "tool-001", result: { content: "" } },
+        timestamp: "2024-01-15T10:00:11.000Z",
+      },
+    ]);
+    expect(messages).toHaveLength(0);
+  });
+
+  it("serializes non-content result fields as JSON for tool.execution_complete", () => {
+    const messages = parse([
+      {
+        type: "tool.execution_complete",
+        data: { toolCallId: "tool-001", result: { exitCode: 0 } },
+        timestamp: "2024-01-15T10:00:11.000Z",
+      },
+    ]);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.category).toBe("tool_result");
+    expect(messages[0]?.content).toBe('{"exitCode":0}');
+  });
+
+  it("uses fallback id for tool.execution_complete when toolCallId is absent", () => {
+    const messages = parse([
+      {
+        type: "tool.execution_complete",
+        data: { result: { content: "ok" } },
+        timestamp: "2024-01-15T10:00:11.000Z",
+      },
+    ]);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.id).toBe(`${sessionId}:tool_result:0`);
+  });
+
+  it("skips non-content events like session.start", () => {
+    const messages = parse([
+      {
+        type: "session.start",
+        data: { sessionId: "abc", version: 1, context: { cwd: "/home/user" } },
+        timestamp: "2024-01-15T10:00:00.000Z",
+      },
+    ]);
+    expect(messages).toHaveLength(0);
+  });
+
+  it("handles a full conversation sequence correctly", () => {
+    const messages = parse([
+      {
+        type: "session.start",
+        data: { sessionId: "s-001", version: 1, context: {} },
+        timestamp: "2024-01-15T10:00:00.000Z",
+      },
+      {
+        type: "user.message",
+        data: { interactionId: "ia-001", content: "What is 2+2?" },
+        timestamp: "2024-01-15T10:00:05.000Z",
+      },
+      {
+        type: "assistant.message",
+        data: { messageId: "m-001", content: "4", outputTokens: 5, toolRequests: [] },
+        timestamp: "2024-01-15T10:00:06.000Z",
+      },
+    ]);
+
+    expect(messages).toHaveLength(2);
+    expect(messages[0]?.category).toBe("user");
+    expect(messages[1]?.category).toBe("assistant");
+    expect(messages[1]?.tokenOutput).toBe(5);
+  });
+});

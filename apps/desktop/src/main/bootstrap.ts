@@ -131,7 +131,7 @@ function createDefaultClaudeHookState(input: {
 
 function filterPotentialLiveTranscriptPaths(
   changedPaths: string[],
-  discoveryConfig: Pick<DiscoveryConfig, "claudeRoot" | "codexRoot">,
+  discoveryConfig: Pick<DiscoveryConfig, "claudeRoot" | "codexRoot" | "copilotCliRoot">,
 ): string[] {
   return changedPaths.filter((changedPath) => {
     if (!hasFileExtension(changedPath, ".jsonl")) {
@@ -139,7 +139,8 @@ function filterPotentialLiveTranscriptPaths(
     }
     return (
       isPathWithinOptionalRoot(changedPath, discoveryConfig.claudeRoot) ||
-      isPathWithinOptionalRoot(changedPath, discoveryConfig.codexRoot)
+      isPathWithinOptionalRoot(changedPath, discoveryConfig.codexRoot) ||
+      isPathWithinOptionalRoot(changedPath, discoveryConfig.copilotCliRoot)
     );
   });
 }

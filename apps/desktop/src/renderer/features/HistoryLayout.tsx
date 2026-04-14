@@ -10,6 +10,7 @@ import { findSessionSummaryById } from "../lib/historySessionLookup";
 import { usePaneFocus } from "../lib/paneFocusController";
 import { openInFileManager, openPath } from "../lib/pathActions";
 import { canActOnSelectedProject } from "../lib/projectActionAvailability";
+import { toggleGroupProviders } from "../lib/providerGroups";
 import { HistoryDetailPane } from "./HistoryDetailPane";
 import { formatProjectDetails, formatSessionDetails } from "./historyCopyFormat";
 import type { useHistoryController } from "./useHistoryController";
@@ -192,12 +193,9 @@ export function HistoryLayout({
           onToggleCollapsed: () => history.setProjectPaneCollapsed((value) => !value),
           onProjectQueryChange: history.setProjectQueryInput,
           onToggleProvider: (provider) =>
-            history.setProjectProviders((value) => {
-              const next = value.includes(provider)
-                ? value.filter((candidate) => candidate !== provider)
-                : [...value, provider];
-              return next;
-            }),
+            history.setProjectProviders((value) =>
+              toggleGroupProviders(provider, value, history.enabledProviders),
+            ),
           onSetSortField: history.setProjectSortField,
           onToggleSortDirection: () =>
             history.setProjectSortDirection((value) => (value === "asc" ? "desc" : "asc")),

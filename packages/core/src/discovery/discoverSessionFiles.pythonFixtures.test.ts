@@ -15,12 +15,13 @@ describe("discoverSessionFiles python fixtures", () => {
       geminiProjectsPath: join(fixturesRoot, "gemini", "projects.json"),
       cursorRoot: join(fixturesRoot, "cursor", "projects"),
       copilotRoot: join(fixturesRoot, "copilot", "workspaceStorage"),
+      copilotCliRoot: join(fixturesRoot, "copilot-cli", "session-state"),
       includeClaudeSubagents: false,
     });
 
-    expect(discovered).toHaveLength(10);
+    expect(discovered).toHaveLength(11);
     expect(new Set(discovered.map((file) => file.provider))).toEqual(
-      new Set(["claude", "codex", "gemini", "cursor", "copilot"]),
+      new Set(["claude", "codex", "gemini", "cursor", "copilot", "copilot_cli"]),
     );
 
     const claude = discovered.find(

@@ -1,0 +1,5 @@
+id: session-fixture-001
+cwd: /home/user/projects/myapp
+repository: owner/myapp
+branch: main
+summary: Add feature X

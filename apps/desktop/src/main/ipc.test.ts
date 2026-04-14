@@ -30,6 +30,7 @@ const settingsInfo = createSettingsInfoFixture({
   },
   pathValues: {
     copilotRoot: "/Users/test/.copilot/projects",
+    copilotCliRoot: "/Users/test/.copilot/session-state",
   },
 });
 

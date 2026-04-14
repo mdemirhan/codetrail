@@ -23,6 +23,7 @@ describe("systemMessageRules", () => {
       gemini: [],
       cursor: [],
       copilot: [],
+      copilot_cli: [],
     });
   });
 

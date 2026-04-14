@@ -137,7 +137,8 @@ export function searchMessages(
          COALESCE(SUM(CASE WHEN provider = 'codex' THEN 1 ELSE 0 END), 0) as codex_count,
          COALESCE(SUM(CASE WHEN provider = 'gemini' THEN 1 ELSE 0 END), 0) as gemini_count,
          COALESCE(SUM(CASE WHEN provider = 'cursor' THEN 1 ELSE 0 END), 0) as cursor_count,
-         COALESCE(SUM(CASE WHEN provider = 'copilot' THEN 1 ELSE 0 END), 0) as copilot_count
+         COALESCE(SUM(CASE WHEN provider = 'copilot' THEN 1 ELSE 0 END), 0) as copilot_count,
+         COALESCE(SUM(CASE WHEN provider = 'copilot_cli' THEN 1 ELSE 0 END), 0) as copilot_cli_count
        FROM facet_matches`,
     )
     .get(...facetWhereParams, ...categoryFilter.params) as
@@ -155,6 +156,7 @@ export function searchMessages(
         gemini_count: number;
         cursor_count: number;
         copilot_count: number;
+        copilot_cli_count: number;
       }
     | undefined;
   const totalCount = Number(summaryRow?.total_count ?? 0);
@@ -170,6 +172,7 @@ export function searchMessages(
   providerCounts.gemini = Number(summaryRow?.gemini_count ?? 0);
   providerCounts.cursor = Number(summaryRow?.cursor_count ?? 0);
   providerCounts.copilot = Number(summaryRow?.copilot_count ?? 0);
+  providerCounts.copilot_cli = Number(summaryRow?.copilot_cli_count ?? 0);
 
   const limit = Math.max(1, input.limit ?? 50);
   const offset = Math.max(0, input.offset ?? 0);

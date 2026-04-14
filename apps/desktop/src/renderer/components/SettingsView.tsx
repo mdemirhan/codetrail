@@ -39,6 +39,7 @@ import type {
 import { copyTextToClipboard } from "../lib/clipboard";
 import { formatInteger } from "../lib/numberFormatting";
 import { openPath } from "../lib/pathActions";
+import { PROVIDER_GROUP_PARENT } from "../lib/providerGroups";
 import { compactPath, prettyCategory, toErrorMessage } from "../lib/viewUtils";
 import { ToolbarIcon } from "./ToolbarIcon";
 import { ExternalToolsSection } from "./settings/ExternalToolsSection";
@@ -172,6 +173,7 @@ const PROVIDER_ICONS: Record<Provider, string> = {
   gemini: "G",
   cursor: "U",
   copilot: "P",
+  copilot_cli: ">_",
 };
 
 export function SettingsView({
@@ -610,12 +612,18 @@ export function SettingsView({
                 <div className="settings-provider-list">
                   {PROVIDER_LIST.map(({ id: provider, label }) => {
                     const enabled = indexing.enabledProviders.includes(provider);
+                    const isChild = provider in PROVIDER_GROUP_PARENT;
                     return (
                       <div
                         key={provider}
                         className={`settings-provider-row settings-provider-row-${provider}${
                           enabled ? " is-enabled" : ""
-                        }`}
+                        }${isChild ? " settings-provider-row-child" : ""}`}
+                        title={
+                          isChild
+                            ? `${label} has an independent toggle — enabling or disabling it does not affect its parent provider.`
+                            : undefined
+                        }
                       >
                         <div className="settings-provider-row-main">
                           <span

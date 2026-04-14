@@ -52,6 +52,7 @@ export function createDefaultDiscoveryConfig(
     geminiProjectsPath: join(homeDir, ".gemini", "projects.json"),
     cursorRoot: join(homeDir, ".cursor", "projects"),
     copilotRoot: getDefaultCopilotRoot(platform, environment),
+    copilotCliRoot: join(homeDir, ".copilot", "session-state"),
     includeClaudeSubagents: false,
     enabledProviders: [...PROVIDER_VALUES],
   };

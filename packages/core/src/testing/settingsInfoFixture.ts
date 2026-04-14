@@ -21,6 +21,7 @@ function buildDefaultDiscoveryPaths(homeDir: string): Record<SettingsInfoPathKey
     geminiProjectsPath: `${homeDir}/.gemini/projects.json`,
     cursorRoot: `${homeDir}/.cursor/projects`,
     copilotRoot: `${homeDir}/Library/Application Support/Code/User/workspaceStorage`,
+    copilotCliRoot: `${homeDir}/.copilot/session-state`,
   };
 }
 

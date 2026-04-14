@@ -54,6 +54,7 @@ export type DiscoveryConfig = {
   geminiProjectsPath?: string;
   cursorRoot: string;
   copilotRoot: string;
+  copilotCliRoot: string;
   includeClaudeSubagents: boolean;
   enabledProviders?: Provider[];
 };

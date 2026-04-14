@@ -1782,6 +1782,12 @@ body.platform-macos .titlebar-left {
   color: var(--accent-teal);
 }
 
+.tag-copilot_cli,
+.provider-chip.provider-copilot_cli {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
+}
+
 .tag-codex.active,
 .provider-chip.active.provider-codex {
   background: var(--accent-blue);
@@ -1809,6 +1815,12 @@ body.platform-macos .titlebar-left {
 
 .tag-copilot.active,
 .provider-chip.active.provider-copilot {
+  background: var(--accent-teal);
+  color: #ffffff;
+}
+
+.tag-copilot_cli.active,
+.provider-chip.active.provider-copilot_cli {
   background: var(--accent-teal);
   color: #ffffff;
 }
@@ -2367,6 +2379,11 @@ body.platform-macos .titlebar-left {
 }
 
 .meta-tag.copilot {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
+}
+
+.meta-tag.copilot_cli {
   background: var(--accent-teal-dim);
   color: var(--accent-teal);
 }
@@ -3245,6 +3262,10 @@ button svg *,
 }
 
 .provider-label.provider-copilot {
+  color: var(--accent-teal);
+}
+
+.provider-label.provider-copilot_cli {
   color: var(--accent-teal);
 }
 
@@ -4846,6 +4867,12 @@ mark {
   background: color-mix(in srgb, var(--accent-teal-dim) 56%, var(--bg-elevated));
 }
 
+.search-filter-chip-provider-copilot_cli {
+  color: color-mix(in srgb, var(--accent-teal) 88%, var(--text-secondary));
+  border-color: color-mix(in srgb, var(--accent-teal) 20%, var(--border));
+  background: color-mix(in srgb, var(--accent-teal-dim) 56%, var(--bg-elevated));
+}
+
 .search-filter-chip-provider.is-active {
   color: var(--text-primary);
 }
@@ -4871,6 +4898,11 @@ mark {
 }
 
 .search-filter-chip-provider-copilot.is-active {
+  background: color-mix(in srgb, var(--accent-teal) 18%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--accent-teal) 36%, transparent);
+}
+
+.search-filter-chip-provider-copilot_cli.is-active {
   background: color-mix(in srgb, var(--accent-teal) 18%, var(--bg-surface));
   border-color: color-mix(in srgb, var(--accent-teal) 36%, transparent);
 }
@@ -5005,6 +5037,10 @@ mark {
   background: var(--accent-teal);
 }
 
+.search-result-card-copilot_cli .search-result-accent {
+  background: var(--accent-teal);
+}
+
 .search-result-content {
   flex: 1;
   min-width: 0;
@@ -5052,6 +5088,11 @@ mark {
 }
 
 .search-result-provider-copilot {
+  background: color-mix(in srgb, var(--accent-teal-dim) 82%, transparent);
+  color: var(--accent-teal);
+}
+
+.search-result-provider-copilot_cli {
   background: color-mix(in srgb, var(--accent-teal-dim) 82%, transparent);
   color: var(--accent-teal);
 }
@@ -6027,6 +6068,11 @@ mark {
   --switch-accent-dim: var(--accent-teal-dim);
 }
 
+.settings-switch-copilot_cli {
+  --switch-accent: var(--accent-teal);
+  --switch-accent-dim: var(--accent-teal-dim);
+}
+
 .settings-switch input {
   position: absolute;
   inset: 0;
@@ -6152,6 +6198,28 @@ mark {
 .settings-provider-row-copilot {
   --provider-accent: var(--accent-teal);
   --provider-accent-dim: var(--accent-teal-dim);
+}
+
+.settings-provider-dot-copilot_cli,
+.settings-provider-row-copilot_cli {
+  --provider-accent: var(--accent-teal);
+  --provider-accent-dim: var(--accent-teal-dim);
+}
+
+.settings-provider-row.settings-provider-row-child {
+  padding-left: 32px;
+  background: color-mix(in srgb, var(--surface-1) 60%, transparent);
+}
+
+.settings-provider-row.settings-provider-row-child .settings-provider-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+.settings-provider-row.settings-provider-row-child .settings-provider-name {
+  font-size: 13px;
+  color: var(--text-2);
 }
 
 .settings-provider-dot.is-active {
@@ -6380,6 +6448,11 @@ mark {
 }
 
 .settings-provider-copilot {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
+}
+
+.settings-provider-copilot_cli {
   background: var(--accent-teal-dim);
   color: var(--accent-teal);
 }

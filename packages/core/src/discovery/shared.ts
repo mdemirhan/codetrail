@@ -330,6 +330,11 @@ export function getDiscoveryPath(
 ): string | null;
 export function getDiscoveryPath(
   config: ResolvedDiscoveryConfig,
+  provider: "copilot_cli",
+  key: Extract<ProviderDiscoveryPathKey, "copilotCliRoot">,
+): string | null;
+export function getDiscoveryPath(
+  config: ResolvedDiscoveryConfig,
   provider: Provider,
   key: ProviderDiscoveryPathKey,
 ): string | null;

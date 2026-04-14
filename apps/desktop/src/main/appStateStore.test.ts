@@ -104,6 +104,7 @@ describe("AppStateStore", () => {
         gemini: [],
         cursor: [],
         copilot: [],
+        copilot_cli: [],
       },
     });
     store.setIndexingState({
@@ -160,6 +161,7 @@ describe("AppStateStore", () => {
         gemini: [],
         cursor: [],
         copilot: [],
+        copilot_cli: [],
       },
     });
     expect(reloaded.getIndexingState()).toEqual({

@@ -114,6 +114,7 @@ describe("discoverSessionFiles", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: true,
     });
 
@@ -144,6 +145,7 @@ describe("discoverSessionFiles", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: false,
     });
 
@@ -210,6 +212,7 @@ describe("discoverSessionFiles", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot,
       copilotRoot: join(dir, ".copilot-workspace"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: false,
     });
 
@@ -315,6 +318,7 @@ describe("discoverSessionFiles", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, "nonexistent-copilot-root"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: false,
     });
 
@@ -420,6 +424,7 @@ describe("discoverSessionFiles", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, "workspaceStorage"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: false,
     });
 

@@ -133,7 +133,14 @@ function createProjectPaneProps(
     projectQueryInput: "",
     projectProviders: ["claude", "codex", "gemini"],
     providers: ["claude", "codex", "gemini", "cursor"],
-    projectProviderCounts: { claude: 1, codex: 1, gemini: 1, cursor: 0, copilot: 0 },
+    projectProviderCounts: {
+      claude: 1,
+      codex: 1,
+      gemini: 1,
+      cursor: 0,
+      copilot: 0,
+      copilot_cli: 0,
+    },
     projectUpdates: { project_2: { messageDelta: 3, updatedAt: Date.now() } },
   };
   const sorting: ComponentProps<typeof ProjectPane>["sorting"] = {
@@ -1281,7 +1288,14 @@ describe("ProjectPane", () => {
             selectedProjectId: "",
             viewMode: "tree",
             updateSource: "auto",
-            projectProviderCounts: { claude: 1, codex: 1, gemini: 0, cursor: 0, copilot: 0 },
+            projectProviderCounts: {
+              claude: 1,
+              codex: 1,
+              gemini: 0,
+              cursor: 0,
+              copilot: 0,
+              copilot_cli: 0,
+            },
             projectUpdates: { project_1: { messageDelta: 5, updatedAt: Date.now() } },
           },
           actions: {

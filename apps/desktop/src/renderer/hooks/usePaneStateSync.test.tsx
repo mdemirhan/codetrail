@@ -169,6 +169,7 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     gemini: [],
     cursor: [],
     copilot: [],
+    copilot_cli: [],
   });
   const sessionScrollTopRef = useRef(0);
   const pendingRestoredSessionScrollRef = useRef<{
@@ -385,6 +386,7 @@ describe("usePaneStateSync", () => {
               gemini: [],
               cursor: [],
               copilot: [],
+              copilot_cli: [],
             },
           };
         }
@@ -569,6 +571,7 @@ describe("usePaneStateSync", () => {
           gemini: [],
           cursor: [],
           copilot: [],
+          copilot_cli: [],
         },
       });
     } finally {

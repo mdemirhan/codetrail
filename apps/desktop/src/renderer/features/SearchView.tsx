@@ -12,6 +12,11 @@ import { useClickOutside } from "../hooks/useClickOutside";
 import { formatCompactInteger, formatInteger } from "../lib/numberFormatting";
 import { usePaneFocusOverlay } from "../lib/paneFocusController";
 import {
+  getChipProviders,
+  getProviderWithChildren,
+  toggleGroupProviders,
+} from "../lib/providerGroups";
+import {
   SEARCH_PLACEHOLDERS,
   getAdvancedSearchToggleTitle,
   getSearchQueryPlaceholder,
@@ -288,27 +293,37 @@ export function SearchView({
                     </div>
 
                     <SearchFilterGroup label="Agent">
-                      {enabledProviders.map((provider) => (
-                        <button
-                          key={provider}
-                          type="button"
-                          className={`msg-filter search-filter-chip search-filter-chip-provider search-filter-chip-provider-${provider}${
-                            search.searchProviders.includes(provider) ? " is-active" : ""
-                          }`}
-                          title={`Show or hide ${prettyProvider(provider)} results`}
-                          onClick={() => {
-                            search.setSearchProviders((value) => toggleValue(value, provider));
-                            search.setSearchPage(0);
-                          }}
-                        >
-                          <span className="filter-label">
-                            {prettyProvider(provider)}
-                            <span className="filter-count search-filter-chip-count">
-                              {formatCompactInteger(search.searchProviderCounts[provider])}
+                      {getChipProviders(enabledProviders).map((provider) => {
+                        const associated = getProviderWithChildren(provider, enabledProviders);
+                        const combinedCount = associated.reduce(
+                          (sum, p) => sum + (search.searchProviderCounts[p] ?? 0),
+                          0,
+                        );
+                        const isActive = associated.some((p) => search.searchProviders.includes(p));
+                        return (
+                          <button
+                            key={provider}
+                            type="button"
+                            className={`msg-filter search-filter-chip search-filter-chip-provider search-filter-chip-provider-${provider}${
+                              isActive ? " is-active" : ""
+                            }`}
+                            title={`Show or hide ${prettyProvider(provider)} results`}
+                            onClick={() => {
+                              search.setSearchProviders((value) =>
+                                toggleGroupProviders(provider, value, enabledProviders),
+                              );
+                              search.setSearchPage(0);
+                            }}
+                          >
+                            <span className="filter-label">
+                              {prettyProvider(provider)}
+                              <span className="filter-count search-filter-chip-count">
+                                {formatCompactInteger(combinedCount)}
+                              </span>
                             </span>
-                          </span>
-                        </button>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </SearchFilterGroup>
 
                     <SearchFilterGroup label="Role">

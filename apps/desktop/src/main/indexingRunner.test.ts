@@ -238,6 +238,7 @@ describe("WorkerIndexingRunner", () => {
         gemini: [],
         cursor: [],
         copilot: [],
+        copilot_cli: [],
       }),
     });
 
@@ -253,6 +254,7 @@ describe("WorkerIndexingRunner", () => {
           gemini: [],
           cursor: [],
           copilot: [],
+          copilot_cli: [],
         },
       },
       {},

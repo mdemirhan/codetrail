@@ -25,6 +25,7 @@ function createDiscoveryConfig(dir: string): DiscoveryConfig {
     geminiProjectsPath: join(dir, ".gemini", "projects.json"),
     cursorRoot: join(dir, ".cursor", "projects"),
     copilotRoot: join(dir, ".copilot-workspace"),
+    copilotCliRoot: join(dir, ".copilot-cli-sessions"),
     includeClaudeSubagents: false,
   };
 }
@@ -222,6 +223,7 @@ describe("runIncrementalIndexing", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: false,
     };
 
@@ -288,6 +290,7 @@ describe("runIncrementalIndexing", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: false,
     };
 
@@ -340,6 +343,7 @@ describe("runIncrementalIndexing", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: false,
     };
 
@@ -489,6 +493,7 @@ describe("runIncrementalIndexing", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: false,
     };
 
@@ -1809,6 +1814,7 @@ describe("runIncrementalIndexing", () => {
           geminiProjectsPath: join(dir, ".gemini", "projects.json"),
           cursorRoot: join(dir, ".cursor", "projects"),
           copilotRoot: join(dir, ".copilot-workspace"),
+          copilotCliRoot: join(dir, ".copilot-cli-sessions"),
           includeClaudeSubagents: false,
         },
       },
@@ -2254,6 +2260,7 @@ describe("runIncrementalIndexing", () => {
         geminiProjectsPath: join(dir, ".gemini", "projects.json"),
         cursorRoot: join(dir, ".cursor", "projects"),
         copilotRoot: join(dir, ".copilot-workspace"),
+        copilotCliRoot: join(dir, ".copilot-cli-sessions"),
         includeClaudeSubagents: false,
       },
     });
@@ -2328,6 +2335,7 @@ describe("runIncrementalIndexing", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
       includeClaudeSubagents: false,
     };
 
@@ -2443,6 +2451,7 @@ describe("runIncrementalIndexing", () => {
         geminiProjectsPath: join(dir, ".gemini", "projects.json"),
         cursorRoot,
         copilotRoot: join(dir, ".copilot-workspace"),
+        copilotCliRoot: join(dir, ".copilot-cli-sessions"),
         includeClaudeSubagents: false,
       },
     });
@@ -2545,6 +2554,7 @@ describe("runIncrementalIndexing", () => {
         geminiProjectsPath: join(dir, ".gemini", "projects.json"),
         cursorRoot,
         copilotRoot: join(dir, ".copilot-workspace"),
+        copilotCliRoot: join(dir, ".copilot-cli-sessions"),
         includeClaudeSubagents: false,
       },
     });

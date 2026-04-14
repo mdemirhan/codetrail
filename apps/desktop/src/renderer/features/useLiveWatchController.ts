@@ -9,6 +9,7 @@ import {
 
 import { isWatchRefreshStrategy } from "../app/autoRefresh";
 import type { RefreshStrategy } from "../app/autoRefresh";
+import { EMPTY_PROVIDER_COUNTS } from "../app/constants";
 import type { MainView, WatchLiveStatusResponse } from "../app/types";
 import type { CodetrailClient } from "../lib/codetrailClient";
 import { toErrorMessage } from "../lib/viewUtils";
@@ -19,13 +20,6 @@ const LIVE_STATUS_ACTIVE_POLL_MS = IS_TEST_ENV ? 0 : 3_000;
 const LIVE_STATUS_IDLE_POLL_MS = IS_TEST_ENV ? 0 : 10_000;
 const LIVE_STATUS_HIDDEN_POLL_MS = IS_TEST_ENV ? 0 : 15_000;
 export const LIVE_STATUS_PUSH_DEBOUNCE_MS = 200;
-const EMPTY_PROVIDER_COUNTS = {
-  claude: 0,
-  codex: 0,
-  gemini: 0,
-  cursor: 0,
-  copilot: 0,
-} as const;
 
 export function resolveLiveStatusPollMs(input: {
   documentVisible: boolean;

@@ -24,12 +24,13 @@ describe("provider fixture indexing", () => {
           geminiProjectsPath: join(fixturesRoot, "gemini", "projects.json"),
           cursorRoot: join(fixturesRoot, "cursor", "projects"),
           copilotRoot: join(fixturesRoot, "copilot", "workspaceStorage"),
+          copilotCliRoot: join(fixturesRoot, "copilot-cli", "session-state"),
           includeClaudeSubagents: false,
         },
       });
 
-      expect(result.discoveredFiles).toBe(10);
-      expect(result.indexedFiles).toBe(10);
+      expect(result.discoveredFiles).toBe(11);
+      expect(result.indexedFiles).toBe(11);
       expect(result.skippedFiles).toBe(0);
 
       const db = openDatabase(dbPath);
@@ -47,6 +48,7 @@ describe("provider fixture indexing", () => {
           { provider: "claude", count: 3 },
           { provider: "codex", count: 4 },
           { provider: "copilot", count: 1 },
+          { provider: "copilot_cli", count: 1 },
           { provider: "cursor", count: 1 },
           { provider: "gemini", count: 1 },
         ]);
@@ -64,6 +66,7 @@ describe("provider fixture indexing", () => {
           { provider: "claude", count: 1 },
           { provider: "codex", count: 2 },
           { provider: "copilot", count: 1 },
+          { provider: "copilot_cli", count: 1 },
           { provider: "cursor", count: 1 },
           { provider: "gemini", count: 1 },
         ]);
