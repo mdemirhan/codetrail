@@ -1,4 +1,8 @@
-import { indexerConfigBaseSchema, paneStateBaseSchema } from "@codetrail/core/browser";
+import {
+  createProviderRecord,
+  indexerConfigBaseSchema,
+  paneStateBaseSchema,
+} from "@codetrail/core/browser";
 import {
   createClaudeHookStateFixture,
   createLiveStatusFixture,
@@ -18,14 +22,7 @@ const EMPTY_INDEXER_CONFIG = Object.fromEntries(
 );
 
 const SETTINGS_INFO = createSettingsInfoFixture();
-const EMPTY_PROVIDER_COUNTS = {
-  claude: 0,
-  codex: 0,
-  gemini: 0,
-  cursor: 0,
-  copilot: 0,
-  copilot_cli: 0,
-} as const;
+const EMPTY_PROVIDER_COUNTS = createProviderRecord(() => 0);
 
 function cloneValue<T>(value: T): T {
   if (typeof structuredClone === "function") {
@@ -127,11 +124,9 @@ function createRendererClient(handlers: Record<string, ChannelHandler>) {
           system: 2,
         },
         providerCounts: {
+          ...EMPTY_PROVIDER_COUNTS,
           claude: 20,
           codex: 22,
-          gemini: 0,
-          cursor: 0,
-          copilot: 0,
         },
         providerStats: [
           {

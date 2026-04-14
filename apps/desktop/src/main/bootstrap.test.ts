@@ -109,6 +109,10 @@ const {
           claude: ["^<command-name>"],
           codex: ["^<environment_context>"],
           gemini: [],
+          cursor: [],
+          copilot: [],
+          copilot_cli: [],
+          opencode: [],
         }
       );
     }),
@@ -255,6 +259,7 @@ const {
             cursor: 0,
             copilot: 0,
             copilot_cli: 0,
+            opencode: 0,
           },
           sessions: [],
           claudeHookState: {
@@ -306,6 +311,7 @@ vi.mock("@codetrail/core", async () => {
       cursorRoot: "/cursor/root",
       copilotRoot: "/copilot/root",
       copilotCliRoot: "/copilot-cli/root",
+      opencodeRoot: "/opencode/root",
       includeClaudeSubagents: false,
     },
     initializeDatabase: mockInitializeDatabase,
@@ -497,6 +503,7 @@ describe("bootstrapMainProcess", () => {
       cursor: [],
       copilot: [],
       copilot_cli: [],
+      opencode: [],
     },
   };
 
@@ -560,7 +567,15 @@ describe("bootstrapMainProcess", () => {
       getFilePath: () => "/tmp/state.json",
       getPaneState: () => paneState,
       getIndexingState: () => ({
-        enabledProviders: ["claude", "codex", "gemini", "cursor", "copilot"],
+        enabledProviders: [
+          "claude",
+          "codex",
+          "gemini",
+          "cursor",
+          "copilot",
+          "copilot_cli",
+          "opencode",
+        ],
         removeMissingSessionsDuringIncrementalIndexing: false,
       }),
       flush,
@@ -632,6 +647,7 @@ describe("bootstrapMainProcess", () => {
           cursorRoot: "/cursor/root",
           copilotRoot: "/copilot/root",
           copilotCliRoot: "/copilot-cli/root",
+          opencodeRoot: "/opencode/root",
         },
       }).discovery,
     );
@@ -694,14 +710,14 @@ describe("bootstrapMainProcess", () => {
         {
           id: "m1",
           ...searchPayload,
-          providers: ["claude", "codex", "gemini", "cursor", "copilot"],
+          providers: ["claude", "codex", "gemini", "cursor", "copilot", "copilot_cli", "opencode"],
         },
       ],
       total: 1,
     });
     expect(mockRunSearchQuery).toHaveBeenCalledWith({
       ...searchPayload,
-      providers: ["claude", "codex", "gemini", "cursor", "copilot"],
+      providers: ["claude", "codex", "gemini", "cursor", "copilot", "copilot_cli", "opencode"],
     });
 
     await expect(getRequiredHandler(handlers, "indexer:refresh")({ force: true })).resolves.toEqual(
@@ -965,6 +981,7 @@ describe("bootstrapMainProcess", () => {
         cursor: [],
         copilot: [],
         copilot_cli: [],
+        opencode: [],
       },
     });
     expect(getRequiredHandler(handlers, "indexer:getConfig")({})).toEqual({
@@ -1232,6 +1249,7 @@ describe("bootstrapMainProcess", () => {
           "/cursor/root",
           "/copilot/root",
           "/copilot-cli/root",
+          "/opencode/root",
         ],
         backend: "kqueue",
       });
@@ -1244,6 +1262,7 @@ describe("bootstrapMainProcess", () => {
           "/cursor/root",
           "/copilot/root",
           "/copilot-cli/root",
+          "/opencode/root",
         ],
         expect.any(Function),
         expect.objectContaining({
@@ -1331,6 +1350,7 @@ describe("bootstrapMainProcess", () => {
           "/cursor/root",
           "/copilot/root",
           "/copilot-cli/root",
+          "/opencode/root",
         ],
         expect.any(Function),
         expect.objectContaining({
@@ -1348,6 +1368,7 @@ describe("bootstrapMainProcess", () => {
           "/cursor/root",
           "/copilot/root",
           "/copilot-cli/root",
+          "/opencode/root",
         ],
         expect.any(Function),
         expect.objectContaining({

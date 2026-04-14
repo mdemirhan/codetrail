@@ -87,12 +87,19 @@ export function createOpenCodeFixtureDatabase(input: {
 
   const projectId = input.projectId ?? "project-1";
   const createdAt = input.sessions[0]?.timeCreated ?? Date.now();
-  const updatedAt = input.sessions.at(-1)?.timeUpdated ?? input.sessions.at(-1)?.timeCreated ?? createdAt;
+  const updatedAt =
+    input.sessions.at(-1)?.timeUpdated ?? input.sessions.at(-1)?.timeCreated ?? createdAt;
   db.prepare(
     `INSERT INTO project (
       id, worktree, vcs, name, icon_url, icon_color, time_created, time_updated, time_initialized, sandboxes, commands
     ) VALUES (?, ?, NULL, ?, NULL, NULL, ?, ?, NULL, '[]', NULL)`,
-  ).run(projectId, input.sessions[0]?.directory ?? "/workspace", input.projectName ?? null, createdAt, updatedAt);
+  ).run(
+    projectId,
+    input.sessions[0]?.directory ?? "/workspace",
+    input.projectName ?? null,
+    createdAt,
+    updatedAt,
+  );
 
   const insertSession = db.prepare(
     `INSERT INTO session (
@@ -101,10 +108,10 @@ export function createOpenCodeFixtureDatabase(input: {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, NULL, NULL)`,
   );
   const insertMessage = db.prepare(
-    `INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)`,
+    "INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)",
   );
   const insertPart = db.prepare(
-    `INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)`,
+    "INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)",
   );
 
   for (const session of input.sessions) {

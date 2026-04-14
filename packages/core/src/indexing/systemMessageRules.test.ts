@@ -24,6 +24,7 @@ describe("systemMessageRules", () => {
       cursor: [],
       copilot: [],
       copilot_cli: [],
+      opencode: [],
     });
   });
 

@@ -16,7 +16,15 @@ function makeLiveStatusResponse(
     enabled: true,
     instrumentationEnabled: false,
     updatedAt: new Date().toISOString(),
-    providerCounts: { claude: 0, codex: 0, gemini: 0, cursor: 0, copilot: 0, copilot_cli: 0 },
+    providerCounts: {
+      claude: 0,
+      codex: 0,
+      gemini: 0,
+      cursor: 0,
+      copilot: 0,
+      copilot_cli: 0,
+      opencode: 0,
+    },
     sessions: [],
     revision: 1,
     claudeHookState: {

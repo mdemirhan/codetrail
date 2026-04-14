@@ -6,6 +6,7 @@ import { usePaneFocus } from "../../lib/paneFocusController";
 import { getProjectGroupId } from "../../lib/projectTree";
 import { getChipProviders, getProviderWithChildren } from "../../lib/providerGroups";
 import { SEARCH_PLACEHOLDERS } from "../../lib/searchLabels";
+import { useShortcutRegistry } from "../../lib/shortcutRegistry";
 import { compactPath, deriveSessionTitle, formatDate, prettyProvider } from "../../lib/viewUtils";
 import { ToolbarIcon } from "../ToolbarIcon";
 import { HistoryListContextMenu } from "./HistoryListContextMenu";
@@ -24,8 +25,11 @@ function isTreeRowActionTarget(target: EventTarget | null): boolean {
   );
 }
 
-function isUnmodifiedArrowEvent(event: React.KeyboardEvent<HTMLElement>): boolean {
-  return !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+function isUnmodifiedArrowEvent(
+  event: React.KeyboardEvent<HTMLElement>,
+  isModifierFree: (event: React.KeyboardEvent<HTMLElement>) => boolean,
+): boolean {
+  return isModifierFree(event);
 }
 
 function OverflowAwareLabel({
@@ -62,6 +66,7 @@ export function ProjectPane({
   actions,
 }: ProjectPaneProps) {
   const paneFocus = usePaneFocus();
+  const shortcuts = useShortcutRegistry();
   const {
     sortedProjects,
     selectedProjectId,
@@ -281,7 +286,10 @@ export function ProjectPane({
           });
         }}
         onKeyDown={(event) => {
-          if (event.key !== "ArrowLeft" || !isUnmodifiedArrowEvent(event)) {
+          if (
+            event.key !== "ArrowLeft" ||
+            !isUnmodifiedArrowEvent(event, shortcuts.matches.isModifierFree)
+          ) {
             return;
           }
           event.preventDefault();
@@ -407,7 +415,7 @@ export function ProjectPane({
                 return;
               }
               if (
-                isUnmodifiedArrowEvent(event) &&
+                isUnmodifiedArrowEvent(event, shortcuts.matches.isModifierFree) &&
                 event.key === "ArrowRight" &&
                 hasSessions &&
                 !isExpanded
@@ -417,7 +425,7 @@ export function ProjectPane({
                 return;
               }
               if (
-                isUnmodifiedArrowEvent(event) &&
+                isUnmodifiedArrowEvent(event, shortcuts.matches.isModifierFree) &&
                 event.key === "ArrowLeft" &&
                 hasSessions &&
                 isExpanded
@@ -616,7 +624,7 @@ export function ProjectPane({
                         return;
                       }
                       if (
-                        isUnmodifiedArrowEvent(event) &&
+                        isUnmodifiedArrowEvent(event, shortcuts.matches.isModifierFree) &&
                         event.key === "ArrowRight" &&
                         !isExpanded
                       ) {
@@ -625,7 +633,7 @@ export function ProjectPane({
                         return;
                       }
                       if (
-                        isUnmodifiedArrowEvent(event) &&
+                        isUnmodifiedArrowEvent(event, shortcuts.matches.isModifierFree) &&
                         event.key === "ArrowLeft" &&
                         isExpanded
                       ) {

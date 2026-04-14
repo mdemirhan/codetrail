@@ -126,11 +126,17 @@ export function ShortcutsDialog({
   const scrollRows: ShortcutSectionRow[] = [
     {
       label: "Page up",
-      shortcuts: sortPageTraversalShortcuts(findShortcuts(shortcuts, "Page up in current list")),
+      shortcuts: sortPageTraversalShortcuts(
+        findShortcuts(shortcuts, "Page up in current list"),
+        shortcuts,
+      ),
     },
     {
       label: "Page down",
-      shortcuts: sortPageTraversalShortcuts(findShortcuts(shortcuts, "Page down in current list")),
+      shortcuts: sortPageTraversalShortcuts(
+        findShortcuts(shortcuts, "Page down in current list"),
+        shortcuts,
+      ),
     },
   ];
   const paneRows: ShortcutSectionRow[] = [
@@ -477,12 +483,6 @@ function findShortcuts(shortcuts: ShortcutRegistry, description: string): string
   return Array.from(new Set(matches));
 }
 
-function sortPageTraversalShortcuts(shortcuts: string[]): string[] {
-  return [...shortcuts].sort(
-    (left, right) => getPageTraversalRank(left) - getPageTraversalRank(right),
-  );
-}
-
 function splitShortcutAlternatives(shortcut: string): string[] {
   return shortcut
     .split(/\s+\/\s+/u)
@@ -490,14 +490,15 @@ function splitShortcutAlternatives(shortcut: string): string[] {
     .filter((part) => part.length > 0);
 }
 
-function getPageTraversalRank(shortcut: string): number {
-  if (shortcut === "Page Up" || shortcut === "Page Down") {
-    return 0;
-  }
-  if (shortcut === "Ctrl+U" || shortcut === "Ctrl+D") {
-    return 1;
-  }
-  return 2;
+function sortPageTraversalShortcuts(
+  shortcuts: string[],
+  shortcutRegistry: ShortcutRegistry,
+): string[] {
+  return [...shortcuts].sort(
+    (left, right) =>
+      shortcutRegistry.rankPageTraversalShortcut(left) -
+      shortcutRegistry.rankPageTraversalShortcut(right),
+  );
 }
 
 function formatKeyToken(token: string): string {

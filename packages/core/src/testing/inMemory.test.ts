@@ -65,6 +65,8 @@ describe("core testing helpers", () => {
         geminiProjectsPath: "/fixtures/.gemini/projects.json",
         cursorRoot: "/fixtures/.cursor/projects",
         copilotRoot: "/fixtures/.copilot/projects",
+        copilotCliRoot: "/fixtures/.copilot/session-state",
+        opencodeRoot: "/fixtures/.local/share/opencode",
         includeClaudeSubagents: false,
       },
       { fs: fs.toDiscoveryFileSystem() },

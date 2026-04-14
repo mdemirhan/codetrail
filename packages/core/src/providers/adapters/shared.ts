@@ -1,5 +1,5 @@
+import type { DiscoveredSessionFile } from "../../discovery/types";
 import type {
-  DiscoveredSessionFile,
   ProviderJsonObject,
   ProviderReadSourceResult,
   ProviderSourceMetadata,

@@ -140,6 +140,7 @@ function createProjectPaneProps(
       cursor: 0,
       copilot: 0,
       copilot_cli: 0,
+      opencode: 0,
     },
     projectUpdates: { project_2: { messageDelta: 3, updatedAt: Date.now() } },
   };
@@ -1295,6 +1296,7 @@ describe("ProjectPane", () => {
               cursor: 0,
               copilot: 0,
               copilot_cli: 0,
+              opencode: 0,
             },
             projectUpdates: { project_1: { messageDelta: 5, updatedAt: Date.now() } },
           },

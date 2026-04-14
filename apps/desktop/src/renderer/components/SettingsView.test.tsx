@@ -140,6 +140,8 @@ function createBaseProps(): Omit<
         gemini: 0,
         cursor: 0,
         copilot: 0,
+        copilot_cli: 0,
+        opencode: 0,
       },
       sessions: [
         {
@@ -299,7 +301,14 @@ function createBaseProps(): Omit<
       onRescanExternalTools: vi.fn(),
     },
     indexing: {
-      enabledProviders: ["claude", "codex", "gemini", "cursor", "copilot", "opencode"] as Provider[],
+      enabledProviders: [
+        "claude",
+        "codex",
+        "gemini",
+        "cursor",
+        "copilot",
+        "opencode",
+      ] as Provider[],
       removeMissingSessionsDuringIncrementalIndexing: false,
       canForceReindex: true,
       onToggleProviderEnabled: vi.fn(),

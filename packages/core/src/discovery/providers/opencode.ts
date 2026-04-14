@@ -3,12 +3,8 @@ import { basename, join } from "node:path";
 import Database from "better-sqlite3";
 
 import { compactMetadata } from "../../metadata";
-import {
-  type ProviderReadSourceResult,
-  type ProviderSource,
-  type ReadFileText,
-} from "../../providers/types";
 import { asRecord, readString } from "../../parsing/helpers";
+import type { ProviderReadSourceResult, ProviderSource, ReadFileText } from "../../providers/types";
 import {
   type ResolvedDiscoveryDependencies,
   getDiscoveryPath,

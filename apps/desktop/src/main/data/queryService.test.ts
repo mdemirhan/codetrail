@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createInMemoryDatabase } from "@codetrail/core";
 
-import type { BookmarkStore } from "./bookmarkStore";
+import type { BookmarkStore, StoredBookmark } from "./bookmarkStore";
 import { createQueryServiceFromDb, listProjects } from "./queryService";
 
 function seedQueryDb() {
@@ -1408,7 +1408,7 @@ describe("queryService in-memory", () => {
     );
 
     const bookmarkStore = createBookmarkStoreMock({
-      listProjectBookmarks: vi.fn(() => [
+      listProjectBookmarks: vi.fn((): StoredBookmark[] => [
         {
           project_id: "project_1",
           session_id: "session_1",

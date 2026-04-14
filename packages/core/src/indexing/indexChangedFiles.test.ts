@@ -117,18 +117,19 @@ describe("indexChangedFiles", () => {
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
       copilotCliRoot: join(dir, ".copilot-cli-sessions"),
+      opencodeRoot: join(dir, ".local", "share", "opencode"),
       includeClaudeSubagents: false,
     };
-    const injectedDiscoverSingleFile = vi.fn(() => {
-      throw new Error("injected-discover-single-file");
+    const injectedDiscoverChangedFiles = vi.fn(() => {
+      throw new Error("injected-discover-changed-files");
     });
 
     expect(() =>
       indexChangedFiles({ dbPath, discoveryConfig }, [join(dir, "missing.jsonl")], {
-        discoverSingleFile: injectedDiscoverSingleFile,
+        discoverChangedFiles: injectedDiscoverChangedFiles,
       }),
-    ).toThrow("injected-discover-single-file");
-    expect(injectedDiscoverSingleFile).toHaveBeenCalledTimes(1);
+    ).toThrow("injected-discover-changed-files");
+    expect(injectedDiscoverChangedFiles).toHaveBeenCalledTimes(1);
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -166,6 +167,7 @@ describe("indexChangedFiles", () => {
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
       copilotCliRoot: join(dir, ".copilot-cli-sessions"),
+      opencodeRoot: join(dir, ".local", "share", "opencode"),
       includeClaudeSubagents: false,
     };
 
@@ -222,6 +224,7 @@ describe("indexChangedFiles", () => {
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
       copilotCliRoot: join(dir, ".copilot-cli-sessions"),
+      opencodeRoot: join(dir, ".local", "share", "opencode"),
       includeClaudeSubagents: false,
     };
 
@@ -323,6 +326,7 @@ describe("indexChangedFiles", () => {
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
       copilotCliRoot: join(dir, ".copilot-cli-sessions"),
+      opencodeRoot: join(dir, ".local", "share", "opencode"),
       includeClaudeSubagents: false,
     };
 
@@ -380,6 +384,7 @@ describe("indexChangedFiles", () => {
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
       copilotCliRoot: join(dir, ".copilot-cli-sessions"),
+      opencodeRoot: join(dir, ".local", "share", "opencode"),
       includeClaudeSubagents: false,
     };
 

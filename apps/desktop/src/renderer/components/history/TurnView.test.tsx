@@ -448,7 +448,10 @@ describe("TurnView", () => {
     };
     history.sessionTurnDetail.messages = [
       history.sessionTurnDetail.anchorMessage,
-      ...history.sessionTurnDetail.messages.map((message) => ({ ...message, provider: "codex" })),
+      ...history.sessionTurnDetail.messages.map((message) => ({
+        ...message,
+        provider: "codex" as const,
+      })),
     ];
     history.sessionTurnDetail.totalCount = 4;
     history.sessionTurnDetail.categoryCounts.system = 1;

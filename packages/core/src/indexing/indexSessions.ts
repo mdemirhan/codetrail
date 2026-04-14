@@ -664,8 +664,9 @@ export function indexChangedFiles(
   const resolvedDependencies = resolveIndexingDependencies(dependencies);
   const discoveryConfig = resolveIndexingDiscoveryConfig(config);
 
-  const initiallyDiscoveredFiles = changedFilePaths
-    .flatMap((filePath) => resolvedDependencies.discoverChangedFiles(filePath, discoveryConfig));
+  const initiallyDiscoveredFiles = changedFilePaths.flatMap((filePath) =>
+    resolvedDependencies.discoverChangedFiles(filePath, discoveryConfig),
+  );
 
   const db = resolvedDependencies.openDatabase(config.dbPath);
   try {
@@ -855,9 +856,7 @@ function removeMissingOpenCodeSessionsForChangedPaths(args: {
       if (discoveredPathSet.has(indexedRow.file_path)) {
         continue;
       }
-      if (
-        !matchesProjectScope(indexedRow.provider, indexedRow.project_path, args.projectScope)
-      ) {
+      if (!matchesProjectScope(indexedRow.provider, indexedRow.project_path, args.projectScope)) {
         continue;
       }
       if (

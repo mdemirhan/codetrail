@@ -56,6 +56,16 @@ function getHistoryCategorySoloShortcuts(
   ) as Record<MessageCategory, string>;
 }
 
+function getPageTraversalShortcutRank(shortcut: string): number {
+  if (shortcut === "Page Up" || shortcut === "Page Down") {
+    return 0;
+  }
+  if (shortcut === "Ctrl+U" || shortcut === "Ctrl+D") {
+    return 1;
+  }
+  return 2;
+}
+
 function getShortcutItems(platform: DesktopPlatform) {
   const modifier = getPrimaryModifierLabel(platform);
   const alternateModifier = getAlternateModifierLabel(platform);
@@ -291,9 +301,13 @@ export type ShortcutRegistry = {
   historyCategoryExpandShortcuts: Record<MessageCategory, string>;
   historyCategorySoloShortcuts: Record<MessageCategory, string>;
   shortcutItems: ReturnType<typeof getShortcutItems>;
+  rankPageTraversalShortcut: (shortcut: string) => number;
   matches: {
     isPrimaryModifierPressed: (event: Pick<KeyboardEvent, "metaKey" | "ctrlKey">) => boolean;
     isProjectNavigationShortcut: (
+      event: Pick<KeyboardEvent, "metaKey" | "ctrlKey" | "altKey" | "shiftKey">,
+    ) => boolean;
+    isModifierFree: (
       event: Pick<KeyboardEvent, "metaKey" | "ctrlKey" | "altKey" | "shiftKey">,
     ) => boolean;
     isPageTraversalShortcut: (
@@ -342,6 +356,7 @@ export function createShortcutRegistry(platform: DesktopPlatform): ShortcutRegis
     historyCategoryExpandShortcuts: getHistoryCategoryExpandShortcuts(platform),
     historyCategorySoloShortcuts: getHistoryCategorySoloShortcuts(platform),
     shortcutItems: getShortcutItems(platform),
+    rankPageTraversalShortcut: (shortcut) => getPageTraversalShortcutRank(shortcut),
     matches: {
       isPrimaryModifierPressed: (event) =>
         isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey,
@@ -349,6 +364,8 @@ export function createShortcutRegistry(platform: DesktopPlatform): ShortcutRegis
         isMac
           ? event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
           : event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey,
+      isModifierFree: (event) =>
+        !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey,
       isPageTraversalShortcut: (event, direction) => {
         if (isMac) {
           return (

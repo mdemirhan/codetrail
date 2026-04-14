@@ -170,6 +170,7 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     cursor: [],
     copilot: [],
     copilot_cli: [],
+    opencode: [],
   });
   const sessionScrollTopRef = useRef(0);
   const pendingRestoredSessionScrollRef = useRef<{
@@ -387,6 +388,7 @@ describe("usePaneStateSync", () => {
               cursor: [],
               copilot: [],
               copilot_cli: [],
+              opencode: [],
             },
           };
         }
@@ -441,6 +443,9 @@ describe("usePaneStateSync", () => {
           codex: ["^<environment_context>"],
           gemini: [],
           cursor: [],
+          copilot: [],
+          copilot_cli: [],
+          opencode: [],
         },
       });
       const indexerSaveCalls = client.invoke.mock.calls.filter(
@@ -572,6 +577,7 @@ describe("usePaneStateSync", () => {
           cursor: [],
           copilot: [],
           copilot_cli: [],
+          opencode: [],
         },
       });
     } finally {

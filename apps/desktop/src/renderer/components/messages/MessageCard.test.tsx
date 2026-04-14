@@ -29,6 +29,10 @@ const message: SessionMessage = {
   operationDurationMs: 5000,
   operationDurationSource: "native",
   operationDurationConfidence: "high",
+  turnGroupId: null,
+  turnGroupingMode: "heuristic",
+  turnAnchorKind: null,
+  nativeTurnId: null,
 };
 
 describe("MessageCard", () => {

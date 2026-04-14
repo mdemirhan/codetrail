@@ -3904,9 +3904,7 @@ describe("runIncrementalIndexing", () => {
         cwd: string | null;
         provider_client: string | null;
       };
-      const toolCallRow = db
-        .prepare("SELECT tool_name, args_json FROM tool_calls")
-        .get() as {
+      const toolCallRow = db.prepare("SELECT tool_name, args_json FROM tool_calls").get() as {
         tool_name: string;
         args_json: string;
       };

@@ -64,6 +64,10 @@ const baseMessage: SessionMessage = {
   operationDurationMs: 1000,
   operationDurationSource: "native",
   operationDurationConfidence: "high",
+  turnGroupId: null,
+  turnGroupingMode: "heuristic",
+  turnAnchorKind: null,
+  nativeTurnId: null,
 };
 
 function buildJsonLines(lineCount: number): string {

@@ -1503,8 +1503,7 @@ function toIsoTimestamp(value: unknown): string | null {
 function buildOpenCodeToolUseContent(partData: Record<string, unknown>): string {
   const state = asRecord(partData.state);
   const toolName = readString(partData.tool) ?? "tool";
-  const operation =
-    toolName === "write" ? "write_file" : toolName === "edit" ? "edit" : toolName;
+  const operation = toolName === "write" ? "write_file" : toolName === "edit" ? "edit" : toolName;
   const result = state?.error ?? state?.output ?? null;
   return serializeUnknown({
     type: "tool_use",

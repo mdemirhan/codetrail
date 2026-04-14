@@ -356,6 +356,10 @@ function createSessionMessage(
     operationDurationMs: null,
     operationDurationSource: null,
     operationDurationConfidence: null,
+    turnGroupId: null,
+    turnGroupingMode: "heuristic" as const,
+    turnAnchorKind: null,
+    nativeTurnId: null,
     ...rest,
   };
 }

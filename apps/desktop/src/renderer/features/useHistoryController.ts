@@ -26,7 +26,10 @@ import type {
   SessionDetail,
   TreeAutoRevealSessionRequest,
 } from "../app/types";
-import { aggregateTurnCombinedFiles } from "../components/history/turnCombinedDiff";
+import {
+  type TurnCombinedMessage,
+  aggregateTurnCombinedFiles,
+} from "../components/history/turnCombinedDiff";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { usePaneStateSync } from "../hooks/usePaneStateSync";
 import { useCodetrailClient } from "../lib/codetrailClient";
@@ -57,17 +60,7 @@ const TURN_PRIMARY_HISTORY_CATEGORIES: readonly MessageCategory[] = [
   "assistant",
   "tool_edit",
 ];
-function turnHasCombinedVisibleDiffs(
-  messages: Array<{
-    category: MessageCategory;
-    content: string;
-    createdAt: string;
-    id: string;
-    sourceId: string;
-    provider: Provider;
-    toolEditFiles?: unknown;
-  }>,
-): boolean {
+function turnHasCombinedVisibleDiffs(messages: TurnCombinedMessage[]): boolean {
   return (
     aggregateTurnCombinedFiles(messages.filter((message) => message.category !== "user")).length > 0
   );

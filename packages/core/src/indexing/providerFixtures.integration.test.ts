@@ -25,6 +25,7 @@ describe("provider fixture indexing", () => {
           cursorRoot: join(fixturesRoot, "cursor", "projects"),
           copilotRoot: join(fixturesRoot, "copilot", "workspaceStorage"),
           copilotCliRoot: join(fixturesRoot, "copilot-cli", "session-state"),
+          opencodeRoot: join(fixturesRoot, "opencode"),
           includeClaudeSubagents: false,
         },
       });

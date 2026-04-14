@@ -53,6 +53,7 @@ describe("desktop smoke flow", () => {
         cursorRoot: join(dir, ".cursor", "projects"),
         copilotRoot: join(dir, ".copilot-workspace"),
         copilotCliRoot: join(dir, ".copilot-cli-sessions"),
+        opencodeRoot: join(dir, ".local", "share", "opencode"),
         includeClaudeSubagents: false,
       },
     });

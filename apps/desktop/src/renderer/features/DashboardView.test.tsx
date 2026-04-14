@@ -38,6 +38,8 @@ const statsFixture: DashboardStatsResponse = {
     gemini: 22,
     cursor: 0,
     copilot: 0,
+    copilot_cli: 0,
+    opencode: 0,
   },
   providerStats: [
     {

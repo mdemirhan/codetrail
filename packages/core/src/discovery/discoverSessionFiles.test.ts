@@ -291,6 +291,8 @@ describe("discoverSessionFiles", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot,
+      copilotCliRoot: join(dir, ".copilot", "session-state"),
+      opencodeRoot: join(dir, ".local", "share", "opencode"),
       includeClaudeSubagents: false,
     });
 
@@ -323,6 +325,7 @@ describe("discoverSessionFiles", () => {
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, "nonexistent-copilot-root"),
       copilotCliRoot: join(dir, ".copilot-cli-sessions"),
+      opencodeRoot: join(dir, ".local", "share", "opencode"),
       includeClaudeSubagents: false,
     });
 
@@ -349,6 +352,8 @@ describe("discoverSessionFiles", () => {
       geminiProjectsPath: join(dir, ".gemini", "projects.json"),
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot,
+      copilotCliRoot: join(dir, ".copilot-cli-sessions"),
+      opencodeRoot: join(dir, ".local", "share", "opencode"),
       includeClaudeSubagents: false,
     });
 
@@ -498,9 +503,9 @@ describe("discoverSessionFiles", () => {
     expect(discovered).toHaveLength(2);
     expect(discovered[0]?.backingFilePath).toBe(dbPath);
     expect(discovered[0]?.filePath).toContain(`opencode:${dbPath}:`);
-    expect(discovered.find((file) => file.sourceSessionId === "opencode-2")?.metadata.sessionKind).toBe(
-      "forked",
-    );
+    expect(
+      discovered.find((file) => file.sourceSessionId === "opencode-2")?.metadata.sessionKind,
+    ).toBe("forked");
     expect(
       discovered.find((file) => file.sourceSessionId === "opencode-2")?.metadata.lineageParentId,
     ).toBe("opencode-1");

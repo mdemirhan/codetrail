@@ -114,6 +114,7 @@ function setupIndexedDb(): { dbPath: string; cleanup: () => void } {
       cursorRoot: join(dir, ".cursor", "projects"),
       copilotRoot: join(dir, ".copilot-workspace"),
       copilotCliRoot: join(dir, ".copilot-cli-sessions"),
+      opencodeRoot: join(dir, ".local", "share", "opencode"),
       includeClaudeSubagents: false,
     },
   });
