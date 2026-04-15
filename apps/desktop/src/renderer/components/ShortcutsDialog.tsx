@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 import type { MessageCategory } from "@codetrail/core/browser";
 
-import type { ShortcutRegistry } from "../lib/shortcutRegistry";
+import { CTRL_SCROLL_DOWN, CTRL_SCROLL_UP, type ShortcutRegistry } from "../lib/shortcutRegistry";
 
 type SyntaxItem = {
   syntax: string;
@@ -494,7 +494,7 @@ function getPageTraversalRank(shortcut: string): number {
   if (shortcut === "Page Up" || shortcut === "Page Down") {
     return 0;
   }
-  if (shortcut === "Ctrl+U" || shortcut === "Ctrl+D") {
+  if (shortcut === CTRL_SCROLL_UP || shortcut === CTRL_SCROLL_DOWN) {
     return 1;
   }
   return 2;

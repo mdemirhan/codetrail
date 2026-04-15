@@ -6,6 +6,7 @@ import { usePaneFocus } from "../../lib/paneFocusController";
 import { getProjectGroupId } from "../../lib/projectTree";
 import { getChipProviders, getProviderWithChildren } from "../../lib/providerGroups";
 import { SEARCH_PLACEHOLDERS } from "../../lib/searchLabels";
+import { isNoModifierPressed } from "../../lib/shortcutRegistry";
 import { compactPath, deriveSessionTitle, formatDate, prettyProvider } from "../../lib/viewUtils";
 import { ToolbarIcon } from "../ToolbarIcon";
 import { HistoryListContextMenu } from "./HistoryListContextMenu";
@@ -25,7 +26,7 @@ function isTreeRowActionTarget(target: EventTarget | null): boolean {
 }
 
 function isUnmodifiedArrowEvent(event: React.KeyboardEvent<HTMLElement>): boolean {
-  return !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+  return isNoModifierPressed(event);
 }
 
 function OverflowAwareLabel({

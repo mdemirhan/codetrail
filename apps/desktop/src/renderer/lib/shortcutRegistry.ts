@@ -5,6 +5,15 @@ import type { MessageCategory } from "@codetrail/core/browser";
 import { type DesktopPlatform, isMacPlatform } from "../../shared/desktopPlatform";
 import { useDesktopPlatform } from "./codetrailClient";
 
+export const CTRL_SCROLL_UP = "Ctrl+U";
+export const CTRL_SCROLL_DOWN = "Ctrl+D";
+
+export function isNoModifierPressed(
+  event: Pick<KeyboardEvent, "metaKey" | "ctrlKey" | "altKey" | "shiftKey">,
+): boolean {
+  return !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+}
+
 const CATEGORY_DIGIT_SHORTCUTS: ReadonlyArray<readonly [MessageCategory, string]> = [
   ["user", "1"],
   ["assistant", "2"],
