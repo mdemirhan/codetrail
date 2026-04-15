@@ -1,3 +1,4 @@
+import type { IpcResponse } from "@codetrail/core/browser";
 import { indexerConfigBaseSchema, paneStateBaseSchema } from "@codetrail/core/browser";
 import {
   createClaudeHookStateFixture,
@@ -18,7 +19,7 @@ const EMPTY_INDEXER_CONFIG = Object.fromEntries(
 );
 
 const SETTINGS_INFO = createSettingsInfoFixture();
-const EMPTY_PROVIDER_COUNTS = {
+export const EMPTY_PROVIDER_COUNTS = {
   claude: 0,
   codex: 0,
   gemini: 0,
@@ -26,6 +27,40 @@ const EMPTY_PROVIDER_COUNTS = {
   copilot: 0,
   copilot_cli: 0,
 } as const;
+
+type SessionDetailMessage = IpcResponse<"sessions:getDetail">["messages"][number];
+
+export function createSessionMessageFixture(
+  overrides: Partial<SessionDetailMessage> & {
+    id: string;
+    sourceId: string;
+    sessionId: string;
+    category: SessionDetailMessage["category"];
+    content: string;
+    createdAt: string;
+  },
+): SessionDetailMessage {
+  const { id, sourceId, sessionId, category, content, createdAt, ...rest } = overrides;
+  return {
+    id,
+    sourceId,
+    sessionId,
+    provider: "claude",
+    category,
+    content,
+    createdAt,
+    tokenInput: null,
+    tokenOutput: null,
+    operationDurationMs: null,
+    operationDurationSource: null,
+    operationDurationConfidence: null,
+    turnGroupId: null,
+    turnGroupingMode: "heuristic",
+    turnAnchorKind: null,
+    nativeTurnId: null,
+    ...rest,
+  };
+}
 
 function cloneValue<T>(value: T): T {
   if (typeof structuredClone === "function") {
@@ -288,6 +323,10 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
             operationDurationMs: null,
             operationDurationSource: null,
             operationDurationConfidence: null,
+            turnGroupId: null,
+            turnGroupingMode: "heuristic",
+            turnAnchorKind: null,
+            nativeTurnId: null,
             sessionTitle: "Investigate markdown rendering",
             sessionActivity: "2026-03-01T10:00:05.000Z",
             sessionStartedAt: "2026-03-01T10:00:00.000Z",
@@ -308,6 +347,10 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
             operationDurationMs: 5000,
             operationDurationSource: "native",
             operationDurationConfidence: "high",
+            turnGroupId: null,
+            turnGroupingMode: "heuristic",
+            turnAnchorKind: null,
+            nativeTurnId: null,
             sessionTitle: "Investigate markdown rendering",
             sessionActivity: "2026-03-01T10:00:05.000Z",
             sessionStartedAt: "2026-03-01T10:00:00.000Z",
@@ -362,6 +405,10 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
           operationDurationMs: null,
           operationDurationSource: null,
           operationDurationConfidence: null,
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
         },
         {
           id: "m2",
@@ -376,6 +423,10 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
           operationDurationMs: 5000,
           operationDurationSource: "native",
           operationDurationConfidence: "high",
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
         },
       ],
     }),
@@ -410,6 +461,10 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
                 operationDurationMs: null,
                 operationDurationSource: null,
                 operationDurationConfidence: null,
+                turnGroupId: null,
+                turnGroupingMode: "heuristic",
+                turnAnchorKind: null,
+                nativeTurnId: null,
               },
               {
                 id: "m4",
@@ -424,6 +479,10 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
                 operationDurationMs: 1000,
                 operationDurationSource: "native",
                 operationDurationConfidence: "high",
+                turnGroupId: null,
+                turnGroupingMode: "heuristic",
+                turnAnchorKind: null,
+                nativeTurnId: null,
               },
             ]
           : [
@@ -440,6 +499,10 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
                 operationDurationMs: null,
                 operationDurationSource: null,
                 operationDurationConfidence: null,
+                turnGroupId: null,
+                turnGroupingMode: "heuristic",
+                turnAnchorKind: null,
+                nativeTurnId: null,
               },
               {
                 id: "m2",
@@ -454,6 +517,10 @@ export function createAppClient(overrides: Record<string, ChannelHandler> = {}) 
                 operationDurationMs: 5000,
                 operationDurationSource: "native",
                 operationDurationConfidence: "high",
+                turnGroupId: null,
+                turnGroupingMode: "heuristic",
+                turnAnchorKind: null,
+                nativeTurnId: null,
               },
             ];
       return {
@@ -670,6 +737,10 @@ export function createBookmarksSearchClient() {
           operationDurationMs: null,
           operationDurationSource: null,
           operationDurationConfidence: null,
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
           sessionTitle: "Investigate markdown rendering",
           sessionActivity: "2026-03-01T10:00:05.000Z",
           sessionStartedAt: "2026-03-01T10:00:00.000Z",
@@ -690,6 +761,10 @@ export function createBookmarksSearchClient() {
           operationDurationMs: 4000,
           operationDurationSource: "native",
           operationDurationConfidence: "high",
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
           sessionTitle: "Investigate markdown rendering",
           sessionActivity: "2026-03-01T10:00:05.000Z",
           sessionStartedAt: "2026-03-01T10:00:00.000Z",
@@ -762,6 +837,10 @@ export function createBookmarksSearchClient() {
         operationDurationMs: null,
         operationDurationSource: null,
         operationDurationConfidence: null,
+        turnGroupId: null,
+        turnGroupingMode: "heuristic",
+        turnAnchorKind: null,
+        nativeTurnId: null,
       },
       turnNumber: 1,
       totalTurns: 1,
@@ -795,6 +874,10 @@ export function createBookmarksSearchClient() {
           operationDurationMs: null,
           operationDurationSource: null,
           operationDurationConfidence: null,
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
         },
         {
           id: "turn-assistant-1",
@@ -809,6 +892,10 @@ export function createBookmarksSearchClient() {
           operationDurationMs: null,
           operationDurationSource: null,
           operationDurationConfidence: null,
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
         },
       ],
     }),
@@ -834,6 +921,10 @@ export function createBookmarksSearchClient() {
           operationDurationMs: null,
           operationDurationSource: null,
           operationDurationConfidence: null,
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
         },
       };
       const matches = query.length === 0 || entry.message.content.toLowerCase().includes(query);
@@ -995,6 +1086,10 @@ export function createHistoryNavigationClient() {
               operationDurationMs: null,
               operationDurationSource: null,
               operationDurationConfidence: null,
+              turnGroupId: null,
+              turnGroupingMode: "heuristic",
+              turnAnchorKind: null,
+              nativeTurnId: null,
               sessionTitle: "Project two session",
               sessionActivity: "2026-03-01T09:05:00.000Z",
               sessionStartedAt: "2026-03-01T09:00:00.000Z",
@@ -1035,6 +1130,10 @@ export function createHistoryNavigationClient() {
             operationDurationMs: null,
             operationDurationSource: null,
             operationDurationConfidence: null,
+            turnGroupId: null,
+            turnGroupingMode: "heuristic",
+            turnAnchorKind: null,
+            nativeTurnId: null,
             sessionTitle: "Session one",
             sessionActivity: "2026-03-01T10:05:00.000Z",
             sessionStartedAt: "2026-03-01T10:00:00.000Z",
@@ -1055,6 +1154,10 @@ export function createHistoryNavigationClient() {
             operationDurationMs: null,
             operationDurationSource: null,
             operationDurationConfidence: null,
+            turnGroupId: null,
+            turnGroupingMode: "heuristic",
+            turnAnchorKind: null,
+            nativeTurnId: null,
             sessionTitle: "Session two",
             sessionActivity: "2026-03-01T09:05:00.000Z",
             sessionStartedAt: "2026-03-01T09:00:00.000Z",
@@ -1150,6 +1253,10 @@ export function createHistoryNavigationClient() {
             operationDurationMs: null,
             operationDurationSource: null,
             operationDurationConfidence: null,
+            turnGroupId: null,
+            turnGroupingMode: "heuristic",
+            turnAnchorKind: null,
+            nativeTurnId: null,
           },
         ],
       };
@@ -1190,6 +1297,10 @@ export function createHistoryNavigationClient() {
             operationDurationMs: null,
             operationDurationSource: null,
             operationDurationConfidence: null,
+            turnGroupId: null,
+            turnGroupingMode: "heuristic",
+            turnAnchorKind: null,
+            nativeTurnId: null,
           },
         },
       ],
@@ -1404,6 +1515,10 @@ export function createProjectSwitchBookmarksDelayClient() {
           operationDurationMs: null,
           operationDurationSource: null,
           operationDurationConfidence: null,
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
           sessionTitle:
             request.projectId === "project_2"
               ? "Project two delayed bookmarks session"
@@ -1469,6 +1584,10 @@ export function createProjectSwitchBookmarksDelayClient() {
           operationDurationMs: null,
           operationDurationSource: null,
           operationDurationConfidence: null,
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
         },
       ],
     }),
@@ -1595,6 +1714,10 @@ export function createBookmarkSearchDelayClient() {
           operationDurationMs: null,
           operationDurationSource: null,
           operationDurationConfidence: null,
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
           sessionTitle: "Investigate markdown rendering",
           sessionActivity: "2026-03-01T10:00:05.000Z",
           sessionStartedAt: "2026-03-01T10:00:00.000Z",
@@ -1615,6 +1738,10 @@ export function createBookmarkSearchDelayClient() {
           operationDurationMs: 4000,
           operationDurationSource: "native",
           operationDurationConfidence: "high",
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
           sessionTitle: "Investigate markdown rendering",
           sessionActivity: "2026-03-01T10:00:05.000Z",
           sessionStartedAt: "2026-03-01T10:00:00.000Z",
@@ -1682,6 +1809,10 @@ export function createBookmarkSearchDelayClient() {
           operationDurationMs: null,
           operationDurationSource: null,
           operationDurationConfidence: null,
+          turnGroupId: null,
+          turnGroupingMode: "heuristic",
+          turnAnchorKind: null,
+          nativeTurnId: null,
         },
       };
       const matches = query.length === 0 || entry.message.content.toLowerCase().includes(query);
