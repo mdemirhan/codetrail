@@ -35,6 +35,9 @@ describe("App history messages", () => {
     await waitFor(() => {
       expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
     });
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "Page number" })).toHaveValue("1");
+    });
 
     await dispatchWindowShortcut({ key: "ArrowDown", metaKey: true });
     await waitFor(() => {

@@ -154,7 +154,10 @@ describe("discoverCopilotCliFiles", () => {
     expect(file.metadata.resolutionSource).toBe("cwd");
     expect(file.metadata.gitBranch).toBe("main");
     expect(file.metadata.repositoryUrl).toBeNull();
-    expect(file.metadata.sessionMetadata).toEqual({ repository: "owner/myapp", summary: "Fix login bug" });
+    expect(file.metadata.sessionMetadata).toEqual({
+      repository: "owner/myapp",
+      summary: "Fix login bug",
+    });
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -277,11 +280,7 @@ describe("discoverSingleCopilotCliFile", () => {
 
     const config = resolveDiscoveryConfig({ copilotCliRoot: dir });
     const deps = resolveDiscoveryDependencies();
-    const result = discoverSingleCopilotCliFile(
-      join(sessionDir, "events.jsonl"),
-      config,
-      deps,
-    );
+    const result = discoverSingleCopilotCliFile(join(sessionDir, "events.jsonl"), config, deps);
 
     expect(result).not.toBeNull();
     expect(result?.provider).toBe("copilot_cli");
@@ -300,11 +299,7 @@ describe("discoverSingleCopilotCliFile", () => {
 
     const config = resolveDiscoveryConfig({ copilotCliRoot: dir });
     const deps = resolveDiscoveryDependencies();
-    const result = discoverSingleCopilotCliFile(
-      join(sessionDir, "other.jsonl"),
-      config,
-      deps,
-    );
+    const result = discoverSingleCopilotCliFile(join(sessionDir, "other.jsonl"), config, deps);
 
     expect(result).toBeNull();
 

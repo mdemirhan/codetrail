@@ -12,6 +12,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { EMPTY_PROVIDER_COUNTS } from "../test/appTestFixtures";
+
 import {
   type DiffViewMode,
   type ExternalEditorId,
@@ -129,13 +131,7 @@ function createBaseProps(): Omit<
     liveStatus: createLiveStatusFixture({
       enabled: true,
       updatedAt: "2026-03-16T10:05:04.000Z",
-      providerCounts: {
-        claude: 1,
-        codex: 1,
-        gemini: 0,
-        cursor: 0,
-        copilot: 0,
-      },
+      providerCounts: { ...EMPTY_PROVIDER_COUNTS, claude: 1, codex: 1 },
       sessions: [
         {
           provider: "claude",

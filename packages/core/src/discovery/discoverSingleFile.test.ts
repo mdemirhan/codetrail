@@ -29,6 +29,7 @@ function makeConfig(dir: string): DiscoveryConfig {
     geminiProjectsPath: join(dir, ".gemini", "projects.json"),
     cursorRoot: join(dir, ".cursor", "projects"),
     copilotRoot: join(dir, "copilot-workspace"),
+    copilotCliRoot: join(dir, "copilot-cli-workspace"),
     includeClaudeSubagents: false,
   };
 }

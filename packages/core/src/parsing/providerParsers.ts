@@ -743,7 +743,9 @@ function parseCopilotCliEvent(args: ParseProviderEventArgs): ParseProviderEventR
     const contentString = result ? readString(result.content) : null;
     const resultContent =
       contentString ??
-      (result && Object.keys(result).some((k) => k !== "content") ? serializeUnknown(result) : null);
+      (result && Object.keys(result).some((k) => k !== "content")
+        ? serializeUnknown(result)
+        : null);
     if (resultContent && resultContent.length > 0) {
       output.push({
         id: toolCallId ? `${toolCallId}:result` : `${sessionId}:tool_result:${sequence}`,
