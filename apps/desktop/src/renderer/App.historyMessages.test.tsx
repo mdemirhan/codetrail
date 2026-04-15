@@ -34,6 +34,12 @@ describe("App history messages", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+      expect(messageList()).not.toBeNull();
+    });
+
+    messageList()?.focus();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(messageList());
     });
 
     await dispatchWindowShortcut({ key: "ArrowDown", metaKey: true });

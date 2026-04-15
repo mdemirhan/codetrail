@@ -1569,6 +1569,9 @@ describe("App shell", () => {
       throw new Error("Expected message list");
     }
     messageList.focus();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(messageList);
+    });
 
     await act(async () => {
       fireEvent.keyDown(window, { key: "ArrowRight", metaKey: true });
@@ -1835,6 +1838,18 @@ describe("App shell", () => {
       expect(screen.getByRole("textbox", { name: "Turn number" })).toHaveValue("1");
     });
 
+    const rememberedTurnMessageList = document.querySelector<HTMLDivElement>(
+      ".msg-scroll.message-list",
+    );
+    expect(rememberedTurnMessageList).not.toBeNull();
+    if (!rememberedTurnMessageList) {
+      throw new Error("Expected message list");
+    }
+    rememberedTurnMessageList.focus();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(rememberedTurnMessageList);
+    });
+
     fireEvent.keyDown(window, { key: "ArrowRight", metaKey: true });
     await waitFor(() => {
       expect(screen.getByRole("textbox", { name: "Turn number" })).toHaveValue("2");
@@ -1878,6 +1893,18 @@ describe("App shell", () => {
     fireEvent.keyDown(window, { key: "t", metaKey: true });
     await waitFor(() => {
       expect(screen.getByRole("textbox", { name: "Turn number" })).toHaveValue("1");
+    });
+
+    const resetRememberedTurnMessageList = document.querySelector<HTMLDivElement>(
+      ".msg-scroll.message-list",
+    );
+    expect(resetRememberedTurnMessageList).not.toBeNull();
+    if (!resetRememberedTurnMessageList) {
+      throw new Error("Expected message list");
+    }
+    resetRememberedTurnMessageList.focus();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(resetRememberedTurnMessageList);
     });
 
     fireEvent.keyDown(window, { key: "ArrowRight", metaKey: true });

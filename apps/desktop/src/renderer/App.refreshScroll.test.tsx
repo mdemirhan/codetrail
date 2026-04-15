@@ -1126,6 +1126,7 @@ describe("App refresh scroll preservation", () => {
     // Wait for project_all view to load, then click Session Alpha.
     await waitFor(() => {
       expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+      expect(screen.getByText("Session Alpha")).toBeInTheDocument();
     });
     await user.click(screen.getByText("Session Alpha"));
     await waitFor(() => {
@@ -1137,6 +1138,9 @@ describe("App refresh scroll preservation", () => {
     await user.click(screen.getByRole("button", { name: "5s scan" }));
 
     // Switch to Session Beta before the refresh tick fires.
+    await waitFor(() => {
+      expect(screen.getByText("Session Beta")).toBeInTheDocument();
+    });
     await user.click(screen.getByText("Session Beta"));
     await waitFor(() => {
       expect(screen.getByText("Beta session message")).toBeInTheDocument();
