@@ -1,4 +1,3 @@
-import { MakerDMG } from "@electron-forge/maker-dmg";
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { AutoUnpackNativesPlugin } from "@electron-forge/plugin-auto-unpack-natives";
@@ -15,7 +14,6 @@ const forgeConfig = {
   plugins: [new AutoUnpackNativesPlugin({})],
   makers: [
     new MakerZIP({}, ["darwin"]),
-    new MakerDMG({}, ["darwin"]),
     new MakerSquirrel({
       name: "codetrail",
       setupExe: "CodeTrailSetup.exe",
