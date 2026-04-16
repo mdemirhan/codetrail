@@ -302,7 +302,8 @@ describe("ProjectPane", () => {
     await user.click(screen.getByRole("button", { name: "Copy" }));
     await user.click(screen.getByRole("button", { name: "Switch to By Folder" }));
     await user.type(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.sidebarProjects), "abc");
-    await user.click(screen.getAllByRole("button", { name: /Gemini/i })[0]!);
+    await user.click(screen.getByRole("button", { name: "Open provider filter" }));
+    await user.click(screen.getByRole("button", { name: "Toggle Gemini provider" }));
     await user.click(screen.getByRole("button", { name: /Project Two/i }));
 
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
@@ -315,6 +316,40 @@ describe("ProjectPane", () => {
     expect(onSelectProject).toHaveBeenCalledWith("project_2");
     expect(onCopyProjectDetails).toHaveBeenCalledTimes(1);
     expect(onOpenProjectLocation).not.toHaveBeenCalled();
+  });
+
+  it("renders Copilot and Copilot CLI as separate provider filter options", async () => {
+    const user = userEvent.setup();
+    const onToggleProvider = vi.fn();
+
+    renderProjectPane({
+      data: {
+        projectProviders: ["copilot"],
+        providers: ["copilot", "copilot_cli"],
+        projectProviderCounts: {
+          claude: 0,
+          codex: 0,
+          gemini: 0,
+          cursor: 0,
+          copilot: 2,
+          copilot_cli: 1,
+          opencode: 0,
+        },
+      },
+      actions: {
+        onToggleProvider,
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open provider filter" }));
+
+    expect(screen.getByRole("button", { name: "Toggle Copilot provider" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Toggle Copilot CLI provider" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Toggle Copilot CLI provider" }));
+
+    expect(onToggleProvider).toHaveBeenCalledWith("copilot_cli");
+    expect(onToggleProvider).not.toHaveBeenCalledWith("copilot");
   });
 
   it("offers project reindex from the project options menu for the selected project", async () => {

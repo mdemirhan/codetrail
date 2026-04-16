@@ -41,11 +41,26 @@ export function getTurnVisualizationSelection(args: {
   selection: HistorySelection;
   selectedProjectId: string;
 }): HistorySelection {
-  if (args.selection.mode !== "bookmarks") {
-    return args.selection;
+  const resolvedProjectId = args.selection.projectId || args.selectedProjectId;
+
+  if (args.selection.mode === "session") {
+    return resolvedProjectId
+      ? createHistorySelection("session", resolvedProjectId, args.selection.sessionId)
+      : args.selection;
   }
+
+  if (args.selection.mode === "project_all") {
+    return resolvedProjectId
+      ? createHistorySelection("project_all", resolvedProjectId)
+      : args.selection;
+  }
+
   if (args.selection.sessionId) {
-    return createHistorySelection("session", args.selection.projectId, args.selection.sessionId);
+    return resolvedProjectId
+      ? createHistorySelection("session", resolvedProjectId, args.selection.sessionId)
+      : args.selection;
   }
-  return createHistorySelection("project_all", args.selectedProjectId, "");
+  return resolvedProjectId
+    ? createHistorySelection("project_all", resolvedProjectId, "")
+    : args.selection;
 }

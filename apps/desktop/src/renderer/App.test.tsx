@@ -2889,6 +2889,38 @@ describe("App shell", () => {
     ).toBe(true);
   });
 
+  it("does not request project-wide turns with a missing project id during hydration", async () => {
+    const client = createAppClient();
+
+    renderWithClient(
+      <App
+        initialPaneState={
+          {
+            historyMode: "project_all",
+            historyDetailMode: "turn",
+            selectedProjectId: "",
+          } as PaneStateSnapshot
+        }
+      />,
+      client,
+    );
+
+    await waitFor(() => {
+      expect(client.invoke.mock.calls.some(([channel]) => channel === "sessions:getTurn")).toBe(
+        true,
+      );
+    });
+
+    expect(
+      client.invoke.mock.calls.some(
+        ([channel, payload]) =>
+          channel === "sessions:getTurn" &&
+          (payload as { scopeMode?: string; projectId?: string }).scopeMode === "project_all" &&
+          !String((payload as { projectId?: string }).projectId ?? "").trim(),
+      ),
+    ).toBe(false);
+  });
+
   it("exits Turn view before revealing a message in the project view", async () => {
     installScrollIntoViewMock();
     const user = userEvent.setup();

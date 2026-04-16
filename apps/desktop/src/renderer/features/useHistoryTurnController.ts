@@ -16,6 +16,41 @@ function getTurnScopeKey(selection: HistorySelection): string {
   return `${selection.mode}:${selection.projectId}:${"sessionId" in selection ? (selection.sessionId ?? "") : ""}`;
 }
 
+function canRequestTurnScope(selection: HistorySelection): boolean {
+  if (selection.mode === "session") {
+    return selection.sessionId.length > 0;
+  }
+  return selection.projectId.length > 0;
+}
+
+const EMPTY_TURN_CATEGORY_COUNTS = {
+  user: 0,
+  assistant: 0,
+  tool_use: 0,
+  tool_edit: 0,
+  tool_result: 0,
+  thinking: 0,
+  system: 0,
+} as const;
+
+const EMPTY_TURN_DETAIL: SessionTurnDetail = {
+  session: null,
+  anchorMessageId: null,
+  anchorMessage: null,
+  turnNumber: 0,
+  totalTurns: 0,
+  previousTurnAnchorMessageId: null,
+  nextTurnAnchorMessageId: null,
+  firstTurnAnchorMessageId: null,
+  latestTurnAnchorMessageId: null,
+  totalCount: 0,
+  categoryCounts: EMPTY_TURN_CATEGORY_COUNTS,
+  queryError: null,
+  highlightPatterns: [],
+  matchedMessageIds: undefined,
+  messages: [],
+};
+
 function ensureCategoryVisible(
   currentCategories: MessageCategory[],
   targetCategory: MessageCategory,
@@ -131,7 +166,7 @@ export function useHistoryTurnController({
 
   const canToggleTurnView =
     historyDetailMode === "turn"
-      ? true
+      ? canRequestTurnScope(turnVisualizationSelection)
       : turnVisualizationSelection.mode === "session"
         ? Boolean(
             ("sessionId" in turnVisualizationSelection && turnVisualizationSelection.sessionId) ||
@@ -173,6 +208,9 @@ export function useHistoryTurnController({
       } = {},
     ) => {
       const scopeSelection = options.scopeSelection ?? turnVisualizationSelection;
+      if (!canRequestTurnScope(scopeSelection)) {
+        return EMPTY_TURN_DETAIL;
+      }
       return codetrail.invoke("sessions:getTurn", {
         ...buildTurnScopeRequestBase(scopeSelection),
         ...request,
@@ -338,6 +376,10 @@ export function useHistoryTurnController({
   useEffect(() => {
     if (historyDetailMode !== "turn" || !canToggleTurnView) {
       setSessionTurnDetail(null);
+      if (!canToggleTurnView) {
+        setTurnAnchorMessageId("");
+        setTurnSourceSessionId("");
+      }
       return;
     }
 

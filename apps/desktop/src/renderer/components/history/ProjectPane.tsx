@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProjectSummary, SessionSummary } from "../../app/types";
+import { useClickOutside } from "../../hooks/useClickOutside";
 import { formatCompactInteger, formatInteger } from "../../lib/numberFormatting";
 import { usePaneFocus } from "../../lib/paneFocusController";
 import { getProjectGroupId } from "../../lib/projectTree";
-import { getChipProviders, getProviderWithChildren } from "../../lib/providerGroups";
 import { SEARCH_PLACEHOLDERS } from "../../lib/searchLabels";
 import { useShortcutRegistry } from "../../lib/shortcutRegistry";
 import { compactPath, deriveSessionTitle, formatDate, prettyProvider } from "../../lib/viewUtils";
@@ -127,6 +127,10 @@ export function ProjectPane({
   const projectListContainerRef = useRef<HTMLDivElement | null>(null);
   const selectedProjectRef = useRef<HTMLButtonElement | null>(null);
   const [contextMenu, setContextMenu] = useState<ProjectPaneContextMenuState>(null);
+  const [providerFilterOpen, setProviderFilterOpen] = useState(false);
+  const providerFilterRef = useRef<HTMLDivElement | null>(null);
+
+  useClickOutside(providerFilterRef, providerFilterOpen, () => setProviderFilterOpen(false));
 
   const setProjectListRefs = useCallback(
     (element: HTMLDivElement | null) => {
@@ -150,6 +154,23 @@ export function ProjectPane({
     }
     selectedProjectRef.current?.scrollIntoView?.({ block: "nearest" });
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (!collapsed) {
+      return;
+    }
+    setProviderFilterOpen(false);
+  }, [collapsed]);
+
+  const activeProviderCount = projectProviders.filter((provider) =>
+    providers.includes(provider),
+  ).length;
+  const providerSummary = `${formatInteger(activeProviderCount)} of ${formatInteger(providers.length)}`;
+  const visibleProviderDots = providers
+    .filter((provider) => projectProviders.includes(provider))
+    .slice(0, 4);
+  const hiddenProviderDotCount = Math.max(0, activeProviderCount - visibleProviderDots.length);
+
   const handleToggleFolder = (folderId: string) => {
     setContextMenu(null);
     onToggleFolder(folderId);
@@ -545,27 +566,120 @@ export function ProjectPane({
           </div>
         </div>
       </div>
-      <div className="tag-row" {...paneFocus.getPaneChromeProps("project")}>
-        {getChipProviders(providers).map((provider) => {
-          const associated = getProviderWithChildren(provider, providers);
-          const combinedCount = associated.reduce(
-            (sum, p) => sum + (projectProviderCounts[p] ?? 0),
-            0,
-          );
-          const isActive = associated.some((p) => projectProviders.includes(p));
-          return (
-            <button
-              key={provider}
-              type="button"
-              className={`tag tag-${provider}${isActive ? " active" : ""}`}
-              onClick={() => onToggleProvider(provider)}
-              {...paneFocus.getPreservePaneFocusProps("project")}
-            >
-              {prettyProvider(provider)}
-              <span className="count">{combinedCount}</span>
-            </button>
-          );
-        })}
+      <div className="tag-row project-provider-filter" {...paneFocus.getPaneChromeProps("project")}>
+        <div
+          ref={providerFilterRef}
+          className={`project-provider-filter-shell${providerFilterOpen ? " is-open" : ""}`}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setProviderFilterOpen(false);
+            }
+          }}
+        >
+          <button
+            type="button"
+            className={`project-provider-filter-trigger${providerFilterOpen ? " is-open" : ""}`}
+            aria-expanded={providerFilterOpen}
+            aria-label={providerFilterOpen ? "Close provider filter" : "Open provider filter"}
+            onClick={() => setProviderFilterOpen((value) => !value)}
+            {...paneFocus.getPreservePaneFocusProps("project")}
+          >
+            <span className="project-provider-filter-trigger-main">
+              <span className="project-provider-filter-trigger-label">Providers</span>
+              <span className="project-provider-filter-trigger-count">
+                {formatInteger(activeProviderCount)}
+              </span>
+            </span>
+            <span className="project-provider-filter-stack" aria-hidden>
+              {visibleProviderDots.map((provider) => (
+                <span
+                  key={provider}
+                  className={`project-provider-filter-stack-dot project-provider-filter-stack-dot-${provider}`}
+                />
+              ))}
+              {hiddenProviderDotCount > 0 ? (
+                <span className="project-provider-filter-stack-overflow">
+                  +{hiddenProviderDotCount}
+                </span>
+              ) : null}
+            </span>
+            <span className="project-provider-filter-trigger-caret" aria-hidden>
+              <ToolbarIcon name="chevronDown" />
+            </span>
+          </button>
+          <div
+            className={`project-provider-filter-menu${providerFilterOpen ? " is-open" : ""}`}
+            aria-label="Project provider filters"
+            aria-hidden={providerFilterOpen ? undefined : true}
+          >
+            <div className="project-provider-filter-menu-list">
+              {providers.map((provider) => {
+                const count = projectProviderCounts[provider] ?? 0;
+                const isActive = projectProviders.includes(provider);
+                return (
+                  <button
+                    key={provider}
+                    type="button"
+                    className={`project-provider-filter-item project-provider-filter-item-${provider}${
+                      isActive ? " is-active" : ""
+                    }${count === 0 ? " is-empty" : ""}`}
+                    aria-label={`Toggle ${prettyProvider(provider)} provider`}
+                    onClick={() => onToggleProvider(provider)}
+                    {...paneFocus.getPreservePaneFocusProps("project")}
+                  >
+                    <span className="project-provider-filter-item-check" aria-hidden>
+                      {isActive ? "✓" : ""}
+                    </span>
+                    <span
+                      className={`project-provider-filter-item-dot project-provider-filter-item-dot-${provider}`}
+                      aria-hidden
+                    />
+                    <span className="project-provider-filter-item-name">
+                      {prettyProvider(provider)}
+                    </span>
+                    <span className="project-provider-filter-item-count">
+                      {formatCompactInteger(count)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="project-provider-filter-menu-actions">
+              <button
+                type="button"
+                className="project-provider-filter-action"
+                onClick={() => {
+                  for (const provider of providers) {
+                    if (!projectProviders.includes(provider)) {
+                      onToggleProvider(provider);
+                    }
+                  }
+                }}
+                {...paneFocus.getPreservePaneFocusProps("project")}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                className="project-provider-filter-action"
+                onClick={() => {
+                  for (const provider of projectProviders) {
+                    if (providers.includes(provider)) {
+                      onToggleProvider(provider);
+                    }
+                  }
+                }}
+                {...paneFocus.getPreservePaneFocusProps("project")}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="project-provider-filter-summary" aria-live="polite">
+          {providerSummary}
+        </div>
       </div>
       <div
         className={`list-scroll project-list${viewMode === "tree" ? " project-list-tree" : ""}`}

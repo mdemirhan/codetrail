@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveInitialHistoryVisualization } from "./historyVisualization";
+import {
+  deriveInitialHistoryVisualization,
+  getTurnVisualizationSelection,
+} from "./historyVisualization";
 
 describe("deriveInitialHistoryVisualization", () => {
   it("defaults to Flat when pane state does not specify a history view", () => {
@@ -22,5 +25,52 @@ describe("deriveInitialHistoryVisualization", () => {
         historyDetailMode: "flat",
       } as never),
     ).toBe("bookmarks");
+  });
+});
+
+describe("getTurnVisualizationSelection", () => {
+  it("fills in a missing project id for project-wide selections from the selected project", () => {
+    expect(
+      getTurnVisualizationSelection({
+        selection: {
+          mode: "project_all",
+          projectId: "",
+        },
+        selectedProjectId: "project_1",
+      }),
+    ).toEqual({
+      mode: "project_all",
+      projectId: "project_1",
+    });
+  });
+
+  it("fills in a missing project id for bookmark selections before switching to turns", () => {
+    expect(
+      getTurnVisualizationSelection({
+        selection: {
+          mode: "bookmarks",
+          projectId: "",
+        },
+        selectedProjectId: "project_1",
+      }),
+    ).toEqual({
+      mode: "project_all",
+      projectId: "project_1",
+    });
+  });
+
+  it("keeps an unresolved selection unchanged when no fallback project is available", () => {
+    expect(
+      getTurnVisualizationSelection({
+        selection: {
+          mode: "project_all",
+          projectId: "",
+        },
+        selectedProjectId: "",
+      }),
+    ).toEqual({
+      mode: "project_all",
+      projectId: "",
+    });
   });
 });
