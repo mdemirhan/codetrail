@@ -240,6 +240,16 @@ type TurnAnchorScopeSql = {
   params: Array<string | number>;
 };
 
+type ScopedMessageFilterSql = {
+  fromSql: string;
+  whereClause: string;
+  params: Array<string | number>;
+};
+
+type ProjectTurnSessionFamily = {
+  sessionIds: string[];
+};
+
 const TURN_ANCHOR_WHERE_SQL = `(
   (
     m.turn_group_id IS NOT NULL
@@ -247,6 +257,12 @@ const TURN_ANCHOR_WHERE_SQL = `(
     AND m.turn_anchor_kind = 'user_prompt'
   )
   OR (m.turn_group_id IS NULL AND m.category = 'user')
+)`;
+
+const PROJECT_TURN_SESSION_FILTER_SQL = `(
+  COALESCE(s.session_kind, '') != 'subagent'
+  AND s.file_path NOT LIKE '%/subagents/%'
+  AND s.file_path NOT LIKE '%\\subagents\\%'
 )`;
 
 type TurnNavigationMetadata = {
@@ -1633,6 +1649,10 @@ function getSessionTurnWithDatabase(
        WHERE s.id = ?`,
     )
     .get(anchor.session_id) as SessionSummaryRow | undefined;
+  const projectTurnSessionFamily =
+    request.scopeMode === "project_all" && request.projectId && sessionRow
+      ? resolveProjectTurnSessionFamily(db, request.projectId, sessionRow)
+      : undefined;
 
   const fallbackScope =
     request.scopeMode === "bookmarks"
@@ -1648,7 +1668,14 @@ function getSessionTurnWithDatabase(
 
   const rows = loadTurnMessages(
     db,
-    anchor.session_id,
+    {
+      ...(request.scopeMode ? { scopeMode: request.scopeMode } : {}),
+      ...(request.projectId ? { projectId: request.projectId } : {}),
+      session: sessionRow,
+      ...(projectTurnSessionFamily
+        ? { projectTurnSessionIds: projectTurnSessionFamily.sessionIds }
+        : {}),
+    },
     anchor,
     resolvedNextAnchor,
     request.sortDirection,
@@ -1689,7 +1716,12 @@ function getSessionTurnWithDatabase(
 
   const { categoryCounts, matchedMessageIds } = queryPlan.hasTerms
     ? loadTurnMatchedMessageMetadata(db, {
-        sessionId: anchor.session_id,
+        ...(request.scopeMode ? { scopeMode: request.scopeMode } : {}),
+        ...(request.projectId ? { projectId: request.projectId } : {}),
+        session: sessionRow,
+        ...(projectTurnSessionFamily
+          ? { projectTurnSessionIds: projectTurnSessionFamily.sessionIds }
+          : {}),
         anchor,
         ...(resolvedNextAnchor ? { nextAnchor: resolvedNextAnchor } : {}),
         queryPlan,
@@ -1810,6 +1842,7 @@ function buildTurnAnchorScopeSql(args: {
     if (!args.projectId) {
       return null;
     }
+    conditions.unshift(PROJECT_TURN_SESSION_FILTER_SQL);
     conditions.unshift("s.project_id = ?");
     params.push(args.projectId);
     return {
@@ -2216,13 +2249,21 @@ function buildTurnNavigationMetadataFromAnchors(
 
 function loadTurnMessages(
   db: DatabaseHandle,
-  sessionId: string,
+  args: {
+    scopeMode?: "session" | "project_all" | "bookmarks";
+    projectId?: string;
+    session: SessionSummaryRow | undefined;
+    projectTurnSessionIds?: readonly string[];
+  },
   anchor: TurnAnchorRow,
   nextAnchor: TurnAnchorRow | undefined,
   sortDirection: "asc" | "desc",
 ): MessageRow[] {
   const turnScope = buildTurnMessageFilters({
-    sessionId,
+    ...(args.scopeMode ? { scopeMode: args.scopeMode } : {}),
+    ...(args.projectId ? { projectId: args.projectId } : {}),
+    session: args.session,
+    ...(args.projectTurnSessionIds ? { projectTurnSessionIds: args.projectTurnSessionIds } : {}),
     anchor,
     ...(nextAnchor ? { nextAnchor } : {}),
     queryPlan: EMPTY_SEARCH_QUERY_PLAN,
@@ -2247,7 +2288,7 @@ function loadTurnMessages(
          m.turn_grouping_mode,
          m.turn_anchor_kind,
          m.native_turn_id
-       FROM messages m
+       ${turnScope.fromSql}
        WHERE ${turnScope.whereClause}
        ORDER BY ${
          sortDirection === "desc"
@@ -2622,7 +2663,10 @@ function countMessageCategories(
 function loadTurnMatchedMessageMetadata(
   db: DatabaseHandle,
   args: {
-    sessionId: string;
+    scopeMode?: "session" | "project_all" | "bookmarks";
+    projectId?: string;
+    session: SessionSummaryRow | undefined;
+    projectTurnSessionIds?: readonly string[];
     anchor: TurnAnchorRow;
     nextAnchor?: TurnAnchorRow;
     queryPlan: SearchQueryPlan;
@@ -2635,7 +2679,7 @@ function loadTurnMatchedMessageMetadata(
   const rows = db
     .prepare(
       `SELECT m.id, m.category
-       FROM messages m
+       ${turnScope.fromSql}
        WHERE ${turnScope.whereClause}
        ORDER BY m.created_at_ms ASC, m.created_at ASC, m.id ASC`,
     )
@@ -2854,18 +2898,90 @@ function buildProjectMessageFilters(args: {
 }
 
 function buildTurnMessageFilters(args: {
-  sessionId: string;
+  scopeMode?: "session" | "project_all" | "bookmarks";
+  projectId?: string;
+  session: SessionSummaryRow | undefined;
+  projectTurnSessionIds?: readonly string[];
   anchor: TurnAnchorRow;
   nextAnchor?: TurnAnchorRow;
   categories?: string[];
   queryPlan: SearchQueryPlan;
-}): { whereClause: string; params: Array<string | number> } {
-  if (args.anchor.turn_group_id) {
+}): ScopedMessageFilterSql {
+  const scopeMode = args.scopeMode ?? "session";
+  if (scopeMode !== "project_all" && args.anchor.turn_group_id) {
+    if (!args.session) {
+      return {
+        fromSql: "FROM messages m",
+        whereClause: "1 = 0",
+        params: [],
+      };
+    }
     const conditions = ["m.session_id = ?", "m.turn_group_id = ?"];
-    const params: Array<string | number> = [args.sessionId, args.anchor.turn_group_id];
+    const params: Array<string | number> = [args.session.id, args.anchor.turn_group_id];
     appendNormalizedCategoryFilter(conditions, params, args.categories);
     appendMessageQueryConditions(conditions, params, args.queryPlan, "m");
-    return { whereClause: conditions.join(" AND "), params };
+    return { fromSql: "FROM messages m", whereClause: conditions.join(" AND "), params };
+  }
+
+  if (scopeMode === "project_all") {
+    if (!args.projectId || !args.session) {
+      return {
+        fromSql: "FROM messages m",
+        whereClause: "1 = 0",
+        params: [],
+      };
+    }
+    const sessionIds =
+      args.projectTurnSessionIds && args.projectTurnSessionIds.length > 0
+        ? [...args.projectTurnSessionIds]
+        : [args.session.id];
+    const conditions = [
+      `m.session_id IN (${sessionIds.map(() => "?").join(",")})`,
+      `(
+        m.created_at_ms > ?
+        OR (m.created_at_ms = ? AND (m.created_at > ? OR (m.created_at = ? AND m.id >= ?)))
+      )`,
+    ];
+    const params: Array<string | number> = [
+      ...sessionIds,
+      args.anchor.created_at_ms,
+      args.anchor.created_at_ms,
+      args.anchor.created_at,
+      args.anchor.created_at,
+      args.anchor.id,
+    ];
+
+    if (args.nextAnchor) {
+      conditions.push(
+        `(
+          m.created_at_ms < ?
+          OR (m.created_at_ms = ? AND (m.created_at < ? OR (m.created_at = ? AND m.id < ?)))
+        )`,
+      );
+      params.push(
+        args.nextAnchor.created_at_ms,
+        args.nextAnchor.created_at_ms,
+        args.nextAnchor.created_at,
+        args.nextAnchor.created_at,
+        args.nextAnchor.id,
+      );
+    }
+
+    appendNormalizedCategoryFilter(conditions, params, args.categories);
+    appendMessageQueryConditions(conditions, params, args.queryPlan, "m");
+    return {
+      fromSql: "FROM messages m",
+      whereClause: conditions.join(" AND "),
+      params,
+    };
+  }
+
+  if (!args.session) {
+    return {
+      fromSql: "FROM messages m",
+      whereClause: "1 = 0",
+      params: [],
+    };
   }
 
   const conditions = [
@@ -2876,7 +2992,7 @@ function buildTurnMessageFilters(args: {
     )`,
   ];
   const params = [
-    args.sessionId,
+    args.session.id,
     args.anchor.created_at_ms,
     args.anchor.created_at_ms,
     args.anchor.created_at,
@@ -2902,7 +3018,72 @@ function buildTurnMessageFilters(args: {
 
   appendNormalizedCategoryFilter(conditions, params, args.categories);
   appendMessageQueryConditions(conditions, params, args.queryPlan, "m");
-  return { whereClause: conditions.join(" AND "), params };
+  return { fromSql: "FROM messages m", whereClause: conditions.join(" AND "), params };
+}
+
+function resolveProjectTurnSessionFamily(
+  db: DatabaseHandle,
+  projectId: string,
+  session: SessionSummaryRow,
+): ProjectTurnSessionFamily {
+  if (session.provider !== "claude") {
+    return { sessionIds: [session.id] };
+  }
+
+  const sessionIds = new Set<string>([session.id]);
+  const rootProviderSessionId =
+    session.provider_session_id ?? session.session_identity ?? session.id;
+  const rootLineageIds = Array.from(
+    new Set(
+      [rootProviderSessionId, session.session_identity].filter((value): value is string =>
+        Boolean(value),
+      ),
+    ),
+  );
+
+  if (rootLineageIds.length > 0) {
+    const lineageRows = db
+      .prepare(
+        `SELECT id
+         FROM sessions
+         WHERE project_id = ?
+           AND lineage_parent_id IN (${rootLineageIds.map(() => "?").join(",")})`,
+      )
+      .all(projectId, ...rootLineageIds) as Array<{ id: string }>;
+    for (const row of lineageRows) {
+      sessionIds.add(row.id);
+    }
+  }
+
+  const providerRows = db
+    .prepare(
+      `SELECT id, session_kind, file_path
+       FROM sessions
+       WHERE project_id = ?
+         AND provider = 'claude'
+         AND provider_session_id = ?`,
+    )
+    .all(projectId, rootProviderSessionId) as Array<{
+    id: string;
+    session_kind: string | null;
+    file_path: string;
+  }>;
+
+  for (const row of providerRows) {
+    if (
+      row.id === session.id ||
+      row.session_kind === "subagent" ||
+      isClaudeSubagentTranscriptPath(row.file_path)
+    ) {
+      sessionIds.add(row.id);
+    }
+  }
+
+  return { sessionIds: [...sessionIds] };
+}
+
+function isClaudeSubagentTranscriptPath(filePath: string): boolean {
+  return filePath.replace(/\\/g, "/").includes("/subagents/");
 }
 
 function buildScopedMessageFilters(args: {

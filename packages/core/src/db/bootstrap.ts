@@ -196,6 +196,8 @@ const tableStatements = [
 
 const indexStatements = [
   "CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id)",
+  "CREATE INDEX IF NOT EXISTS idx_sessions_project_lineage_parent ON sessions(project_id, lineage_parent_id, id)",
+  "CREATE INDEX IF NOT EXISTS idx_sessions_project_provider_session ON sessions(project_id, provider, provider_session_id, id)",
   "CREATE INDEX IF NOT EXISTS idx_sessions_activity ON sessions(activity_at_ms DESC, activity_at DESC, id DESC)",
   "CREATE INDEX IF NOT EXISTS idx_sessions_project_activity ON sessions(project_id, activity_at_ms DESC, activity_at DESC, id DESC)",
   "CREATE INDEX IF NOT EXISTS idx_messages_session_created ON messages(session_id, created_at_ms, created_at, id)",

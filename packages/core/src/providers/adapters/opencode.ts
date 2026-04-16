@@ -25,7 +25,7 @@ export const opencodeAdapter: ProviderAdapter = {
     const root = asRecord(payload);
     const session = asRecord(root?.session);
     const models = new Set<string>();
-    let cwd = readString(session?.directory);
+    const cwd = readString(session?.directory);
 
     for (const entry of asArray(root?.messages)) {
       const record = asRecord(entry);

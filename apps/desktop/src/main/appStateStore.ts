@@ -556,7 +556,10 @@ function matchesProviderSelection(
   providers: readonly Provider[],
   expected: readonly Provider[],
 ): boolean {
-  return providers.length === expected.length && expected.every((provider) => providers.includes(provider));
+  return (
+    providers.length === expected.length &&
+    expected.every((provider) => providers.includes(provider))
+  );
 }
 
 function sanitizeWindowState(value: unknown): WindowState | null {

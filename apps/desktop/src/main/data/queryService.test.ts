@@ -2291,6 +2291,180 @@ describe("queryService in-memory", () => {
     expect(latestTurn.matchedMessageIds).toEqual([]);
   });
 
+  it("ignores Claude subagent transcript sessions in project-wide turn navigation", () => {
+    const db = createInMemoryDatabase();
+    const now = "2026-03-01T10:00:00.000Z";
+
+    db.prepare(
+      `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run("project_1", "claude", "Project One", "/workspace/project-one", now, now);
+
+    db.prepare(
+      `INSERT INTO sessions (
+        id,
+        project_id,
+        provider,
+        file_path,
+        model_names,
+        provider_session_id,
+        session_kind,
+        started_at,
+        ended_at,
+        duration_ms,
+        git_branch,
+        cwd,
+        message_count,
+        token_input_total,
+        token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "session_parent",
+      "project_1",
+      "claude",
+      "/workspace/project-one/main.jsonl",
+      "claude-opus-4-6",
+      "root-session",
+      "regular",
+      "2026-03-01T10:00:00.000Z",
+      "2026-03-01T10:00:03.000Z",
+      3000,
+      "main",
+      "/workspace/project-one",
+      2,
+      0,
+      0,
+    );
+
+    db.prepare(
+      `INSERT INTO sessions (
+        id,
+        project_id,
+        provider,
+        file_path,
+        model_names,
+        provider_session_id,
+        session_kind,
+        started_at,
+        ended_at,
+        duration_ms,
+        git_branch,
+        cwd,
+        message_count,
+        token_input_total,
+        token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "session_subagent",
+      "project_1",
+      "claude",
+      "/workspace/project-one/parent/subagents/agent-1.jsonl",
+      "claude-opus-4-6",
+      "root-session",
+      "sidechain",
+      "2026-03-01T10:00:04.000Z",
+      "2026-03-01T10:00:07.000Z",
+      3000,
+      "main",
+      "/workspace/project-one",
+      2,
+      0,
+      0,
+    );
+
+    const insertMessage = db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    insertMessage.run(
+      "message_1",
+      "source_1",
+      "session_parent",
+      "claude",
+      "user",
+      "Main request",
+      "2026-03-01T10:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "message_2",
+      "source_2",
+      "session_parent",
+      "claude",
+      "assistant",
+      "Main reply",
+      "2026-03-01T10:00:01.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "message_3",
+      "source_3",
+      "session_subagent",
+      "claude",
+      "user",
+      "Internal subagent task",
+      "2026-03-01T10:00:04.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+    insertMessage.run(
+      "message_4",
+      "source_4",
+      "session_subagent",
+      "claude",
+      "assistant",
+      "Subagent result",
+      "2026-03-01T10:00:05.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+
+    const service = createQueryServiceFromDb(db);
+    const latestTurn = service.getSessionTurn({
+      scopeMode: "project_all",
+      projectId: "project_1",
+      latest: true,
+      query: "",
+      sortDirection: "desc",
+    });
+
+    expect(latestTurn.totalTurns).toBe(1);
+    expect(latestTurn.anchorMessageId).toBe("message_1");
+    expect(latestTurn.messages.map((message) => message.id)).toEqual([
+      "message_4",
+      "message_3",
+      "message_2",
+      "message_1",
+    ]);
+  });
+
   it("returns project combined detail sorted by message timestamp", () => {
     const db = createInMemoryDatabase();
     const now = "2026-03-01T10:00:00.000Z";

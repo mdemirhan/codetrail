@@ -533,9 +533,13 @@ describe("indexChangedFiles", () => {
 
     const indexedDb = openDatabase(dbPath);
     expect(
-      (indexedDb.prepare("SELECT COUNT(*) as c FROM sessions WHERE provider = 'opencode'").get() as {
-        c: number;
-      }).c,
+      (
+        indexedDb
+          .prepare("SELECT COUNT(*) as c FROM sessions WHERE provider = 'opencode'")
+          .get() as {
+          c: number;
+        }
+      ).c,
     ).toBe(0);
     indexedDb.close();
 

@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { normalizeOpenCodeDatabasePath } from "./providers/opencode";
 import { createOpenCodeFixtureDatabase } from "../testing/opencodeFixture";
 import { discoverChangedFiles, discoverSessionFiles } from "./discoverSessionFiles";
+import { normalizeOpenCodeDatabasePath } from "./providers/opencode";
 
 describe("discoverSessionFiles", () => {
   it("discovers provider session files with configured parity rules", () => {
@@ -505,12 +505,12 @@ describe("discoverSessionFiles", () => {
     expect(discovered).toHaveLength(2);
     expect(discovered[0]?.backingFilePath).toBe(dbPath);
     expect(discovered[0]?.filePath).toContain(`opencode:${dbPath}:`);
-    expect(
-      discovered.find((file) => file.sourceSessionId === "opencode-2")?.projectPath,
-    ).toBe("/workspace/opencode-app");
-    expect(
-      discovered.find((file) => file.sourceSessionId === "opencode-2")?.metadata.cwd,
-    ).toBe("/workspace/opencode-app/packages/core");
+    expect(discovered.find((file) => file.sourceSessionId === "opencode-2")?.projectPath).toBe(
+      "/workspace/opencode-app",
+    );
+    expect(discovered.find((file) => file.sourceSessionId === "opencode-2")?.metadata.cwd).toBe(
+      "/workspace/opencode-app/packages/core",
+    );
     expect(
       discovered.find((file) => file.sourceSessionId === "opencode-2")?.metadata.sessionKind,
     ).toBe("forked");

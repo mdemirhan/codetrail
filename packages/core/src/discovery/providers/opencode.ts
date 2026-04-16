@@ -3,8 +3,8 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 
 import { compactMetadata } from "../../metadata";
-import { normalizePathForComparison } from "../../pathMatching";
 import { asRecord, readString } from "../../parsing/helpers";
+import { normalizePathForComparison } from "../../pathMatching";
 import type { ProviderReadSourceResult, ProviderSource, ReadFileText } from "../../providers/types";
 import {
   type ResolvedDiscoveryDependencies,
@@ -171,7 +171,9 @@ function toDiscoveredSession(row: OpenCodeDiscoveryRow, dbPath: string): Discove
     provider: "opencode",
     projectPath,
     canonicalProjectPath: projectPath,
-    projectName: unresolvedProject ? row.project_name || "Unknown" : projectNameFromPath(projectPath),
+    projectName: unresolvedProject
+      ? row.project_name || "Unknown"
+      : projectNameFromPath(projectPath),
     sessionIdentity: providerSessionIdentity("opencode", row.session_id, filePath),
     sourceSessionId: row.session_id,
     filePath,
@@ -261,7 +263,8 @@ export function discoverChangedOpenCodeFiles(
   const parsed = parseOpenCodeSessionSourceKey(filePath);
   if (parsed) {
     const configuredDbPath = buildOpenCodeDatabasePath(root);
-    return normalizePathForComparison(parsed.dbPath) === normalizePathForComparison(configuredDbPath)
+    return normalizePathForComparison(parsed.dbPath) ===
+      normalizePathForComparison(configuredDbPath)
       ? discoverSessionsFromDb(configuredDbPath, dependencies, parsed.sessionId)
       : [];
   }

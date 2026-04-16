@@ -110,7 +110,8 @@ export function discoverSessionFiles(
 /**
  * Determines which provider a single file belongs to and constructs a {@link DiscoveredSessionFile}
  * using the same rules as the per-provider discover functions. Returns `null` if the file is
- * unrecognised, not statable, or is a subagent transcript.
+ * unrecognised, not statable, or is a Claude subagent transcript while subagent discovery is
+ * disabled.
  */
 export function discoverSingleFile(
   filePath: string,

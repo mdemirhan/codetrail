@@ -177,43 +177,28 @@ export function discoverClaudeFiles(
           fileMeta,
         });
 
-        discovered.push({
-          provider: "claude",
-          projectPath: projectInfo.projectPath,
-          canonicalProjectPath: projectInfo.projectPath,
-          projectName: projectNameFromPath(projectInfo.projectPath),
-          sessionIdentity,
-          sourceSessionId: parentSessionId,
-          filePath,
-          fileSize: fileStat.size,
-          fileMtimeMs: Math.trunc(fileStat.mtimeMs),
-          metadata: {
-            includeInHistory: true,
-            isSubagent: true,
-            unresolvedProject: false,
+        discovered.push(
+          buildClaudeSubagentDiscoveredFile({
+            projectPath: projectInfo.projectPath,
+            providerProjectKey: projectEntry.name,
+            sessionIdentity,
+            sourceSessionId: parentSessionId,
+            providerSessionId: fileMeta.sessionId ?? subagentName,
+            filePath,
+            fileSize: fileStat.size,
+            fileMtimeMs: Math.trunc(fileStat.mtimeMs),
             gitBranch: fileMeta.gitBranch,
             cwd: fileMeta.cwd,
+            mainRepositoryPath: fileMeta.mainRepositoryPath,
+            providerClientVersion: fileMeta.version,
+            userType: fileMeta.userType,
+            isSidechain: fileMeta.isSidechain,
             worktreeLabel: projectInfo.worktreeLabel,
             worktreeSource: projectInfo.worktreeSource,
-            repositoryUrl: null,
-            forkedFromSessionId: null,
-            parentSessionCwd: fileMeta.mainRepositoryPath,
-            providerProjectKey: projectEntry.name,
-            providerSessionId: fileMeta.sessionId ?? subagentName,
-            sessionKind: "subagent",
-            gitCommitHash: null,
-            providerClient: "Claude",
-            providerSource: null,
-            providerClientVersion: fileMeta.version,
-            lineageParentId: parentSessionId,
             resolutionSource: projectInfo.resolutionSource,
-            projectMetadata: null,
-            sessionMetadata: compactMetadata({
-              userType: fileMeta.userType,
-              isSidechain: fileMeta.isSidechain ? true : undefined,
-            }),
-          },
-        });
+            lineageParentId: parentSessionId,
+          }),
+        );
       }
     }
   }
@@ -251,6 +236,48 @@ export function discoverSingleClaudeFile(
   }
 
   const projectDir = join(claudeRoot, projectId);
+  const subagentIndex = segments.findIndex((segment) => segment === "subagents");
+  if (subagentIndex >= 0) {
+    if (!config.providers.claude.options.includeSubagents) {
+      return null;
+    }
+    const parentSessionId = segments[subagentIndex - 1];
+    if (!parentSessionId) {
+      return null;
+    }
+    const subagentName = stripFileExtension(basename(filePath), ".jsonl");
+    const fileMeta = readClaudeJsonlMeta(filePath, dependencies);
+    const sessionIdentity = `${parentSessionId}:subagent:${subagentName}`;
+    const sessionsIndexById = readClaudeSessionsIndex(projectDir, dependencies);
+    const sessionIndexEntry = sessionsIndexById.get(parentSessionId);
+    const projectInfo = resolveClaudeProjectInfo({
+      sessionIndexProjectPath: sessionIndexEntry?.projectPath,
+      fallbackProjectId: projectId,
+      fileMeta,
+    });
+
+    return buildClaudeSubagentDiscoveredFile({
+      projectPath: projectInfo.projectPath,
+      providerProjectKey: projectId,
+      sessionIdentity,
+      sourceSessionId: parentSessionId,
+      providerSessionId: fileMeta.sessionId ?? subagentName,
+      filePath,
+      fileSize: fileStat.size,
+      fileMtimeMs: Math.trunc(fileStat.mtimeMs),
+      gitBranch: fileMeta.gitBranch,
+      cwd: fileMeta.cwd,
+      mainRepositoryPath: fileMeta.mainRepositoryPath,
+      providerClientVersion: fileMeta.version,
+      userType: fileMeta.userType,
+      isSidechain: fileMeta.isSidechain,
+      worktreeLabel: projectInfo.worktreeLabel,
+      worktreeSource: projectInfo.worktreeSource,
+      resolutionSource: projectInfo.resolutionSource,
+      lineageParentId: parentSessionId,
+    });
+  }
+
   const sessionIdentity = basename(stripFileExtension(filePath, ".jsonl"));
   const sessionsIndexById = readClaudeSessionsIndex(projectDir, dependencies);
   const sessionIndexEntry = sessionsIndexById.get(sessionIdentity);
@@ -295,6 +322,65 @@ export function discoverSingleClaudeFile(
       sessionMetadata: compactMetadata({
         userType: fileMeta.userType,
         isSidechain: fileMeta.isSidechain ? true : undefined,
+      }),
+    },
+  };
+}
+
+function buildClaudeSubagentDiscoveredFile(args: {
+  projectPath: string;
+  providerProjectKey: string;
+  sessionIdentity: string;
+  sourceSessionId: string;
+  providerSessionId: string;
+  filePath: string;
+  fileSize: number;
+  fileMtimeMs: number;
+  gitBranch: string | null;
+  cwd: string | null;
+  mainRepositoryPath: string | null;
+  providerClientVersion: string | null;
+  userType: string | null;
+  isSidechain: boolean;
+  worktreeLabel: string | null;
+  worktreeSource: DiscoveredSessionFile["metadata"]["worktreeSource"];
+  resolutionSource: string | null;
+  lineageParentId: string;
+}): DiscoveredSessionFile {
+  return {
+    provider: "claude",
+    projectPath: args.projectPath,
+    canonicalProjectPath: args.projectPath,
+    projectName: projectNameFromPath(args.projectPath),
+    sessionIdentity: args.sessionIdentity,
+    sourceSessionId: args.sourceSessionId,
+    filePath: args.filePath,
+    fileSize: args.fileSize,
+    fileMtimeMs: args.fileMtimeMs,
+    metadata: {
+      includeInHistory: true,
+      isSubagent: true,
+      unresolvedProject: false,
+      gitBranch: args.gitBranch,
+      cwd: args.cwd,
+      worktreeLabel: args.worktreeLabel,
+      worktreeSource: args.worktreeSource,
+      repositoryUrl: null,
+      forkedFromSessionId: null,
+      parentSessionCwd: args.mainRepositoryPath,
+      providerProjectKey: args.providerProjectKey,
+      providerSessionId: args.providerSessionId,
+      sessionKind: "subagent",
+      gitCommitHash: null,
+      providerClient: "Claude",
+      providerSource: null,
+      providerClientVersion: args.providerClientVersion,
+      lineageParentId: args.lineageParentId,
+      resolutionSource: args.resolutionSource,
+      projectMetadata: null,
+      sessionMetadata: compactMetadata({
+        userType: args.userType,
+        isSidechain: args.isSidechain ? true : undefined,
       }),
     },
   };

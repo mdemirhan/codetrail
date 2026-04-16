@@ -475,6 +475,41 @@ describe("discoverSingleFile", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("classifies Claude subagent paths when subagent discovery is enabled", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-single-subagent-enabled-"));
+    const config = {
+      ...makeConfig(dir),
+      includeClaudeSubagents: true,
+    };
+    const claudeProject = join(config.claudeRoot, "project-a");
+    const subagentDir = join(claudeProject, "parent-session", "subagents");
+    mkdirSync(subagentDir, { recursive: true });
+    writeFileSync(
+      join(subagentDir, "agent-1.jsonl"),
+      `${JSON.stringify({
+        sessionId: "subagent-session",
+        cwd: "/workspace/app",
+        gitBranch: "main",
+        isSidechain: true,
+        type: "user",
+        message: { role: "user", content: "Investigate issue" },
+      })}\n`,
+    );
+
+    const result = discoverSingleFile(join(subagentDir, "agent-1.jsonl"), config);
+
+    const discovered = expectDefined(result, "Expected Claude subagent result");
+    expect(discovered.provider).toBe("claude");
+    expect(discovered.sessionIdentity).toBe("parent-session:subagent:agent-1");
+    expect(discovered.sourceSessionId).toBe("parent-session");
+    expect(discovered.metadata.isSubagent).toBe(true);
+    expect(discovered.metadata.sessionKind).toBe("subagent");
+    expect(discovered.metadata.lineageParentId).toBe("parent-session");
+    expect(discovered.metadata.providerSessionId).toBe("subagent-session");
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("correctly identifies a Gemini session file", () => {
     const dir = mkdtempSync(join(tmpdir(), "codetrail-single-gemini-"));
     const config = makeConfig(dir);
