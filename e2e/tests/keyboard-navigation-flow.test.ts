@@ -41,7 +41,7 @@ test.describe("Keyboard Navigation Flow", () => {
   test("Cmd+Shift+M toggles focus mode", async ({ appPage }) => {
     await test.step("Enter focus mode via shortcut", async () => {
       await appPage.keyboard.press(`${MOD}+Shift+m`);
-      await expect(appPage.locator(".history-focus-pane")).toBeVisible();
+      await expect(appPage.locator("section.history-focus-pane")).toBeVisible();
       await expect(appPage.locator(".workspace")).not.toHaveClass(/history-layout/);
     });
 

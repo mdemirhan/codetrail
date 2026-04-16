@@ -25,7 +25,8 @@ test.describe("View Navigation Flow", () => {
     await test.step("Navigate to help — shortcuts and syntax content is interactive", async () => {
       await appPage.locator('button[aria-label="Open help"]').click();
       await expect(appPage.locator(".help-view")).toBeVisible();
-      const shortcutGroups = appPage.locator(".help-group-label");
+      const shortcutGroups = appPage.locator(".help-section-title");
+      await expect(shortcutGroups.first()).toBeVisible();
       const groupCount = await shortcutGroups.count();
       expect(groupCount).toBeGreaterThan(1);
     });

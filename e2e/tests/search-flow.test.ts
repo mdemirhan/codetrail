@@ -88,9 +88,10 @@ test.describe("Search Flow", () => {
     await test.step("Press Enter on query focuses results pane", async () => {
       const searchInput = appPage.locator("input.search-query-input");
       await searchInput.fill("test");
+      const firstResult = appPage.locator(".search-results-scroll button").first();
+      await expect(firstResult).toBeVisible();
       await searchInput.press("Enter");
-      const resultsScroll = appPage.locator(".search-results-scroll");
-      await expect(resultsScroll).toBeFocused();
+      await expect(firstResult).toBeFocused();
     });
 
     await test.step("Escape returns to history from search", async () => {

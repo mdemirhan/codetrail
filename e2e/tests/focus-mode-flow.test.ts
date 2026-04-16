@@ -12,7 +12,7 @@ test.describe("Focus Mode Flow", () => {
 
     await test.step("Click Focus button", async () => {
       await appPage.locator('button[aria-label="Enter focus mode"]').click();
-      await expect(appPage.locator(".history-focus-pane")).toBeVisible();
+      await expect(appPage.locator("section.history-focus-pane")).toBeVisible();
       await expect(appPage.locator(".workspace")).not.toHaveClass(/history-layout/);
     });
 
@@ -60,7 +60,7 @@ test.describe("Focus Mode Flow", () => {
   test("focus mode state resets when navigating to other views and back", async ({ appPage }) => {
     await test.step("Enter focus mode", async () => {
       await appPage.locator('button[aria-label="Enter focus mode"]').click();
-      await expect(appPage.locator(".history-focus-pane")).toBeVisible();
+      await expect(appPage.locator("section.history-focus-pane")).toBeVisible();
     });
 
     await test.step("Open settings while in focus mode", async () => {
@@ -70,7 +70,7 @@ test.describe("Focus Mode Flow", () => {
 
     await test.step("Return via Escape — focus mode is preserved", async () => {
       await appPage.keyboard.press("Escape");
-      await expect(appPage.locator(".history-focus-pane")).toBeVisible();
+      await expect(appPage.locator("section.history-focus-pane")).toBeVisible();
       await expect(appPage.locator(".workspace")).not.toHaveClass(/history-layout/);
     });
 

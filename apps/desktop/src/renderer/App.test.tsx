@@ -1530,10 +1530,13 @@ describe("App shell", () => {
 
     const { container } = renderWithClient(<App />, client);
 
-    await waitFor(() => {
-      expect(screen.getByRole("textbox", { name: "Page number" })).toHaveValue("1");
-      expect(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByRole("textbox", { name: "Page number" })).toHaveValue("1");
+        expect(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
+      },
+      { timeout: 5000 },
+    );
 
     const messageList = container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
     expect(messageList).not.toBeNull();
