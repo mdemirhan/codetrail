@@ -1767,7 +1767,9 @@ body.platform-macos .titlebar-left {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .project-provider-filter-trigger:hover,
@@ -1783,7 +1785,9 @@ body.platform-macos .titlebar-left {
 .project-provider-filter-trigger-main {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 8px;
+  white-space: nowrap;
 }
 
 .project-provider-filter-trigger-label {
@@ -1805,12 +1809,16 @@ body.platform-macos .titlebar-left {
 
 .project-provider-filter-trigger-summary {
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .project-provider-filter-stack {
   display: inline-flex;
   align-items: center;
+  flex: 0 1 auto;
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .project-provider-filter-stack-dot {
@@ -1829,14 +1837,6 @@ body.platform-macos .titlebar-left {
 
 .project-provider-filter-stack-dot:first-child {
   margin-left: 0;
-}
-
-.project-provider-filter-stack-overflow {
-  margin-left: 6px;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
 }
 
 .project-provider-filter-trigger-caret {

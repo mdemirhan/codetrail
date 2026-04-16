@@ -165,10 +165,7 @@ export function ProjectPane({
   const activeProviderCount = projectProviders.filter((provider) =>
     providers.includes(provider),
   ).length;
-  const visibleProviderDots = providers
-    .filter((provider) => projectProviders.includes(provider))
-    .slice(0, 4);
-  const hiddenProviderDotCount = Math.max(0, activeProviderCount - visibleProviderDots.length);
+  const activeProviders = providers.filter((provider) => projectProviders.includes(provider));
 
   const handleToggleFolder = (folderId: string) => {
     setContextMenu(null);
@@ -595,17 +592,12 @@ export function ProjectPane({
                 </span>
               </span>
               <span className="project-provider-filter-stack" aria-hidden>
-                {visibleProviderDots.map((provider) => (
+                {activeProviders.map((provider) => (
                   <span
                     key={provider}
                     className={`project-provider-filter-stack-dot project-provider-filter-stack-dot-${provider}`}
                   />
                 ))}
-                {hiddenProviderDotCount > 0 ? (
-                  <span className="project-provider-filter-stack-overflow">
-                    +{hiddenProviderDotCount}
-                  </span>
-                ) : null}
               </span>
             </span>
             <span className="project-provider-filter-trigger-caret" aria-hidden>
