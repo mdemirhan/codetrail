@@ -12,6 +12,7 @@ import {
   buildSearchQueryPlan,
   buildWildcardFilterPatterns,
   createProviderRecord,
+  getProviderAdapter,
   makeEmptyCategoryCounts,
   normalizeMessageCategories,
   normalizeMessageCategory,
@@ -1223,6 +1224,7 @@ function listSessionsManyWithDatabase(
          s.resolution_source,
          s.worktree_label,
          s.worktree_source,
+         s.metadata_json,
          s.message_count,
          s.token_input_total,
          s.token_output_total
@@ -3026,64 +3028,26 @@ function resolveProjectTurnSessionFamily(
   projectId: string,
   session: SessionSummaryRow,
 ): ProjectTurnSessionFamily {
-  if (session.provider !== "claude") {
+  const resolveTurnFamilySessionIds = getProviderAdapter(
+    session.provider,
+  ).resolveTurnFamilySessionIds;
+  if (!resolveTurnFamilySessionIds) {
     return { sessionIds: [session.id] };
   }
 
-  const sessionIds = new Set<string>([session.id]);
-  const rootProviderSessionId =
-    session.provider_session_id ?? session.session_identity ?? session.id;
-  const rootLineageIds = Array.from(
-    new Set(
-      [rootProviderSessionId, session.session_identity].filter((value): value is string =>
-        Boolean(value),
-      ),
-    ),
-  );
-
-  if (rootLineageIds.length > 0) {
-    const lineageRows = db
-      .prepare(
-        `SELECT id
-         FROM sessions
-         WHERE project_id = ?
-           AND lineage_parent_id IN (${rootLineageIds.map(() => "?").join(",")})`,
-      )
-      .all(projectId, ...rootLineageIds) as Array<{ id: string }>;
-    for (const row of lineageRows) {
-      sessionIds.add(row.id);
-    }
-  }
-
-  const providerRows = db
-    .prepare(
-      `SELECT id, session_kind, file_path
-       FROM sessions
-       WHERE project_id = ?
-         AND provider = 'claude'
-         AND provider_session_id = ?`,
-    )
-    .all(projectId, rootProviderSessionId) as Array<{
-    id: string;
-    session_kind: string | null;
-    file_path: string;
-  }>;
-
-  for (const row of providerRows) {
-    if (
-      row.id === session.id ||
-      row.session_kind === "subagent" ||
-      isClaudeSubagentTranscriptPath(row.file_path)
-    ) {
-      sessionIds.add(row.id);
-    }
-  }
-
-  return { sessionIds: [...sessionIds] };
-}
-
-function isClaudeSubagentTranscriptPath(filePath: string): boolean {
-  return filePath.replace(/\\/g, "/").includes("/subagents/");
+  return {
+    sessionIds: resolveTurnFamilySessionIds({
+      db,
+      projectId,
+      session: {
+        id: session.id,
+        provider: session.provider,
+        filePath: session.file_path,
+        sessionIdentity: session.session_identity,
+        providerSessionId: session.provider_session_id,
+      },
+    }),
+  };
 }
 
 function buildScopedMessageFilters(args: {

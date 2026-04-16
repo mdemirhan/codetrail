@@ -11,10 +11,16 @@ import {
 } from "./platformDiscoveryDefaults";
 import {
   type DiscoveryDependencies,
+  getConfigDiscoveryPath,
   getDiscoveryPath,
   resolveDiscoveryDependencies,
 } from "./shared";
-import type { DiscoveredSessionFile, DiscoveryConfig, ResolvedDiscoveryConfig } from "./types";
+import type {
+  DiscoveredSessionFile,
+  DiscoveryConfig,
+  ProviderDiscoveryOptions,
+  ResolvedDiscoveryConfig,
+} from "./types";
 
 export type { DiscoveryDependencies, DiscoveryFileSystem } from "./shared";
 
@@ -28,17 +34,35 @@ export const DEFAULT_DISCOVERY_CONFIG: DiscoveryConfig = {
 export function resolveDiscoveryConfig(
   config: Partial<DiscoveryConfig> = {},
 ): ResolvedDiscoveryConfig {
+  const mergedProviderPaths = {
+    ...(DEFAULT_DISCOVERY_CONFIG.providerPaths ?? {}),
+  } as Partial<Record<ProviderDiscoveryPathKey, string>>;
+  for (const provider of PROVIDER_VALUES) {
+    for (const { key } of PROVIDER_METADATA[provider].discoveryPaths) {
+      const configuredValue = getConfigDiscoveryPath(config, key);
+      if (configuredValue) {
+        mergedProviderPaths[key] = configuredValue;
+      }
+    }
+  }
+  const mergedProviderOptions = createProviderRecord<ProviderDiscoveryOptions>((provider) => ({
+    ...((DEFAULT_DISCOVERY_CONFIG.providerOptions?.[provider] ?? {}) as ProviderDiscoveryOptions),
+    ...((config.providerOptions?.[provider] ?? {}) as ProviderDiscoveryOptions),
+  }));
+  if (config.includeClaudeSubagents !== undefined) {
+    mergedProviderOptions.claude.includeSubagents = config.includeClaudeSubagents;
+  }
   const merged: DiscoveryConfig = {
     ...DEFAULT_DISCOVERY_CONFIG,
     ...config,
+    providerPaths: mergedProviderPaths,
+    providerOptions: mergedProviderOptions,
   };
 
   return {
     providers: createProviderRecord((provider) => ({
       paths: resolveProviderPaths(provider, merged),
-      options: {
-        includeSubagents: provider === "claude" ? merged.includeClaudeSubagents : false,
-      },
+      options: merged.providerOptions?.[provider] ?? {},
     })),
     enabledProviders: resolveEnabledProviders(merged.enabledProviders),
   };
@@ -66,7 +90,7 @@ function resolveProviderPaths(
   const paths: Partial<Record<ProviderDiscoveryPathKey, string>> = {};
 
   for (const { key } of PROVIDER_METADATA[provider].discoveryPaths) {
-    const value = config[key];
+    const value = getConfigDiscoveryPath(config, key);
     if (typeof value === "string" && value.length > 0) {
       paths[key] = value;
     }

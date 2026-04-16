@@ -9,6 +9,7 @@ export * from "./db/constants";
 export * from "./indexing";
 export * from "./live";
 export * from "./parsing";
+export * from "./providers";
 export * from "./search";
 export * from "./pathMatching";
 export * from "./tooling/editOperations";

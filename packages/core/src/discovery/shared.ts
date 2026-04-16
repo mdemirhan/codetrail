@@ -16,7 +16,7 @@ import type { PROVIDER_METADATA, ProviderDiscoveryPathKey } from "../contracts/p
 import { asRecord } from "../parsing/helpers";
 
 import { isPathWithinRoot, relativePathSegments } from "../pathMatching";
-import type { ResolvedDiscoveryConfig } from "./types";
+import type { DiscoveryConfig, ResolvedDiscoveryConfig } from "./types";
 
 export type DiscoveryDirent = {
   name: string;
@@ -305,41 +305,6 @@ export function decodeFileUrlPath(value: string): string {
 
 export function getDiscoveryPath(
   config: ResolvedDiscoveryConfig,
-  provider: "claude",
-  key: Extract<ProviderDiscoveryPathKey, "claudeRoot">,
-): string | null;
-export function getDiscoveryPath(
-  config: ResolvedDiscoveryConfig,
-  provider: "codex",
-  key: Extract<ProviderDiscoveryPathKey, "codexRoot">,
-): string | null;
-export function getDiscoveryPath(
-  config: ResolvedDiscoveryConfig,
-  provider: "gemini",
-  key: Extract<ProviderDiscoveryPathKey, "geminiRoot" | "geminiHistoryRoot" | "geminiProjectsPath">,
-): string | null;
-export function getDiscoveryPath(
-  config: ResolvedDiscoveryConfig,
-  provider: "cursor",
-  key: Extract<ProviderDiscoveryPathKey, "cursorRoot">,
-): string | null;
-export function getDiscoveryPath(
-  config: ResolvedDiscoveryConfig,
-  provider: "copilot",
-  key: Extract<ProviderDiscoveryPathKey, "copilotRoot">,
-): string | null;
-export function getDiscoveryPath(
-  config: ResolvedDiscoveryConfig,
-  provider: "copilot_cli",
-  key: Extract<ProviderDiscoveryPathKey, "copilotCliRoot">,
-): string | null;
-export function getDiscoveryPath(
-  config: ResolvedDiscoveryConfig,
-  provider: "opencode",
-  key: Extract<ProviderDiscoveryPathKey, "opencodeRoot">,
-): string | null;
-export function getDiscoveryPath(
-  config: ResolvedDiscoveryConfig,
   provider: Provider,
   key: ProviderDiscoveryPathKey,
 ): string | null;
@@ -349,4 +314,17 @@ export function getDiscoveryPath<P extends Provider>(
   key: (typeof PROVIDER_METADATA)[P]["discoveryPaths"][number]["key"],
 ): string | null {
   return config.providers[provider].paths[key] ?? null;
+}
+
+export function getConfigDiscoveryPath(
+  config: Pick<DiscoveryConfig, "providerPaths"> &
+    Partial<Record<ProviderDiscoveryPathKey, string>>,
+  key: ProviderDiscoveryPathKey,
+): string | null {
+  const nested = config.providerPaths?.[key];
+  if (typeof nested === "string" && nested.length > 0) {
+    return nested;
+  }
+  const legacy = config[key];
+  return typeof legacy === "string" && legacy.length > 0 ? legacy : null;
 }

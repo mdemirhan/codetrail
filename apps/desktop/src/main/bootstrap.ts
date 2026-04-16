@@ -16,6 +16,8 @@ import {
   type ProjectIndexingScope,
   type Provider,
   createProviderRecord,
+  getConfigDiscoveryPath,
+  getProviderAdapter,
   hasFileExtension,
   indexerConfigBaseSchema,
   initializeDatabase,
@@ -23,7 +25,6 @@ import {
   listDiscoverySettingsPaths,
   listDiscoveryWatchRoots,
   paneStateBaseSchema,
-  resolveEnabledProviders,
   resolveSystemMessageRegexRules,
 } from "@codetrail/core";
 
@@ -131,17 +132,28 @@ function createDefaultClaudeHookState(input: {
 
 function filterPotentialLiveTranscriptPaths(
   changedPaths: string[],
-  discoveryConfig: Pick<DiscoveryConfig, "claudeRoot" | "codexRoot" | "copilotCliRoot">,
+  discoveryConfig: DiscoveryConfig,
 ): string[] {
+  const enabledProviders =
+    discoveryConfig.enabledProviders ?? PROVIDER_LIST.map((provider) => provider.id);
+  const liveTranscriptRoots = enabledProviders.flatMap((provider) => {
+    const adapter = getProviderAdapter(provider);
+    if (!adapter.liveSession?.applyTranscriptLine) {
+      return [];
+    }
+
+    return adapter.discoveryPaths
+      .map((definition) => getConfigDiscoveryPath(discoveryConfig, definition.key))
+      .filter(
+        (rootPath): rootPath is string => typeof rootPath === "string" && rootPath.length > 0,
+      );
+  });
+
   return changedPaths.filter((changedPath) => {
     if (!hasFileExtension(changedPath, ".jsonl")) {
       return false;
     }
-    return (
-      isPathWithinOptionalRoot(changedPath, discoveryConfig.claudeRoot) ||
-      isPathWithinOptionalRoot(changedPath, discoveryConfig.codexRoot) ||
-      isPathWithinOptionalRoot(changedPath, discoveryConfig.copilotCliRoot)
-    );
+    return liveTranscriptRoots.some((rootPath) => isPathWithinOptionalRoot(changedPath, rootPath));
   });
 }
 
@@ -227,7 +239,8 @@ export async function bootstrapMainProcess(
   initializeBookmarkStore(bookmarksDbPath);
   const watchStatsStore = new WatchStatsStore();
   const getEnabledProviders = () =>
-    resolveEnabledProviders(options.appStateStore?.getIndexingState()?.enabledProviders);
+    options.appStateStore?.getIndexingState()?.enabledProviders ??
+    PROVIDER_LIST.map((provider) => provider.id);
   const liveInstrumentationEnabled = options.instrumentationEnabled ?? false;
   const liveUiTraceLogPath = getLiveUiTraceLogPath(app.getPath("userData"));
   const getRemoveMissingSessionsDuringIncrementalIndexing = () =>

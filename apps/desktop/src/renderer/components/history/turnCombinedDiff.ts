@@ -1,4 +1,5 @@
 import type { MessageCategory } from "@codetrail/core/browser";
+import { PROVIDER_LIST } from "@codetrail/core/browser";
 
 import { collectClaudeTurnEdits } from "./claudeTurnEdits";
 import { collectRawTurnEdits } from "./rawTurnEdits";
@@ -13,13 +14,20 @@ export type TurnCombinedMessage = TurnCombinedSourceMessage & {
   category: MessageCategory;
 };
 
+const RAW_TURN_DIFF_PROVIDERS = PROVIDER_LIST.filter(
+  (provider) => provider.turnDiffStrategy === "raw_tool_payload",
+).map((provider) => provider.id);
+const RAW_TURN_DIFF_FALLBACK_PROVIDERS = PROVIDER_LIST.filter(
+  (provider) => provider.turnDiffStrategy === "raw_tool_payload_fallback",
+).map((provider) => provider.id);
+
 export function aggregateTurnCombinedFiles(messages: TurnCombinedMessage[]): TurnCombinedFile[] {
   const grouped = groupEditsByFile(
     [
       ...collectClaudeTurnEdits(messages),
-      ...collectRawTurnEdits(messages, { providers: ["codex", "gemini", "cursor", "opencode"] }),
+      ...collectRawTurnEdits(messages, { providers: RAW_TURN_DIFF_PROVIDERS }),
       ...collectRawTurnEdits(messages, {
-        providers: ["copilot"],
+        providers: RAW_TURN_DIFF_FALLBACK_PROVIDERS,
         allowTouchedFileFallback: true,
       }),
     ].sort(

@@ -7,12 +7,9 @@ import {
   type IpcResponse,
   type LiveSessionState,
   type PrefetchedJsonlChunk,
-  applyClaudeHookLine,
-  applyClaudeTranscriptLine,
-  applyCodexLiveLine,
   createInitialLiveSessionState,
   discoverSingleFile,
-  readClaudeHookTranscriptPath,
+  getProviderAdapter,
 } from "@codetrail/core";
 
 import type { QueryService, RecentLiveSessionFile } from "./data/queryService";
@@ -61,8 +58,10 @@ type FileCursorState = {
 };
 
 type RecentLiveSessionCandidate = RecentLiveSessionFile & {
-  provider: "claude" | "codex";
+  provider: LiveTrackedProvider;
 };
+
+type LiveTrackedProvider = RecentLiveSessionFile["provider"];
 
 type LiveSessionRepairResult = {
   ran: boolean;
@@ -497,11 +496,12 @@ export class LiveSessionStore {
     });
   }
 
-  private getRecentLiveProviders(): Array<"claude" | "codex"> {
+  private getRecentLiveProviders(): LiveTrackedProvider[] {
     return (
       this.discoveryConfig?.enabledProviders?.filter(
-        (provider): provider is "claude" | "codex" => provider === "claude" || provider === "codex",
-      ) ?? ["claude", "codex"]
+        (provider): provider is LiveTrackedProvider =>
+          getProviderAdapter(provider).liveSession != null,
+      ) ?? []
     );
   }
 
@@ -569,7 +569,7 @@ export class LiveSessionStore {
   }
 
   private async repairCandidatesSince(input: {
-    providers: Array<"claude" | "codex">;
+    providers: LiveTrackedProvider[];
     minFileMtimeMs: number;
   }): Promise<RepairPassSummary> {
     let candidateCount = 0;
@@ -601,7 +601,7 @@ export class LiveSessionStore {
   }
 
   private async collectStaleRecentSessionCandidatesSince(input: {
-    providers: Array<"claude" | "codex">;
+    providers: LiveTrackedProvider[];
     minFileMtimeMs: number;
   }): Promise<RecentLiveSessionCandidate[]> {
     const staleCandidates: RecentLiveSessionCandidate[] = [];
@@ -677,7 +677,7 @@ export class LiveSessionStore {
 
   private async forEachRecentSessionCandidatePage(
     input: {
-      providers: Array<"claude" | "codex">;
+      providers: LiveTrackedProvider[];
       minFileMtimeMs: number;
     },
     visitor: (page: RecentLiveSessionCandidate[]) => Promise<void>,
@@ -700,7 +700,7 @@ export class LiveSessionStore {
   }
 
   private listRecentSessionCandidatePage(input: {
-    providers: Array<"claude" | "codex">;
+    providers: LiveTrackedProvider[];
     minFileMtimeMs: number;
     limit: number;
     offset?: number;
@@ -709,7 +709,7 @@ export class LiveSessionStore {
       .listRecentLiveSessionFiles(input)
       .filter(
         (candidate): candidate is RecentLiveSessionCandidate =>
-          candidate.provider === "claude" || candidate.provider === "codex",
+          getProviderAdapter(candidate.provider).liveSession != null,
       );
   }
 
@@ -736,7 +736,8 @@ export class LiveSessionStore {
     }
 
     const discovered = discoverSingleFile(filePath, this.discoveryConfig);
-    if (!discovered || (discovered.provider !== "claude" && discovered.provider !== "codex")) {
+    const liveHooks = discovered ? getProviderAdapter(discovered.provider).liveSession : null;
+    if (!discovered || !liveHooks) {
       return;
     }
 
@@ -843,20 +844,16 @@ export class LiveSessionStore {
 
     for (const line of completeLines.lines) {
       const before = this.instrumentationEnabled ? summarizeLiveSessionState(cursor.session) : null;
-      if (discovered.provider === "codex") {
-        cursor.session = applyCodexLiveLine(cursor.session, line, passiveFallbackTimestampMs);
-      } else {
-        cursor.session = applyClaudeTranscriptLine(
-          cursor.session,
-          line,
-          passiveFallbackTimestampMs,
-        );
-      }
+      cursor.session = liveHooks.applyTranscriptLine(
+        cursor.session,
+        line,
+        passiveFallbackTimestampMs,
+      );
       if (this.instrumentationEnabled) {
         const after = summarizeLiveSessionState(cursor.session);
         this.recordTrace({
           kind: "line_applied",
-          source: discovered.provider === "codex" ? "codex_transcript" : "claude_transcript",
+          source: liveHooks.transcriptTraceSource ?? `${discovered.provider}_transcript`,
           filePath,
           line: summarizeLiveLine(line),
           before,
@@ -906,26 +903,42 @@ export class LiveSessionStore {
       });
 
       for (const line of completeLines.lines) {
-        const transcriptPath = readClaudeHookTranscriptPath(line);
-        if (!transcriptPath || !this.discoveryConfig) {
+        if (!this.discoveryConfig) {
           continue;
         }
-        const discovered = discoverSingleFile(transcriptPath, this.discoveryConfig);
-        if (!discovered || discovered.provider !== "claude") {
+        const eligibleProviders = this.getRecentLiveProviders().filter(
+          (provider) => getProviderAdapter(provider).liveSession?.readHookTranscriptPath,
+        );
+        if (eligibleProviders.length === 0) {
+          continue;
+        }
+        const transcriptMatch = eligibleProviders
+          .map((provider) => ({
+            provider,
+            transcriptPath:
+              getProviderAdapter(provider).liveSession?.readHookTranscriptPath?.(line) ?? null,
+          }))
+          .find((candidate) => candidate.transcriptPath);
+        if (!transcriptMatch?.transcriptPath) {
+          continue;
+        }
+        const discovered = discoverSingleFile(transcriptMatch.transcriptPath, this.discoveryConfig);
+        const liveHooks = discovered ? getProviderAdapter(discovered.provider).liveSession : null;
+        if (!discovered || !liveHooks?.applyHookLine) {
           continue;
         }
         const cursor = this.ensureCursor(discovered.filePath, discovered);
         const before = this.instrumentationEnabled
           ? summarizeLiveSessionState(cursor.session)
           : null;
-        cursor.session = applyClaudeHookLine(cursor.session, line, this.now());
+        cursor.session = liveHooks.applyHookLine(cursor.session, line, this.now());
         if (this.instrumentationEnabled) {
           const after = summarizeLiveSessionState(cursor.session);
           this.recordTrace({
             kind: "line_applied",
-            source: "claude_hook",
+            source: liveHooks.hookTraceSource ?? `${discovered.provider}_hook`,
             filePath,
-            transcriptPath,
+            transcriptPath: transcriptMatch.transcriptPath,
             line: summarizeLiveLine(line),
             before,
             after,

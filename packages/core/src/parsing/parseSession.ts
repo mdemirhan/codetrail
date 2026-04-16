@@ -7,7 +7,7 @@ import {
   type ParserDiagnostic,
   parseSessionInputSchema,
 } from "./contracts";
-import type { ParsedProviderMessage } from "./providerParsers";
+import type { ParsedProviderMessage } from "./providerParserShared";
 
 // parseSession is the narrow boundary between provider-specific transcript shapes and the
 // canonical message model used everywhere else in the app.

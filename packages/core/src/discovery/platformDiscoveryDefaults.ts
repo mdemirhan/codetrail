@@ -1,15 +1,12 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
 
 import { PROVIDER_VALUES } from "../contracts/canonical";
-
-export type DiscoveryPlatform = "darwin" | "win32" | "linux";
-
-export type DiscoveryPlatformEnvironment = {
-  homeDir?: string;
-  appDataDir?: string | null;
-  localAppDataDir?: string | null;
-};
+import {
+  type DiscoveryPlatform,
+  type DiscoveryPlatformEnvironment,
+  PROVIDER_LIST,
+  type ProviderDiscoveryPathKey,
+} from "../contracts/providerMetadata";
 
 export function getCurrentDiscoveryPlatform(): DiscoveryPlatform {
   if (process.platform === "win32") {
@@ -21,43 +18,35 @@ export function getCurrentDiscoveryPlatform(): DiscoveryPlatform {
   return "linux";
 }
 
-export function getDefaultCopilotRoot(
-  platform: DiscoveryPlatform,
-  environment: DiscoveryPlatformEnvironment = {},
-): string {
-  const homeDir = environment.homeDir ?? homedir();
-  if (platform === "darwin") {
-    return join(homeDir, "Library", "Application Support", "Code", "User", "workspaceStorage");
-  }
-  if (platform === "win32") {
-    return join(
-      environment.appDataDir ?? join(homeDir, "AppData", "Roaming"),
-      "Code",
-      "User",
-      "workspaceStorage",
-    );
-  }
-  return join(homeDir, ".config", "Code", "User", "workspaceStorage");
-}
-
 export function createDefaultDiscoveryConfig(
   platform: DiscoveryPlatform,
-  environment: DiscoveryPlatformEnvironment = {},
-) {
-  const homeDir = environment.homeDir ?? homedir();
+  environment: Partial<DiscoveryPlatformEnvironment> = {},
+): {
+  providerPaths: Record<ProviderDiscoveryPathKey, string>;
+  providerOptions: { claude: { includeSubagents: boolean } };
+  enabledProviders: typeof PROVIDER_VALUES;
+  includeClaudeSubagents: boolean;
+} & Record<ProviderDiscoveryPathKey, string> {
+  const normalizedEnvironment = {
+    ...environment,
+    homeDir: environment.homeDir ?? homedir(),
+  } satisfies DiscoveryPlatformEnvironment;
+  const providerPaths = Object.fromEntries(
+    PROVIDER_LIST.flatMap((provider) =>
+      provider.discoveryPaths.map((pathDef) => [
+        pathDef.key,
+        pathDef.defaultPath(platform, normalizedEnvironment),
+      ]),
+    ),
+  ) as Record<ProviderDiscoveryPathKey, string>;
   return {
-    claudeRoot: join(homeDir, ".claude", "projects"),
-    codexRoot: join(homeDir, ".codex", "sessions"),
-    geminiRoot: join(homeDir, ".gemini", "tmp"),
-    geminiHistoryRoot: join(homeDir, ".gemini", "history"),
-    geminiProjectsPath: join(homeDir, ".gemini", "projects.json"),
-    cursorRoot: join(homeDir, ".cursor", "projects"),
-    copilotRoot: getDefaultCopilotRoot(platform, environment),
-    copilotCliRoot: join(homeDir, ".copilot", "session-state"),
-    opencodeRoot:
-      platform === "win32"
-        ? join(environment.localAppDataDir ?? join(homeDir, "AppData", "Local"), "opencode")
-        : join(homeDir, ".local", "share", "opencode"),
+    providerPaths,
+    providerOptions: {
+      claude: {
+        includeSubagents: false,
+      },
+    },
+    ...providerPaths,
     includeClaudeSubagents: false,
     enabledProviders: [...PROVIDER_VALUES],
   };

@@ -47,7 +47,16 @@ export type DiscoveredSessionFile = {
   };
 };
 
+export type ProviderDiscoveryOptions = {
+  includeSubagents?: boolean;
+};
+
 export type DiscoveryConfig = {
+  providerPaths?: Partial<Record<ProviderDiscoveryPathKey, string>>;
+  providerOptions?: Partial<Record<Provider, ProviderDiscoveryOptions>>;
+  enabledProviders?: Provider[];
+  // Legacy flat fields remain part of the shape during the migration so existing callers
+  // stay type-stable while generic code moves over to providerPaths/providerOptions.
   claudeRoot: string;
   codexRoot: string;
   geminiRoot: string;
@@ -58,14 +67,11 @@ export type DiscoveryConfig = {
   copilotCliRoot: string;
   opencodeRoot: string;
   includeClaudeSubagents: boolean;
-  enabledProviders?: Provider[];
 };
 
 export type ResolvedDiscoveryProviderConfig = {
   paths: Partial<Record<ProviderDiscoveryPathKey, string>>;
-  options: {
-    includeSubagents: boolean;
-  };
+  options: ProviderDiscoveryOptions;
 };
 
 export type ResolvedDiscoveryConfig = {

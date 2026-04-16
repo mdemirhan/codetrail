@@ -225,11 +225,34 @@ const dataTables = [
   "deleted_projects",
 ] as const;
 
+const trackedTestDatabases = new Set<SqliteDatabase>();
+
+function trackDatabaseForTests(db: SqliteDatabase): SqliteDatabase {
+  if (!process.env.VITEST) {
+    return db;
+  }
+  trackedTestDatabases.add(db);
+  return db;
+}
+
 export function openDatabase(databasePath: string): SqliteDatabase {
   const db = new Database(databasePath);
   // WAL keeps read-heavy UI queries responsive while indexing writes in the background.
   db.pragma("journal_mode = WAL");
-  return db;
+  return trackDatabaseForTests(db);
+}
+
+export function closeTrackedDatabasesForTests(): void {
+  for (const db of [...trackedTestDatabases]) {
+    try {
+      if (db.open) {
+        db.close();
+      }
+    } catch {
+      // Ignore teardown-close failures in tests; the worker is already shutting down.
+    }
+  }
+  trackedTestDatabases.clear();
 }
 
 export function ensureDatabaseSchema(db: SqliteDatabase): DatabaseBootstrapResult {

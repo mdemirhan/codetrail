@@ -26,21 +26,19 @@ import {
   discoverSessionFiles,
   discoverSingleFile,
 } from "../discovery";
-import {
-  buildOpenCodeSessionSourcePrefix,
-  normalizeOpenCodeDatabasePath,
-} from "../discovery/providers/opencode";
-import { projectNameFromPath } from "../discovery/shared";
+import { getConfigDiscoveryPath, projectNameFromPath } from "../discovery/shared";
 import { stringifyCompactMetadata } from "../metadata";
 import { type ParserDiagnostic, parseSession, parseSessionEvent } from "../parsing";
 import { asArray, asRecord, lowerString, readString } from "../parsing/helpers";
 import {
+  type PendingCodexUserMessage,
   type ProviderReadSourceResult,
   type ProviderSourceMetadata,
   type ProviderSourceMetadataAccumulator,
   type ReadFileText,
   getProviderAdapter,
 } from "../providers";
+import { CLAUDE_TURN_ROOT_EVENT_ID_LIMIT } from "../providers/claude/indexing";
 import { summarizeOversizedSanitization } from "../providers/oversized/shared";
 import { buildUnifiedDiffFromTextPair, countUnifiedDiffLines } from "../tooling/unifiedDiff";
 
@@ -226,10 +224,6 @@ type MessageNormalizationSnapshot = {
   assistantThinkingRunBaseline: IndexedMessage | null;
   aggregate: SessionAggregateState;
 };
-type PendingCodexUserMessage = {
-  message: IndexedMessage;
-  nativeTurnId: string | null;
-};
 type SerializablePendingCodexUserMessage = {
   message: IndexedMessage | null;
   nativeTurnId: string | null;
@@ -270,7 +264,6 @@ type StreamJsonlResult = {
   nextLineNumber: number;
   nextEventIndex: number;
 };
-const CLAUDE_TURN_ROOT_EVENT_ID_LIMIT = 2048;
 type JsonlRescueNotice = {
   severity: "info" | "warning";
   message: string;
@@ -303,27 +296,6 @@ export type IndexingNotice = {
 
 type ToolEditExactness = "exact" | "best_effort";
 type ToolEditChangeType = "add" | "update" | "delete" | "move";
-type ClaudeSnapshotFileEntry = {
-  backupFileName: string | null;
-  version: number | null;
-  backupTime: string | null;
-};
-type ClaudePendingToolEdit = {
-  messageDbId: string;
-  sourceId: string;
-  fileOrdinal: number;
-  filePath: string;
-  comparisonPath: string;
-  toolName: "Edit" | "Write";
-  input: Record<string, unknown>;
-};
-type ClaudeTurnNormalizationState = {
-  fileHistoryDirectory: string | null;
-  previousSnapshotByPath: Map<string, ClaudeSnapshotFileEntry>;
-  pendingBySourceId: Map<string, ClaudePendingToolEdit[]>;
-  backupTextByName: Map<string, string | null>;
-  currentTextByPath: Map<string, string>;
-};
 
 type IndexingStatements = {
   upsertProject: PreparedStatement<
@@ -745,22 +717,39 @@ export function indexChangedFiles(
     // on. This mirrors the full incremental path, just scoped to the changed file set.
     const discoveredPathSet = new Set(discoveredFiles.map((f) => f.filePath));
     const enabledProviderSet = new Set(discoveryConfig.enabledProviders);
-    removedFiles += removeMissingOpenCodeSessionsForChangedPaths({
-      changedFilePaths,
-      discoveredFiles,
-      discoveryConfig,
-      listIndexedFilesByPrefix: listIndexedFilesByPrefix as {
-        all: (provider: Provider, prefix: string) => IndexedFileRow[];
-      },
-      getSessionByFile: getSessionByFile as {
-        get: (filePath: string) => SessionFileRow | undefined;
-      },
-      statements,
-      enabledProviderSet,
-      removeMissingSessionsDuringIncrementalIndexing:
-        config.removeMissingSessionsDuringIncrementalIndexing ?? false,
-      ...(config.projectScope ? { projectScope: config.projectScope } : {}),
-    });
+    for (const provider of PROVIDER_VALUES) {
+      const adapter = getProviderAdapter(provider);
+      if (!adapter.cleanupMissingSessions) {
+        continue;
+      }
+      removedFiles += adapter.cleanupMissingSessions({
+        changedFilePaths,
+        discoveredFiles,
+        discoveryConfig,
+        enabledProviderSet,
+        removeMissingSessionsDuringIncrementalIndexing:
+          config.removeMissingSessionsDuringIncrementalIndexing ?? false,
+        listIndexedFilesByPrefix: (prefix) =>
+          (listIndexedFilesByPrefix.all(provider, prefix) as IndexedFileRow[]).map((row) => ({
+            provider: row.provider,
+            filePath: row.file_path,
+            projectPath: row.project_path,
+          })),
+        hasSessionForFile: (filePath) =>
+          Boolean(getSessionByFile.get(filePath) as SessionFileRow | undefined),
+        deleteSessionDataForFilePath: (filePath) => {
+          deleteSessionDataForFilePath(statements, filePath);
+        },
+        deleteIndexedFileByFilePath: (filePath) => {
+          statements.deleteIndexedFileByFilePath.run(filePath);
+        },
+        deleteCheckpointByFilePath: (filePath) => {
+          statements.deleteCheckpointByFilePath.run(filePath);
+        },
+        matchesProjectScope: (rowProvider, projectPath) =>
+          matchesProjectScope(rowProvider, projectPath, config.projectScope),
+      });
+    }
     for (const filePath of changedFilePaths) {
       if (discoveredPathSet.has(filePath)) continue;
       const existingSession = getSessionByFile.get(filePath) as SessionFileRow | undefined;
@@ -825,62 +814,6 @@ export function indexChangedFiles(
   }
 }
 
-function removeMissingOpenCodeSessionsForChangedPaths(args: {
-  changedFilePaths: string[];
-  discoveredFiles: ReturnType<typeof discoverSessionFiles>;
-  discoveryConfig: DiscoveryConfig;
-  listIndexedFilesByPrefix: { all: (provider: Provider, prefix: string) => IndexedFileRow[] };
-  getSessionByFile: { get: (filePath: string) => SessionFileRow | undefined };
-  statements: IndexingStatements;
-  enabledProviderSet: Set<Provider>;
-  removeMissingSessionsDuringIncrementalIndexing: boolean;
-  projectScope?: ProjectIndexingScope;
-}): number {
-  const opencodeRoot = args.discoveryConfig.opencodeRoot;
-  if (!opencodeRoot) {
-    return 0;
-  }
-
-  let removedFiles = 0;
-  const discoveredPathSet = new Set(args.discoveredFiles.map((file) => file.filePath));
-  for (const changedPath of args.changedFilePaths) {
-    const dbPath = normalizeOpenCodeDatabasePath(changedPath, opencodeRoot);
-    if (!dbPath) {
-      continue;
-    }
-
-    const indexedRows = args.listIndexedFilesByPrefix.all(
-      "opencode",
-      `${buildOpenCodeSessionSourcePrefix(dbPath)}%`,
-    );
-    for (const indexedRow of indexedRows) {
-      if (discoveredPathSet.has(indexedRow.file_path)) {
-        continue;
-      }
-      if (!matchesProjectScope(indexedRow.provider, indexedRow.project_path, args.projectScope)) {
-        continue;
-      }
-      if (
-        args.enabledProviderSet.has(indexedRow.provider) &&
-        !args.removeMissingSessionsDuringIncrementalIndexing
-      ) {
-        continue;
-      }
-
-      const existingSession = args.getSessionByFile.get(indexedRow.file_path);
-      if (!existingSession) {
-        continue;
-      }
-
-      deleteSessionDataForFilePath(args.statements, indexedRow.file_path);
-      args.statements.deleteIndexedFileByFilePath.run(indexedRow.file_path);
-      args.statements.deleteCheckpointByFilePath.run(indexedRow.file_path);
-      removedFiles += 1;
-    }
-  }
-  return removedFiles;
-}
-
 function filterDiscoveredFilesByProjectScope(
   discoveredFiles: ReturnType<typeof discoverSessionFiles>,
   projectScope: ProjectIndexingScope | undefined,
@@ -931,143 +864,38 @@ function normalizeDiscoveredProjectPaths(
     .all(
       ...(projectScope ? ([projectScope.provider, projectScope.projectPath] as const) : []),
     ) as ExistingProjectCandidateRow[];
-  const codexCandidateProjects = buildCodexCandidateProjects(discoveredFiles, existingProjects);
-
-  return discoveredFiles.map((discovered) => {
+  let normalizedFiles = discoveredFiles.map((discovered) => {
     const canonicalProjectPath = discovered.canonicalProjectPath || discovered.projectPath;
-    if (discovered.provider !== "codex") {
-      return canonicalProjectPath === discovered.projectPath
-        ? discovered
-        : {
-            ...discovered,
-            projectPath: canonicalProjectPath,
-            canonicalProjectPath,
-            projectName: projectNameFromPath(canonicalProjectPath),
-          };
-    }
+    return canonicalProjectPath === discovered.projectPath
+      ? discovered
+      : {
+          ...discovered,
+          projectPath: canonicalProjectPath,
+          canonicalProjectPath,
+        };
+  });
 
-    const normalized = normalizeCodexDiscoveredProjectPath(discovered, codexCandidateProjects);
+  for (const provider of new Set(normalizedFiles.map((file) => file.provider))) {
+    normalizedFiles =
+      getProviderAdapter(provider).normalizeProjectPaths?.({
+        discoveredFiles: normalizedFiles,
+        existingProjects: existingProjects.map((project) => ({
+          provider: project.provider,
+          path: project.path,
+          repositoryUrl: project.repository_url,
+        })),
+      }) ?? normalizedFiles;
+  }
+
+  return normalizedFiles.map((discovered) => {
+    const canonicalProjectPath = discovered.canonicalProjectPath || discovered.projectPath;
     return {
-      ...normalized,
-      projectName: projectNameFromPath(normalized.canonicalProjectPath),
-      projectPath: normalized.canonicalProjectPath,
+      ...discovered,
+      canonicalProjectPath,
+      projectPath: canonicalProjectPath,
+      projectName: projectNameFromPath(canonicalProjectPath),
     };
   });
-}
-
-function normalizeCodexDiscoveredProjectPath(
-  discovered: ReturnType<typeof discoverSessionFiles>[number],
-  candidates: CodexCandidateProject[],
-): ReturnType<typeof discoverSessionFiles>[number] {
-  const currentCanonicalPath = discovered.canonicalProjectPath || discovered.projectPath;
-  const currentCwd = discovered.metadata.cwd;
-  if (
-    currentCanonicalPath &&
-    currentCwd &&
-    currentCanonicalPath !== currentCwd &&
-    discovered.metadata.worktreeSource
-  ) {
-    return discovered;
-  }
-
-  const currentRepoName = currentCwd ? basename(currentCwd) : "";
-  const repositoryUrl = discovered.metadata.repositoryUrl;
-  const repoUrlMatches =
-    repositoryUrl && currentRepoName
-      ? candidates.filter(
-          (candidate) =>
-            candidate.repositoryUrl === repositoryUrl &&
-            basename(candidate.path) === currentRepoName,
-        )
-      : [];
-  const repoUrlMatch = repoUrlMatches[0];
-  if (repoUrlMatches.length === 1 && repoUrlMatch) {
-    return {
-      ...discovered,
-      canonicalProjectPath: repoUrlMatch.path,
-      metadata: {
-        ...discovered.metadata,
-        worktreeLabel: discovered.metadata.worktreeLabel,
-        worktreeSource: discovered.metadata.worktreeLabel ? "repo_url_match" : null,
-        resolutionSource: "repo_url_match",
-      },
-    };
-  }
-
-  const basenameMatches = currentRepoName
-    ? candidates.filter((candidate) => basename(candidate.path) === currentRepoName)
-    : [];
-  const basenameMatch = basenameMatches[0];
-  if (basenameMatches.length === 1 && basenameMatch) {
-    return {
-      ...discovered,
-      canonicalProjectPath: basenameMatch.path,
-      metadata: {
-        ...discovered.metadata,
-        worktreeLabel: discovered.metadata.worktreeLabel,
-        worktreeSource: discovered.metadata.worktreeLabel ? "basename_match" : null,
-        resolutionSource: "basename_match",
-      },
-    };
-  }
-
-  return {
-    ...discovered,
-    canonicalProjectPath: currentCanonicalPath,
-    metadata: {
-      ...discovered.metadata,
-      worktreeLabel:
-        currentCanonicalPath && currentCwd && currentCanonicalPath !== currentCwd
-          ? discovered.metadata.worktreeLabel
-          : null,
-      worktreeSource:
-        currentCanonicalPath && currentCwd && currentCanonicalPath !== currentCwd
-          ? discovered.metadata.worktreeSource
-          : null,
-      resolutionSource:
-        currentCanonicalPath && currentCwd && currentCanonicalPath !== currentCwd
-          ? (discovered.metadata.resolutionSource ?? null)
-          : null,
-    },
-  };
-}
-
-type CodexCandidateProject = {
-  path: string;
-  repositoryUrl: string | null;
-};
-
-function buildCodexCandidateProjects(
-  discoveredFiles: ReturnType<typeof discoverSessionFiles>,
-  existingProjects: ExistingProjectCandidateRow[],
-): CodexCandidateProject[] {
-  const candidates = new Map<string, CodexCandidateProject>();
-
-  for (const discovered of discoveredFiles) {
-    if (discovered.provider !== "codex") {
-      continue;
-    }
-    const cwd = discovered.metadata.cwd;
-    if (!cwd || cwd !== discovered.canonicalProjectPath || discovered.metadata.worktreeLabel) {
-      continue;
-    }
-    candidates.set(discovered.canonicalProjectPath, {
-      path: discovered.canonicalProjectPath,
-      repositoryUrl: discovered.metadata.repositoryUrl,
-    });
-  }
-
-  for (const project of existingProjects) {
-    if (project.provider !== "codex") {
-      continue;
-    }
-    candidates.set(project.path, {
-      path: project.path,
-      repositoryUrl: project.repository_url,
-    });
-  }
-
-  return [...candidates.values()];
 }
 
 function createIndexingStatements(db: SqliteDatabase): IndexingStatements {
@@ -1539,9 +1367,29 @@ function resolveDeletedSessionDecision(args: {
 }
 
 function resolveIndexingDiscoveryConfig(config: IndexingConfig): DiscoveryConfig {
+  const overrideConfig = config.discoveryConfig ?? {};
+  const mergedProviderPaths = {
+    ...(DEFAULT_DISCOVERY_CONFIG.providerPaths ?? {}),
+    ...(overrideConfig.providerPaths ?? {}),
+  };
+  for (const key of Object.keys(DEFAULT_DISCOVERY_CONFIG.providerPaths ?? {})) {
+    const resolved = getConfigDiscoveryPath(
+      overrideConfig,
+      key as keyof typeof mergedProviderPaths,
+    );
+    if (resolved) {
+      mergedProviderPaths[key as keyof typeof mergedProviderPaths] = resolved;
+    }
+  }
+
   return {
     ...DEFAULT_DISCOVERY_CONFIG,
-    ...config.discoveryConfig,
+    ...overrideConfig,
+    providerPaths: mergedProviderPaths,
+    providerOptions: {
+      ...(DEFAULT_DISCOVERY_CONFIG.providerOptions ?? {}),
+      ...(overrideConfig.providerOptions ?? {}),
+    },
     ...(config.projectScope
       ? { enabledProviders: [config.projectScope.provider] }
       : config.enabledProviders
@@ -2024,10 +1872,7 @@ function streamAndPersistJsonlEvents(args: {
 }): { sequence: number; emittedEvents: number; streamResult: StreamJsonlResult } {
   let sequence = args.resumeCheckpoint?.nextMessageSequence ?? 0;
   let emittedEvents = 0;
-  const claudeNormalizationState =
-    args.discovered.provider === "claude"
-      ? createClaudeTurnNormalizationState(args.discovered)
-      : null;
+  const providerIndexingState = args.adapter.createIndexingState?.(args.discovered) ?? null;
   try {
     const streamResult = streamJsonlEvents(args.discovered.filePath, {
       adapter: args.adapter,
@@ -2060,6 +1905,7 @@ function streamAndPersistJsonlEvents(args: {
         args.adapter.updateSourceMetadataFromEvent?.(event, args.sourceMetaAccumulator);
         sequence = parseAndPersistStreamEvent({
           db: args.db,
+          adapter: args.adapter,
           discovered: args.discovered,
           event,
           eventIndex,
@@ -2069,27 +1915,29 @@ function streamAndPersistJsonlEvents(args: {
           sessionDbId: args.sessionDbId,
           statements: args.statements,
           onNotice: args.onNotice,
-          claudeNormalizationState,
+          providerIndexingState,
         });
       },
       onOmittedLine: (omitted) => {
         emittedEvents += 1;
-        flushPendingCodexUserMessages({
+        flushDeferredProviderMessages({
+          adapter: args.adapter,
           discovered: args.discovered,
           processingState: args.processingState,
           sessionDbId: args.sessionDbId,
           statements: args.statements,
           onNotice: args.onNotice,
-          claudeNormalizationState,
+          providerIndexingState,
           classification: "user_prompt",
         });
         persistStreamMessage({
+          adapter: args.adapter,
           discovered: args.discovered,
           processingState: args.processingState,
           sessionDbId: args.sessionDbId,
           statements: args.statements,
           onNotice: args.onNotice,
-          claudeNormalizationState,
+          providerIndexingState,
           message: buildOversizedJsonlOmissionMessage(
             args.discovered,
             args.processingState,
@@ -2115,13 +1963,14 @@ function streamAndPersistJsonlEvents(args: {
         );
       },
     });
-    flushPendingCodexUserMessages({
+    flushDeferredProviderMessages({
+      adapter: args.adapter,
       discovered: args.discovered,
       processingState: args.processingState,
       sessionDbId: args.sessionDbId,
       statements: args.statements,
       onNotice: args.onNotice,
-      claudeNormalizationState,
+      providerIndexingState,
       classification: "user_prompt",
     });
     return { sequence, emittedEvents, streamResult };
@@ -2141,6 +1990,7 @@ function streamAndPersistJsonlEvents(args: {
 
 function parseAndPersistStreamEvent(args: {
   db: SqliteDatabase;
+  adapter: ReturnType<typeof getProviderAdapter>;
   discovered: ReturnType<typeof discoverSessionFiles>[number];
   event: unknown;
   eventIndex: number;
@@ -2150,22 +2000,27 @@ function parseAndPersistStreamEvent(args: {
   sessionDbId: string;
   statements: IndexingStatements;
   onNotice: (notice: IndexingNotice) => void;
-  claudeNormalizationState: ClaudeTurnNormalizationState | null;
+  providerIndexingState: unknown;
 }): number {
   const eventRecord = asRecord(args.event);
-  updateProviderTurnGroupingStateBeforeEvent(
-    args.processingState,
-    args.discovered.provider,
-    eventRecord,
-  );
-  maybeFlushPendingCodexUserMessagesBeforeEvent({
-    discovered: args.discovered,
+  args.adapter.updateTurnGroupingBeforeEvent?.({
     processingState: args.processingState,
-    sessionDbId: args.sessionDbId,
-    statements: args.statements,
-    onNotice: args.onNotice,
-    claudeNormalizationState: args.claudeNormalizationState,
     eventRecord,
+  });
+  args.adapter.flushPendingMessagesBeforeEvent?.({
+    eventRecord,
+    processingState: args.processingState,
+    flushPending: (classification) =>
+      flushDeferredProviderMessages({
+        adapter: args.adapter,
+        discovered: args.discovered,
+        processingState: args.processingState,
+        sessionDbId: args.sessionDbId,
+        statements: args.statements,
+        onNotice: args.onNotice,
+        providerIndexingState: args.providerIndexingState,
+        classification,
+      }),
   });
 
   let parsedEvent: ReturnType<typeof parseSessionEvent>;
@@ -2188,12 +2043,22 @@ function parseAndPersistStreamEvent(args: {
     });
   }
 
-  if (shouldSkipDuplicateClaudeCompactBoundaryEvent(args, parsedEvent.messages)) {
+  if (
+    args.adapter.shouldSkipDuplicateEvent?.({
+      discovered: args.discovered,
+      event: args.event,
+      sessionDbId: args.sessionDbId,
+      messages: parsedEvent.messages,
+      hasPersistedMessage: (messageId) =>
+        Boolean(args.statements.getMessageById.get(makeMessageId(args.sessionDbId, messageId))),
+      onNotice: args.onNotice,
+    })
+  ) {
     return parsedEvent.nextSequence;
   }
 
   const preparedMessages = prepareMessagesForPersistence({
-    provider: args.discovered.provider,
+    adapter: args.adapter,
     event: args.event,
     eventRecord,
     processingState: args.processingState,
@@ -2205,236 +2070,64 @@ function parseAndPersistStreamEvent(args: {
       continue;
     }
     persistStreamMessage({
+      adapter: args.adapter,
       discovered: args.discovered,
       processingState: args.processingState,
       sessionDbId: args.sessionDbId,
       statements: args.statements,
       onNotice: args.onNotice,
-      claudeNormalizationState: args.claudeNormalizationState,
+      providerIndexingState: args.providerIndexingState,
       message,
     });
   }
 
   args.processingState.pendingCodexUserMessages.push(...preparedMessages.deferredCodexUserMessages);
 
-  processClaudeSnapshotEvent({
+  args.adapter.processIndexedEvent?.({
     db: args.db,
     discovered: args.discovered,
     event: args.event,
     sessionDbId: args.sessionDbId,
-    statements: args.statements,
-    claudeNormalizationState: args.claudeNormalizationState,
+    providerIndexingState: args.providerIndexingState,
+    upsertToolEditFile: (row) => upsertMessageToolEditFile(args.statements, row),
   });
 
-  updateProviderTurnGroupingStateAfterEvent(
-    args.processingState,
-    args.discovered.provider,
+  args.adapter.updateTurnGroupingAfterEvent?.({
+    processingState: args.processingState,
     eventRecord,
-  );
+  });
 
   return parsedEvent.nextSequence;
 }
 
 function prepareMessagesForPersistence(args: {
-  provider: Provider;
+  adapter: ReturnType<typeof getProviderAdapter>;
   event: unknown;
   eventRecord: Record<string, unknown> | null;
   processingState: MessageProcessingState;
   messages: IndexedMessage[];
-}): {
-  immediateMessages: IndexedMessage[];
-  deferredCodexUserMessages: PendingCodexUserMessage[];
-} {
-  if (args.provider === "claude") {
-    return {
-      immediateMessages: annotateClaudeMessagesForEvent(
-        args.processingState,
-        args.eventRecord,
-        args.messages,
-      ),
+}) {
+  return (
+    args.adapter.prepareMessagesForPersistence?.({
+      event: args.event,
+      eventRecord: args.eventRecord,
+      processingState: args.processingState,
+      messages: args.messages,
+    }) ?? {
+      immediateMessages: args.messages,
       deferredCodexUserMessages: [],
-    };
-  }
-
-  if (args.provider === "codex") {
-    const immediateMessages: IndexedMessage[] = [];
-    const deferredCodexUserMessages: PendingCodexUserMessage[] = [];
-    const codexUserResponse = isCodexResponseItemUserEvent(args.event);
-
-    for (const message of args.messages) {
-      if (codexUserResponse && message.category === "user") {
-        deferredCodexUserMessages.push({
-          message,
-          nativeTurnId: args.processingState.currentNativeTurnId,
-        });
-        continue;
-      }
-      immediateMessages.push(annotateCodexImmediateMessage(args.processingState, message));
     }
-
-    return {
-      immediateMessages,
-      deferredCodexUserMessages,
-    };
-  }
-
-  return {
-    immediateMessages: args.messages,
-    deferredCodexUserMessages: [],
-  };
+  );
 }
 
-function annotateClaudeMessagesForEvent(
-  state: MessageProcessingState,
-  eventRecord: Record<string, unknown> | null,
-  messages: IndexedMessage[],
-): IndexedMessage[] {
-  if (messages.length === 0) {
-    return messages;
-  }
-
-  const messageRecord = asRecord(eventRecord?.message);
-  const normalized = messageRecord ?? eventRecord;
-  const eventId =
-    readString(eventRecord?.uuid) ??
-    readString(eventRecord?.id) ??
-    readString(normalized?.uuid) ??
-    readString(normalized?.id) ??
-    null;
-  const parentEventId =
-    readString(eventRecord?.parentUuid) ??
-    readString(eventRecord?.parent_uuid) ??
-    readString(normalized?.parentUuid) ??
-    readString(normalized?.parent_uuid) ??
-    null;
-  const userAnchorId = messages.find((message) => message.category === "user")?.id ?? null;
-  const eventTurnGroupId =
-    userAnchorId ??
-    (parentEventId ? (state.claudeTurnRootByEventId[parentEventId] ?? null) : null) ??
-    state.currentTurnGroupId;
-
-  if (eventId && eventTurnGroupId) {
-    trackClaudeTurnRootEvent(state, eventId, eventTurnGroupId);
-  }
-  if (eventTurnGroupId) {
-    state.currentTurnGroupId = eventTurnGroupId;
-    state.currentNativeTurnId = eventTurnGroupId;
-  }
-
-  return messages.map((message) => ({
-    ...message,
-    turnGroupId: eventTurnGroupId,
-    turnGroupingMode: "native",
-    turnAnchorKind: message.id === userAnchorId ? "user_prompt" : null,
-    nativeTurnId: eventTurnGroupId,
-  }));
-}
-
-function annotateCodexImmediateMessage(
-  state: MessageProcessingState,
-  message: IndexedMessage,
-): IndexedMessage {
-  return {
-    ...message,
-    turnGroupId: state.currentTurnGroupId,
-    turnGroupingMode: "hybrid",
-    turnAnchorKind: null,
-    nativeTurnId: state.currentNativeTurnId,
-  };
-}
-
-function updateProviderTurnGroupingStateBeforeEvent(
-  state: MessageProcessingState,
-  provider: Provider,
-  eventRecord: Record<string, unknown> | null,
-): void {
-  if (provider !== "codex" || !eventRecord) {
-    return;
-  }
-  const nextNativeTurnId = extractCodexNativeTurnId(eventRecord);
-  if (nextNativeTurnId) {
-    state.currentNativeTurnId = nextNativeTurnId;
-  }
-}
-
-function updateProviderTurnGroupingStateAfterEvent(
-  state: MessageProcessingState,
-  provider: Provider,
-  eventRecord: Record<string, unknown> | null,
-): void {
-  if (provider !== "codex" || !eventRecord) {
-    return;
-  }
-  const payloadRecord = asRecord(eventRecord.payload);
-  const payloadType = lowerString(payloadRecord?.type);
-  if (
-    readString(eventRecord.type) === "event_msg" &&
-    (payloadType === "task_complete" || payloadType === "turn_aborted")
-  ) {
-    state.currentNativeTurnId = null;
-    state.currentTurnGroupId = null;
-  }
-}
-
-function maybeFlushPendingCodexUserMessagesBeforeEvent(args: {
+function flushDeferredProviderMessages(args: {
+  adapter: ReturnType<typeof getProviderAdapter>;
   discovered: ReturnType<typeof discoverSessionFiles>[number];
   processingState: MessageProcessingState;
   sessionDbId: string;
   statements: IndexingStatements;
   onNotice: (notice: IndexingNotice) => void;
-  claudeNormalizationState: ClaudeTurnNormalizationState | null;
-  eventRecord: Record<string, unknown> | null;
-}): void {
-  if (
-    args.discovered.provider !== "codex" ||
-    args.processingState.pendingCodexUserMessages.length === 0
-  ) {
-    return;
-  }
-
-  const classification = classifyPendingCodexUserMessages(args.eventRecord);
-  if (classification === "wait") {
-    return;
-  }
-
-  flushPendingCodexUserMessages({
-    discovered: args.discovered,
-    processingState: args.processingState,
-    sessionDbId: args.sessionDbId,
-    statements: args.statements,
-    onNotice: args.onNotice,
-    claudeNormalizationState: args.claudeNormalizationState,
-    classification: classification ?? "user_prompt",
-  });
-}
-
-function classifyPendingCodexUserMessages(
-  eventRecord: Record<string, unknown> | null,
-): TurnAnchorKind | "wait" | null {
-  if (!eventRecord) {
-    return null;
-  }
-  if (readString(eventRecord.type) !== "event_msg") {
-    return null;
-  }
-  const payloadRecord = asRecord(eventRecord.payload);
-  const payloadType = lowerString(payloadRecord?.type);
-  if (payloadType === "user_message") {
-    return "user_prompt";
-  }
-  if (payloadType === "turn_aborted") {
-    return "synthetic_control";
-  }
-  return "wait";
-}
-
-function flushPendingCodexUserMessages(args: {
-  discovered: ReturnType<typeof discoverSessionFiles>[number];
-  processingState: MessageProcessingState;
-  sessionDbId: string;
-  statements: IndexingStatements;
-  onNotice: (notice: IndexingNotice) => void;
-  claudeNormalizationState: ClaudeTurnNormalizationState | null;
+  providerIndexingState: unknown;
   classification: TurnAnchorKind;
 }): void {
   if (args.processingState.pendingCodexUserMessages.length === 0) {
@@ -2443,79 +2136,33 @@ function flushPendingCodexUserMessages(args: {
 
   const pending = args.processingState.pendingCodexUserMessages.splice(0);
   for (const entry of pending) {
-    const annotated = annotateFlushedCodexUserMessage(
-      args.processingState,
-      entry,
-      args.classification,
-    );
+    const annotated =
+      args.adapter.annotateFlushedPendingMessage?.({
+        processingState: args.processingState,
+        pendingMessage: entry,
+        classification: args.classification,
+      }) ?? entry.message;
     persistStreamMessage({
+      adapter: args.adapter,
       discovered: args.discovered,
       processingState: args.processingState,
       sessionDbId: args.sessionDbId,
       statements: args.statements,
       onNotice: args.onNotice,
-      claudeNormalizationState: args.claudeNormalizationState,
+      providerIndexingState: args.providerIndexingState,
       message: annotated,
     });
   }
 }
 
-function annotateFlushedCodexUserMessage(
-  state: MessageProcessingState,
-  entry: PendingCodexUserMessage,
-  classification: TurnAnchorKind,
-): IndexedMessage {
-  const nativeTurnId = entry.nativeTurnId ?? state.currentNativeTurnId;
-  const shouldStartNewDisplayedTurn =
-    classification === "user_prompt" &&
-    (!state.currentTurnGroupId ||
-      !nativeTurnId ||
-      !state.currentNativeTurnId ||
-      nativeTurnId !== state.currentNativeTurnId);
-  const turnGroupId =
-    classification === "user_prompt"
-      ? shouldStartNewDisplayedTurn
-        ? entry.message.id
-        : (state.currentTurnGroupId ?? entry.message.id)
-      : state.currentTurnGroupId;
-
-  if (classification === "user_prompt") {
-    state.currentTurnGroupId = turnGroupId ?? entry.message.id;
-    state.currentNativeTurnId = nativeTurnId;
-  }
-
-  return {
-    ...entry.message,
-    turnGroupId: turnGroupId ?? null,
-    turnGroupingMode: "hybrid",
-    turnAnchorKind: classification,
-    nativeTurnId,
-  };
-}
-
-function isCodexResponseItemUserEvent(event: unknown): boolean {
-  const eventRecord = asRecord(event);
-  if (readString(eventRecord?.type) !== "response_item") {
-    return false;
-  }
-  const payloadRecord = asRecord(eventRecord?.payload);
-  return (
-    lowerString(payloadRecord?.type) === "message" && lowerString(payloadRecord?.role) === "user"
-  );
-}
-
-function extractCodexNativeTurnId(eventRecord: Record<string, unknown>): string | null {
-  const payloadRecord = asRecord(eventRecord.payload);
-  return readString(payloadRecord?.turn_id) ?? readString(eventRecord.turn_id) ?? null;
-}
-
 function persistStreamMessage(args: {
+  adapter: ReturnType<typeof getProviderAdapter>;
   discovered: ReturnType<typeof discoverSessionFiles>[number];
   processingState: MessageProcessingState;
   sessionDbId: string;
   statements: IndexingStatements;
   onNotice: (notice: IndexingNotice) => void;
-  claudeNormalizationState: ClaudeTurnNormalizationState | null;
+  providerIndexingState: unknown;
   message: IndexedMessage;
 }): void {
   const stateSnapshot = snapshotMessageNormalizationState(args.processingState);
@@ -2583,12 +2230,12 @@ function persistStreamMessage(args: {
     });
   }
 
-  registerClaudeToolEditCandidate({
-    statements: args.statements,
+  args.adapter.registerPersistedMessage?.({
     discovered: args.discovered,
-    claudeNormalizationState: args.claudeNormalizationState,
+    providerIndexingState: args.providerIndexingState,
     message: messageToPersist,
     persistedMessageId,
+    upsertToolEditFile: (row) => upsertMessageToolEditFile(args.statements, row),
   });
   registerGenericToolEditFiles({
     statements: args.statements,
@@ -2604,7 +2251,8 @@ function registerGenericToolEditFiles(args: {
   message: IndexedMessage;
   persistedMessageId: string;
 }): void {
-  if (args.discovered.provider === "claude" || args.message.category !== "tool_edit") {
+  const adapter = getProviderAdapter(args.discovered.provider);
+  if (adapter.handlesToolEditsNatively || args.message.category !== "tool_edit") {
     return;
   }
 
@@ -2788,559 +2436,6 @@ function countTextLines(text: string): number {
     lineCount -= 1;
   }
   return Math.max(lineCount, 0);
-}
-
-function createClaudeTurnNormalizationState(
-  discovered: ReturnType<typeof discoverSessionFiles>[number],
-): ClaudeTurnNormalizationState {
-  return {
-    fileHistoryDirectory: resolveClaudeFileHistoryDirectory(
-      discovered.filePath,
-      discovered.sourceSessionId,
-    ),
-    previousSnapshotByPath: new Map(),
-    pendingBySourceId: new Map(),
-    backupTextByName: new Map(),
-    currentTextByPath: new Map(),
-  };
-}
-
-function resolveClaudeFileHistoryDirectory(filePath: string, sessionId: string): string | null {
-  const projectsDirectory = dirname(filePath);
-  const claudeRoot = dirname(dirname(projectsDirectory));
-  if (basename(claudeRoot) !== ".claude") {
-    return null;
-  }
-  return join(claudeRoot, "file-history", sessionId);
-}
-
-function registerClaudeToolEditCandidate(args: {
-  statements: IndexingStatements;
-  discovered: ReturnType<typeof discoverSessionFiles>[number];
-  claudeNormalizationState: ClaudeTurnNormalizationState | null;
-  message: IndexedMessage;
-  persistedMessageId: string;
-}): void {
-  if (args.discovered.provider !== "claude" || !args.claudeNormalizationState) {
-    return;
-  }
-  if (args.message.category !== "tool_use" && args.message.category !== "tool_edit") {
-    return;
-  }
-
-  const record = tryParseJsonRecord(args.message.content);
-  const toolName = readString(record?.name);
-  if (toolName !== "Edit" && toolName !== "Write") {
-    return;
-  }
-  const input = asRecord(record?.input);
-  const filePath = readString(input?.file_path);
-  if (!filePath) {
-    return;
-  }
-
-  const sourceId = args.message.id;
-  const fileOrdinal = 0;
-  const candidate: ClaudePendingToolEdit = {
-    messageDbId: args.persistedMessageId,
-    sourceId,
-    fileOrdinal,
-    filePath,
-    comparisonPath: normalizeClaudeComparisonPath(filePath, args.discovered.metadata.cwd),
-    toolName,
-    input: input ?? {},
-  };
-  const pending =
-    args.claudeNormalizationState.pendingBySourceId.get(sourceId) ??
-    args.claudeNormalizationState.pendingBySourceId.get(sourceId.split("#")[0] ?? sourceId) ??
-    [];
-  pending.push(candidate);
-  args.claudeNormalizationState.pendingBySourceId.set(sourceId.split("#")[0] ?? sourceId, pending);
-
-  const provisional = buildBestEffortClaudeToolEditFile({
-    candidate,
-    fileHistoryDirectory: args.claudeNormalizationState.fileHistoryDirectory,
-    previousSnapshotByPath: args.claudeNormalizationState.previousSnapshotByPath,
-    backupTextByName: args.claudeNormalizationState.backupTextByName,
-    currentTextByPath: args.claudeNormalizationState.currentTextByPath,
-  });
-  if (!provisional) {
-    return;
-  }
-  rememberClaudeCurrentText(
-    args.claudeNormalizationState.currentTextByPath,
-    candidate,
-    provisional.currentText,
-  );
-  upsertMessageToolEditFile(args.statements, {
-    id: makeToolCallId(args.persistedMessageId, 1000 + fileOrdinal),
-    messageId: args.persistedMessageId,
-    fileOrdinal,
-    filePath: provisional.filePath,
-    previousFilePath: provisional.previousFilePath,
-    changeType: provisional.changeType,
-    unifiedDiff: provisional.unifiedDiff,
-    addedLineCount: provisional.addedLineCount,
-    removedLineCount: provisional.removedLineCount,
-    exactness: provisional.exactness,
-    beforeHash: provisional.beforeHash,
-    afterHash: provisional.afterHash,
-  });
-}
-
-function processClaudeSnapshotEvent(args: {
-  db: SqliteDatabase;
-  discovered: ReturnType<typeof discoverSessionFiles>[number];
-  event: unknown;
-  sessionDbId: string;
-  statements: IndexingStatements;
-  claudeNormalizationState: ClaudeTurnNormalizationState | null;
-}): void {
-  if (args.discovered.provider !== "claude" || !args.claudeNormalizationState) {
-    return;
-  }
-  const eventRecord = asRecord(args.event);
-  if (readString(eventRecord?.type) !== "file-history-snapshot") {
-    return;
-  }
-  const sourceId = readString(eventRecord?.messageId);
-  if (!sourceId) {
-    return;
-  }
-  const snapshot = asRecord(eventRecord?.snapshot);
-  const trackedFileBackups = asRecord(snapshot?.trackedFileBackups);
-  if (!trackedFileBackups) {
-    return;
-  }
-
-  const currentSnapshotByPath = new Map<string, ClaudeSnapshotFileEntry>();
-  const changedPaths: string[] = [];
-  for (const [filePath, value] of Object.entries(trackedFileBackups)) {
-    const entryRecord = asRecord(value);
-    const entry: ClaudeSnapshotFileEntry = {
-      backupFileName: readString(entryRecord?.backupFileName) ?? null,
-      version:
-        typeof entryRecord?.version === "number" && Number.isFinite(entryRecord.version)
-          ? entryRecord.version
-          : null,
-      backupTime: readString(entryRecord?.backupTime) ?? null,
-    };
-    currentSnapshotByPath.set(filePath, entry);
-    const previous = args.claudeNormalizationState.previousSnapshotByPath.get(filePath);
-    if (!previous || !isSameClaudeSnapshotEntry(previous, entry)) {
-      changedPaths.push(filePath);
-    }
-  }
-  args.claudeNormalizationState.previousSnapshotByPath = currentSnapshotByPath;
-
-  const pending =
-    args.claudeNormalizationState.pendingBySourceId.get(sourceId) ??
-    loadPersistedClaudePendingToolEdits({
-      db: args.db,
-      sessionDbId: args.sessionDbId,
-      discovered: args.discovered,
-      sourceId,
-    });
-  if (!pending || pending.length === 0) {
-    return;
-  }
-
-  for (const changedPath of changedPaths) {
-    const snapshotEntry = currentSnapshotByPath.get(changedPath);
-    if (!snapshotEntry) {
-      continue;
-    }
-    const pendingIndex = pending.findIndex(
-      (candidate) =>
-        candidate.comparisonPath === normalizeClaudeComparisonPath(changedPath, null) ||
-        candidate.filePath === changedPath,
-    );
-    if (pendingIndex === -1) {
-      continue;
-    }
-    const candidate = pending[pendingIndex];
-    if (!candidate) {
-      continue;
-    }
-    const normalized = buildExactClaudeToolEditFile({
-      candidate,
-      snapshotEntry,
-      fileHistoryDirectory: args.claudeNormalizationState.fileHistoryDirectory,
-      backupTextByName: args.claudeNormalizationState.backupTextByName,
-    });
-    if (normalized) {
-      rememberClaudeCurrentText(
-        args.claudeNormalizationState.currentTextByPath,
-        candidate,
-        normalized.currentText,
-      );
-      upsertMessageToolEditFile(args.statements, {
-        id: makeToolCallId(candidate.messageDbId, 1000 + candidate.fileOrdinal),
-        messageId: candidate.messageDbId,
-        fileOrdinal: candidate.fileOrdinal,
-        filePath: normalized.filePath,
-        previousFilePath: normalized.previousFilePath,
-        changeType: normalized.changeType,
-        unifiedDiff: normalized.unifiedDiff,
-        addedLineCount: normalized.addedLineCount,
-        removedLineCount: normalized.removedLineCount,
-        exactness: normalized.exactness,
-        beforeHash: normalized.beforeHash,
-        afterHash: normalized.afterHash,
-      });
-    }
-    pending.splice(pendingIndex, 1);
-  }
-
-  if (pending.length === 0) {
-    args.claudeNormalizationState.pendingBySourceId.delete(sourceId);
-  }
-}
-
-function isSameClaudeSnapshotEntry(
-  left: ClaudeSnapshotFileEntry,
-  right: ClaudeSnapshotFileEntry,
-): boolean {
-  return (
-    left.backupFileName === right.backupFileName &&
-    left.version === right.version &&
-    left.backupTime === right.backupTime
-  );
-}
-
-function normalizeClaudeComparisonPath(filePath: string, cwd: string | null | undefined): string {
-  if (cwd && filePath.startsWith(`${cwd}/`)) {
-    return relative(cwd, filePath).replace(/\\/g, "/");
-  }
-  return filePath.replace(/\\/g, "/");
-}
-
-function buildBestEffortClaudeToolEditFile(args: {
-  candidate: ClaudePendingToolEdit;
-  fileHistoryDirectory: string | null;
-  previousSnapshotByPath: Map<string, ClaudeSnapshotFileEntry>;
-  backupTextByName: Map<string, string | null>;
-  currentTextByPath: Map<string, string>;
-}): {
-  filePath: string;
-  previousFilePath: string | null;
-  changeType: ToolEditChangeType;
-  unifiedDiff: string | null;
-  addedLineCount: number;
-  removedLineCount: number;
-  exactness: ToolEditExactness;
-  beforeHash: string | null;
-  afterHash: string | null;
-  currentText: string | null;
-} | null {
-  const beforeText = readClaudeKnownBeforeText({
-    candidate: args.candidate,
-    fileHistoryDirectory: args.fileHistoryDirectory,
-    previousSnapshotByPath: args.previousSnapshotByPath,
-    backupTextByName: args.backupTextByName,
-    currentTextByPath: args.currentTextByPath,
-  });
-
-  if (args.candidate.toolName === "Write") {
-    const afterText = readString(args.candidate.input.content);
-    if (afterText === null) {
-      return null;
-    }
-    if (beforeText === null) {
-      return {
-        filePath: args.candidate.filePath,
-        previousFilePath: null,
-        changeType: "update",
-        unifiedDiff: null,
-        addedLineCount: 0,
-        removedLineCount: 0,
-        exactness: "best_effort",
-        beforeHash: null,
-        afterHash: hashText(afterText),
-        currentText: afterText,
-      };
-    }
-    const diff = buildUnifiedDiffFromTextPair({
-      oldText: beforeText,
-      newText: afterText,
-      filePath: args.candidate.filePath,
-    });
-    const stats = countUnifiedDiffLines(diff);
-    return {
-      filePath: args.candidate.filePath,
-      previousFilePath: null,
-      changeType: "update",
-      unifiedDiff: diff,
-      addedLineCount: stats.addedLineCount,
-      removedLineCount: stats.removedLineCount,
-      exactness: "best_effort",
-      beforeHash: hashText(beforeText),
-      afterHash: hashText(afterText),
-      currentText: afterText,
-    };
-  }
-
-  const oldText = readString(args.candidate.input.old_string);
-  const newText = readString(args.candidate.input.new_string);
-  if (oldText === null || newText === null) {
-    return null;
-  }
-  if (beforeText !== null) {
-    const afterText = applyClaudeEditToText(
-      beforeText,
-      oldText,
-      newText,
-      args.candidate.input.replace_all === true,
-    );
-    if (afterText !== null) {
-      const diff = buildUnifiedDiffFromTextPair({
-        oldText: beforeText,
-        newText: afterText,
-        filePath: args.candidate.filePath,
-      });
-      const stats = countUnifiedDiffLines(diff);
-      return {
-        filePath: args.candidate.filePath,
-        previousFilePath: null,
-        changeType: "update",
-        unifiedDiff: diff,
-        addedLineCount: stats.addedLineCount,
-        removedLineCount: stats.removedLineCount,
-        exactness: "best_effort",
-        beforeHash: hashText(beforeText),
-        afterHash: hashText(afterText),
-        currentText: afterText,
-      };
-    }
-  }
-  const diff = buildUnifiedDiffFromTextPair({
-    oldText,
-    newText,
-    filePath: args.candidate.filePath,
-  });
-  const stats = countUnifiedDiffLines(diff);
-  return {
-    filePath: args.candidate.filePath,
-    previousFilePath: null,
-    changeType: "update",
-    unifiedDiff: diff,
-    addedLineCount: stats.addedLineCount,
-    removedLineCount: stats.removedLineCount,
-    exactness: "best_effort",
-    beforeHash: null,
-    afterHash: null,
-    currentText: null,
-  };
-}
-
-function readClaudeKnownBeforeText(args: {
-  candidate: ClaudePendingToolEdit;
-  fileHistoryDirectory: string | null;
-  previousSnapshotByPath: Map<string, ClaudeSnapshotFileEntry>;
-  backupTextByName: Map<string, string | null>;
-  currentTextByPath: Map<string, string>;
-}): string | null {
-  const currentText =
-    args.currentTextByPath.get(args.candidate.comparisonPath) ??
-    args.currentTextByPath.get(args.candidate.filePath) ??
-    null;
-  if (currentText !== null) {
-    return currentText;
-  }
-  const snapshotEntry =
-    args.previousSnapshotByPath.get(args.candidate.comparisonPath) ??
-    args.previousSnapshotByPath.get(args.candidate.filePath);
-  if (!snapshotEntry) {
-    return null;
-  }
-  return readClaudeBackupText(
-    args.fileHistoryDirectory,
-    snapshotEntry.backupFileName,
-    args.backupTextByName,
-  );
-}
-
-function loadPersistedClaudePendingToolEdits(args: {
-  db: SqliteDatabase;
-  sessionDbId: string;
-  discovered: ReturnType<typeof discoverSessionFiles>[number];
-  sourceId: string;
-}): ClaudePendingToolEdit[] {
-  const rows = args.db
-    .prepare(
-      `SELECT id, source_id, content
-       FROM messages
-       WHERE session_id = ?
-         AND (source_id = ? OR source_id LIKE ?)
-       ORDER BY created_at_ms ASC, created_at ASC, id ASC`,
-    )
-    .all(args.sessionDbId, args.sourceId, `${args.sourceId}#%`) as Array<{
-    id: string;
-    source_id: string;
-    content: string;
-  }>;
-  const output: ClaudePendingToolEdit[] = [];
-  for (const row of rows) {
-    const record = tryParseJsonRecord(row.content);
-    const toolName = readString(record?.name);
-    if (toolName !== "Edit" && toolName !== "Write") {
-      continue;
-    }
-    const input = asRecord(record?.input);
-    const filePath = readString(input?.file_path);
-    if (!filePath) {
-      continue;
-    }
-    output.push({
-      messageDbId: row.id,
-      sourceId: row.source_id,
-      fileOrdinal: 0,
-      filePath,
-      comparisonPath: normalizeClaudeComparisonPath(filePath, args.discovered.metadata.cwd),
-      toolName,
-      input: input ?? {},
-    });
-  }
-  return output;
-}
-
-function buildExactClaudeToolEditFile(args: {
-  candidate: ClaudePendingToolEdit;
-  snapshotEntry: ClaudeSnapshotFileEntry;
-  fileHistoryDirectory: string | null;
-  backupTextByName: Map<string, string | null>;
-}): {
-  filePath: string;
-  previousFilePath: string | null;
-  changeType: ToolEditChangeType;
-  unifiedDiff: string | null;
-  addedLineCount: number;
-  removedLineCount: number;
-  exactness: ToolEditExactness;
-  beforeHash: string | null;
-  afterHash: string | null;
-  currentText: string | null;
-} | null {
-  const beforeText = readClaudeBackupText(
-    args.fileHistoryDirectory,
-    args.snapshotEntry.backupFileName,
-    args.backupTextByName,
-  );
-
-  if (args.candidate.toolName === "Write") {
-    const afterText = readString(args.candidate.input.content);
-    if (afterText === null) {
-      return null;
-    }
-    const diff = buildUnifiedDiffFromTextPair({
-      oldText: beforeText ?? "",
-      newText: afterText,
-      filePath: args.candidate.filePath,
-    });
-    const stats = countUnifiedDiffLines(diff);
-    return {
-      filePath: args.candidate.filePath,
-      previousFilePath: null,
-      changeType: beforeText === null ? "add" : "update",
-      unifiedDiff: diff,
-      addedLineCount: stats.addedLineCount,
-      removedLineCount: stats.removedLineCount,
-      exactness: "exact",
-      beforeHash: beforeText === null ? null : hashText(beforeText),
-      afterHash: hashText(afterText),
-      currentText: afterText,
-    };
-  }
-
-  if (beforeText === null) {
-    return null;
-  }
-  const oldString = readString(args.candidate.input.old_string);
-  const newString = readString(args.candidate.input.new_string);
-  if (oldString === null || newString === null) {
-    return null;
-  }
-  const replaceAll = args.candidate.input.replace_all === true;
-  const afterText = applyClaudeEditToText(beforeText, oldString, newString, replaceAll);
-  if (afterText === null) {
-    return null;
-  }
-  const diff = buildUnifiedDiffFromTextPair({
-    oldText: beforeText,
-    newText: afterText,
-    filePath: args.candidate.filePath,
-  });
-  const stats = countUnifiedDiffLines(diff);
-  return {
-    filePath: args.candidate.filePath,
-    previousFilePath: null,
-    changeType: "update",
-    unifiedDiff: diff,
-    addedLineCount: stats.addedLineCount,
-    removedLineCount: stats.removedLineCount,
-    exactness: "exact",
-    beforeHash: hashText(beforeText),
-    afterHash: hashText(afterText),
-    currentText: afterText,
-  };
-}
-
-function rememberClaudeCurrentText(
-  currentTextByPath: Map<string, string>,
-  candidate: ClaudePendingToolEdit,
-  currentText: string | null,
-): void {
-  if (currentText === null) {
-    return;
-  }
-  currentTextByPath.set(candidate.filePath, currentText);
-  currentTextByPath.set(candidate.comparisonPath, currentText);
-}
-
-function readClaudeBackupText(
-  fileHistoryDirectory: string | null,
-  backupFileName: string | null,
-  cache: Map<string, string | null>,
-): string | null {
-  if (!fileHistoryDirectory || !backupFileName) {
-    return null;
-  }
-  if (cache.has(backupFileName)) {
-    return cache.get(backupFileName) ?? null;
-  }
-  try {
-    const text = readFileSync(join(fileHistoryDirectory, backupFileName), "utf8");
-    cache.set(backupFileName, text);
-    return text;
-  } catch {
-    cache.set(backupFileName, null);
-    return null;
-  }
-}
-
-function applyClaudeEditToText(
-  beforeText: string,
-  oldString: string,
-  newString: string,
-  replaceAll: boolean,
-): string | null {
-  if (oldString.length === 0) {
-    return null;
-  }
-  if (replaceAll) {
-    return beforeText.includes(oldString) ? beforeText.split(oldString).join(newString) : null;
-  }
-  const firstIndex = beforeText.indexOf(oldString);
-  if (firstIndex === -1) {
-    return null;
-  }
-  const lastIndex = beforeText.lastIndexOf(oldString);
-  if (firstIndex !== lastIndex) {
-    return null;
-  }
-  return (
-    beforeText.slice(0, firstIndex) + newString + beforeText.slice(firstIndex + oldString.length)
-  );
 }
 
 function upsertMessageToolEditFile(
@@ -3583,26 +2678,6 @@ function createMessageProcessingState(
   };
 }
 
-function snapshotMessageProcessingState(
-  state: MessageProcessingState,
-): SerializableMessageProcessingState {
-  return {
-    previousMessage: state.previousMessage,
-    previousTimestampMs: state.previousTimestampMs,
-    assistantThinkingRunRoot: state.assistantThinkingRunRoot,
-    assistantThinkingRunBaseline: state.assistantThinkingRunBaseline,
-    currentTurnGroupId: state.currentTurnGroupId,
-    currentNativeTurnId: state.currentNativeTurnId,
-    claudeTurnRootByEventId: state.claudeTurnRootByEventId,
-    claudeTurnRootEventIds: state.claudeTurnRootEventIds,
-    pendingCodexUserMessages: state.pendingCodexUserMessages.map((entry) => ({
-      message: entry.message,
-      nativeTurnId: entry.nativeTurnId,
-    })),
-    aggregate: { ...state.aggregate },
-  };
-}
-
 function snapshotMessageNormalizationState(
   state: MessageProcessingState,
 ): MessageNormalizationSnapshot {
@@ -3615,34 +2690,6 @@ function snapshotMessageNormalizationState(
   };
 }
 
-function restoreMessageProcessingState(
-  state: MessageProcessingState,
-  snapshot: SerializableMessageProcessingState,
-): void {
-  state.previousMessage = snapshot.previousMessage;
-  state.previousTimestampMs = snapshot.previousTimestampMs;
-  state.assistantThinkingRunRoot = snapshot.assistantThinkingRunRoot;
-  state.assistantThinkingRunBaseline = snapshot.assistantThinkingRunBaseline;
-  state.currentTurnGroupId = snapshot.currentTurnGroupId;
-  state.currentNativeTurnId = snapshot.currentNativeTurnId;
-  state.claudeTurnRootByEventId = snapshot.claudeTurnRootByEventId;
-  state.claudeTurnRootEventIds =
-    snapshot.claudeTurnRootEventIds?.filter(
-      (eventId) => eventId in snapshot.claudeTurnRootByEventId,
-    ) ?? Object.keys(snapshot.claudeTurnRootByEventId);
-  state.pendingCodexUserMessages = snapshot.pendingCodexUserMessages
-    .map((entry) =>
-      entry.message
-        ? {
-            message: entry.message,
-            nativeTurnId: entry.nativeTurnId,
-          }
-        : null,
-    )
-    .filter((entry): entry is PendingCodexUserMessage => entry !== null);
-  state.aggregate = { ...snapshot.aggregate };
-}
-
 function restoreMessageNormalizationState(
   state: MessageProcessingState,
   snapshot: MessageNormalizationSnapshot,
@@ -3652,27 +2699,6 @@ function restoreMessageNormalizationState(
   state.assistantThinkingRunRoot = snapshot.assistantThinkingRunRoot;
   state.assistantThinkingRunBaseline = snapshot.assistantThinkingRunBaseline;
   state.aggregate = { ...snapshot.aggregate };
-}
-
-function trackClaudeTurnRootEvent(
-  state: MessageProcessingState,
-  eventId: string,
-  turnGroupId: string,
-): void {
-  if (state.claudeTurnRootByEventId[eventId] === turnGroupId) {
-    return;
-  }
-  if (!(eventId in state.claudeTurnRootByEventId)) {
-    state.claudeTurnRootEventIds.push(eventId);
-  }
-  state.claudeTurnRootByEventId[eventId] = turnGroupId;
-  if (state.claudeTurnRootEventIds.length <= CLAUDE_TURN_ROOT_EVENT_ID_LIMIT) {
-    return;
-  }
-  const evictedEventId = state.claudeTurnRootEventIds.shift();
-  if (evictedEventId) {
-    delete state.claudeTurnRootByEventId[evictedEventId];
-  }
 }
 
 function normalizeIndexedMessage(
@@ -3973,52 +2999,6 @@ function isEquivalentPersistedMessage(
     existing.turn_anchor_kind === message.turnAnchorKind &&
     existing.native_turn_id === message.nativeTurnId
   );
-}
-
-function shouldSkipDuplicateClaudeCompactBoundaryEvent(
-  args: {
-    discovered: ReturnType<typeof discoverSessionFiles>[number];
-    event: unknown;
-    sessionDbId: string;
-    statements: IndexingStatements;
-    onNotice: (notice: IndexingNotice) => void;
-  },
-  messages: IndexedMessage[],
-): boolean {
-  if (args.discovered.provider !== "claude" || messages.length !== 1) {
-    return false;
-  }
-  const eventRecord = asRecord(args.event);
-  if (!eventRecord) {
-    return false;
-  }
-  if (
-    readString(eventRecord.type) !== "system" ||
-    readString(eventRecord.subtype) !== "compact_boundary"
-  ) {
-    return false;
-  }
-  const message = messages[0];
-  if (!message) {
-    return false;
-  }
-  const existing = args.statements.getMessageById.get(makeMessageId(args.sessionDbId, message.id));
-  if (!existing) {
-    return false;
-  }
-  args.onNotice({
-    provider: args.discovered.provider,
-    sessionId: args.discovered.sourceSessionId,
-    filePath: args.discovered.filePath,
-    stage: "parse",
-    severity: "warning",
-    code: "index.claude_compact_boundary_duplicate_skipped",
-    message: `Skipped duplicate Claude compact boundary event ${message.id}.`,
-    details: {
-      messageId: message.id,
-    },
-  });
-  return true;
 }
 
 function buildStreamCheckpointState(args: {
@@ -5290,22 +4270,6 @@ function deriveOperationDurations(messages: IndexedMessage[]): IndexedMessage[] 
   );
 }
 
-function normalizeMessageTimestamps(
-  messages: IndexedMessage[],
-  adapter: ReturnType<typeof getProviderAdapter>,
-  fileMtimeMs: number,
-): IndexedMessage[] {
-  let previousMs = Number.NEGATIVE_INFINITY;
-  return messages.map((message) => {
-    const normalized = adapter.normalizeMessageTimestamp(message, {
-      fileMtimeMs,
-      previousTimestampMs: previousMs,
-    });
-    previousMs = normalized.previousTimestampMs;
-    return normalized.message;
-  });
-}
-
 function prepareMaterializedMessagesForPersistence(
   messages: IndexedMessage[],
   adapter: ReturnType<typeof getProviderAdapter>,
@@ -5410,28 +4374,6 @@ function selectDerivedBaseline(
 
 function splitMessageRoot(id: string): string {
   return id.replace(/#\d+$/, "");
-}
-
-function deriveSessionTitle(messages: IndexedMessage[]): string {
-  let bestTitle = "";
-  let bestRank = Number.POSITIVE_INFINITY;
-
-  for (const message of messages) {
-    const title = normalizeSessionTitleText(message.content);
-    if (title.length === 0) {
-      continue;
-    }
-    const rank = sessionTitleCategoryRank(message.category);
-    if (rank < bestRank) {
-      bestTitle = title;
-      bestRank = rank;
-      if (rank === 0) {
-        break;
-      }
-    }
-  }
-
-  return bestTitle;
 }
 
 function normalizeSessionTitleText(value: string): string {

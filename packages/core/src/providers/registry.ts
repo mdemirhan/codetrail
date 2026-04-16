@@ -1,12 +1,12 @@
 import { PROVIDER_VALUES, type Provider } from "../contracts/canonical";
 
-import { claudeAdapter } from "./adapters/claude";
-import { codexAdapter } from "./adapters/codex";
-import { copilotAdapter } from "./adapters/copilot";
-import { copilotCliAdapter } from "./adapters/copilotCli";
-import { cursorAdapter } from "./adapters/cursor";
-import { geminiAdapter } from "./adapters/gemini";
-import { opencodeAdapter } from "./adapters/opencode";
+import { claudeAdapter } from "./claude/adapter";
+import { codexAdapter } from "./codex/adapter";
+import { copilotAdapter } from "./copilot/adapter";
+import { copilotCliAdapter } from "./copilotCli/adapter";
+import { cursorAdapter } from "./cursor/adapter";
+import { geminiAdapter } from "./gemini/adapter";
+import { opencodeAdapter } from "./opencode/adapter";
 import type { ProviderAdapter } from "./types";
 
 export const PROVIDER_ADAPTERS: Record<Provider, ProviderAdapter> = {

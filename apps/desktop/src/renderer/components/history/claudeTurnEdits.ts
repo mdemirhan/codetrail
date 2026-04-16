@@ -1,3 +1,5 @@
+import { PROVIDER_METADATA } from "@codetrail/core/browser";
+
 import { type ParsedToolEditFile, buildUnifiedDiffFromTextPair } from "../../../shared/toolParsing";
 import { parseMessageToolPayload } from "../messages/messageToolPayload";
 import {
@@ -11,7 +13,7 @@ export function collectClaudeTurnEdits(messages: TurnCombinedSourceMessage[]): T
   const edits: TurnSequenceEdit[] = [];
 
   for (const message of messages) {
-    if (message.provider !== "claude") {
+    if (PROVIDER_METADATA[message.provider].turnDiffStrategy !== "inline_reconstructed") {
       continue;
     }
     const payload = parseMessageToolPayload(message.category as never, message.content);
@@ -119,7 +121,7 @@ function mapParsedFileToSequenceEdit(
     unifiedDiff,
     addedLineCount: counts.added,
     removedLineCount: counts.removed,
-    exactness: unifiedDiff ? "best_effort" : "best_effort",
+    exactness: unifiedDiff ? "exact" : "best_effort",
   });
   if (!renderable) {
     return null;

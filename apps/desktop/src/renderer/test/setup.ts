@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { closeTrackedDatabasesForTests } from "@codetrail/core";
 import { cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 
@@ -23,4 +24,5 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  closeTrackedDatabasesForTests();
 });
