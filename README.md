@@ -1,18 +1,34 @@
 # Code Trail
 
-A local desktop app for browsing, searching, and revisiting your AI coding session history across **Claude**, **Codex**, **Gemini**, **Cursor**, and **VS Code Copilot** from one interface.
+A local desktop app for browsing, searching, and revisiting your AI coding session history across **Claude**, **Codex**, **Gemini**, **Cursor**, **VS Code Copilot**, **GitHub Copilot CLI**, and **OpenCode** from one interface.
 
-Code Trail discovers session files from each provider's local directory, parses them into a unified format, indexes everything into SQLite, and gives you fast full-text search with filtering by provider, project, and message type.
+Code Trail discovers local transcript files and provider databases, parses them into a unified format, indexes everything into SQLite, and gives you fast full-text search with filtering by provider, project, and message type.
 
-![Code Trail](docs/images/screenshot1.png)
+![Code Trail](docs/images/screenshot2.png)
+
+![Code Trail dashboard](docs/images/screenshot3.png)
+
+![Code Trail dashboard cont.](docs/images/screenshot4.png)
+
+## Why Code Trail?
+
+AI coding tools leave useful context scattered across local transcript folders, editor storage, and provider databases. Code Trail brings that history together so you can:
+
+- Find an old answer, command, or file edit quickly
+- Review what changed during a specific prompt/turn
+- Compare activity across providers and projects
+- Keep a private, local archive of your AI coding work
 
 ## Features
 
-- **Multi-provider support** - Claude Code, Codex CLI, Gemini CLI, Cursor, and VS Code Copilot sessions in one place.
+- **Multi-provider support** - Claude Code, Codex CLI, Gemini CLI, Cursor, VS Code Copilot, GitHub Copilot CLI, and OpenCode sessions in one place.
 - **Full-text search** - BM25-ranked search across all messages with highlighted snippets.
 - **Project and session browser** - Navigate sessions grouped by project, with deep links to individual messages.
+- **Turns and combined changes** - Browse each user prompt as a turn and review the combined file edits made in response.
+- **Activity dashboard** - See provider, project, session, message, tool-use, and AI code-writing stats at a glance.
 - **Category filters** - Filter by User, Assistant, Tool Use, Write (edits), Tool Result, Thinking, and System messages.
-- **Incremental indexing** - Only re-indexes files that changed based on size and mtime.
+- **Live session tracking** - Follow active Claude and Codex sessions while watch mode is running.
+- **Incremental indexing** - Only re-indexes provider sources that changed.
 
 ## Development
 
@@ -123,7 +139,7 @@ Prebuilt binaries are published on [GitHub Releases](https://github.com/mdemirha
 xattr -dr com.apple.quarantine "/Applications/Code Trail.app"
 ```
 
-- **Windows**: experimental. Download either `CodeTrailSetup.exe` or the portable `.zip` from Releases if you want to try it, but expect rough edges. Contributions to improve Windows support are welcome.
+- **Windows**: experimental. Download either `CodeTrailSetup.exe` or the portable `.zip` from Releases if you want to try it, but expect rough edges. Windows ARM builds are also available. Contributions to improve Windows support are welcome.
 
 ### Mac
 
@@ -172,7 +188,7 @@ The Windows release flow:
 
 ## How It Works
 
-Code Trail reads session files from the default provider directories:
+Code Trail reads local provider history from the default provider locations:
 
 | Provider | Directory |
 |---|---|
@@ -181,8 +197,10 @@ Code Trail reads session files from the default provider directories:
 | Gemini CLI | `~/.gemini/tmp/` and `~/.gemini/history/` |
 | Cursor | `~/.cursor/projects/` |
 | VS Code Copilot | `.../Code/User/workspaceStorage/*/chatSessions/` |
+| GitHub Copilot CLI | `~/.copilot/session-state/` |
+| OpenCode | `~/.local/share/opencode/opencode.db` on macOS/Linux, `%LOCALAPPDATA%/opencode/opencode.db` on Windows |
 
-Each session file is parsed into a canonical message format, indexed into a local SQLite database with FTS5 for full-text search, and made available through the UI. The database and settings are stored in the Electron `userData` directory, typically `~/Library/Application Support/Code Trail/` on macOS or `%APPDATA%\Code Trail\` on Windows.
+Each provider source is parsed into a canonical message format, indexed into a local SQLite database with FTS5 for full-text search, and made available through the UI. File-backed providers are tracked by transcript path; SQLite-backed providers such as OpenCode are tracked as logical sessions inside the backing database. The database and settings are stored in the Electron `userData` directory, typically `~/Library/Application Support/Code Trail/` on macOS or `%APPDATA%\Code Trail\` on Windows.
 
 No data leaves your machine. Everything is local.
 
