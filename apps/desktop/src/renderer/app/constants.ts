@@ -87,4 +87,5 @@ export const MONO_FONT_STACKS: Record<MonoFontFamily, string> = {
 export const REGULAR_FONT_STACKS: Record<RegularFontFamily, string> = {
   current: '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   inter: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  lexend: '"Lexend", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
 };

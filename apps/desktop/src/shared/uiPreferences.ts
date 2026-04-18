@@ -56,6 +56,7 @@ export const UI_THEME_VALUES = [
   "ft-dark",
   "tomorrow-night",
   "catppuccin-mocha",
+  "obsidian-blue",
   "obsidian",
   "graphite",
   "midnight",
@@ -68,7 +69,7 @@ export const UI_THEME_VALUES = [
 
 export type ThemeMode = (typeof UI_THEME_VALUES)[number];
 export type MonoFontFamily = "current" | "droid_sans_mono";
-export type RegularFontFamily = "current" | "inter";
+export type RegularFontFamily = "current" | "inter" | "lexend";
 export type MonoFontSize =
   | "10px"
   | "11px"
@@ -111,6 +112,7 @@ export const THEME_OPTIONS = [
   { value: "ft-dark", label: "FT Dark", group: "dark" },
   { value: "tomorrow-night", label: "Tomorrow Night", group: "dark" },
   { value: "catppuccin-mocha", label: "Catppuccin Mocha", group: "dark" },
+  { value: "obsidian-blue", label: "Obsidian Blue", group: "dark" },
   { value: "obsidian", label: "Obsidian", group: "dark" },
   { value: "graphite", label: "Graphite", group: "dark" },
   { value: "midnight", label: "Midnight", group: "dark" },
@@ -162,7 +164,7 @@ export function resolveShikiThemeForUiTheme(
 }
 
 export const UI_MONO_FONT_VALUES: MonoFontFamily[] = ["current", "droid_sans_mono"];
-export const UI_REGULAR_FONT_VALUES: RegularFontFamily[] = ["current", "inter"];
+export const UI_REGULAR_FONT_VALUES: RegularFontFamily[] = ["current", "inter", "lexend"];
 export const UI_MESSAGE_PAGE_SIZE_VALUES: MessagePageSize[] = [10, 25, 50, 100, 250];
 export const UI_VIEWER_WRAP_MODE_VALUES: ViewerWrapMode[] = ["nowrap", "wrap"];
 export const UI_DIFF_VIEW_MODE_VALUES: DiffViewMode[] = ["unified", "split"];

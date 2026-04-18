@@ -149,7 +149,8 @@ const MONO_FONT_OPTIONS: Array<{ value: MonoFontFamily; label: string }> = UI_MO
 const REGULAR_FONT_OPTIONS: Array<{ value: RegularFontFamily; label: string }> =
   UI_REGULAR_FONT_VALUES.map((value) => ({
     value,
-    label: value === "current" ? "Plus Jakarta Sans" : "Inter",
+    label:
+      value === "current" ? "Plus Jakarta Sans" : value === "inter" ? "Inter" : "Lexend",
   }));
 
 const MONO_FONT_SIZE_OPTIONS: Array<{ value: MonoFontSize; label: string }> =

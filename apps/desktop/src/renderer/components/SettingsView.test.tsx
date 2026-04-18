@@ -382,7 +382,8 @@ describe("SettingsView", () => {
     );
     await user.selectOptions(screen.getByRole("combobox", { name: "Monospaced font" }), "current");
     await user.selectOptions(screen.getByRole("combobox", { name: "Monospaced size" }), "13px");
-    await user.selectOptions(screen.getByRole("combobox", { name: "Regular font" }), "inter");
+    expect(screen.getByRole("option", { name: "Lexend" })).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Regular font" }), "lexend");
     await user.selectOptions(screen.getByRole("combobox", { name: "Regular size" }), "14px");
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Preferred editor" }),
@@ -468,7 +469,7 @@ describe("SettingsView", () => {
     expect(baseProps.appearance.onShikiThemeChange).toHaveBeenCalledWith("tokyo-night");
     expect(baseProps.appearance.onMonoFontFamilyChange).toHaveBeenCalledWith("current");
     expect(baseProps.appearance.onMonoFontSizeChange).toHaveBeenCalledWith("13px");
-    expect(baseProps.appearance.onRegularFontFamilyChange).toHaveBeenCalledWith("inter");
+    expect(baseProps.appearance.onRegularFontFamilyChange).toHaveBeenCalledWith("lexend");
     expect(baseProps.appearance.onRegularFontSizeChange).toHaveBeenCalledWith("14px");
     expect(baseProps.appearance.onUseMonospaceForAllMessagesChange).toHaveBeenCalledWith(true);
     expect(baseProps.appearance.onDefaultViewerWrapModeChange).toHaveBeenCalledWith("wrap");
