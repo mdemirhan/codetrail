@@ -114,6 +114,7 @@ describe("App focus restoration", () => {
     clickToolbarButton(screen.getByRole("button", { name: "Open settings" }));
     await waitFor(() => {
       expect(screen.getByText("Discovery Roots")).toBeInTheDocument();
+      expect(document.activeElement).toBe(container.querySelector(".settings-view"));
     });
 
     fireEvent.keyDown(window, { key: "Escape" });
@@ -147,6 +148,7 @@ describe("App focus restoration", () => {
     clickToolbarButton(screen.getByRole("button", { name: "Open help" }));
     await waitFor(() => {
       expect(container.querySelector(".help-view")).toBeInTheDocument();
+      expect(document.activeElement).toBe(container.querySelector(".help-view"));
     });
 
     fireEvent.keyDown(window, { key: "Escape" });
@@ -180,6 +182,7 @@ describe("App focus restoration", () => {
     clickToolbarButton(screen.getByRole("button", { name: "Open help" }));
     await waitFor(() => {
       expect(container.querySelector(".help-view")).toBeInTheDocument();
+      expect(document.activeElement).toBe(container.querySelector(".help-view"));
     });
 
     clickToolbarButton(screen.getByRole("button", { name: "Return to history view" }));
@@ -213,6 +216,7 @@ describe("App focus restoration", () => {
     clickToolbarButton(screen.getByRole("button", { name: "Open dashboard" }));
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Activity Dashboard" })).toBeInTheDocument();
+      expect(document.activeElement).toBe(container.querySelector(".dashboard-view"));
     });
 
     fireEvent.keyDown(window, { key: "Escape" });

@@ -3053,7 +3053,7 @@ describe("App shell", () => {
     });
   });
 
-  it("shows generic pagination shortcuts in help page", async () => {
+  it("shows distinct message and current-list pagination shortcuts in help page", async () => {
     const user = userEvent.setup();
     const client = createAppClient();
 
@@ -3067,6 +3067,10 @@ describe("App shell", () => {
 
     expect(screen.getByText("Previous page / turn")).toBeInTheDocument();
     expect(screen.getByText("Next page / turn")).toBeInTheDocument();
+    expect(screen.getByText("Page messages up (keep focus)")).toBeInTheDocument();
+    expect(screen.getByText("Page messages down (keep focus)")).toBeInTheDocument();
+    expect(screen.getByText("Page up in current list")).toBeInTheDocument();
+    expect(screen.getByText("Page down in current list")).toBeInTheDocument();
     expect(screen.getByText("Turns view")).toBeInTheDocument();
     expect(screen.getByText("Previous session / project")).toBeInTheDocument();
     expect(screen.getByText("Next session / project")).toBeInTheDocument();

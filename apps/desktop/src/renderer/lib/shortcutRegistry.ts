@@ -168,12 +168,12 @@ function getShortcutItems(platform: DesktopPlatform) {
     {
       group: "Search & Navigation",
       shortcut: "Ctrl+U",
-      description: "Page up in current list",
+      description: "Page messages up without changing focus",
     },
     {
       group: "Search & Navigation",
       shortcut: "Ctrl+D",
-      description: "Page down in current list",
+      description: "Page messages down without changing focus",
     },
     {
       group: "Search & Navigation",

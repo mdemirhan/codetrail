@@ -204,9 +204,9 @@ export function App({
   const watcherLifecycleRef = useRef(0);
   const watcherPendingPathCountRef = useRef(0);
   const watcherStatusBurstUntilRef = useRef(0);
-  const dashboardViewRef = useRef<HTMLElement | null>(null);
-  const helpViewRef = useRef<HTMLElement | null>(null);
-  const settingsViewRef = useRef<HTMLElement | null>(null);
+  const dashboardViewRef = useRef<HTMLDivElement | null>(null);
+  const helpViewRef = useRef<HTMLDivElement | null>(null);
+  const settingsViewRef = useRef<HTMLDivElement | null>(null);
   const viewFocusRafRef = useRef<number | null>(null);
   const returnToHistoryFocusRafRef = useRef<number | null>(null);
   const focusModeRafRef = useRef<number | null>(null);
@@ -1382,8 +1382,12 @@ export function App({
                 </section>
               )
             ) : mainView === "dashboard" ? (
-              <section className="pane content-pane" ref={dashboardViewRef} tabIndex={-1}>
-                <DashboardView stats={dashboard.stats} error={dashboard.error} />
+              <section className="pane content-pane">
+                <DashboardView
+                  rootRef={dashboardViewRef}
+                  stats={dashboard.stats}
+                  error={dashboard.error}
+                />
               </section>
             ) : mainView === "search" ? (
               <SearchView
@@ -1405,16 +1409,18 @@ export function App({
                 }}
               />
             ) : mainView === "help" ? (
-              <section className="pane content-pane" ref={helpViewRef} tabIndex={-1}>
+              <section className="pane content-pane">
                 <ShortcutsDialog
+                  rootRef={helpViewRef}
                   shortcuts={shortcuts}
                   commonSyntaxItems={[...COMMON_SYNTAX_ITEMS]}
                   advancedSyntaxItems={[...ADVANCED_SYNTAX_ITEMS]}
                 />
               </section>
             ) : (
-              <section className="pane content-pane" ref={settingsViewRef} tabIndex={-1}>
+              <section className="pane content-pane">
                 <SettingsView
+                  rootRef={settingsViewRef}
                   info={appearance.settingsInfo}
                   loading={appearance.settingsLoading}
                   error={appearance.settingsError}

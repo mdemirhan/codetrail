@@ -456,7 +456,7 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.key === "u"
   ) {
     context.event.preventDefault();
-    if (historySearchInputTarget) {
+    if (context.mainView === "history") {
       context.pageHistoryMessagesUp({ preserveFocus: true });
     } else {
       pageUp();
@@ -471,7 +471,7 @@ function handleHistoryNavigationShortcut(context: ShortcutContext): boolean {
     context.key === "d"
   ) {
     context.event.preventDefault();
-    if (historySearchInputTarget) {
+    if (context.mainView === "history") {
       context.pageHistoryMessagesDown({ preserveFocus: true });
     } else {
       pageDown();

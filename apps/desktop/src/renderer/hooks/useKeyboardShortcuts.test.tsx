@@ -675,6 +675,29 @@ describe("useKeyboardShortcuts", () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it("preserves the focused history pane while routing Ctrl+U and Ctrl+D", () => {
+    const props = createProps();
+
+    renderHarness(props);
+
+    const projectList = props.projectListRef.current;
+    if (!projectList) {
+      throw new Error("Expected project pane ref to be attached");
+    }
+
+    projectList.focus();
+    projectList.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "u", bubbles: true, ctrlKey: true }),
+    );
+    projectList.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "d", bubbles: true, ctrlKey: true }),
+    );
+
+    expect(props.pageHistoryMessagesUp).toHaveBeenCalledWith({ preserveFocus: true });
+    expect(props.pageHistoryMessagesDown).toHaveBeenCalledWith({ preserveFocus: true });
+    expect(document.activeElement).toBe(projectList);
+  });
+
   it("routes Cmd+Up and Cmd+Down from the history search input to history message focus", () => {
     const props = createProps();
 

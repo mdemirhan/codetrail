@@ -21,6 +21,8 @@ describe("ShortcutsDialog", () => {
     expect(screen.getByText("Navigation")).toBeInTheDocument();
     expect(screen.getByText("Views & Panels")).toBeInTheDocument();
     expect(screen.getByText("Message Filters")).toBeInTheDocument();
+    expect(screen.getByText("Scroll current list")).toBeInTheDocument();
+    expect(screen.getByText("Scroll message pane")).toBeInTheDocument();
     expect(screen.getAllByText("System").length).toBeGreaterThan(0);
     expect(
       screen.getAllByText((_, element) => (element?.textContent ?? "").trim() === "react").length,
@@ -70,8 +72,16 @@ describe("ShortcutsDialog", () => {
     expect(toggleSessionsRow?.textContent).toContain("⌥");
     expect(toggleSessionsRow?.textContent).toContain("B");
 
-    const pageUpRow = screen.getByText("Page up").closest(".help-shortcut-row");
+    const keepFocusPageUpRow = screen
+      .getByText("Page messages up (keep focus)")
+      .closest(".help-shortcut-row");
+    expect(keepFocusPageUpRow?.textContent).toContain("⌃");
+    expect(keepFocusPageUpRow?.textContent).toContain("U");
+
+    const pageUpRow = screen
+      .getByText("Page up in current list")
+      .closest(".help-shortcut-row");
     expect(pageUpRow?.textContent).toContain("PgUp");
-    expect(pageUpRow?.textContent).toContain("U");
+    expect(pageUpRow?.textContent).toContain("⌃");
   });
 });

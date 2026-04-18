@@ -299,6 +299,54 @@ describe("App history messages", () => {
     expect(document.activeElement).toBe(messageList);
   });
 
+  it("lets Ctrl+U/Ctrl+D page messages without leaving the focused history pane", async () => {
+    const client = createAppClient();
+    const { container } = renderWithClient(<App />, client);
+
+    await waitFor(() => {
+      expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
+    });
+
+    const messageList = container.querySelector<HTMLDivElement>(".msg-scroll.message-list");
+    const sessionList = container.querySelector<HTMLDivElement>(".list-scroll.session-list");
+    expect(messageList).not.toBeNull();
+    expect(sessionList).not.toBeNull();
+    if (!messageList || !sessionList) {
+      throw new Error("Expected message list and session list");
+    }
+
+    const scrollTo = vi.fn(({ top }: { top: number }) => {
+      messageList.scrollTop = top;
+    });
+
+    messageList.style.paddingTop = "20px";
+    messageList.style.paddingBottom = "20px";
+    Object.defineProperty(messageList, "clientHeight", {
+      value: 320,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTop", {
+      value: 40,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(messageList, "scrollTo", {
+      value: scrollTo,
+      configurable: true,
+    });
+
+    sessionList.focus();
+    expect(document.activeElement).toBe(sessionList);
+
+    fireEvent.keyDown(sessionList, { key: "d", ctrlKey: true });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 300 });
+    expect(document.activeElement).toBe(sessionList);
+
+    fireEvent.keyDown(sessionList, { key: "u", ctrlKey: true });
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 40 });
+    expect(document.activeElement).toBe(sessionList);
+  });
+
   it("lets Cmd+Up/Cmd+Down from the history search box keep focus in the search box", async () => {
     installScrollIntoViewMock();
 

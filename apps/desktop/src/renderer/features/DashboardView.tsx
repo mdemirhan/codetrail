@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { type Ref, useMemo } from "react";
 
 import type { DashboardStatsResponse } from "../app/types";
 import { formatCompactInteger, formatInteger } from "../lib/numberFormatting";
@@ -127,9 +127,11 @@ function EmptyListState({ copy }: { copy: string }) {
 export function DashboardView({
   stats,
   error,
+  rootRef,
 }: {
   stats: DashboardStatsResponse;
   error: string | null;
+  rootRef?: Ref<HTMLDivElement>;
 }) {
   const messageCategories = useMemo(() => {
     return Object.entries(stats.categoryCounts)
@@ -260,7 +262,7 @@ export function DashboardView({
   }, [stats.aiCodeStats.topFileTypes]);
 
   return (
-    <div className="dashboard-view dashboard-redesign">
+    <div className="dashboard-view dashboard-redesign" ref={rootRef} tabIndex={-1}>
       <header className="dashboard-redesign-hero">
         <div className="dashboard-redesign-hero-main">
           <p className="dashboard-redesign-eyebrow">Workspace telemetry</p>

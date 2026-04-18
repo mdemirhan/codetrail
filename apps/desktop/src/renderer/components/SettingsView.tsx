@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, type Ref, useState } from "react";
 
 import {
   PROVIDER_LIST,
@@ -198,6 +198,7 @@ export function SettingsView({
   indexing,
   messageRules,
   onActionError,
+  rootRef,
 }: {
   info: SettingsInfoResponse | null;
   loading: boolean;
@@ -219,6 +220,7 @@ export function SettingsView({
   indexing: SettingsIndexingProps;
   messageRules: SettingsMessageRulesProps;
   onActionError?: (context: string, error: unknown) => void;
+  rootRef?: Ref<HTMLDivElement>;
 }) {
   const [activeTab, setActiveTab] = useState<"settings" | "diagnostics">("settings");
   const storageRows = info
@@ -242,7 +244,7 @@ export function SettingsView({
   const shikiThemeGroup = getShikiThemeGroupForUiTheme(appearance.theme);
 
   return (
-    <div className="settings-view">
+    <div className="settings-view" ref={rootRef} tabIndex={-1}>
       <div className="settings-page">
         <div className="settings-page-body">
           <div className="settings-tab-bar" role="tablist" aria-label="Settings sections">

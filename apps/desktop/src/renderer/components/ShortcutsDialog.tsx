@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
 
 import type { MessageCategory } from "@codetrail/core/browser";
 
@@ -60,10 +60,12 @@ export function ShortcutsDialog({
   shortcuts,
   commonSyntaxItems,
   advancedSyntaxItems,
+  rootRef,
 }: {
   shortcuts: ShortcutRegistry;
   commonSyntaxItems: SyntaxItem[];
   advancedSyntaxItems: SyntaxItem[];
+  rootRef?: Ref<HTMLDivElement>;
 }) {
   const syntaxItems = [
     ...commonSyntaxItems.map((item) => ({ ...item, advanced: false })),
@@ -123,20 +125,30 @@ export function ShortcutsDialog({
       shortcuts: [findShortcut(shortcuts, "Next project")],
     },
   ];
-  const scrollRows: ShortcutSectionRow[] = [
+  const scrollCurrentListRows: ShortcutSectionRow[] = [
     {
-      label: "Page up",
+      label: "Page up in current list",
       shortcuts: sortPageTraversalShortcuts(
         findShortcuts(shortcuts, "Page up in current list"),
         shortcuts,
       ),
     },
     {
-      label: "Page down",
+      label: "Page down in current list",
       shortcuts: sortPageTraversalShortcuts(
         findShortcuts(shortcuts, "Page down in current list"),
         shortcuts,
       ),
+    },
+  ];
+  const scrollMessagePaneRows: ShortcutSectionRow[] = [
+    {
+      label: "Page messages up (keep focus)",
+      shortcuts: [findShortcut(shortcuts, "Page messages up without changing focus")],
+    },
+    {
+      label: "Page messages down (keep focus)",
+      shortcuts: [findShortcut(shortcuts, "Page messages down without changing focus")],
     },
   ];
   const paneRows: ShortcutSectionRow[] = [
@@ -207,7 +219,7 @@ export function ShortcutsDialog({
   ];
 
   return (
-    <div className="help-view">
+    <div className="help-view" ref={rootRef} tabIndex={-1}>
       <div className="help-page">
         <HelpSection title="Search">
           <ShortcutGrid rows={searchRows} />
@@ -235,7 +247,9 @@ export function ShortcutsDialog({
         <HelpSection title="Navigation">
           <ShortcutGrid rows={navigationRows} />
           <div className="help-subheading">Scroll current list</div>
-          <ShortcutGrid rows={scrollRows} />
+          <ShortcutGrid rows={scrollCurrentListRows} />
+          <div className="help-subheading">Scroll message pane</div>
+          <ShortcutGrid rows={scrollMessagePaneRows} />
           <div className="help-subheading">Panes</div>
           <ShortcutGrid rows={paneRows} />
         </HelpSection>
