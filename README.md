@@ -4,7 +4,7 @@ A local desktop app for browsing, searching, and revisiting your AI coding sessi
 
 Code Trail discovers local transcript files and provider databases, parses them into a unified format, indexes everything into SQLite, and gives you fast full-text search with filtering by provider, project, and message type.
 
-![Code Trail](docs/images/screenshot2.png)
+![Code Trail](docs/images/screenshot1.png)
 
 ![Code Trail dashboard](docs/images/screenshot3.png)
 
