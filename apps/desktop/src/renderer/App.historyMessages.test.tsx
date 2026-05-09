@@ -92,6 +92,16 @@ describe("App history messages", () => {
       expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
     });
 
+    const messageListElement = messageList();
+    expect(messageListElement).not.toBeNull();
+    if (!messageListElement) {
+      throw new Error("Expected message list");
+    }
+    await focusElement(messageListElement);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(messageList());
+    });
+
     await dispatchWindowShortcut({ key: "ArrowDown", metaKey: true });
     await waitFor(() => {
       expect(getFocusedHistoryMessageId(container)).toBe("m1");
