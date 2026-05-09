@@ -78,9 +78,7 @@ describe("ShortcutsDialog", () => {
     expect(keepFocusPageUpRow?.textContent).toContain("⌃");
     expect(keepFocusPageUpRow?.textContent).toContain("U");
 
-    const pageUpRow = screen
-      .getByText("Page up in current list")
-      .closest(".help-shortcut-row");
+    const pageUpRow = screen.getByText("Page up in current list").closest(".help-shortcut-row");
     expect(pageUpRow?.textContent).toContain("PgUp");
     expect(pageUpRow?.textContent).toContain("⌃");
   });
