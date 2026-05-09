@@ -2,6 +2,7 @@
 
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../lib/codetrailClient", () => ({
@@ -11,7 +12,12 @@ vi.mock("../../lib/codetrailClient", () => ({
   }),
 }));
 
+import { ViewerExternalAppsTestProvider } from "../../test/viewerExternalApps";
 import { MessageContent } from "./MessageContent";
+
+function renderWithViewerExternalApps(element: ReactElement) {
+  return render(element, { wrapper: ViewerExternalAppsTestProvider });
+}
 
 describe("MessageContent", () => {
   beforeEach(() => {
@@ -19,14 +25,16 @@ describe("MessageContent", () => {
   });
 
   it("renders thinking messages as highlighted pre blocks", () => {
-    render(<MessageContent text="thinking text" category="thinking" query="" />);
+    renderWithViewerExternalApps(
+      <MessageContent text="thinking text" category="thinking" query="" />,
+    );
 
     expect(screen.getByText("thinking text")).toBeInTheDocument();
     expect(document.querySelector(".thinking-block")).not.toBeNull();
   });
 
   it("renders tool_use payload with command and arguments", () => {
-    render(
+    renderWithViewerExternalApps(
       <MessageContent
         text={JSON.stringify({
           tool_name: "run_command",
@@ -43,7 +51,7 @@ describe("MessageContent", () => {
   });
 
   it("renders write-like tool_use payloads through the tool edit view", () => {
-    render(
+    renderWithViewerExternalApps(
       <MessageContent
         text={JSON.stringify({
           tool_name: "write_file",
@@ -60,7 +68,7 @@ describe("MessageContent", () => {
   });
 
   it("renders tool_edit diff and written content variants", () => {
-    const { rerender } = render(
+    const { rerender } = renderWithViewerExternalApps(
       <MessageContent
         text={JSON.stringify({
           input: {
@@ -96,7 +104,7 @@ describe("MessageContent", () => {
     const user = userEvent.setup();
     document.documentElement.dataset.collapseMultiFileToolDiffs = "true";
 
-    render(
+    renderWithViewerExternalApps(
       <MessageContent
         text={JSON.stringify({
           name: "apply_patch",
@@ -144,7 +152,7 @@ describe("MessageContent", () => {
   it("renders single-file tool-edit diffs as collapsible viewers", async () => {
     const user = userEvent.setup();
 
-    render(
+    renderWithViewerExternalApps(
       <MessageContent
         text={JSON.stringify({
           input: {
@@ -169,7 +177,7 @@ describe("MessageContent", () => {
   it("toggles collapsible diffs from the filename, diff counts, and empty header area", async () => {
     const user = userEvent.setup();
 
-    render(
+    renderWithViewerExternalApps(
       <MessageContent
         text={JSON.stringify({
           input: {
@@ -226,7 +234,7 @@ describe("MessageContent", () => {
       query: "",
     };
 
-    const { rerender } = render(<MessageContent {...messageProps} />);
+    const { rerender } = renderWithViewerExternalApps(<MessageContent {...messageProps} />);
 
     expect(screen.getByRole("button", { name: "Collapse diff for parser.ts" })).toBeInTheDocument();
     expect(document.body.textContent).toContain("const value = next();");
@@ -263,7 +271,7 @@ describe("MessageContent", () => {
   it("defaults multi-file diffs to expanded when the collapse setting attribute is absent", () => {
     delete document.documentElement.dataset.collapseMultiFileToolDiffs;
 
-    render(
+    renderWithViewerExternalApps(
       <MessageContent
         text={JSON.stringify({
           name: "apply_patch",
@@ -286,7 +294,7 @@ describe("MessageContent", () => {
   });
 
   it("renders tool_result metadata and output", () => {
-    render(
+    renderWithViewerExternalApps(
       <MessageContent
         text={JSON.stringify({
           metadata: { code: 0 },
@@ -303,7 +311,7 @@ describe("MessageContent", () => {
   });
 
   it("highlights query matches inside tool_result code output", () => {
-    render(
+    renderWithViewerExternalApps(
       <MessageContent
         text={JSON.stringify({
           output: "feat(history): add collapsible side panes",
@@ -319,7 +327,7 @@ describe("MessageContent", () => {
   });
 
   it("renders markdown-rich assistant content and generic fallback content", () => {
-    const { rerender } = render(
+    const { rerender } = renderWithViewerExternalApps(
       <MessageContent
         text={"## Summary\n\n| A | B |\n| --- | --- |\n| 1 | 2 |"}
         category="assistant"
@@ -334,7 +342,9 @@ describe("MessageContent", () => {
   });
 
   it("preserves single-line breaks for plain user/system content", () => {
-    render(<MessageContent text={"line one\nline two\nline three"} category="user" query="" />);
+    renderWithViewerExternalApps(
+      <MessageContent text={"line one\nline two\nline three"} category="user" query="" />,
+    );
 
     const paragraphs = document.querySelectorAll(".rich-block .md-p");
     expect(paragraphs).toHaveLength(3);

@@ -8,6 +8,7 @@ import type { CodetrailClient } from "../lib/codetrailClient";
 import { LIVE_STATUS_PUSH_DEBOUNCE_MS, useLiveWatchController } from "./useLiveWatchController";
 
 type MinimalClient = Pick<CodetrailClient, "invoke" | "onLiveStatusChanged">;
+type LiveWatchControllerOptions = Parameters<typeof useLiveWatchController>[0];
 
 function makeLiveStatusResponse(
   overrides: Partial<WatchLiveStatusResponse> = {},
@@ -66,6 +67,27 @@ function createMockClient(): {
   };
 }
 
+async function renderLiveWatchController(
+  overrides: Partial<LiveWatchControllerOptions> & { codetrail: MinimalClient },
+) {
+  let result: ReturnType<typeof renderHook<ReturnType<typeof useLiveWatchController>, []>>;
+  await act(async () => {
+    result = renderHook(() =>
+      useLiveWatchController({
+        mainView: "settings",
+        refreshStrategy: "watch-1s",
+        liveWatchEnabled: true,
+        claudeEnabled: false,
+        claudeHooksPrompted: false,
+        logError: vi.fn(),
+        ...overrides,
+      }),
+    );
+    await Promise.resolve();
+  });
+  return result!;
+}
+
 describe("useLiveWatchController push notifications", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -76,56 +98,26 @@ describe("useLiveWatchController push notifications", () => {
     vi.restoreAllMocks();
   });
 
-  it("subscribes to push notifications when live watch is active", () => {
+  it("subscribes to push notifications when live watch is active", async () => {
     const { client } = createMockClient();
 
-    renderHook(() =>
-      useLiveWatchController({
-        codetrail: client,
-        mainView: "settings",
-        refreshStrategy: "watch-1s",
-        liveWatchEnabled: true,
-        claudeEnabled: false,
-        claudeHooksPrompted: false,
-        logError: vi.fn(),
-      }),
-    );
+    await renderLiveWatchController({ codetrail: client });
 
     expect(client.onLiveStatusChanged).toHaveBeenCalledTimes(1);
   });
 
-  it("does not subscribe when live watch is inactive", () => {
+  it("does not subscribe when live watch is inactive", async () => {
     const { client } = createMockClient();
 
-    renderHook(() =>
-      useLiveWatchController({
-        codetrail: client,
-        mainView: "settings",
-        refreshStrategy: "off",
-        liveWatchEnabled: true,
-        claudeEnabled: false,
-        claudeHooksPrompted: false,
-        logError: vi.fn(),
-      }),
-    );
+    await renderLiveWatchController({ codetrail: client, refreshStrategy: "off" });
 
     expect(client.onLiveStatusChanged).not.toHaveBeenCalled();
   });
 
-  it("does not subscribe when live status is not visible", () => {
+  it("does not subscribe when live status is not visible", async () => {
     const { client } = createMockClient();
 
-    renderHook(() =>
-      useLiveWatchController({
-        codetrail: client,
-        mainView: "help",
-        refreshStrategy: "watch-1s",
-        liveWatchEnabled: true,
-        claudeEnabled: false,
-        claudeHooksPrompted: false,
-        logError: vi.fn(),
-      }),
-    );
+    await renderLiveWatchController({ codetrail: client, mainView: "help" });
 
     expect(client.onLiveStatusChanged).not.toHaveBeenCalled();
   });
@@ -133,17 +125,7 @@ describe("useLiveWatchController push notifications", () => {
   it("calls loadLiveStatus on push notification", async () => {
     const { client, emitPush } = createMockClient();
 
-    renderHook(() =>
-      useLiveWatchController({
-        codetrail: client,
-        mainView: "settings",
-        refreshStrategy: "watch-1s",
-        liveWatchEnabled: true,
-        claudeEnabled: false,
-        claudeHooksPrompted: false,
-        logError: vi.fn(),
-      }),
-    );
+    await renderLiveWatchController({ codetrail: client });
 
     const invokeCallsBefore = (client.invoke as ReturnType<typeof vi.fn>).mock.calls.length;
 
@@ -159,17 +141,7 @@ describe("useLiveWatchController push notifications", () => {
   it("debounces rapid push notifications", async () => {
     const { client, emitPush } = createMockClient();
 
-    renderHook(() =>
-      useLiveWatchController({
-        codetrail: client,
-        mainView: "settings",
-        refreshStrategy: "watch-1s",
-        liveWatchEnabled: true,
-        claudeEnabled: false,
-        claudeHooksPrompted: false,
-        logError: vi.fn(),
-      }),
-    );
+    await renderLiveWatchController({ codetrail: client });
 
     const invokeCallsBefore = (client.invoke as ReturnType<typeof vi.fn>).mock.calls.length;
 
@@ -187,20 +159,10 @@ describe("useLiveWatchController push notifications", () => {
     expect(invokeCallsAfter - invokeCallsBefore).toBe(1);
   });
 
-  it("unsubscribes from push notifications on cleanup", () => {
+  it("unsubscribes from push notifications on cleanup", async () => {
     const { client, pushListeners } = createMockClient();
 
-    const { unmount } = renderHook(() =>
-      useLiveWatchController({
-        codetrail: client,
-        mainView: "settings",
-        refreshStrategy: "watch-1s",
-        liveWatchEnabled: true,
-        claudeEnabled: false,
-        claudeHooksPrompted: false,
-        logError: vi.fn(),
-      }),
-    );
+    const { unmount } = await renderLiveWatchController({ codetrail: client });
 
     expect(pushListeners.size).toBe(1);
 
@@ -212,17 +174,7 @@ describe("useLiveWatchController push notifications", () => {
   it("clears pending debounce timer on cleanup", async () => {
     const { client, emitPush } = createMockClient();
 
-    const { unmount } = renderHook(() =>
-      useLiveWatchController({
-        codetrail: client,
-        mainView: "settings",
-        refreshStrategy: "watch-1s",
-        liveWatchEnabled: true,
-        claudeEnabled: false,
-        claudeHooksPrompted: false,
-        logError: vi.fn(),
-      }),
-    );
+    const { unmount } = await renderLiveWatchController({ codetrail: client });
 
     // Emit a push that starts the debounce timer
     await act(async () => {

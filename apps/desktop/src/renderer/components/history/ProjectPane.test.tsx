@@ -3,7 +3,7 @@
 import type { ComponentProps } from "react";
 import { createRef, useMemo } from "react";
 
-import { fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -451,16 +451,22 @@ describe("ProjectPane", () => {
       throw new Error("Expected project list");
     }
 
-    searchInput.focus();
-    fireEvent.keyDown(searchInput, { key: "Enter" });
+    act(() => {
+      searchInput.focus();
+      fireEvent.keyDown(searchInput, { key: "Enter" });
+    });
     expect(document.activeElement).toBe(projectList);
 
-    searchInput.focus();
-    fireEvent.keyDown(searchInput, { key: "Escape" });
+    act(() => {
+      searchInput.focus();
+      fireEvent.keyDown(searchInput, { key: "Escape" });
+    });
     expect(document.activeElement).toBe(projectList);
 
-    searchInput.focus();
-    fireEvent.keyDown(searchInput, { key: "Tab" });
+    act(() => {
+      searchInput.focus();
+      fireEvent.keyDown(searchInput, { key: "Tab" });
+    });
     expect(document.activeElement).toBe(projectList);
   });
 
@@ -1189,9 +1195,13 @@ describe("ProjectPane", () => {
     const sessionRow = screen.getByRole("button", { name: /Investigate markdown rendering/i });
     const projectRow = screen.getByRole("button", { name: /project one/i });
 
-    sessionRow.focus();
+    act(() => {
+      sessionRow.focus();
+    });
     expect(sessionRow).toHaveFocus();
-    fireEvent.keyDown(sessionRow, { key: "ArrowLeft", metaKey: true });
+    act(() => {
+      fireEvent.keyDown(sessionRow, { key: "ArrowLeft", metaKey: true });
+    });
 
     expect(sessionRow).toHaveFocus();
     expect(projectRow).not.toHaveFocus();
