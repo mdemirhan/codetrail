@@ -13,6 +13,18 @@ import {
 import { renderWithClient } from "./test/renderWithClient";
 
 describe("App history messages", () => {
+  const focusElement = async (element: HTMLElement) => {
+    await act(async () => {
+      element.focus();
+    });
+  };
+
+  const fireKeyDown = async (target: Element | Window | Document, init: KeyboardEventInit) => {
+    await act(async () => {
+      fireEvent.keyDown(target, init);
+    });
+  };
+
   const dispatchWindowShortcut = async (init: KeyboardEventInit) => {
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent("keydown", init));
@@ -37,7 +49,12 @@ describe("App history messages", () => {
       expect(messageList()).not.toBeNull();
     });
 
-    messageList()?.focus();
+    const messageListElement = messageList();
+    expect(messageListElement).not.toBeNull();
+    if (!messageListElement) {
+      throw new Error("Expected message list");
+    }
+    await focusElement(messageListElement);
     await waitFor(() => {
       expect(document.activeElement).toBe(messageList());
     });
@@ -232,11 +249,11 @@ describe("App history messages", () => {
       configurable: true,
     });
 
-    fireEvent.keyDown(window, { key: "d", ctrlKey: true });
+    await fireKeyDown(window, { key: "d", ctrlKey: true });
     expect(scrollTo).toHaveBeenCalledWith({ top: 300 });
     expect(document.activeElement).toBe(messageList);
 
-    fireEvent.keyDown(window, { key: "u", ctrlKey: true });
+    await fireKeyDown(window, { key: "u", ctrlKey: true });
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 40 });
     expect(document.activeElement).toBe(messageList);
   });
@@ -277,25 +294,25 @@ describe("App history messages", () => {
       configurable: true,
     });
 
-    searchInput.focus();
+    await focusElement(searchInput);
 
-    fireEvent.keyDown(searchInput, { key: "d", ctrlKey: true });
+    await fireKeyDown(searchInput, { key: "d", ctrlKey: true });
     expect(scrollTo).toHaveBeenCalledWith({ top: 300 });
     expect(document.activeElement).toBe(searchInput);
 
-    fireEvent.keyDown(searchInput, { key: "u", ctrlKey: true });
+    await fireKeyDown(searchInput, { key: "u", ctrlKey: true });
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 40 });
     expect(document.activeElement).toBe(searchInput);
 
-    fireEvent.keyDown(searchInput, { key: "Enter" });
+    await fireKeyDown(searchInput, { key: "Enter" });
     expect(document.activeElement).toBe(messageList);
 
-    searchInput.focus();
-    fireEvent.keyDown(searchInput, { key: "Escape" });
+    await focusElement(searchInput);
+    await fireKeyDown(searchInput, { key: "Escape" });
     expect(document.activeElement).toBe(messageList);
 
-    searchInput.focus();
-    fireEvent.keyDown(searchInput, { key: "Tab" });
+    await focusElement(searchInput);
+    await fireKeyDown(searchInput, { key: "Tab" });
     expect(document.activeElement).toBe(messageList);
   });
 
@@ -335,14 +352,14 @@ describe("App history messages", () => {
       configurable: true,
     });
 
-    sessionList.focus();
+    await focusElement(sessionList);
     expect(document.activeElement).toBe(sessionList);
 
-    fireEvent.keyDown(sessionList, { key: "d", ctrlKey: true });
+    await fireKeyDown(sessionList, { key: "d", ctrlKey: true });
     expect(scrollTo).toHaveBeenCalledWith({ top: 300 });
     expect(document.activeElement).toBe(sessionList);
 
-    fireEvent.keyDown(sessionList, { key: "u", ctrlKey: true });
+    await fireKeyDown(sessionList, { key: "u", ctrlKey: true });
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 40 });
     expect(document.activeElement).toBe(sessionList);
   });
@@ -363,14 +380,14 @@ describe("App history messages", () => {
       throw new Error("Expected history search input");
     }
 
-    searchInput.focus();
+    await focusElement(searchInput);
     await dispatchElementShortcut(searchInput, { key: "ArrowDown", metaKey: true });
     await waitFor(() => {
       expect(getFocusedHistoryMessageId(container)).toBe("m1");
       expect(document.activeElement).toBe(searchInput);
     });
 
-    searchInput.focus();
+    await focusElement(searchInput);
     await dispatchElementShortcut(searchInput, { key: "ArrowUp", metaKey: true });
     await waitFor(() => {
       expect(getFocusedHistoryMessageId(container)).toBe("m1");
@@ -396,7 +413,7 @@ describe("App history messages", () => {
       throw new Error("Expected message list");
     }
 
-    messageListElement.focus();
+    await focusElement(messageListElement);
     await user.click(screen.getAllByRole("button", { name: "Collapse message" })[0]!);
     await waitFor(() => {
       expect(document.activeElement).toBe(messageListElement);
@@ -433,7 +450,7 @@ describe("App history messages", () => {
       throw new Error("Expected message list and header");
     }
 
-    messageListElement.focus();
+    await focusElement(messageListElement);
     await user.pointer([
       {
         target: header,
@@ -456,14 +473,18 @@ describe("App history messages", () => {
       expect(screen.getByText("Please review markdown table rendering")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Enter focus mode" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Enter focus mode" }));
+    });
 
     await waitFor(() => {
       expect(document.activeElement).toBe(messageList());
       expect(messageList()?.closest(".history-focus-pane")).not.toBeNull();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Exit focus mode" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Exit focus mode" }));
+    });
 
     await waitFor(() => {
       expect(document.activeElement).toBe(messageList());

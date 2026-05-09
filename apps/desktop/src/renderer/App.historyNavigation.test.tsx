@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -24,22 +24,54 @@ function activePane(container: HTMLElement): HTMLElement | null {
   return container.querySelector('[data-pane-active="true"]');
 }
 
-function pressWindowArrow(
+async function focusElement(element: HTMLElement) {
+  await act(async () => {
+    element.focus();
+  });
+}
+
+async function clickElement(element: HTMLElement) {
+  await act(async () => {
+    fireEvent.click(element);
+  });
+}
+
+async function mouseDownElement(element: HTMLElement) {
+  await act(async () => {
+    fireEvent.mouseDown(element);
+  });
+}
+
+async function keyDownElement(element: Element | Window | Document, init: KeyboardEventInit) {
+  await act(async () => {
+    fireEvent.keyDown(element, init);
+  });
+}
+
+async function keyUpElement(element: Element | Window | Document, init: KeyboardEventInit) {
+  await act(async () => {
+    fireEvent.keyUp(element, init);
+  });
+}
+
+async function pressWindowArrow(
   key: "ArrowUp" | "ArrowDown",
   modifiers: { altKey?: boolean; ctrlKey?: boolean },
 ) {
-  fireEvent.keyDown(window, { key, ...modifiers });
-  fireEvent.keyUp(window, { key, ...modifiers });
+  await act(async () => {
+    fireEvent.keyDown(window, { key, ...modifiers });
+    fireEvent.keyUp(window, { key, ...modifiers });
+  });
 }
 
 async function expandHistoryPanes() {
   const expandProjectsButton = screen.queryByRole("button", { name: "Expand Projects pane" });
   if (expandProjectsButton) {
-    fireEvent.click(expandProjectsButton);
+    await clickElement(expandProjectsButton);
   }
   const expandSessionsButton = screen.queryByRole("button", { name: "Expand Sessions pane" });
   if (expandSessionsButton) {
-    fireEvent.click(expandSessionsButton);
+    await clickElement(expandSessionsButton);
   }
   await waitFor(() => {
     expect(screen.getByRole("button", { name: "Collapse Projects pane" })).toBeInTheDocument();
@@ -71,28 +103,28 @@ describe("App history navigation", () => {
     await waitFor(() => {
       expect(screen.getByText("Session one message")).toBeInTheDocument();
     });
-    expectDefined(messageList(), "Expected message list").focus();
+    await focusElement(expectDefined(messageList(), "Expected message list"));
 
-    pressWindowArrow("ArrowDown", { altKey: true });
+    await pressWindowArrow("ArrowDown", { altKey: true });
     await waitFor(() => {
       expect(screen.getByText("Session two message")).toBeInTheDocument();
       expect(document.activeElement).toBe(messageList());
     });
 
-    pressWindowArrow("ArrowUp", { altKey: true });
+    await pressWindowArrow("ArrowUp", { altKey: true });
     await waitFor(() => {
       expect(screen.getByText("Session one message")).toBeInTheDocument();
       expect(document.activeElement).toBe(messageList());
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Switch to List" }));
-    pressWindowArrow("ArrowDown", { ctrlKey: true });
+    await clickElement(screen.getByRole("button", { name: "Switch to List" }));
+    await pressWindowArrow("ArrowDown", { ctrlKey: true });
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
       expect(document.activeElement).toBe(messageList());
     });
 
-    pressWindowArrow("ArrowUp", { ctrlKey: true });
+    await pressWindowArrow("ArrowUp", { ctrlKey: true });
     await waitFor(() => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
       expect(document.activeElement).toBe(messageList());
@@ -113,8 +145,8 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
-    pressWindowArrow("ArrowDown", { ctrlKey: true });
+    await clickElement(screen.getByRole("button", { name: "Collapse Projects pane" }));
+    await pressWindowArrow("ArrowDown", { ctrlKey: true });
 
     await waitFor(() => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
@@ -136,16 +168,16 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Switch to List" }));
-    expectDefined(messageList(), "Expected message list").focus();
+    await clickElement(screen.getByRole("button", { name: "Switch to List" }));
+    await focusElement(expectDefined(messageList(), "Expected message list"));
 
-    pressWindowArrow("ArrowDown", { ctrlKey: true });
+    await pressWindowArrow("ArrowDown", { ctrlKey: true });
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
       expect(document.activeElement).toBe(messageList());
     });
 
-    pressWindowArrow("ArrowUp", { ctrlKey: true });
+    await pressWindowArrow("ArrowUp", { ctrlKey: true });
     await waitFor(() => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
       expect(document.activeElement).toBe(messageList());
@@ -169,15 +201,15 @@ describe("App history navigation", () => {
       container.querySelector<HTMLButtonElement>('[data-project-expand-toggle-for="project_1"]'),
       "Expected project_1 expand toggle",
     );
-    projectToggle.focus();
-    fireEvent.click(projectToggle);
+    await focusElement(projectToggle);
+    await clickElement(projectToggle);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Collapse project sessions" })).toBeInTheDocument();
       expect(document.activeElement).toBe(projectToggle);
     });
 
-    pressWindowArrow("ArrowDown", { ctrlKey: true });
+    await pressWindowArrow("ArrowDown", { ctrlKey: true });
     await waitFor(() => {
       expect(screen.getByText("Session one message")).toBeInTheDocument();
     });
@@ -197,9 +229,9 @@ describe("App history navigation", () => {
       expect(screen.getByText("Project one first message")).toBeInTheDocument();
     });
 
-    expectDefined(messageList(), "Expected message list").focus();
-    pressWindowArrow("ArrowDown", { ctrlKey: true });
-    pressWindowArrow("ArrowDown", { ctrlKey: true });
+    await focusElement(expectDefined(messageList(), "Expected message list"));
+    await pressWindowArrow("ArrowDown", { ctrlKey: true });
+    await pressWindowArrow("ArrowDown", { ctrlKey: true });
 
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
@@ -229,9 +261,9 @@ describe("App history navigation", () => {
     );
     folderRow.removeAttribute("data-folder-first-project-id");
 
-    expectDefined(messageList(), "Expected message list").focus();
-    pressWindowArrow("ArrowDown", { ctrlKey: true });
-    pressWindowArrow("ArrowDown", { ctrlKey: true });
+    await focusElement(expectDefined(messageList(), "Expected message list"));
+    await pressWindowArrow("ArrowDown", { ctrlKey: true });
+    await pressWindowArrow("ArrowDown", { ctrlKey: true });
 
     await waitFor(() => {
       expect(screen.getByText("Project two combined message")).toBeInTheDocument();
@@ -265,19 +297,21 @@ describe("App history navigation", () => {
       expect(screen.getByText("Session one message")).toBeInTheDocument();
     });
 
-    fireEvent.mouseDown(expectDefined(sessionHeader(), "Expected session pane header"));
-    fireEvent.click(expectDefined(sessionHeader(), "Expected session pane header"));
-    fireEvent.keyDown(expectDefined(sessionList(), "Expected session list"), { key: "ArrowUp" });
-    fireEvent.keyUp(window, { key: "ArrowUp" });
+    await mouseDownElement(expectDefined(sessionHeader(), "Expected session pane header"));
+    await clickElement(expectDefined(sessionHeader(), "Expected session pane header"));
+    await keyDownElement(expectDefined(sessionList(), "Expected session list"), { key: "ArrowUp" });
+    await keyUpElement(window, { key: "ArrowUp" });
     await waitFor(() => {
       expect(screen.getByPlaceholderText(SEARCH_PLACEHOLDERS.globalMessages)).toBeInTheDocument();
       expect(activePane()).toHaveAttribute("data-history-pane", "session");
     });
 
-    fireEvent.mouseDown(expectDefined(projectHeader(), "Expected project pane header"));
-    fireEvent.click(expectDefined(projectHeader(), "Expected project pane header"));
-    fireEvent.keyDown(expectDefined(projectList(), "Expected project list"), { key: "ArrowDown" });
-    fireEvent.keyUp(window, { key: "ArrowDown" });
+    await mouseDownElement(expectDefined(projectHeader(), "Expected project pane header"));
+    await clickElement(expectDefined(projectHeader(), "Expected project pane header"));
+    await keyDownElement(expectDefined(projectList(), "Expected project list"), {
+      key: "ArrowDown",
+    });
+    await keyUpElement(window, { key: "ArrowDown" });
     await waitFor(() => {
       expect(activePane()).toHaveAttribute("data-history-pane", "project");
       expect(
@@ -285,10 +319,14 @@ describe("App history navigation", () => {
       ).toBeTruthy();
     });
 
-    fireEvent.keyDown(expectDefined(projectList(), "Expected project list"), { key: "ArrowRight" });
-    fireEvent.keyUp(window, { key: "ArrowRight" });
-    fireEvent.keyDown(expectDefined(projectList(), "Expected project list"), { key: "ArrowDown" });
-    fireEvent.keyUp(window, { key: "ArrowDown" });
+    await keyDownElement(expectDefined(projectList(), "Expected project list"), {
+      key: "ArrowRight",
+    });
+    await keyUpElement(window, { key: "ArrowRight" });
+    await keyDownElement(expectDefined(projectList(), "Expected project list"), {
+      key: "ArrowDown",
+    });
+    await keyUpElement(window, { key: "ArrowDown" });
 
     await waitFor(() => {
       expect(activePane()).toHaveAttribute("data-history-pane", "project");
@@ -331,8 +369,8 @@ describe("App history navigation", () => {
     });
 
     const globalSearchButton = screen.getByRole("button", { name: "Search" });
-    globalSearchButton.focus();
-    fireEvent.keyDown(document.activeElement ?? window, { key: "Tab" });
+    await focusElement(globalSearchButton);
+    await keyDownElement(document.activeElement ?? window, { key: "Tab" });
     await waitFor(() => {
       expect(document.activeElement).toBe(projectList());
     });
@@ -365,7 +403,7 @@ describe("App history navigation", () => {
     const projectHeaderElement = expectDefined(projectHeader(), "Expected project pane header");
     const sessionHeaderElement = expectDefined(sessionHeader(), "Expected session pane header");
 
-    fireEvent.mouseDown(projectHeaderElement);
+    await mouseDownElement(projectHeaderElement);
     await waitFor(() => {
       expect(container.querySelector('[data-pane-active="true"]')).toHaveAttribute(
         "data-history-pane",
@@ -373,7 +411,7 @@ describe("App history navigation", () => {
       );
     });
 
-    fireEvent.mouseDown(sessionHeaderElement);
+    await mouseDownElement(sessionHeaderElement);
     await waitFor(() => {
       expect(container.querySelector('[data-pane-active="true"]')).toHaveAttribute(
         "data-history-pane",
@@ -400,10 +438,10 @@ describe("App history navigation", () => {
     const expandProjectsButton = screen.queryByRole("button", { name: "Expand Projects pane" });
     const expandSessionsButton = screen.queryByRole("button", { name: "Expand Sessions pane" });
     if (expandProjectsButton) {
-      fireEvent.click(expandProjectsButton);
+      await clickElement(expandProjectsButton);
     }
     if (expandSessionsButton) {
-      fireEvent.click(expandSessionsButton);
+      await clickElement(expandSessionsButton);
     }
 
     await waitFor(() => {
@@ -411,12 +449,12 @@ describe("App history navigation", () => {
       expect(screen.getByRole("button", { name: "Collapse Sessions pane" })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Sessions pane" }));
+    await clickElement(screen.getByRole("button", { name: "Collapse Sessions pane" }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Expand Sessions pane" })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Projects pane" }));
+    await clickElement(screen.getByRole("button", { name: "Collapse Projects pane" }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Expand Projects pane" })).toBeInTheDocument();
     });
