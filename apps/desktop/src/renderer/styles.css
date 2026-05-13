@@ -1683,6 +1683,12 @@ body.platform-macos .titlebar-left {
   color: var(--accent-orange);
 }
 
+.tag-claude-saka,
+.provider-chip.provider-claude-saka {
+  background: var(--accent-red-dim);
+  color: var(--accent-red);
+}
+
 .tag-codex,
 .provider-chip.provider-codex {
   background: var(--accent-blue-dim);
@@ -1717,6 +1723,12 @@ body.platform-macos .titlebar-left {
 .tag-claude.active,
 .provider-chip.active.provider-claude {
   background: var(--accent-orange);
+  color: #ffffff;
+}
+
+.tag-claude-saka.active,
+.provider-chip.active.provider-claude-saka {
+  background: var(--accent-red);
   color: #ffffff;
 }
 
@@ -2279,6 +2291,11 @@ body.platform-macos .titlebar-left {
 .meta-tag.claude {
   background: var(--accent-orange-dim);
   color: var(--accent-orange);
+}
+
+.meta-tag.claude-saka {
+  background: var(--accent-red-dim);
+  color: var(--accent-red);
 }
 
 .meta-tag.gemini {
@@ -3162,6 +3179,10 @@ button svg *,
 
 .provider-label.provider-claude {
   color: var(--accent-orange);
+}
+
+.provider-label.provider-claude-saka {
+  color: var(--accent-red);
 }
 
 .provider-label.provider-codex {
@@ -4429,6 +4450,12 @@ mark {
   background: color-mix(in srgb, var(--accent-orange-dim) 56%, var(--bg-elevated));
 }
 
+.search-filter-chip-provider-claude-saka {
+  color: color-mix(in srgb, var(--accent-red) 88%, var(--text-secondary));
+  border-color: color-mix(in srgb, var(--accent-red) 20%, var(--border));
+  background: color-mix(in srgb, var(--accent-red-dim) 56%, var(--bg-elevated));
+}
+
 .search-filter-chip-provider-codex {
   color: color-mix(in srgb, var(--accent-blue) 88%, var(--text-secondary));
   border-color: color-mix(in srgb, var(--accent-blue) 20%, var(--border));
@@ -4460,6 +4487,11 @@ mark {
 .search-filter-chip-provider-claude.is-active {
   background: color-mix(in srgb, var(--accent-orange) 18%, var(--bg-surface));
   border-color: color-mix(in srgb, var(--accent-orange) 36%, transparent);
+}
+
+.search-filter-chip-provider-claude-saka.is-active {
+  background: color-mix(in srgb, var(--accent-red) 18%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--accent-red) 36%, transparent);
 }
 
 .search-filter-chip-provider-codex.is-active {
@@ -4596,6 +4628,10 @@ mark {
   background: var(--accent-orange);
 }
 
+.search-result-card-claude-saka .search-result-accent {
+  background: var(--accent-red);
+}
+
 .search-result-card-codex .search-result-accent {
   background: var(--accent-blue);
 }
@@ -4641,6 +4677,11 @@ mark {
 .search-result-provider-claude {
   background: color-mix(in srgb, var(--accent-orange-dim) 82%, transparent);
   color: var(--accent-orange);
+}
+
+.search-result-provider-claude-saka {
+  background: color-mix(in srgb, var(--accent-red-dim) 82%, transparent);
+  color: var(--accent-red);
 }
 
 .search-result-provider-codex {
@@ -5614,6 +5655,11 @@ mark {
   --switch-accent-dim: var(--accent-orange-dim);
 }
 
+.settings-switch-claude-saka {
+  --switch-accent: var(--accent-red);
+  --switch-accent-dim: var(--accent-red-dim);
+}
+
 .settings-switch-codex {
   --switch-accent: var(--accent-blue);
   --switch-accent-dim: var(--accent-blue-dim);
@@ -5730,6 +5776,12 @@ mark {
 .settings-provider-row-claude {
   --provider-accent: var(--accent-orange);
   --provider-accent-dim: var(--accent-orange-dim);
+}
+
+.settings-provider-dot-claude-saka,
+.settings-provider-row-claude-saka {
+  --provider-accent: var(--accent-red);
+  --provider-accent-dim: var(--accent-red-dim);
 }
 
 .settings-provider-dot-codex,
@@ -5964,6 +6016,11 @@ mark {
 .settings-provider-claude {
   background: var(--accent-orange-dim);
   color: var(--accent-orange);
+}
+
+.settings-provider-claude-saka {
+  background: var(--accent-red-dim);
+  color: var(--accent-red);
 }
 
 .settings-provider-codex {

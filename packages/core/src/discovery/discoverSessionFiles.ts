@@ -36,7 +36,7 @@ export function resolveDiscoveryConfig(
     providers: createProviderRecord((provider) => ({
       paths: resolveProviderPaths(provider, merged),
       options: {
-        includeSubagents: provider === "claude" ? merged.includeClaudeSubagents : false,
+        includeSubagents: provider === "claude" || provider === "claude-saka" ? merged.includeClaudeSubagents : false,
       },
     })),
     enabledProviders: resolveEnabledProviders(merged.enabledProviders),
@@ -120,7 +120,8 @@ export function discoverSingleFile(
   const resolvedConfig = resolveDiscoveryConfig(config);
   if (
     /[\\/]subagents[\\/]/.test(filePath) &&
-    !resolvedConfig.providers.claude.options.includeSubagents
+    !resolvedConfig.providers.claude.options.includeSubagents &&
+    !resolvedConfig.providers["claude-saka"].options.includeSubagents
   ) {
     return null;
   }

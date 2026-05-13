@@ -136,6 +136,7 @@ function Harness({ logError }: { logError: (context: string, error: unknown) => 
     Record<Provider, string[]>
   >({
     claude: [],
+    "claude-saka": [],
     codex: [],
     gemini: [],
     cursor: [],
@@ -332,6 +333,7 @@ describe("usePaneStateSync", () => {
             sessionScrollTop: 222,
             systemMessageRegexRules: {
               claude: ["^<command-name>"],
+              "claude-saka": [],
               codex: ["^<environment_context>"],
               gemini: [],
               cursor: [],

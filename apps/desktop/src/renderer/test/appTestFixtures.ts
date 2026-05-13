@@ -20,6 +20,7 @@ const EMPTY_INDEXER_CONFIG = Object.fromEntries(
 const SETTINGS_INFO = createSettingsInfoFixture();
 const EMPTY_PROVIDER_COUNTS = {
   claude: 0,
+  "claude-saka": 0,
   codex: 0,
   gemini: 0,
   cursor: 0,

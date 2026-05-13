@@ -21,6 +21,7 @@ const LIVE_STATUS_HIDDEN_POLL_MS = IS_TEST_ENV ? 0 : 15_000;
 export const LIVE_STATUS_PUSH_DEBOUNCE_MS = 200;
 const EMPTY_PROVIDER_COUNTS = {
   claude: 0,
+  "claude-saka": 0,
   codex: 0,
   gemini: 0,
   cursor: 0,

@@ -61,7 +61,7 @@ type FileCursorState = {
 
 type StartupSeedCandidate = {
   filePath: string;
-  provider: "claude" | "codex";
+  provider: "claude" | "claude-saka" | "codex";
   fileMtimeMs: number;
 };
 
@@ -344,8 +344,8 @@ export class LiveSessionStore {
     }
 
     const providers = this.discoveryConfig.enabledProviders?.filter(
-      (provider) => provider === "claude" || provider === "codex",
-    ) ?? ["claude", "codex"];
+      (provider) => provider === "claude" || provider === "claude-saka" || provider === "codex",
+    ) ?? ["claude", "claude-saka", "codex"];
     const cutoffMs = this.now() - STARTUP_SEED_WINDOW_MS;
     const candidates = this.queryService.listRecentLiveSessionFiles({
       providers,
@@ -377,7 +377,7 @@ export class LiveSessionStore {
     }
 
     const discovered = discoverSingleFile(filePath, this.discoveryConfig);
-    if (!discovered || (discovered.provider !== "claude" && discovered.provider !== "codex")) {
+    if (!discovered || (discovered.provider !== "claude" && discovered.provider !== "claude-saka" && discovered.provider !== "codex")) {
       return;
     }
 
@@ -552,7 +552,7 @@ export class LiveSessionStore {
           continue;
         }
         const discovered = discoverSingleFile(transcriptPath, this.discoveryConfig);
-        if (!discovered || discovered.provider !== "claude") {
+        if (!discovered || (discovered.provider !== "claude" && discovered.provider !== "claude-saka")) {
           continue;
         }
         const cursor = this.ensureCursor(discovered.filePath, discovered);

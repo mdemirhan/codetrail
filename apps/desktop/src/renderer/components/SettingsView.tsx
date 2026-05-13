@@ -166,6 +166,7 @@ const DIFF_VIEW_MODE_OPTIONS: Array<{ value: DiffViewMode; label: string }> =
 
 const PROVIDER_ICONS: Record<Provider, string> = {
   claude: "C",
+  "claude-saka": "S",
   codex: "X",
   gemini: "G",
   cursor: "U",

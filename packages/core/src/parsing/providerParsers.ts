@@ -97,6 +97,7 @@ function parseEventStreamPayload(
 
 export const PROVIDER_EVENT_PARSERS: Record<Provider, ProviderEventParser> = {
   claude: parseClaudeEvent,
+  "claude-saka": parseClaudeEvent,
   codex: parseCodexEvent,
   gemini: parseGeminiEvent,
   cursor: parseCursorEvent,
@@ -105,6 +106,7 @@ export const PROVIDER_EVENT_PARSERS: Record<Provider, ProviderEventParser> = {
 
 export const PROVIDER_PAYLOAD_PARSERS: Record<Provider, ProviderPayloadParser> = {
   claude: (args) => parseEventStreamPayload(args, extractEvents),
+  "claude-saka": (args) => parseEventStreamPayload(args, extractEvents),
   codex: (args) => parseEventStreamPayload(args, extractEvents),
   gemini: (args) => parseEventStreamPayload(args, extractGeminiEvents),
   cursor: (args) => parseEventStreamPayload(args, extractEvents),

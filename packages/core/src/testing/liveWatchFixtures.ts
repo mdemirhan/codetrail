@@ -32,6 +32,7 @@ export function createLiveStatusFixture(
     updatedAt: input.updatedAt ?? "2026-03-24T10:00:00.000Z",
     providerCounts: input.providerCounts ?? {
       claude: 0,
+      "claude-saka": 0,
       codex: 0,
       gemini: 0,
       cursor: 0,

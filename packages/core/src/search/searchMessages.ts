@@ -133,11 +133,12 @@ export function searchMessages(
          COALESCE(SUM(CASE WHEN category = 'tool_result' THEN 1 ELSE 0 END), 0) as tool_result_count,
          COALESCE(SUM(CASE WHEN category = 'thinking' THEN 1 ELSE 0 END), 0) as thinking_count,
          COALESCE(SUM(CASE WHEN category = 'system' THEN 1 ELSE 0 END), 0) as system_count,
-         COALESCE(SUM(CASE WHEN provider = 'claude' THEN 1 ELSE 0 END), 0) as claude_count,
-         COALESCE(SUM(CASE WHEN provider = 'codex' THEN 1 ELSE 0 END), 0) as codex_count,
-         COALESCE(SUM(CASE WHEN provider = 'gemini' THEN 1 ELSE 0 END), 0) as gemini_count,
-         COALESCE(SUM(CASE WHEN provider = 'cursor' THEN 1 ELSE 0 END), 0) as cursor_count,
-         COALESCE(SUM(CASE WHEN provider = 'copilot' THEN 1 ELSE 0 END), 0) as copilot_count
+          COALESCE(SUM(CASE WHEN provider = 'claude' THEN 1 ELSE 0 END), 0) as claude_count,
+          COALESCE(SUM(CASE WHEN provider = 'claude-saka' THEN 1 ELSE 0 END), 0) as claude_saka_count,
+          COALESCE(SUM(CASE WHEN provider = 'codex' THEN 1 ELSE 0 END), 0) as codex_count,
+          COALESCE(SUM(CASE WHEN provider = 'gemini' THEN 1 ELSE 0 END), 0) as gemini_count,
+          COALESCE(SUM(CASE WHEN provider = 'cursor' THEN 1 ELSE 0 END), 0) as cursor_count,
+          COALESCE(SUM(CASE WHEN provider = 'copilot' THEN 1 ELSE 0 END), 0) as copilot_count
        FROM facet_matches`,
     )
     .get(...facetWhereParams, ...categoryFilter.params) as
@@ -151,6 +152,7 @@ export function searchMessages(
         thinking_count: number;
         system_count: number;
         claude_count: number;
+        claude_saka_count: number;
         codex_count: number;
         gemini_count: number;
         cursor_count: number;
@@ -166,6 +168,7 @@ export function searchMessages(
   categoryCounts.thinking = Number(summaryRow?.thinking_count ?? 0);
   categoryCounts.system = Number(summaryRow?.system_count ?? 0);
   providerCounts.claude = Number(summaryRow?.claude_count ?? 0);
+  providerCounts["claude-saka"] = Number(summaryRow?.claude_saka_count ?? 0);
   providerCounts.codex = Number(summaryRow?.codex_count ?? 0);
   providerCounts.gemini = Number(summaryRow?.gemini_count ?? 0);
   providerCounts.cursor = Number(summaryRow?.cursor_count ?? 0);

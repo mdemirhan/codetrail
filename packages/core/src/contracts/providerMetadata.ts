@@ -9,7 +9,8 @@ export type ProviderDiscoveryPathKey =
   | "geminiHistoryRoot"
   | "geminiProjectsPath"
   | "cursorRoot"
-  | "copilotRoot";
+  | "copilotRoot"
+  | "claudeSakaRoot";
 
 export type ProviderDiscoveryPathDefinition = {
   key: ProviderDiscoveryPathKey;
@@ -31,6 +32,17 @@ export const PROVIDER_METADATA: Record<Provider, ProviderMetadata> = {
     label: "Claude",
     sourceFormat: "jsonl_stream",
     discoveryPaths: [{ key: "claudeRoot", label: "Claude root", watch: true }],
+    defaultSystemMessageRegexRules: [
+      "^<command-name>",
+      "^<local-command-stdout>",
+      "^<local-command-caveat>",
+    ],
+  },
+  "claude-saka": {
+    id: "claude-saka",
+    label: "Claude Saka",
+    sourceFormat: "jsonl_stream",
+    discoveryPaths: [{ key: "claudeSakaRoot", label: "Claude Saka root", watch: true }],
     defaultSystemMessageRegexRules: [
       "^<command-name>",
       "^<local-command-stdout>",

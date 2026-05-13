@@ -46,6 +46,7 @@ export function createDefaultDiscoveryConfig(
   const homeDir = environment.homeDir ?? homedir();
   return {
     claudeRoot: join(homeDir, ".claude", "projects"),
+    claudeSakaRoot: join(homeDir, ".claude-corp", "claude-config", "projects"),
     codexRoot: join(homeDir, ".codex", "sessions"),
     geminiRoot: join(homeDir, ".gemini", "tmp"),
     geminiHistoryRoot: join(homeDir, ".gemini", "history"),

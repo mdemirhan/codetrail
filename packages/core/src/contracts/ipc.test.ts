@@ -483,6 +483,7 @@ const channelExamples: Record<IpcChannel, ChannelExample> = {
       enabled: true,
       providerCounts: {
         claude: 1,
+        "claude-saka": 0,
         codex: 0,
         gemini: 0,
         cursor: 0,

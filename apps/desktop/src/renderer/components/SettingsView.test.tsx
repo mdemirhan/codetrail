@@ -130,6 +130,7 @@ function createBaseProps(): Omit<
       updatedAt: "2026-03-16T10:05:04.000Z",
       providerCounts: {
         claude: 1,
+        "claude-saka": 0,
         codex: 1,
         gemini: 0,
         cursor: 0,
@@ -301,6 +302,7 @@ function createBaseProps(): Omit<
     messageRules: {
       systemMessageRegexRules: {
         claude: ["^<command-name>"],
+        "claude-saka": [],
         codex: ["^<environment_context>"],
         gemini: [],
         cursor: [],

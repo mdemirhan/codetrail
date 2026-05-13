@@ -473,7 +473,9 @@ function sanitizeIndexingState(value: unknown): IndexingConfigState | null {
   }
 
   const record = value as Record<string, unknown>;
-  const enabledProviders = sanitizeStringArray(record.enabledProviders, PROVIDER_VALUES);
+  const enabledProviders = addMissingProviders(
+    sanitizeStringArray(record.enabledProviders, PROVIDER_VALUES),
+  );
   const removeMissingSessionsDuringIncrementalIndexing = sanitizeOptionalBoolean(
     record.removeMissingSessionsDuringIncrementalIndexing,
   );
