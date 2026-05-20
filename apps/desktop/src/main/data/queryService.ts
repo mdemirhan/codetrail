@@ -254,8 +254,26 @@ type ProjectTurnSessionFamily = {
 const TURN_ANCHOR_WHERE_SQL = `(
   (
     m.turn_group_id IS NOT NULL
-    AND m.source_id = m.turn_group_id
+    AND m.category = 'user'
     AND m.turn_anchor_kind = 'user_prompt'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM messages earlier
+      WHERE earlier.session_id = m.session_id
+        AND earlier.turn_group_id = m.turn_group_id
+        AND earlier.category = 'user'
+        AND earlier.turn_anchor_kind = 'user_prompt'
+        AND (
+          earlier.created_at_ms < m.created_at_ms
+          OR (
+            earlier.created_at_ms = m.created_at_ms
+            AND (
+              earlier.created_at < m.created_at
+              OR (earlier.created_at = m.created_at AND earlier.id < m.id)
+            )
+          )
+        )
+    )
   )
   OR (m.turn_group_id IS NULL AND m.category = 'user')
 )`;
@@ -2012,9 +2030,10 @@ function loadContainingTurnAnchorByTargetMessage(
            m.source_id,
            m.turn_group_id,
            m.turn_anchor_kind
-         FROM messages m
-         WHERE m.session_id = ?
-           AND m.source_id = ?
+       FROM messages m
+       WHERE m.session_id = ?
+           AND m.turn_group_id = ?
+           AND m.category = 'user'
            AND m.turn_anchor_kind = 'user_prompt'
          ORDER BY m.created_at_ms ASC, m.created_at ASC, m.id ASC
          LIMIT 1`,

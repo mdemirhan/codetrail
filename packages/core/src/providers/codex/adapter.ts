@@ -7,9 +7,11 @@ import type { ProviderAdapter } from "../types";
 import { discoverCodexFiles, discoverSingleCodexFile } from "./discovery";
 import {
   annotateFlushedCodexPendingMessage,
+  createCodexIndexingState,
   flushCodexPendingMessagesBeforeEvent,
   normalizeCodexProjectPaths,
   prepareCodexMessagesForPersistence,
+  processCodexIndexedEvent,
   updateCodexTurnGroupingStateAfterEvent,
   updateCodexTurnGroupingStateBeforeEvent,
 } from "./indexing";
@@ -66,6 +68,7 @@ export const codexAdapter: ProviderAdapter = {
   },
   normalizeMessageTimestamp: defaultTimestampNormalization,
   normalizeProjectPaths: normalizeCodexProjectPaths,
+  createIndexingState: createCodexIndexingState,
   prepareMessagesForPersistence: ({ event, processingState, messages }) =>
     prepareCodexMessagesForPersistence({
       event,
@@ -76,6 +79,7 @@ export const codexAdapter: ProviderAdapter = {
   updateTurnGroupingAfterEvent: updateCodexTurnGroupingStateAfterEvent,
   flushPendingMessagesBeforeEvent: flushCodexPendingMessagesBeforeEvent,
   annotateFlushedPendingMessage: annotateFlushedCodexPendingMessage,
+  processIndexedEvent: processCodexIndexedEvent,
   liveSession: {
     applyTranscriptLine: applyCodexLiveLine,
     transcriptTraceSource: "codex_transcript",

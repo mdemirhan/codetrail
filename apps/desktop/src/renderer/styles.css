@@ -8421,7 +8421,6 @@ mark {
   align-self: start;
 }
 
-.dashboard-redesign-eyebrow,
 .dashboard-redesign-micro-label,
 .dashboard-redesign-panel-kicker,
 .dashboard-redesign-section-label {
@@ -8445,7 +8444,6 @@ mark {
   color: var(--dashboard-redesign-gold);
 }
 
-.dashboard-redesign-subtitle,
 .dashboard-redesign-muted-copy,
 .dashboard-redesign-stat-meta,
 .dashboard-redesign-panel-copy,
@@ -8454,13 +8452,6 @@ mark {
 .dashboard-redesign-provider-value span,
 .dashboard-redesign-ranked-value span {
   color: var(--dashboard-redesign-text-secondary);
-}
-
-.dashboard-redesign-subtitle {
-  margin: 0;
-  max-width: 60ch;
-  font-size: 12px;
-  line-height: 1.55;
 }
 
 .dashboard-redesign-hero-side {

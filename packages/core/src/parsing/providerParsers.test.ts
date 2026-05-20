@@ -94,6 +94,58 @@ describe("parseProviderPayload (Gemini attachment normalization)", () => {
   });
 });
 
+describe("parseProviderPayload (Claude noise filtering)", () => {
+  it("drops signature-only empty thinking assistant events", () => {
+    const diagnostics: ParserDiagnostic[] = [];
+
+    const messages = parseProviderPayload({
+      provider: "claude",
+      sessionId: "claude-noise",
+      payload: [
+        {
+          type: "assistant",
+          uuid: "empty-thinking",
+          timestamp: "2026-05-09T05:24:16.627Z",
+          message: {
+            role: "assistant",
+            content: [{ type: "thinking", thinking: "", signature: "signed-empty-block" }],
+          },
+        },
+      ],
+      diagnostics,
+    });
+
+    expect(messages).toHaveLength(0);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("drops duplicate Claude last-prompt and attachment bookkeeping events", () => {
+    const diagnostics: ParserDiagnostic[] = [];
+
+    const messages = parseProviderPayload({
+      provider: "claude",
+      sessionId: "claude-noise",
+      payload: [
+        {
+          type: "last-prompt",
+          lastPrompt: "Do the thing",
+          leafUuid: "leaf-1",
+          sessionId: "claude-noise",
+        },
+        {
+          type: "attachment",
+          uuid: "attachment-1",
+          attachment: { type: "todo_reminder", content: [], itemCount: 0 },
+        },
+      ],
+      diagnostics,
+    });
+
+    expect(messages).toHaveLength(0);
+    expect(diagnostics).toHaveLength(0);
+  });
+});
+
 describe("parseProviderPayload (Copilot)", () => {
   it("parses user messages and markdown responses", () => {
     const payload = {

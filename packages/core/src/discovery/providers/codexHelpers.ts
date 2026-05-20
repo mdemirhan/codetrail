@@ -1,7 +1,22 @@
+import { basename, dirname, join } from "node:path";
+
 import { asArray, asRecord, readString } from "../../parsing/helpers";
 import type { ResolvedDiscoveryDependencies } from "../shared";
 import { readLeadingNonEmptyLines } from "../shared";
 import { inferGitCanonicalProjectPath, matchCodexManagedWorktree } from "./worktreeHelpers";
+
+const MAX_CODEX_SESSION_INDEX_BYTES = 16 * 1024 * 1024;
+
+type CodexThreadNameIndexCacheEntry = {
+  size: number;
+  mtimeMs: number;
+  namesBySessionId: Map<string, string>;
+};
+
+const codexThreadNameIndexCache = new WeakMap<
+  ResolvedDiscoveryDependencies["fs"],
+  Map<string, CodexThreadNameIndexCacheEntry | null>
+>();
 
 export function readCodexJsonlMeta(
   filePath: string,
@@ -22,6 +37,7 @@ export function readCodexJsonlMeta(
   cliVersion: string | null;
   modelProvider: string | null;
   dynamicToolsCount: number;
+  threadName: string | null;
   resolutionSource: string;
 } {
   const lines = readLeadingNonEmptyLines(filePath, 160, 512 * 1024, dependencies);
@@ -116,6 +132,7 @@ export function readCodexJsonlMeta(
   const liveGit = inferGitCanonicalProjectPath(cwd, dependencies);
   const codexManagedWorktree = matchCodexManagedWorktree(cwd);
   const worktreeLabel = codexManagedWorktree?.slot ?? null;
+  const threadName = readCodexThreadName(filePath, sessionId, dependencies);
   if (parentSessionCwd) {
     return {
       sessionId,
@@ -133,6 +150,7 @@ export function readCodexJsonlMeta(
       cliVersion,
       modelProvider,
       dynamicToolsCount,
+      threadName,
       resolutionSource: worktreeLabel ? "codex_fork" : "cwd",
     };
   }
@@ -153,8 +171,116 @@ export function readCodexJsonlMeta(
     cliVersion,
     modelProvider,
     dynamicToolsCount,
+    threadName,
     resolutionSource: worktreeLabel && liveGit ? "git_live" : "cwd",
   };
+}
+
+function readCodexThreadName(
+  filePath: string,
+  sessionId: string | null,
+  dependencies: ResolvedDiscoveryDependencies,
+): string | null {
+  if (!sessionId) {
+    return null;
+  }
+
+  const codexHome = findCodexHomeForSessionFile(filePath);
+  if (!codexHome) {
+    return null;
+  }
+
+  const sessionIndexPath = join(codexHome, "session_index.jsonl");
+  const index = readCodexThreadNameIndex(sessionIndexPath, dependencies);
+  return index?.get(sessionId) ?? null;
+}
+
+function readCodexThreadNameIndex(
+  sessionIndexPath: string,
+  dependencies: ResolvedDiscoveryDependencies,
+): Map<string, string> | null {
+  let cacheByPath = codexThreadNameIndexCache.get(dependencies.fs);
+  if (!cacheByPath) {
+    cacheByPath = new Map();
+    codexThreadNameIndexCache.set(dependencies.fs, cacheByPath);
+  }
+
+  let stat: { size: number; mtimeMs: number };
+  try {
+    stat = dependencies.fs.statSync(sessionIndexPath);
+  } catch {
+    cacheByPath.set(sessionIndexPath, null);
+    return null;
+  }
+  if (stat.size > MAX_CODEX_SESSION_INDEX_BYTES) {
+    cacheByPath.set(sessionIndexPath, null);
+    return null;
+  }
+
+  const cached = cacheByPath.get(sessionIndexPath);
+  if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) {
+    return cached.namesBySessionId;
+  }
+
+  let content: string;
+  try {
+    content = dependencies.fs.readFileSync(sessionIndexPath, "utf8");
+  } catch {
+    cacheByPath.set(sessionIndexPath, null);
+    return null;
+  }
+
+  const entriesBySessionId = new Map<string, { name: string; updatedAt: string }>();
+  for (const line of content.split(/\r?\n/)) {
+    if (line.trim().length === 0) {
+      continue;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const record = asRecord(parsed);
+    const sessionId = readString(record?.id);
+    if (!sessionId) {
+      continue;
+    }
+    const threadName = readString(record?.thread_name);
+    if (!threadName) {
+      continue;
+    }
+    const updatedAt = readString(record?.updated_at) ?? "";
+    const existing = entriesBySessionId.get(sessionId);
+    if (!existing || updatedAt >= existing.updatedAt) {
+      entriesBySessionId.set(sessionId, { name: threadName, updatedAt });
+    }
+  }
+
+  const namesBySessionId = new Map(
+    [...entriesBySessionId.entries()].map(([id, entry]) => [id, entry.name]),
+  );
+  cacheByPath.set(sessionIndexPath, {
+    size: stat.size,
+    mtimeMs: stat.mtimeMs,
+    namesBySessionId,
+  });
+  return namesBySessionId;
+}
+
+function findCodexHomeForSessionFile(filePath: string): string | null {
+  let current = dirname(filePath);
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (basename(current) === "sessions") {
+      return dirname(current);
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+  return null;
 }
 
 function parseFunctionCallArguments(argumentsText: string | null): Record<string, unknown> | null {

@@ -233,7 +233,6 @@ describe("App shell", () => {
       expect(screen.getByRole("heading", { name: "Activity Dashboard" })).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Workspace telemetry")).toBeInTheDocument();
     expect(countChannelCalls(client, "dashboard:getStats")).toBeGreaterThanOrEqual(1);
   });
 

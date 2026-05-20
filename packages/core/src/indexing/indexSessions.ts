@@ -1545,13 +1545,14 @@ function indexStreamedJsonlSessionFile(args: {
       const sourceMeta = finalizeSourceMetadata(sourceMetaAccumulator);
       const aggregate = finalizeSessionAggregate(processingState.aggregate);
       const modelNames = sourceMeta.models.join(",");
+      const discoveredSessionTitle = readString(args.discovered.metadata.sessionMetadata?.title);
 
       upsertSessionSummary(args.statements, {
         sessionDbId: args.sessionDbId,
         projectId,
         provider: args.discovered.provider,
         filePath: args.discovered.filePath,
-        title: processingState.aggregate.title || modelNames,
+        title: discoveredSessionTitle || processingState.aggregate.title || modelNames,
         modelNames,
         aggregate,
         messageCount: processingState.aggregate.messageCount,

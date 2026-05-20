@@ -265,14 +265,9 @@ export function DashboardView({
     <div className="dashboard-view dashboard-redesign" ref={rootRef} tabIndex={-1}>
       <header className="dashboard-redesign-hero">
         <div className="dashboard-redesign-hero-main">
-          <p className="dashboard-redesign-eyebrow">Workspace telemetry</p>
           <h1 className="dashboard-redesign-title">
             Activity <span>Dashboard</span>
           </h1>
-          <p className="dashboard-redesign-subtitle">
-            Workspace telemetry across all providers, sessions, projects, message categories, and
-            indexed AI write activity.
-          </p>
         </div>
 
         <div className="dashboard-redesign-hero-side">

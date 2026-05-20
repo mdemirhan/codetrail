@@ -66,6 +66,7 @@ function toDiscoveredCodexFile(
       resolutionSource: meta.resolutionSource,
       projectMetadata: null,
       sessionMetadata: compactMetadata({
+        title: meta.threadName,
         modelProvider: meta.modelProvider,
         dynamicToolsCount: meta.dynamicToolsCount || undefined,
       }),

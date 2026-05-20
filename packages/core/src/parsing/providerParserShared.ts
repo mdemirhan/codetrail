@@ -400,6 +400,12 @@ export function extractDurationSeconds(value: unknown): number | null {
   }
 
   const metadata = asRecord(record.metadata);
+  const secs = parseNonNegativeNumber(record.secs);
+  const nanos = parseNonNegativeNumber(record.nanos);
+  if (secs !== null || nanos !== null) {
+    return (secs ?? 0) + (nanos ?? 0) / 1_000_000_000;
+  }
+
   const direct = [
     record.duration_seconds,
     record.durationSeconds,

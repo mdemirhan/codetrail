@@ -54,7 +54,10 @@ export function parseClaudeEvent(args: ParseProviderEventArgs): ParseProviderEve
   if (
     sourceType === "progress" ||
     sourceType === "file-history-snapshot" ||
-    sourceType === "queue-operation"
+    sourceType === "queue-operation" ||
+    sourceType === "last-prompt" ||
+    sourceType === "attachment" ||
+    isEmptyClaudeThinkingOnlyEvent(sourceType, normalized)
   ) {
     return { messages: output, nextSequence: sequence };
   }
@@ -158,4 +161,27 @@ function parseClaudeSegments(
     segments.push({ category: "system", content: fallback });
   }
   return segments;
+}
+
+function isEmptyClaudeThinkingOnlyEvent(
+  sourceType: string | null,
+  event: Record<string, unknown>,
+): boolean {
+  if (sourceType !== "assistant" && sourceType !== "model") {
+    return false;
+  }
+
+  const content = event.content;
+  if (!Array.isArray(content) || content.length === 0) {
+    return false;
+  }
+
+  return content.every((block) => {
+    const blockRecord = asRecord(block);
+    if (!blockRecord || lowerString(blockRecord.type) !== "thinking") {
+      return false;
+    }
+    const thinking = blockRecord.thinking;
+    return typeof thinking === "string" && thinking.trim().length === 0;
+  });
 }

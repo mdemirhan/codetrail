@@ -1381,6 +1381,25 @@ describe("runIncrementalIndexing", () => {
           },
         }),
         JSON.stringify({
+          timestamp: "2026-04-11T09:52:40.500Z",
+          type: "response_item",
+          payload: {
+            type: "message",
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: [
+                  "<environment_context>",
+                  "  <cwd>/workspace/codex</cwd>",
+                  "  <shell>zsh</shell>",
+                  "</environment_context>",
+                ].join("\n"),
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
           timestamp: "2026-04-11T09:52:40.000Z",
           type: "turn_context",
           payload: { turn_id: "native-turn-1" },
@@ -1508,48 +1527,56 @@ describe("runIncrementalIndexing", () => {
     expect(rows).toEqual([
       {
         source_id: "codex-session-turn-groups:msg:0",
-        category: "user",
-        turn_group_id: "codex-session-turn-groups:msg:0",
+        category: "system",
+        turn_group_id: null,
         turn_grouping_mode: "hybrid",
-        turn_anchor_kind: "user_prompt",
-        native_turn_id: "native-turn-1",
+        turn_anchor_kind: null,
+        native_turn_id: null,
       },
       {
         source_id: "codex-session-turn-groups:msg:1",
-        category: "assistant",
-        turn_group_id: "codex-session-turn-groups:msg:0",
+        category: "user",
+        turn_group_id: "codex-session-turn-groups:msg:1",
         turn_grouping_mode: "hybrid",
-        turn_anchor_kind: null,
+        turn_anchor_kind: "user_prompt",
         native_turn_id: "native-turn-1",
       },
       {
         source_id: "codex-session-turn-groups:msg:2",
-        category: "user",
-        turn_group_id: "codex-session-turn-groups:msg:0",
-        turn_grouping_mode: "hybrid",
-        turn_anchor_kind: "user_prompt",
-        native_turn_id: "native-turn-1",
-      },
-      {
-        source_id: "codex-session-turn-groups:msg:3",
         category: "assistant",
-        turn_group_id: "codex-session-turn-groups:msg:0",
+        turn_group_id: "codex-session-turn-groups:msg:1",
         turn_grouping_mode: "hybrid",
         turn_anchor_kind: null,
         native_turn_id: "native-turn-1",
       },
       {
-        source_id: "codex-session-turn-groups:msg:4",
+        source_id: "codex-session-turn-groups:msg:3",
         category: "user",
-        turn_group_id: "codex-session-turn-groups:msg:4",
+        turn_group_id: "codex-session-turn-groups:msg:1",
+        turn_grouping_mode: "hybrid",
+        turn_anchor_kind: "user_prompt",
+        native_turn_id: "native-turn-1",
+      },
+      {
+        source_id: "codex-session-turn-groups:msg:4",
+        category: "assistant",
+        turn_group_id: "codex-session-turn-groups:msg:1",
+        turn_grouping_mode: "hybrid",
+        turn_anchor_kind: null,
+        native_turn_id: "native-turn-1",
+      },
+      {
+        source_id: "codex-session-turn-groups:msg:5",
+        category: "user",
+        turn_group_id: "codex-session-turn-groups:msg:5",
         turn_grouping_mode: "hybrid",
         turn_anchor_kind: "user_prompt",
         native_turn_id: "native-turn-2",
       },
       {
-        source_id: "codex-session-turn-groups:msg:5",
+        source_id: "codex-session-turn-groups:msg:6",
         category: "assistant",
-        turn_group_id: "codex-session-turn-groups:msg:4",
+        turn_group_id: "codex-session-turn-groups:msg:5",
         turn_grouping_mode: "hybrid",
         turn_anchor_kind: null,
         native_turn_id: "native-turn-2",
@@ -3483,6 +3510,293 @@ describe("runIncrementalIndexing", () => {
 
       expect(project.metadata_json).toBeNull();
       expect(session.metadata_json).toBeNull();
+    } finally {
+      db.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("uses Codex event messages for exact patch diffs, command metadata, and thread titles", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-codex-event-msg-"));
+    const dbPath = join(dir, "index.db");
+    const codexRoot = join(dir, ".codex", "sessions");
+    const sessionId = "codex-event-msg-session";
+    const sessionFile = join(codexRoot, "session.jsonl");
+    mkdirSync(codexRoot, { recursive: true });
+    writeFileSync(
+      join(dir, ".codex", "session_index.jsonl"),
+      `${JSON.stringify({
+        id: sessionId,
+        thread_name: "Audit provider event streams",
+        updated_at: "2026-05-12T12:00:39.703472Z",
+      })}\n`,
+    );
+    writeFileSync(
+      sessionFile,
+      `${[
+        JSON.stringify({
+          type: "session_meta",
+          timestamp: "2026-05-12T12:00:00.000Z",
+          payload: {
+            id: sessionId,
+            cwd: "/workspace/codex",
+            originator: "codex",
+            source: "cli",
+            cli_version: "1.0.0",
+            model_provider: "openai",
+            dynamic_tools: [],
+            git: { branch: "main", repository_url: "https://example.test/repo.git" },
+          },
+        }),
+        JSON.stringify({
+          type: "response_item",
+          timestamp: "2026-05-12T12:00:01.000Z",
+          payload: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: "Patch and inspect" }],
+          },
+        }),
+        JSON.stringify({
+          type: "event_msg",
+          timestamp: "2026-05-12T12:00:02.000Z",
+          payload: {
+            type: "user_message",
+            message: "Patch and inspect",
+            images: [],
+            local_images: [],
+            text_elements: [],
+          },
+        }),
+        JSON.stringify({
+          type: "response_item",
+          timestamp: "2026-05-12T12:00:03.000Z",
+          payload: {
+            type: "custom_tool_call",
+            call_id: "call_patch",
+            name: "apply_patch",
+            input: "*** Begin Patch\n*** Update File: src/a.ts\n@@\n-old\n+new\n*** End Patch",
+            status: "completed",
+          },
+        }),
+        JSON.stringify({
+          type: "event_msg",
+          timestamp: "2026-05-12T12:00:04.000Z",
+          payload: {
+            type: "patch_apply_end",
+            call_id: "call_patch",
+            turn_id: "turn-1",
+            stdout: "Success. Updated the following files:\nM src/a.ts\n",
+            stderr: "",
+            success: true,
+            status: "completed",
+            changes: {
+              "/workspace/codex/src/a.ts": {
+                type: "update",
+                unified_diff: "@@ -1 +1 @@\n-old\n+new\n",
+                move_path: null,
+              },
+            },
+          },
+        }),
+        JSON.stringify({
+          type: "response_item",
+          timestamp: "2026-05-12T12:00:05.000Z",
+          payload: {
+            type: "custom_tool_call_output",
+            call_id: "call_patch",
+            output: "Success. Updated the following files:\nM src/a.ts\n",
+          },
+        }),
+        JSON.stringify({
+          type: "response_item",
+          timestamp: "2026-05-12T12:00:06.000Z",
+          payload: {
+            type: "function_call",
+            call_id: "call_exec",
+            name: "exec_command",
+            arguments: JSON.stringify({ cmd: "rg old src", workdir: "/workspace/codex" }),
+          },
+        }),
+        JSON.stringify({
+          type: "event_msg",
+          timestamp: "2026-05-12T12:00:07.000Z",
+          payload: {
+            type: "exec_command_end",
+            call_id: "call_exec",
+            process_id: "123",
+            turn_id: "turn-1",
+            command: ["/bin/zsh", "-lc", "rg old src"],
+            cwd: "/workspace/codex",
+            parsed_cmd: [{ type: "search", query: "old", path: "src" }],
+            source: "unified_exec_startup",
+            stdout: "",
+            stderr: "",
+            aggregated_output: "",
+            exit_code: 1,
+            duration: { secs: 2, nanos: 500000000 },
+            formatted_output: "",
+            status: "completed",
+          },
+        }),
+        JSON.stringify({
+          type: "response_item",
+          timestamp: "2026-05-12T12:00:08.000Z",
+          payload: {
+            type: "function_call_output",
+            call_id: "call_exec",
+            output: "No matches",
+          },
+        }),
+      ].join("\n")}\n`,
+    );
+
+    runIncrementalIndexing({
+      dbPath,
+      discoveryConfig: createDiscoveryConfig(dir),
+      enabledProviders: ["codex"],
+    });
+
+    const db = openDatabase(dbPath);
+    try {
+      const session = db
+        .prepare("SELECT title FROM sessions WHERE file_path = ?")
+        .get(sessionFile) as { title: string };
+      expect(session.title).toBe("Audit provider event streams");
+
+      const edit = db
+        .prepare(
+          `SELECT file_path, change_type, unified_diff, added_line_count, removed_line_count, exactness
+           FROM message_tool_edit_files`,
+        )
+        .get() as {
+        file_path: string;
+        change_type: string;
+        unified_diff: string;
+        added_line_count: number;
+        removed_line_count: number;
+        exactness: string;
+      };
+      expect(edit.file_path).toBe("/workspace/codex/src/a.ts");
+      expect(edit.change_type).toBe("update");
+      expect(edit.unified_diff).toContain("-old");
+      expect(edit.unified_diff).toContain("+new");
+      expect(edit.added_line_count).toBe(1);
+      expect(edit.removed_line_count).toBe(1);
+      expect(edit.exactness).toBe("exact");
+
+      const commandResult = db
+        .prepare(
+          `SELECT m.operation_duration_ms, m.operation_duration_source, m.operation_duration_confidence,
+                  tc.result_json
+           FROM messages m
+           LEFT JOIN messages tool_m ON tool_m.session_id = m.session_id
+             AND tool_m.source_id = 'call_exec:function_call'
+           LEFT JOIN tool_calls tc ON tc.message_id = tool_m.id
+           WHERE m.source_id = 'call_exec:function_call_output'`,
+        )
+        .get() as {
+        operation_duration_ms: number;
+        operation_duration_source: string;
+        operation_duration_confidence: string;
+        result_json: string;
+      };
+      expect(commandResult.operation_duration_ms).toBe(2500);
+      expect(commandResult.operation_duration_source).toBe("native");
+      expect(commandResult.operation_duration_confidence).toBe("high");
+      expect(JSON.parse(commandResult.result_json)).toMatchObject({
+        exitCode: 1,
+        cwd: "/workspace/codex",
+        processId: "123",
+        durationMs: 2500,
+      });
+    } finally {
+      db.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("restores Codex command duration when output arrives after a checkpoint", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codetrail-codex-command-resume-"));
+    const dbPath = join(dir, "index.db");
+    const sessionFile = join(dir, ".codex", "sessions", "session.jsonl");
+    mkdirSync(dirname(sessionFile), { recursive: true });
+    writeFileSync(
+      sessionFile,
+      `${[
+        JSON.stringify({
+          type: "session_meta",
+          timestamp: "2026-05-12T12:00:00.000Z",
+          payload: { id: "codex-command-resume", cwd: "/workspace/codex" },
+        }),
+        JSON.stringify({
+          type: "response_item",
+          timestamp: "2026-05-12T12:00:01.000Z",
+          payload: {
+            type: "function_call",
+            call_id: "call_exec",
+            name: "exec_command",
+            arguments: JSON.stringify({ cmd: "bun test", workdir: "/workspace/codex" }),
+          },
+        }),
+        JSON.stringify({
+          type: "event_msg",
+          timestamp: "2026-05-12T12:00:02.000Z",
+          payload: {
+            type: "exec_command_end",
+            call_id: "call_exec",
+            cwd: "/workspace/codex",
+            exit_code: 0,
+            duration: { secs: 1, nanos: 250000000 },
+            status: "completed",
+          },
+        }),
+      ].join("\n")}\n`,
+    );
+
+    runIncrementalIndexing({
+      dbPath,
+      discoveryConfig: createDiscoveryConfig(dir),
+      enabledProviders: ["codex"],
+    });
+
+    appendFileSync(
+      sessionFile,
+      `${JSON.stringify({
+        type: "response_item",
+        timestamp: "2026-05-12T12:00:03.000Z",
+        payload: {
+          type: "function_call_output",
+          call_id: "call_exec",
+          output: "ok",
+        },
+      })}\n`,
+    );
+    const appended = new Date("2026-05-12T12:00:04.000Z");
+    utimesSync(sessionFile, appended, appended);
+
+    runIncrementalIndexing({
+      dbPath,
+      discoveryConfig: createDiscoveryConfig(dir),
+      enabledProviders: ["codex"],
+    });
+
+    const db = openDatabase(dbPath);
+    try {
+      const output = db
+        .prepare(
+          `SELECT operation_duration_ms, operation_duration_source, operation_duration_confidence
+           FROM messages
+           WHERE source_id = 'call_exec:function_call_output'`,
+        )
+        .get() as {
+        operation_duration_ms: number;
+        operation_duration_source: string;
+        operation_duration_confidence: string;
+      };
+      expect(output.operation_duration_ms).toBe(1250);
+      expect(output.operation_duration_source).toBe("native");
+      expect(output.operation_duration_confidence).toBe("high");
     } finally {
       db.close();
       rmSync(dir, { recursive: true, force: true });

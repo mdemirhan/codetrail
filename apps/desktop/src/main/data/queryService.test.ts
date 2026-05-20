@@ -1272,6 +1272,142 @@ describe("queryService in-memory", () => {
     ]);
   });
 
+  it("uses the first real user message when a persisted Codex turn group starts with system context", () => {
+    const db = createInMemoryDatabase();
+    const now = "2026-03-01T10:00:00.000Z";
+
+    db.prepare(
+      `INSERT INTO projects (id, provider, name, path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run("project_1", "codex", "Project One", "/workspace/project-one", now, now);
+
+    db.prepare(
+      `INSERT INTO sessions (
+        id,
+        project_id,
+        provider,
+        file_path,
+        model_names,
+        started_at,
+        ended_at,
+        duration_ms,
+        git_branch,
+        cwd,
+        message_count,
+        token_input_total,
+        token_output_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "session_1",
+      "project_1",
+      "codex",
+      "/workspace/project-one/session-1.jsonl",
+      "gpt-5.4",
+      "2026-03-01T10:00:00.000Z",
+      "2026-03-01T10:00:03.000Z",
+      3000,
+      "main",
+      "/workspace/project-one",
+      3,
+      0,
+      0,
+    );
+
+    const insertMessage = db.prepare(
+      `INSERT INTO messages (
+        id,
+        source_id,
+        session_id,
+        provider,
+        category,
+        content,
+        created_at,
+        token_input,
+        token_output,
+        operation_duration_ms,
+        operation_duration_source,
+        operation_duration_confidence,
+        turn_group_id,
+        turn_grouping_mode,
+        turn_anchor_kind,
+        native_turn_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    insertMessage.run(
+      "message_context",
+      "source_context",
+      "session_1",
+      "codex",
+      "system",
+      "<environment_context>",
+      "2026-03-01T10:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+      "source_context",
+      "hybrid",
+      "user_prompt",
+      "native-turn-1",
+    );
+    insertMessage.run(
+      "message_user",
+      "source_user",
+      "session_1",
+      "codex",
+      "user",
+      "Real prompt",
+      "2026-03-01T10:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+      "source_context",
+      "hybrid",
+      "user_prompt",
+      "native-turn-1",
+    );
+    insertMessage.run(
+      "message_assistant",
+      "source_assistant",
+      "session_1",
+      "codex",
+      "assistant",
+      "Answer",
+      "2026-03-01T10:00:01.000Z",
+      null,
+      null,
+      null,
+      null,
+      null,
+      "source_context",
+      "hybrid",
+      null,
+      "native-turn-1",
+    );
+
+    const service = createQueryServiceFromDb(db);
+    const turn = service.getSessionTurn({
+      scopeMode: "session",
+      sessionId: "session_1",
+      latest: true,
+      query: "",
+      sortDirection: "asc",
+    });
+
+    expect(turn.anchorMessageId).toBe("message_user");
+    expect(turn.anchorMessage?.category).toBe("user");
+    expect(turn.categoryCounts.user).toBe(1);
+    expect(turn.messages.map((message) => message.id)).toEqual([
+      "message_context",
+      "message_user",
+      "message_assistant",
+    ]);
+  });
+
   it("uses persisted turn_group_id for bookmark-scoped turns", () => {
     const db = createInMemoryDatabase();
     const now = "2026-03-01T10:00:00.000Z";

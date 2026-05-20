@@ -343,7 +343,6 @@ describe("DashboardView", () => {
     renderWithPaneFocus(<DashboardView stats={statsFixture} error={null} />);
 
     expect(screen.getByRole("heading", { name: "Activity Dashboard" })).toBeInTheDocument();
-    expect(screen.getByText("Workspace telemetry")).toBeInTheDocument();
     expect(screen.getByText("AI Code Activity")).toBeInTheDocument();
     expect(screen.getByText("Write Velocity")).toBeInTheDocument();
     expect(screen.getByText("Change Profile")).toBeInTheDocument();
